@@ -1,7 +1,7 @@
 import pytest
 
 import zigpy_znp.types as t
-import zigpy_znp.types.frames as frames
+import zigpy_znp.api.frames as frames
 
 
 def test_general_frame():
