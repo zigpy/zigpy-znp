@@ -41,13 +41,13 @@ class Subsystem(t.uint8_t, enum.Enum):
     """Command sybsystem."""
     RPC = 0
     SYS = 1
-    RESERVED_2 = 2
-    RESERVED_3 = 3
+    MAC = 2
+    NWK = 3
     AF = 4
     ZDO = 5
-    API = 6
+    SAPI = 6
     UTIL = 7
-    RESERVED_8 = 8
+    DEBUG = 8
     APP = 9
     RESERVED_10 = 10
     RESERVED_11 = 11
@@ -74,11 +74,11 @@ class Subsystem(t.uint8_t, enum.Enum):
 
 
 @attr.s
-class Command(basic.uint16_t):
+class Command(t.Struct):
     """Command class."""
 
-    cmd0 = attr.ib(factory=t.uint8_t, type=t.uint8_t, converted=t.uint8_t)
-    id = attr.ib(factory=t.uint8_t, type=t.uint8_t, converted=t.uint8_t)
+    cmd0 = attr.ib(factory=t.uint8_t, type=t.uint8_t, converter=t.uint8_t)
+    id = attr.ib(factory=t.uint8_t, type=t.uint8_t, converter=t.uint8_t)
 
     @property
     def subsystem(self) -> t.uint8_t:

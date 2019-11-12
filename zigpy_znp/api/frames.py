@@ -9,9 +9,9 @@ from zigpy_znp.types import struct as struct_t
 
 @attr.s
 class GeneralFrame(struct_t.Struct):
-    length = attr.ib(factory=t.uint8_t, type=t.uint8_t, converter=t.uint8_t)
-    command = attr.ib(factory=Command, type=Command, converter=Command)
-    data = attr.ib(factory=t.Bytes, type=t.Bytes, converter=t.Bytes)
+    length = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+    command = attr.ib(type=Command, converter=Command)
+    data = attr.ib(type=t.Bytes, converter=t.Bytes)
 
     @classmethod
     def deserialize(cls, payload):
