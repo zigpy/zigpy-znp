@@ -9,30 +9,33 @@ from zigpy_znp.types import struct as struct_t
 
 @attr.s
 class GeneralFrame(struct_t.Struct):
-    length = attr.ib(type=t.uint8_t, converter=t.uint8_t)
-    command = attr.ib(type=Command, converter=Command)
-    data = attr.ib(type=t.Bytes, converter=t.Bytes)
+    command = attr.ib(type=Command)
+    data = attr.ib(factory=t.Bytes, type=t.Bytes, converter=t.Bytes)
+
+    @property
+    def length(self) -> t.uint8_t:
+        """Length of the frame."""
+        return t.uint8_t(len(self.data))
 
     @classmethod
-    def deserialize(cls, payload):
+    def deserialize(cls, data):
         """Deserialize frame and sanity checks."""
-        length, payload = t.uint8_t.deserialize(payload)
-        if length > 250 or len(payload) < length + 2:
-            raise ValueError(f"Invalid data: {payload}")
-        cmd, payload = Command.deserialize(payload)
-        payload, data = payload[:length], payload[length:]
-        return cls(length, cmd, payload), data
+        length, data = t.uint8_t.deserialize(data)
+        if length > 250 or len(data) < length + 2:
+            raise ValueError(f"Data is too short for {cls.__name__}")
+        cmd, data = Command.deserialize(data)
+        payload, data = data[:length], data[length:]
+        return cls(cmd, payload), data
 
     @data.validator
     def data_validator(self, attribute, value):
         """Len of data should not exceed 250 bytes."""
         if len(value) > 250:
-            raise ValueError(f"Invalid data length: {len(value)}")
+            raise ValueError(f"data length: {len(value)} exceeds max 250")
 
     def serialize(self):
         """Serialize Frame."""
-        self.length = t.uint8_t(len(self.data))
-        return super().serialize()
+        return self.length.serialize() + super().serialize()
 
 
 @attr.s
@@ -40,22 +43,30 @@ class TransportFrame(struct_t.Struct):
     """Transport frame."""
     SOF = t.uint8_t(0xFE)
 
-    sof = attr.ib(default=SOF, type=t.uint8_t, converter=t.uint8_t)
-    frame = attr.ib(factory=GeneralFrame, type=GeneralFrame, converter=GeneralFrame)
-    fcs = attr.ib(factory=t.uint8_t, type=t.uint8_t, converter=t.uint8_t)
+    frame = attr.ib(type=GeneralFrame)
 
-    def get_fcs(self):
-        """Calculate FCS on the payload."""
-        fcs = functools.reduce(lambda a, b: a ^ b, self.frame)
-        return t.uint8_t(fcs)
+    @classmethod
+    def deserialize(cls, data: bytes):
+        """Deserialize frame."""
+        sof, data = t.uint8_t.deserialize(data)
+        if sof != cls.SOF:
+            raise ValueError("deserialization error: invalid sof")
+        gen_frame, data = GeneralFrame.deserialize(data)
+        t_frame = cls(gen_frame)
+        fcs, data = t.uint8_t.deserialize(data)
+        if fcs != t_frame.fcs:
+            raise ValueError((f"deserialization error: frame 0x{fcs:02x},"
+                              f" calculated fcs 0x{t_frame.fcs:02x}"))
+        return t_frame, data
 
     @property
-    def is_valid(self):
-        """Return True if frames passes sanity check."""
-        return self.sof == self.SOF and self.fcs == self.get_fcs()
+    def fcs(self):
+        """Calculate FCS on the payload."""
+        fcs = functools.reduce(lambda a, b: a ^ b, self.frame.serialize())
+        return t.uint8_t(fcs)
 
     def serialize(self):
         """Serialize data."""
-        return self.SOF.serialize() + self.frame.serialize() + self.get_fcs().serialize()
+        return self.SOF.serialize() + self.frame.serialize() + self.fcs.serialize()
 
 

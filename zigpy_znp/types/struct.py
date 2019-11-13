@@ -26,3 +26,12 @@ class Struct:
         """Return tuple of fields values."""
         names = (f.name for f in attr.fields(self.__class__))
         return (getattr(self, n) for n in names)
+
+    @staticmethod
+    def converter(_type):
+        """Pass through converter."""
+        def converter(input):
+            if isinstance(input, _type):
+                return input
+            return _type(*input)
+        return converter

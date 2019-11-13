@@ -14,6 +14,30 @@ def test_command():
     assert r.cmd0 == 0x02
 
 
+def test_command_subsystem():
+    """Test subsystem setter."""
+    # setting subsystem shouldn't change type
+    command = cmds.Command(0xff, 0xff)
+    for cmd_type in cmds.CommandType:
+        command.type = cmd_type
+        for subsys in cmds.Subsystem:
+            command.subsystem = subsys
+            assert command.subsystem == subsys
+            assert command.type == cmd_type
+
+
+def test_command_type():
+    """Test subsystem setter."""
+    # setting type shouldn't change subsystem
+    command = cmds.Command(0xff, 0xff)
+    for subsys in cmds.Subsystem:
+        command.subsystem = subsys
+        for cmd_type in cmds.CommandType:
+            command.type = cmd_type
+            assert command.subsystem == subsys
+            assert command.type == cmd_type
+
+
 def test_error_code():
     data = b"\x03"
     extra = b"the rest of the owl\x00\xff"

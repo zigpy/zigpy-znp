@@ -10,11 +10,11 @@ def test_general_frame():
     length = t.uint8_t(len(data)).serialize()
     cmd = commands.Command(0x61, 0x01)
 
-    frame = frames.GeneralFrame(0, cmd, data)
-    assert frame.serialize() == length + b"\x23\x00" + data
+    frame = frames.GeneralFrame(cmd, data)
+    assert frame.serialize() == length + b"\x61\x01" + data
 
     with pytest.raises(ValueError):
-        frames.GeneralFrame(0, 0, b"\x00" * 251)
+        frames.GeneralFrame(0, b"\x00" * 251)
 
     extra = b"the rest of the owl\x00\x00"
     r, rest = frames.GeneralFrame.deserialize(length + b"\x23\x00" + data + extra)
@@ -43,11 +43,13 @@ def test_transport_frame():
 
     r, rest = frames.TransportFrame.deserialize(sof + payload + fcs + extra)
     assert rest == extra
-    assert r.sof == frames.TransportFrame.SOF
-    assert r.is_valid() is True
+    assert r.serialize() == sof + payload + fcs
 
+    # bad FCS
+    with pytest.raises(ValueError):
+        frames.TransportFrame.deserialize(sof + payload + bad_fcs + extra)
 
-def test_gen_frame():
-    data = b'\x02a\x01\x11\x00sthe rest of the owl\x00\xaaU\xff'
-    r, rest = frames.GeneralFrame.deserialize(data)
-    assert r is not None
+    # wrong SOF
+    with pytest.raises(ValueError):
+        frames.TransportFrame.deserialize(bad_sof + payload + fcs + extra)
+

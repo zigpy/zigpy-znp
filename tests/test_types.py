@@ -67,3 +67,24 @@ def test_struct_deserialize_nested():
     assert isinstance(r.field_2, TS)
     assert r.field_2.field_1 == 0xAA
     assert r.field_2.field_2 == list(range(8))
+
+
+def test_struct_converter():
+    @attr.s
+    class Cmd(t.Struct):
+        id_0 = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+        id_1 = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+
+    @attr.s
+    class Nested(t.Struct):
+        cmd = attr.ib(type=Cmd, converter=t.Struct.converter(Cmd))
+
+    c = Cmd(2, 3)
+    nstd = Nested(c)
+    assert nstd.cmd.id_0 == 2
+    assert nstd.cmd.id_1 == 3
+
+    test_2 = Nested((4, 5))
+    assert test_2.cmd.id_0 == 4
+    assert test_2.cmd.id_1 == 5
+
