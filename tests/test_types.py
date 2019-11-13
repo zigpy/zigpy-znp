@@ -88,3 +88,20 @@ def test_struct_converter():
     assert test_2.cmd.id_0 == 4
     assert test_2.cmd.id_1 == 5
 
+
+def test_struct_converter_2():
+    @attr.s
+    class Cmd(t.Struct):
+        id_0 = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+
+    @attr.s
+    class Nested(t.Struct):
+        cmd = attr.ib(type=Cmd, converter=t.Struct.converter(Cmd))
+
+    c = Cmd(2)
+    nstd = Nested(c)
+    assert nstd.cmd.id_0 == 2
+
+    test_2 = Nested(4)
+    assert test_2.cmd.id_0 == 4
+

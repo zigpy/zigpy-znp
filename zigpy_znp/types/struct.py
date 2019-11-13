@@ -33,5 +33,8 @@ class Struct:
         def converter(input):
             if isinstance(input, _type):
                 return input
-            return _type(*input)
+            try:
+                return _type(*input)
+            except TypeError:
+                return _type(input)
         return converter

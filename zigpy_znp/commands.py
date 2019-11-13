@@ -77,8 +77,22 @@ class Subsystem(t.uint8_t, enum.Enum):
 class Command(t.Struct):
     """Command class."""
 
-    cmd0 = attr.ib(type=t.uint8_t, converter=t.uint8_t)
-    id = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+    cmd = attr.ib(type=t.uint16_t, converter=t.uint16_t)
+
+    @property
+    def cmd0(self) -> t.uint8_t:
+        """Cmd0 of the command."""
+        return t.uint8_t(self.cmd & 0x00FF)
+
+    @property
+    def id(self) -> t.uint8_t:
+        """Return Command id."""
+        return t.uint8_t(self.cmd >> 8)
+
+    @id.setter
+    def id(self, value: int) -> None:
+        """command ID setter."""
+        self.cmd = t.uint16_t(self.cmd & 0xFF00 | value & 0xFF << 8)
 
     @property
     def subsystem(self) -> t.uint8_t:
@@ -88,7 +102,7 @@ class Command(t.Struct):
     @subsystem.setter
     def subsystem(self, value: int) -> None:
         """Subsystem setter."""
-        self.cmd0 = t.uint8_t(self.cmd0 & 0b11100000 | (value & 0x1F))
+        self.cmd = self.cmd & 0xFFE0 | value & 0x1F
 
     @property
     def type(self) -> t.uint8_t:
@@ -98,4 +112,4 @@ class Command(t.Struct):
     @type.setter
     def type(self, value) -> None:
         """Type setter."""
-        self.cmd0 = t.uint8_t(self.cmd0 & 0b00011111 | (value & 0x07) << 5)
+        self.cmd = self.cmd & 0xFF1F | (value & 0x07) << 5

@@ -9,7 +9,7 @@ from zigpy_znp.types import struct as struct_t
 
 @attr.s
 class GeneralFrame(struct_t.Struct):
-    command = attr.ib(type=Command)
+    command = attr.ib(type=Command, converter=struct_t.Struct.converter(Command))
     data = attr.ib(factory=t.Bytes, type=t.Bytes, converter=t.Bytes)
 
     @property
@@ -43,7 +43,7 @@ class TransportFrame(struct_t.Struct):
     """Transport frame."""
     SOF = t.uint8_t(0xFE)
 
-    frame = attr.ib(type=GeneralFrame)
+    frame = attr.ib(type=GeneralFrame, converter=struct_t.Struct.converter(GeneralFrame))
 
     @classmethod
     def deserialize(cls, data: bytes):

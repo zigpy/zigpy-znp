@@ -8,7 +8,7 @@ import zigpy_znp.types as t
 def test_general_frame():
     data = b"\xaa\55\xccdata goes in here\x00\x00"
     length = t.uint8_t(len(data)).serialize()
-    cmd = commands.Command(0x61, 0x01)
+    cmd = commands.Command(0x0161)
 
     frame = frames.GeneralFrame(cmd, data)
     assert frame.serialize() == length + b"\x61\x01" + data
