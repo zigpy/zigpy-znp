@@ -4,7 +4,6 @@ import enum
 import attr
 
 import zigpy_znp.types as t
-from zigpy_znp.types import basic
 
 
 class CommandType(enum.IntEnum):
@@ -113,3 +112,11 @@ class Command(t.Struct):
     def type(self, value) -> None:
         """Type setter."""
         self.cmd = self.cmd & 0xFF1F | (value & 0x07) << 5
+
+
+@attr.s
+class CommandDef:
+    command_type: CommandType = attr.ib(converter=CommandType)
+    command_id: t.uint8_t = attr.ib(converter=t.uint8_t)
+    schema: t.Schema = attr.ib()
+
