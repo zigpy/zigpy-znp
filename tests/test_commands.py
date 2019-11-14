@@ -14,6 +14,14 @@ def test_command():
     assert r.cmd0 == 0x61
     assert r.id == 0x02
 
+    r.id = 0xFF
+    assert r.id == 0xFF
+    assert r.cmd0 == 0x61
+
+    r.id = 0x00
+    assert r.id == 0x00
+    assert r.cmd0 == 0x61
+
 
 def test_command_subsystem():
     """Test subsystem setter."""

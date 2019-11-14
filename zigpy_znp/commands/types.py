@@ -93,7 +93,7 @@ class Command(t.Struct):
     @id.setter
     def id(self, value: int) -> None:
         """command ID setter."""
-        self.cmd = t.uint16_t(self.cmd & 0xFF00 | value & 0xFF << 8)
+        self.cmd = t.uint16_t(self.cmd & 0x00FF | (value & 0xFF) << 8)
 
     @property
     def subsystem(self) -> t.uint8_t:
