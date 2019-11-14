@@ -8,11 +8,12 @@ import zigpy_znp.types as t
 
 class CommandType(enum.IntEnum):
     """Command Type."""
+
     POLL = 0
     SREQ = 1  # A synchronous request that requires an immediate response
     AREQ = 2  # An asynchronous request
     SRSP = 3  # A synchronous response. This type of command is only sent in response to
-              # a SREQ command
+    # a SREQ command
     RESERVED_4 = 4
     RESERVED_5 = 5
     RESERVED_6 = 6
@@ -21,6 +22,7 @@ class CommandType(enum.IntEnum):
 
 class ErrorCode(t.uint8_t, enum.Enum):
     """Error code."""
+
     INVALID_SUBSYSTEM = 0x01
     INVALID_COMMAND_ID = 0x02
     INVALID_PARAMETER = 0x03
@@ -38,6 +40,7 @@ class ErrorCode(t.uint8_t, enum.Enum):
 
 class Subsystem(t.uint8_t, enum.Enum):
     """Command sybsystem."""
+
     RPC = 0
     SYS = 1
     MAC = 2
@@ -119,4 +122,3 @@ class CommandDef:
     command_type: CommandType = attr.ib(converter=CommandType)
     command_id: t.uint8_t = attr.ib(converter=t.uint8_t)
     schema: t.Schema = attr.ib()
-

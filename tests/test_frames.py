@@ -52,4 +52,3 @@ def test_transport_frame():
     # wrong SOF
     with pytest.raises(ValueError):
         frames.TransportFrame.deserialize(bad_sof + payload + fcs + extra)
-

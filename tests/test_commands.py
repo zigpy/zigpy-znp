@@ -18,7 +18,7 @@ def test_command():
 def test_command_subsystem():
     """Test subsystem setter."""
     # setting subsystem shouldn't change type
-    command = cmds.Command(0xffff)
+    command = cmds.Command(0xFFFF)
     for cmd_type in cmds.CommandType:
         command.type = cmd_type
         for subsys in cmds.Subsystem:
@@ -30,7 +30,7 @@ def test_command_subsystem():
 def test_command_type():
     """Test subsystem setter."""
     # setting type shouldn't change subsystem
-    command = cmds.Command(0xffff)
+    command = cmds.Command(0xFFFF)
     for subsys in cmds.Subsystem:
         command.subsystem = subsys
         for cmd_type in cmds.CommandType:

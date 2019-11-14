@@ -41,9 +41,12 @@ class GeneralFrame(struct_t.Struct):
 @attr.s
 class TransportFrame(struct_t.Struct):
     """Transport frame."""
+
     SOF = t.uint8_t(0xFE)
 
-    frame = attr.ib(type=GeneralFrame, converter=struct_t.Struct.converter(GeneralFrame))
+    frame = attr.ib(
+        type=GeneralFrame, converter=struct_t.Struct.converter(GeneralFrame)
+    )
 
     @classmethod
     def deserialize(cls, data: bytes):
@@ -55,8 +58,12 @@ class TransportFrame(struct_t.Struct):
         t_frame = cls(gen_frame)
         fcs, data = t.uint8_t.deserialize(data)
         if fcs != t_frame.fcs:
-            raise ValueError((f"deserialization error: frame 0x{fcs:02x},"
-                              f" calculated fcs 0x{t_frame.fcs:02x}"))
+            raise ValueError(
+                (
+                    f"deserialization error: frame 0x{fcs:02x},"
+                    f" calculated fcs 0x{t_frame.fcs:02x}"
+                )
+            )
         return t_frame, data
 
     @property
@@ -68,5 +75,3 @@ class TransportFrame(struct_t.Struct):
     def serialize(self):
         """Serialize data."""
         return self.SOF.serialize() + self.frame.serialize() + self.fcs.serialize()
-
-

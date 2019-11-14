@@ -104,4 +104,3 @@ def test_struct_converter_2():
 
     test_2 = Nested(4)
     assert test_2.cmd.id_0 == 4
-

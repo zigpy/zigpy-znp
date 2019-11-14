@@ -30,6 +30,7 @@ class Struct:
     @staticmethod
     def converter(_type):
         """Pass through converter."""
+
         def converter(input):
             if isinstance(input, _type):
                 return input
@@ -37,4 +38,5 @@ class Struct:
                 return _type(*input)
             except TypeError:
                 return _type(input)
+
         return converter
