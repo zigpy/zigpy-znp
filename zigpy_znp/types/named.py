@@ -1,7 +1,11 @@
 import attr
 import enum
+import typing
+
+from zigpy.types import EUI64, NWK
 
 from . import basic
+from . import struct
 
 
 class _EnumEq:
@@ -10,6 +14,30 @@ class _EnumEq:
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+class AddrMode(basic.uint8_t, enum.Enum):
+    """Address mode."""
+
+    NWK = 0x02
+    IEEE = 0x03
+
+
+@attr.s
+class AddrModeAddress(struct.Struct):
+    mode: AddrMode = attr.ib(converter=struct.Struct.converter(AddrMode))
+    address: typing.Union[EUI64, NWK] = attr.ib()
+
+    @classmethod
+    def deserialize(cls, data: bytes):
+        """Deserialize data."""
+        mode, data = AddrMode.deserialize(data)
+        if mode == AddrMode.NWK:
+            addr, data = basic.uint64_t.deserialize(data)
+            addr = basic.uint64_t(addr & 0xFFFF)
+        elif mode == AddrMode.IEEE:
+            addr, data = EUI64.deserialize(data)
+        return cls(mode=mode, address=addr), data
 
 
 def FakeEnum(class_name: str):
@@ -37,6 +65,8 @@ class Schema:
 class Status(basic.uint8_t, enum.Enum):
     Success = 0x00
     Failure = 0x01
+    InvalidParameter = 0x02
+    MemoryFailure = 0x10
 
     @classmethod
     def deserialize(cls, data, byteorder="little"):

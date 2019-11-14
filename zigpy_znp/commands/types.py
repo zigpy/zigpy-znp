@@ -122,3 +122,10 @@ class CommandDef:
     command_id: t.uint8_t = attr.ib(converter=t.uint8_t)
     req_schema: t.Schema = attr.ib()
     rsp_schema: t.Schema = attr.ib()
+
+
+class InterPanCommand(t.uint8_t, enum.Enum):
+    InterPanClr = 0x00
+    InterPanSet = 0x01
+    InterPanReg = 0x02
+    InterPanChk = 0x03
