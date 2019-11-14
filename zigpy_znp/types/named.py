@@ -31,7 +31,7 @@ class GroupId(basic.HexRepr, basic.uint16_t):
 class Schema:
     """List of Parameters."""
 
-    parameters = attr.ib()
+    parameters = attr.ib(factory=list, converter=list)
 
 
 class Status(basic.uint8_t, enum.Enum):
@@ -49,7 +49,7 @@ class Status(basic.uint8_t, enum.Enum):
 
 
 @attr.s
-class Parameter:
+class Param:
     """Parameter."""
 
     name = attr.ib(converter=str)

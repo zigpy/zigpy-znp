@@ -131,6 +131,32 @@ class List(list):
         return r, data
 
 
+class _LVList(List):
+    _header = uint8_t
+
+    def serialize(self):
+        assert self._itemtype is not None
+        return self._header(len(self)) + super().serialize()
+
+    @classmethod
+    def deserialize(cls, data):
+        assert cls._itemtype is not None
+        length, data = cls._header.deserialize(data)
+        r = cls()
+        for i in range(length):
+            item, data = cls._itemtype.deserialize(data)
+            r.append(item)
+        return r, data
+
+
+def LVList(itemtype, headertype=uint8_t):
+    class LVList(_LVList):
+        _header = headertype
+        _itemtype = itemtype
+
+    return LVList
+
+
 class FixedList(List):
     _length = None
     _itemtype = None

@@ -120,4 +120,5 @@ class Command(t.Struct):
 class CommandDef:
     command_type: CommandType = attr.ib(converter=CommandType)
     command_id: t.uint8_t = attr.ib(converter=t.uint8_t)
-    schema: t.Schema = attr.ib()
+    req_schema: t.Schema = attr.ib()
+    rsp_schema: t.Schema = attr.ib()
