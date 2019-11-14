@@ -1,7 +1,5 @@
 import attr
 
-from unittest import mock
-
 import zigpy_znp.types as t
 
 
@@ -106,12 +104,3 @@ def test_struct_converter_2():
 
     test_2 = Nested(4)
     assert test_2.cmd.id_0 == 4
-
-
-def test_fake_enum():
-    """Test fake enum."""
-
-    fake_enum = t.FakeEnum("test_enum")
-    r = fake_enum("test_member", mock.sentinel.value)
-    assert r == mock.sentinel.value
-    assert mock.sentinel.wrong != r

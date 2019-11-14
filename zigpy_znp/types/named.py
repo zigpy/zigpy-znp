@@ -1,4 +1,5 @@
 import attr
+import enum
 
 from . import basic
 
@@ -31,6 +32,20 @@ class Schema:
     """List of Parameters."""
 
     parameters = attr.ib()
+
+
+class Status(basic.uint8_t, enum.Enum):
+    Success = 0x00
+    Failure = 0x01
+
+    @classmethod
+    def deserialize(cls, data, byteorder="little"):
+        try:
+            return super().deserialize(data, byteorder)
+        except ValueError:
+            fenum = FakeEnum(cls.__name__)
+            status, data = basic.uint8_t.deserialize(data, byteorder)
+            return fenum(f"unknown_0x{status:02x}", status), data
 
 
 @attr.s
