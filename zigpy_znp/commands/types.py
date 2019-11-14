@@ -1,4 +1,3 @@
-import collections
 import enum
 
 import attr
@@ -34,7 +33,7 @@ class ErrorCode(t.uint8_t, enum.Enum):
             return super().deserialize(data, byteorder)
         except ValueError:
             code, data = t.uint8_t.deserialize(data, byteorder)
-            fake_enum = collections.namedtuple("ErrorCode", "name,value")
+            fake_enum = t.FakeEnum("ErrorCode")
             return fake_enum(f"unknown_0x{code:02x}", code), data
 
 

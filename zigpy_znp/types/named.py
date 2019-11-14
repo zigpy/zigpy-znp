@@ -3,6 +3,23 @@ import attr
 from . import basic
 
 
+class _EnumEq:
+    def __eq__(self, other):
+        return self.value == other
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+def FakeEnum(class_name: str):
+    return attr.make_class(
+        class_name,
+        {"name": attr.ib(converter=str), "value": attr.ib()},
+        bases=(_EnumEq,),
+        eq=False,
+    )
+
+
 class GroupId(basic.HexRepr, basic.uint16_t):
     """"Group ID class"""
 
