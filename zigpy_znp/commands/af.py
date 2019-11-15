@@ -5,6 +5,7 @@ import zigpy_znp.types as t
 
 
 class AFCommands(enum.Enum):
+    # This command enables the tester to register an application’s endpoint description
     Register = CommandDef(
         CommandType.SREQ,
         0x00,
@@ -35,6 +36,7 @@ class AFCommands(enum.Enum):
         ),
     )
 
+    # This command is used by the tester to build and send a message through AF layer
     DataRequest = CommandDef(
         CommandType.SREQ,
         0x01,
@@ -72,6 +74,8 @@ class AFCommands(enum.Enum):
         ),
     )
 
+    # This extended form of the AF_DATA_REQUEST must be used to send an
+    # inter-pan message
     DataRequestExt = CommandDef(
         CommandType.SREQ,
         0x02,
@@ -121,6 +125,8 @@ class AFCommands(enum.Enum):
         ),
     )
 
+    # This command is used by the tester to build and send a message through AF layer
+    # using source routing
     DataRequestSrcRtg = CommandDef(
         CommandType.SREQ,
         0x03,
@@ -159,6 +165,7 @@ class AFCommands(enum.Enum):
         ),
     )
 
+    # Inter-Pan control command and data
     InterPanCtl = CommandDef(
         CommandType.SREQ,
         0x10,
@@ -191,6 +198,7 @@ class AFCommands(enum.Enum):
         ),
     )
 
+    # Huge AF data request data buffer store command and data
     DataStore = CommandDef(
         CommandType.SREQ,
         0x11,
@@ -216,15 +224,115 @@ class AFCommands(enum.Enum):
         ),
     )
 
-    DataRequestSrcRtg = CommandDef(
+    # Huge AF incoming message data buffer retrieve command
+    DataRetrieve = CommandDef(
         CommandType.SREQ,
-        0x03,
-        req_schema=t.Schema(()),
+        0x12,
+        req_schema=t.Schema(
+            (
+                t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
+                t.Param(
+                    "Index",
+                    t.uint16_t,
+                    (
+                        "Specifies the index into the outgoing data request data buffer"
+                        "to start the storing of this chunk of data"
+                    ),
+                ),
+                t.Param(
+                    "Length",
+                    t.uint8_t,
+                    (
+                        "A length of zero is special and triggers the freeing of the "
+                        "corresponding incoming message"
+                    ),
+                ),
+            )
+        ),
         rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
+                t.Param("YData", t.LVBytes, "Data"),
             )
         ),
+    )
+
+    # This command is sent by the device to the user after it receives a data request
+    DataConfirm = CommandDef(
+        CommandType.AREQ,
+        0x80,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                ),
+                t.Param("Endpoint", t.uint8_t, "Endpoint of the device"),
+                t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
+            )
+        ),
+        rsp_schema=t.Schema(()),
+    )
+
+    # This callback message is in response to incoming data to any of the registered
+    # endpoints on this device
+    IncomingMsg = CommandDef(
+        CommandType.AREQ,
+        0x81,
+        req_schema=t.Schema(
+            (
+                t.Param("GroupId", t.GroupId, "The group ID of the device"),
+                t.Param("ClusterId", t.ClusterId, "Cluster ID"),
+                t.Param(
+                    "SrcAddr", t.NWK, "Short address of the device sending the message"
+                ),
+                t.Param("SrcEndpoint", t.uint8_t, "Endpoint of the source device"),
+                t.Param("DstEndpoint", t.uint8_t, "Endpoint of the destination device"),
+                t.Param(
+                    "WasBroadcast",
+                    t.uint8_t,
+                    "Was the incoming message broadcast or not",
+                ),
+                t.Param("LQI", t.uint8_t, "Link quality measured during reception"),
+                t.Param("SecurityUse", t.uint8_t, "Is security in use or not"),
+                t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
+                t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
+                t.Param("Data", t.LVBytes, "Data"),
+            )
+        ),
+        rsp_schema=t.Schema(()),
+    )
+
+    # This callback message is in response to incoming data to any of the registered
+    # endpoints on this device when the code is compiled with the INTER_PAN
+    # flag defined
+    IncomingMsgExt = CommandDef(
+        CommandType.AREQ,
+        0x82,
+        req_schema=t.Schema(
+            (
+                t.Param("GroupId", t.GroupId, "The group ID of the device"),
+                t.Param("ClusterId", t.ClusterId, "Cluster ID"),
+                t.Param(
+                    "SrcAddrModeAddress",
+                    t.AddrModeAddress,
+                    "Address of the device sending the message",
+                ),
+                t.Param("SrcEndpoint", t.uint8_t, "Endpoint of the source device"),
+                t.Param("SrcPanId", t.PanId, "Source PanId of the message"),
+                t.Param("DstEndpoint", t.uint8_t, "Endpoint of the destination device"),
+                t.Param(
+                    "WasBroadcast",
+                    t.uint8_t,
+                    "Was the incoming message broadcast or not",
+                ),
+                t.Param("LQI", t.uint8_t, "Link quality measured during reception"),
+                t.Param("SecurityUse", t.uint8_t, "Is security in use or not"),
+                t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
+                t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
+                t.Param("Data", t.LVBytes, "Data"),
+            )
+        ),
+        rsp_schema=t.Schema(()),
     )
