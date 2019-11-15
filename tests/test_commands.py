@@ -1,4 +1,6 @@
 import zigpy_znp.commands as cmds
+import zigpy_znp.commands.af as af_commands
+import zigpy_znp.commands.app as app_commands
 
 
 def test_command():
@@ -59,3 +61,24 @@ def test_error_code():
     r, rest = cmds.ErrorCode.deserialize(b"\xaa" + extra)
     assert rest == extra
     assert r.name == "unknown_0xaa"
+
+
+def _validate_schema(schema):
+    for param in schema.parameters:
+        assert isinstance(param.name, str)
+        assert isinstance(param.type, type)
+        assert isinstance(param.description, str)
+
+
+def _test_commands(commands):
+    for command in commands:
+        command = command.value
+        assert command.command_type in (cmds.CommandType.AREQ, cmds.CommandType.SREQ)
+        assert isinstance(command.command_id, int)
+        _validate_schema(command.req_schema)
+        _validate_schema(command.rsp_schema)
+
+
+def test_commands_schema():
+    for commands in (af_commands.AFCommands, app_commands.APPCommands):
+        _test_commands(commands)
