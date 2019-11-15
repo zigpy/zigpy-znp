@@ -19,8 +19,11 @@ class _EnumEq:
 class AddrMode(basic.uint8_t, enum.Enum):
     """Address mode."""
 
+    NOT_PRESENT = 0x00
+    Group = 0x01
     NWK = 0x02
     IEEE = 0x03
+    Broadcast = 0xFF
 
 
 @attr.s
@@ -78,6 +81,13 @@ class GroupId(basic.HexRepr, basic.uint16_t):
     pass
 
 
+class ScanType(basic.enum_uint8, enum.IntEnum):
+    EnergyDetect = 0x00
+    Active = 0x01
+    Passive = 0x02
+    Orphan = 0x03
+
+
 @attr.s
 class Schema:
     """List of Parameters."""
@@ -108,3 +118,8 @@ class Param:
     name = attr.ib(converter=str)
     type = attr.ib()
     description = attr.ib(default="")
+
+
+class KeySource(basic.FixedList):
+    _length = 8
+    _itemtype = basic.uint8_t

@@ -118,8 +118,8 @@ class Command(t.Struct):
 
 @attr.s
 class CommandDef:
-    command_type: CommandType = attr.ib(converter=CommandType)
-    command_id: t.uint8_t = attr.ib(converter=t.uint8_t)
+    command_type: CommandType = attr.ib()
+    command_id: int = attr.ib()
     req_schema: t.Schema = attr.ib()
     rsp_schema: t.Schema = attr.ib()
 
@@ -129,3 +129,8 @@ class InterPanCommand(t.uint8_t, enum.Enum):
     InterPanSet = 0x01
     InterPanReg = 0x02
     InterPanChk = 0x03
+
+
+STATUS_SCHEMA = t.Schema(
+    (t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),)
+)
