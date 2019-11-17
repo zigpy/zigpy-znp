@@ -177,3 +177,45 @@ class HexRepr:
 
     def __str__(self):
         return ("0x{:0" + str(self._size * 2) + "x}").format(self)
+
+
+class enum_uint8:
+    _type = uint8_t
+
+    def serialize(self):
+        """Serialize enum."""
+        return self._type(self.value).serialize()
+
+    @classmethod
+    def deserialize(cls, data: bytes, byteorder: str = "little") -> (bytes, bytes):
+        """Deserialize data."""
+        val, data = cls._type.deserialize(data, byteorder)
+        return cls(val), data
+
+
+class enum_uint16(enum_uint8):
+    _type = uint16_t
+
+
+class enum_uint24(enum_uint8):
+    _type = uint24_t
+
+
+class enum_uint32(enum_uint8):
+    _type = uint32_t
+
+
+class enum_uint40(enum_uint8):
+    _type = uint40_t
+
+
+class enum_uint48(enum_uint8):
+    _type = uint48_t
+
+
+class enum_uint56(enum_uint8):
+    _type = uint56_t
+
+
+class enum_uint64(enum_uint8):
+    _type = uint64_t
