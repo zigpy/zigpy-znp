@@ -1,6 +1,11 @@
 import enum
 
-from zigpy_znp.commands.types import CommandDef, CommandType, InterPanCommand
+from zigpy_znp.commands.types import (
+    CommandDef,
+    CommandType,
+    InterPanCommand,
+    STATUS_SCHEMA,
+)
 import zigpy_znp.types as t
 
 
@@ -27,13 +32,7 @@ class AFCommands(enum.Enum):
                 t.Param("OutputClusters", t.LVList(t.ClusterId), "Output cluster list"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # This command is used by the tester to build and send a message through AF layer
@@ -65,13 +64,7 @@ class AFCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Data request"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # This extended form of the AF_DATA_REQUEST must be used to send an
@@ -116,13 +109,7 @@ class AFCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Data request"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # This command is used by the tester to build and send a message through AF layer
@@ -156,13 +143,7 @@ class AFCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Data request"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # Inter-Pan control command and data
@@ -189,13 +170,7 @@ class AFCommands(enum.Enum):
                 t.Param("Data", t.Bytes, "Data"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # Huge AF data request data buffer store command and data
@@ -215,13 +190,7 @@ class AFCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Data"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # Huge AF incoming message data buffer retrieve command
@@ -249,14 +218,7 @@ class AFCommands(enum.Enum):
                 ),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("YData", t.LVBytes, "Data"),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # This command is sent by the device to the user after it receives a data request
@@ -272,7 +234,6 @@ class AFCommands(enum.Enum):
                 t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # This callback message is in response to incoming data to any of the registered
@@ -301,7 +262,6 @@ class AFCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Data"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # This callback message is in response to incoming data to any of the registered
@@ -334,5 +294,4 @@ class AFCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Data"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )

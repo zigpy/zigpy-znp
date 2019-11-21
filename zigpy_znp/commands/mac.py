@@ -18,28 +18,11 @@ class MacCommands(enum.Enum):
                 ),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # initialize the MAC
-    Init = CommandDef(
-        CommandType.SREQ,
-        0x02,
-        req_schema=t.Schema(()),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
-    )
+    Init = CommandDef(CommandType.SREQ, 0x02, rsp_schema=STATUS_SCHEMA)
 
     # start the MAC as a coordinator or end device
     StartReq = CommandDef(
@@ -111,13 +94,7 @@ class MacCommands(enum.Enum):
                 t.Param("BeaconKeyIndex", t.uint8_t, "Key index of this data frame"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # request synchronization to the current network beacon
@@ -139,13 +116,7 @@ class MacCommands(enum.Enum):
                 ),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # send (on behalf of the next higher layer) MAC Data Frame packet
@@ -181,13 +152,7 @@ class MacCommands(enum.Enum):
                 t.Param("MSDU", t.LVBytes, "Actual data that will be sent"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # request (on behalf of the next higher layer) an association with a coordinator
@@ -216,13 +181,7 @@ class MacCommands(enum.Enum):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # This command is sent by the host to response to the MAC_ASSOCIATE_IND
@@ -490,7 +449,6 @@ class MacCommands(enum.Enum):
     SrcMatchCheckAllPending = CommandDef(
         CommandType.SREQ,
         0x15,
-        req_schema=t.Schema(()),
         rsp_schema=t.Schema(
             (
                 t.Param(
@@ -535,7 +493,6 @@ class MacCommands(enum.Enum):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) an association indication message
@@ -558,7 +515,6 @@ class MacCommands(enum.Enum):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) an association confirmation message
@@ -581,7 +537,6 @@ class MacCommands(enum.Enum):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC beacon notify indication
@@ -623,7 +578,6 @@ class MacCommands(enum.Enum):
                 t.Param("NSDU", t.LVBytes, "Beacon payload"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC data confirmation
@@ -670,7 +624,6 @@ class MacCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Actual data that will be sent"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC disassociation indication
@@ -694,7 +647,6 @@ class MacCommands(enum.Enum):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC disassociate confirm
@@ -714,7 +666,6 @@ class MacCommands(enum.Enum):
                 t.Param("PanId", t.PanId, "The PAN Id of the device"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC orphan indication
@@ -734,7 +685,6 @@ class MacCommands(enum.Enum):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC poll confirmation
@@ -765,7 +715,6 @@ class MacCommands(enum.Enum):
                 t.Param("ResultList", t.LVBytes, "Result list"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC communication indicator
@@ -793,7 +742,6 @@ class MacCommands(enum.Enum):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC start confirmation
@@ -818,5 +766,4 @@ class MacCommands(enum.Enum):
                 t.Param("Handle", t.uint8_t, "Handle of the message"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )

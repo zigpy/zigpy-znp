@@ -92,7 +92,7 @@ class ScanType(basic.enum_uint8, enum.IntEnum):
 class Schema:
     """List of Parameters."""
 
-    parameters = attr.ib(factory=list, converter=list)
+    parameters = attr.ib(factory=tuple, converter=tuple)
 
 
 class Status(basic.uint8_t, enum.Enum):

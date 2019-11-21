@@ -120,8 +120,8 @@ class Command(t.Struct):
 class CommandDef:
     command_type: CommandType = attr.ib()
     command_id: int = attr.ib()
-    req_schema: t.Schema = attr.ib()
-    rsp_schema: t.Schema = attr.ib()
+    req_schema: t.Schema = attr.ib(factory=t.Schema)
+    rsp_schema: t.Schema = attr.ib(factory=t.Schema)
 
 
 class InterPanCommand(t.uint8_t, enum.Enum):

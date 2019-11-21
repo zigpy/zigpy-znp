@@ -1,6 +1,6 @@
 import enum
 
-from zigpy_znp.commands.types import CommandDef, CommandType
+from zigpy_znp.commands.types import CommandDef, CommandType, STATUS_SCHEMA
 import zigpy_znp.types as t
 
 
@@ -30,13 +30,7 @@ class APPCommands(enum.Enum):
                 t.Param("Data", t.LVBytes, "Data request"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # This command is used by tester to issue user’s defined commands to the
@@ -58,11 +52,5 @@ class APPCommands(enum.Enum):
                 t.Param("Parameter2", t.uint16_t, "Parameter #2 of the command"),
             )
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-            )
-        ),
+        rsp_schema=STATUS_SCHEMA,
     )
