@@ -1,7 +1,4 @@
 import zigpy_znp.commands as cmds
-import zigpy_znp.commands.af as af_commands
-import zigpy_znp.commands.app as app_commands
-import zigpy_znp.commands.mac as mac_commands
 
 
 def test_command():
@@ -82,8 +79,9 @@ def _test_commands(commands):
 
 def test_commands_schema():
     for commands in (
-        af_commands.AFCommands,
-        app_commands.APPCommands,
-        mac_commands.MacCommands,
+        cmds.af.AFCommands,
+        cmds.app.APPCommands,
+        cmds.mac.MacCommands,
+        cmds.sapi.SAPICommands,
     ):
         _test_commands(commands)
