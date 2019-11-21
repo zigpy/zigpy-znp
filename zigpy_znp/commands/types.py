@@ -131,6 +131,19 @@ class InterPanCommand(t.uint8_t, enum.Enum):
     InterPanChk = 0x03
 
 
+class MTCapabilities(t.enum_uint16, enum.IntFlag):
+    CAP_SYS = 0x0001
+    CAP_MAC = 0x0002
+    CAP_NWK = 0x0004
+    CAP_AF = 0x0008
+    CAP_ZDO = 0x0010
+    CAP_SAPI = 0x0020
+    CAP_UTIL = 0x0040
+    CAP_DEBUG = 0x0080
+    CAP_APP = 0x0100
+    CAP_ZOAD = 0x1000
+
+
 STATUS_SCHEMA = t.Schema(
     (t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),)
 )

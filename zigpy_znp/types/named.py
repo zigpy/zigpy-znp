@@ -16,6 +16,30 @@ class _EnumEq:
         return not self.__eq__(other)
 
 
+class ADCChannel(basic.enum_uint8, enum.IntEnum):
+    """The ADC channel."""
+
+    AIN0 = 0x00
+    AIN1 = 0x01
+    AIN2 = 0x02
+    AIN3 = 0x03
+    AIN4 = 0x04
+    AIN5 = 0x05
+    AIN6 = 0x06
+    AIN7 = 0x07
+    Temperature = 0x0E
+    Voltage = 0x0F
+
+
+class ADCResolution(basic.enum_uint8, enum.IntEnum):
+    """Resolution of the ADC channel."""
+
+    bits_8 = 0x00
+    bits_10 = 0x01
+    bits_12 = 0x02
+    bits_14 = 0x03
+
+
 class AddrMode(basic.uint8_t, enum.Enum):
     """Address mode."""
 
@@ -118,6 +142,12 @@ class Param:
     name = attr.ib(converter=str)
     type = attr.ib()
     description = attr.ib(default="")
+
+
+class ResetReason(basic.enum_uint8, enum.IntEnum):
+    PowerUp = 0x00
+    Externam = 0x01
+    Watchdog = 0x02
 
 
 class KeySource(basic.FixedList):
