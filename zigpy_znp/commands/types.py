@@ -37,7 +37,7 @@ class ErrorCode(t.uint8_t, enum.Enum):
             return fake_enum(f"unknown_0x{code:02x}", code), data
 
 
-class Subsystem(t.uint8_t, enum.Enum):
+class Subsystem(t.enum_uint8, enum.IntEnum):
     """Command sybsystem."""
 
     RPC = 0
@@ -72,6 +72,21 @@ class Subsystem(t.uint8_t, enum.Enum):
     RESERVED_29 = 29
     RESERVED_30 = 30
     RESERVED_31 = 31
+
+
+class CallbackSubsystem(t.enum_uint16, enum.IntEnum):
+    """Subscribe/unsubscribe subsystem callbacks."""
+
+    MT_SYS = Subsystem.SYS << 8
+    MC_MAC = Subsystem.MAC << 8
+    MT_NWK = Subsystem.NWK << 8
+    MT_AF = Subsystem.AF << 8
+    MT_ZDO = Subsystem.ZDO << 8
+    MT_SAPI = Subsystem.SAPI << 8
+    MT_UTIL = Subsystem.UTIL << 8
+    MT_DEBUG = Subsystem.DEBUG << 8
+    MT_APP = Subsystem.APP << 8
+    ALL = 0xFFFF
 
 
 @attr.s
@@ -122,6 +137,22 @@ class CommandDef:
     command_id: int = attr.ib()
     req_schema: t.Schema = attr.ib(factory=t.Schema)
     rsp_schema: t.Schema = attr.ib(factory=t.Schema)
+
+
+class DeviceState(t.enum_uint8, enum.IntEnum):
+    """Indicated device state."""
+
+    InitializedNotStarted = 0x00
+    InitializedNotConnected = 0x01
+    DiscoveringPANs = 0x02
+    Joining = 0x03
+    ReJoining = 0x04
+    JoinedNotAuthenticated = 0x05
+    JoinedAsEndDevice = 0x06
+    JoinedAsRouter = 0x07
+    StartingAsCoordinator = 0x08
+    StartedAsCoordinator = 0x09
+    LostParent = 0x0A
 
 
 class InterPanCommand(t.uint8_t, enum.Enum):

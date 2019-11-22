@@ -84,5 +84,6 @@ def test_commands_schema():
         cmds.mac.MacCommands,
         cmds.sapi.SAPICommands,
         cmds.sys.SysCommands,
+        cmds.util.UtilCommands,
     ):
         _test_commands(commands)
