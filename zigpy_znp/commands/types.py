@@ -1,8 +1,22 @@
 import enum
 
 import attr
+import zigpy.zdo.types
 
 import zigpy_znp.types as t
+
+
+@attr.s
+class BindEntry(t.Struct):
+    """Bind table entry."""
+
+    Src = attr.ib(type=t.EUI64, converter=t.Struct.converter(t.EUI64))
+    SrcEp = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+    ClusterId = attr.ib(type=t.ClusterId, converter=t.ClusterId)
+    DstAddr = attr.ib(
+        type=zigpy.zdo.types.MultiAddress,
+        converter=t.Struct.converter(zigpy.zdo.types.MultiAddress),
+    )
 
 
 class CommandType(enum.IntEnum):
@@ -173,6 +187,15 @@ class MTCapabilities(t.enum_uint16, enum.IntFlag):
     CAP_DEBUG = 0x0080
     CAP_APP = 0x0100
     CAP_ZOAD = 0x1000
+
+
+@attr.s
+class Network(t.Struct):
+    PanId = attr.ib(type=t.PanId, converter=t.Struct.converter(t.PanId))
+    Channel = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+    StackProfileVersion = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+    BeaconOrderSuperframe = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+    PermitJoining = attr.ib(type=t.uint8_t, converter=t.uint8_t)
 
 
 STATUS_SCHEMA = t.Schema(

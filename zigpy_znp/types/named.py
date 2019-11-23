@@ -123,6 +123,13 @@ class Status(basic.uint8_t, enum.Enum):
     Failure = 0x01
     InvalidParameter = 0x02
     MemoryFailure = 0x10
+    TableFull = 0x011
+    MACNoResource = 0x1A
+    InvalidRequest = 0xC2
+    UnknownDevice = 0xC8
+    ZMACInvalidParameter = 0xE8
+    ZMACNoBeacon = 0xEA
+    MACScanInProgress = 0xFC
 
     @classmethod
     def deserialize(cls, data, byteorder="little"):
