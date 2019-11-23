@@ -2,7 +2,7 @@
 
 import enum
 
-from zigpy_znp.commands.types import CommandDef, CommandType, STATUS_SCHEMA
+from zigpy_znp.commands.types import STATUS_SCHEMA, CommandDef, CommandType
 import zigpy_znp.types as t
 
 

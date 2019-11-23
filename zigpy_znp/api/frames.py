@@ -3,8 +3,7 @@ import functools
 import attr
 
 from zigpy_znp.commands import Command
-from zigpy_znp.types import basic as t
-from zigpy_znp.types import struct as struct_t
+from zigpy_znp.types import basic as t, struct as struct_t
 
 
 @attr.s

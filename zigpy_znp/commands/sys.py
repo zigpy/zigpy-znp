@@ -5,10 +5,10 @@ as reset, read/write memory, read/write extended address…etc.
 import enum
 
 from zigpy_znp.commands.types import (
+    STATUS_SCHEMA,
     CommandDef,
     CommandType,
     MTCapabilities,
-    STATUS_SCHEMA,
 )
 import zigpy_znp.types as t
 

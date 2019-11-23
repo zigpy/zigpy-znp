@@ -1,10 +1,10 @@
 import enum
 
 from zigpy_znp.commands.types import (
+    STATUS_SCHEMA,
     CommandDef,
     CommandType,
     InterPanCommand,
-    STATUS_SCHEMA,
 )
 import zigpy_znp.types as t
 

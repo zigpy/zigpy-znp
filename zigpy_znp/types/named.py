@@ -1,11 +1,10 @@
-import attr
 import enum
 import typing
 
+import attr
 from zigpy.types import EUI64, NWK
 
-from . import basic
-from . import struct
+from . import basic, struct
 
 
 class _EnumEq:
