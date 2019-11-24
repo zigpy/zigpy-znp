@@ -75,6 +75,8 @@ def _test_commands(commands):
         assert isinstance(command.command_id, int)
         _validate_schema(command.req_schema)
         _validate_schema(command.rsp_schema)
+    cmd_ids = set((cmd.value.command_id for cmd in commands))
+    assert len(cmd_ids) == len(commands)
 
 
 def test_commands_schema():
@@ -85,5 +87,6 @@ def test_commands_schema():
         cmds.sapi.SAPICommands,
         cmds.sys.SysCommands,
         cmds.util.UtilCommands,
+        cmds.zdo.ZDOCommands,
     ):
         _test_commands(commands)

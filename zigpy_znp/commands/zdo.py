@@ -528,7 +528,7 @@ class ZDOCommands(enum.Enum):
     )
 
     # remove the application link key for a given device
-    SetLinkKey = CommandDef(
+    RemoveLinkKey = CommandDef(
         CommandType.SREQ,
         0x24,
         req_schema=t.Schema(
@@ -841,7 +841,7 @@ class ZDOCommands(enum.Enum):
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
-                t.PanId("Networks", t.LVList(Network), "Discovered networks list"),
+                t.Param("Networks", t.LVList(Network), "Discovered networks list"),
             )
         ),
     )
@@ -856,7 +856,7 @@ class ZDOCommands(enum.Enum):
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
-                t.PanId("Neighbours", zigpy.zdo.types.Neighbors, "Neighbours"),
+                t.Param("Neighbours", zigpy.zdo.types.Neighbors, "Neighbours"),
             )
         ),
     )
@@ -877,7 +877,7 @@ class ZDOCommands(enum.Enum):
     )
 
     # return the results to the MgmtBingReq
-    MgmtRtgRsp = CommandDef(
+    MgmtBindRsp = CommandDef(
         CommandType.AREQ,
         0xB3,
         req_schema=t.Schema(

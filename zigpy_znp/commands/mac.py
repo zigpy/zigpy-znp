@@ -339,7 +339,7 @@ class MacCommands(enum.Enum):
     # send a request to the device to purge a data frame
     PurgeReq = CommandDef(
         CommandType.SREQ,
-        0x0D,
+        0x0E,
         req_schema=t.Schema((t.Param("MsduHandle", t.uint8_t, "MSDU handle"),)),
         rsp_schema=STATUS_SCHEMA,
     )
