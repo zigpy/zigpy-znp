@@ -136,7 +136,7 @@ class _LVList(List):
 
     def serialize(self):
         assert self._itemtype is not None
-        return self._header(len(self)) + super().serialize()
+        return self._header(len(self)).serialize() + super().serialize()
 
     @classmethod
     def deserialize(cls, data):
