@@ -27,7 +27,7 @@ class APPCommands(enum.Enum):
                     "Destination endpoint of the outgoing message",
                 ),
                 t.Param("ClusterId", t.ClusterId, "Cluster ID"),
-                t.Param("Data", t.LongBytes, "Data request"),
+                t.Param("Data", t.ShortBytes, "Data request"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,

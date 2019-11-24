@@ -61,7 +61,7 @@ class AFCommands(enum.Enum):
                     t.uint8_t,
                     "Specifies the number of hops allowed delivering the message",
                 ),
-                t.Param("Data", t.LongBytes, "Data request"),
+                t.Param("Data", t.ShortBytes, "Data request"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -140,7 +140,7 @@ class AFCommands(enum.Enum):
                     "Specifies the number of hops allowed delivering the message",
                 ),
                 t.Param("SourceRoute", t.LVList(t.NWK), "Relay list"),
-                t.Param("Data", t.LongBytes, "Data request"),
+                t.Param("Data", t.ShortBytes, "Data request"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -187,7 +187,7 @@ class AFCommands(enum.Enum):
                         "to start the storing of this chunk of data"
                     ),
                 ),
-                t.Param("Data", t.LongBytes, "Data"),
+                t.Param("Data", t.ShortBytes, "Data"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -218,7 +218,14 @@ class AFCommands(enum.Enum):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.Schema(
+            (
+                t.Param(
+                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                ),
+                t.Param("Data", t.ShortBytes, "Data"),
+            )
+        ),
     )
 
     # This command is sent by the device to the user after it receives a data request
@@ -259,7 +266,7 @@ class AFCommands(enum.Enum):
                 t.Param("SecurityUse", t.uint8_t, "Is security in use or not"),
                 t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
                 t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
-                t.Param("Data", t.LongBytes, "Data"),
+                t.Param("Data", t.ShortBytes, "Data"),
             )
         ),
     )

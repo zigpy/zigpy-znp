@@ -305,7 +305,7 @@ class UtilCommands(enum.Enum):
     ZCLKeyEstSign = CommandDef(
         CommandType.SREQ,
         0x81,
-        req_schema=t.Schema((t.Param("Input", t.LongBytes, "The input data"),)),
+        req_schema=t.Schema((t.Param("Input", t.ShortBytes, "The input data"),)),
         rsp_schema=t.Schema(
             (
                 t.Param(

@@ -90,7 +90,7 @@ class SAPICommands(enum.Enum):
                 t.Param(
                     "Radius", t.uint8_t, "The max number of hops the packet can travel"
                 ),
-                t.Param("Data", t.LongBytes, "Data"),
+                t.Param("Data", t.ShortBytes, "Data"),
             )
         ),
     )
@@ -114,7 +114,7 @@ class SAPICommands(enum.Enum):
                 t.Param(
                     "ConfigId", t.uint8_t, "ID of the configuration property to read"
                 ),
-                t.Param("Value", t.LongBytes, "Value"),
+                t.Param("Value", t.ShortBytes, "Value"),
             )
         ),
     )
@@ -131,7 +131,7 @@ class SAPICommands(enum.Enum):
                 t.Param(
                     "ConfigId", t.uint8_t, "ID of the configuration property to read"
                 ),
-                t.Param("Value", t.LongBytes, "Value"),
+                t.Param("Value", t.ShortBytes, "Value"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -147,7 +147,7 @@ class SAPICommands(enum.Enum):
         rsp_schema=t.Schema(
             (
                 t.Param("Param", t.uint8_t, "The identifier for deice information"),
-                t.Param("Value", t.LongBytes, "Value"),
+                t.Param("Value", t.ShortBytes, "Value"),
             )
         ),
     )
@@ -222,7 +222,7 @@ class SAPICommands(enum.Enum):
                 t.Param(
                     "CommandId", t.uint16_t, "The command id associated with the data"
                 ),
-                t.Param("Data", t.LongBytes, "Data"),
+                t.Param("Data", t.ShortBytes, "Data"),
             )
         ),
     )
