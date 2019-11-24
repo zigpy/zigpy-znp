@@ -51,15 +51,24 @@ def test_bytes():
     assert r.serialize() == data
 
 
-def test_lvbytes():
-    data = b"abcde\x00\xff"
+def test_longbytes():
+    data = b"abcde\x00\xff" * 50
     extra = b"\xffrest of the data\x00"
 
-    r, rest = t.LVBytes.deserialize(len(data).to_bytes(2, "little") + data + extra)
+    r, rest = t.LongBytes.deserialize(len(data).to_bytes(2, "little") + data + extra)
     assert rest == extra
     assert r == data
 
     assert r.serialize() == len(data).to_bytes(2, "little") + data
+
+    with pytest.raises(ValueError):
+        t.LongBytes.deserialize(b"\x01")
+
+    with pytest.raises(ValueError):
+        t.LongBytes.deserialize(b"\x01\x00")
+
+    with pytest.raises(ValueError):
+        t.LongBytes.deserialize(len(data).to_bytes(2, "little") + data[:-1])
 
 
 def test_list():

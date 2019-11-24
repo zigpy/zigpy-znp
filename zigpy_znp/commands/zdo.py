@@ -738,7 +738,7 @@ class ZDOCommands(enum.Enum):
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("ComplexDesc", t.LVBytes, "Complex descriptor"),
+                t.Param("ComplexDesc", t.LongBytes, "Complex descriptor"),
             )
         ),
     )
@@ -754,7 +754,7 @@ class ZDOCommands(enum.Enum):
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("UserDesc", t.LVBytes, "User descriptor"),
+                t.Param("UserDesc", t.LongBytes, "User descriptor"),
             )
         ),
     )

@@ -19,16 +19,6 @@ class Bytes(bytes):
         return cls(data), b""
 
 
-class LVBytes(bytes):
-    def serialize(self):
-        return uint16_t(len(self)).serialize() + self
-
-    @classmethod
-    def deserialize(cls, data, byteorder="little"):
-        length, data = uint16_t.deserialize(data)
-        return cls(data[:length]), data[length:]
-
-
 class int_t(int):
     _signed = True
     _size = 0
@@ -111,6 +101,24 @@ class uint56_t(uint_t):
 
 class uint64_t(uint_t):
     _size = 8
+
+
+class ShortBytes(bytes):
+    _header = uint8_t
+
+    def serialize(self):
+        return self._header(len(self)).serialize() + self
+
+    @classmethod
+    def deserialize(cls, data, byteorder="little"):
+        length, data = cls._header.deserialize(data)
+        if length > len(data):
+            raise ValueError(f"Data is too short to contain {length} bytes of data")
+        return cls(data[:length]), data[length:]
+
+
+class LongBytes(ShortBytes):
+    _header = uint16_t
 
 
 class List(list):

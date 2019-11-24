@@ -149,7 +149,7 @@ class MacCommands(enum.Enum):
                 # ToDo: Make this an enum
                 t.Param("KeyIdMode", t.uint8_t, "Key Id Mode of this frame"),
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
-                t.Param("MSDU", t.LVBytes, "Actual data that will be sent"),
+                t.Param("MSDU", t.LongBytes, "Actual data that will be sent"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -575,7 +575,7 @@ class MacCommands(enum.Enum):
                     t.uint8_t,
                     "List of address associate with the device",
                 ),
-                t.Param("NSDU", t.LVBytes, "Beacon payload"),
+                t.Param("NSDU", t.LongBytes, "Beacon payload"),
             )
         ),
     )
@@ -621,7 +621,7 @@ class MacCommands(enum.Enum):
                 # ToDo: Make this an enum
                 t.Param("KeyIdMode", t.uint8_t, "Key Id Mode of this frame"),
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
-                t.Param("Data", t.LVBytes, "Actual data that will be sent"),
+                t.Param("Data", t.LongBytes, "Actual data that will be sent"),
             )
         ),
     )
@@ -712,7 +712,7 @@ class MacCommands(enum.Enum):
                 t.Param(
                     "ResultListCount", t.uint8_t, "Number of items in the result list"
                 ),
-                t.Param("ResultList", t.LVBytes, "Result list"),
+                t.Param("ResultList", t.LongBytes, "Result list"),
             )
         ),
     )

@@ -119,7 +119,7 @@ class SysCommands(enum.Enum):
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
-                t.Param("Value", t.LVBytes, "The value read from memory address"),
+                t.Param("Value", t.LongBytes, "The value read from memory address"),
             )
         ),
     )
@@ -133,7 +133,7 @@ class SysCommands(enum.Enum):
         req_schema=t.Schema(
             (
                 t.Param("Address", t.uint16_t, "Address of the memory to read"),
-                t.Param("Value", t.LVBytes, "The value read from memory address"),
+                t.Param("Value", t.LongBytes, "The value read from memory address"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -160,7 +160,7 @@ class SysCommands(enum.Enum):
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
-                t.Param("Value", t.LVBytes, "The value of the NV item"),
+                t.Param("Value", t.LongBytes, "The value of the NV item"),
             )
         ),
     )
@@ -179,7 +179,7 @@ class SysCommands(enum.Enum):
                     t.uint8_t,
                     "Number of bytes offset from the beginning of the NV value",
                 ),
-                t.Param("Value", t.LVBytes, "The value of the NV item"),
+                t.Param("Value", t.LongBytes, "The value of the NV item"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
