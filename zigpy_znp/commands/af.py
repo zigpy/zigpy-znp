@@ -19,6 +19,7 @@ class AFCommands(enum.Enum):
                 t.Param("Endpoint", t.uint8_t, "Endpoint Id of the device"),
                 t.Param("ProfileId", t.uint16_t, "Application Profile ID"),
                 t.Param("DeviceId", t.uint16_t, "Device Description ID"),
+                t.Param("DeviceVersion", t.uint8_t, "Device version number"),
                 t.Param(
                     "LatencyReq",
                     t.uint8_t,
@@ -228,6 +229,27 @@ class AFCommands(enum.Enum):
         ),
     )
 
+    # proxy for afAPSF_ConfigSet()
+    APSFConfigSet = CommandDef(
+        CommandType.SREQ,
+        0x13,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "Endpoint", t.uint8_t, "Endpoint for which to set fragmentation"
+                ),
+                t.Param(
+                    "FrameDelay",
+                    t.uint8_t,
+                    "APS Fragmentation inter-frame delay in milliseconds",
+                ),
+                t.Param("WindowSize", t.uint8_t, "APS Fragmentation window size"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # AF Callbacks
     # This command is sent by the device to the user after it receives a data request
     DataConfirm = CommandDef(
         CommandType.AREQ,
@@ -290,15 +312,31 @@ class AFCommands(enum.Enum):
                 t.Param("SrcPanId", t.PanId, "Source PanId of the message"),
                 t.Param("DstEndpoint", t.uint8_t, "Endpoint of the destination device"),
                 t.Param(
-                    "WasBroadcast",
-                    t.uint8_t,
-                    "Was the incoming message broadcast or not",
+                    "WasBroadcast", t.Bool, "Was the incoming message broadcast or not"
                 ),
                 t.Param("LQI", t.uint8_t, "Link quality measured during reception"),
                 t.Param("SecurityUse", t.uint8_t, "Is security in use or not"),
                 t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
                 t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
                 t.Param("Data", t.LongBytes, "Data"),
+            )
+        ),
+    )
+
+    # sent by the device to the user when it determines that an error occurred during
+    # a reflected message
+    ReflectError = CommandDef(
+        CommandType.AREQ,
+        0x83,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                ),
+                t.Param("Endpoint", t.uint8_t, "Endpoint of the device"),
+                t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
+                t.Param("AddrMode", t.AddrMode, "Format of the address"),
+                t.Param("Dst", t.NWK, "Destination address -- depends on AddrMode"),
             )
         ),
     )

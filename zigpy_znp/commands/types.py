@@ -54,38 +54,38 @@ class ErrorCode(t.uint8_t, enum.Enum):
 class Subsystem(t.enum_uint8, enum.IntEnum):
     """Command sybsystem."""
 
-    RPC = 0
-    SYS = 1
-    MAC = 2
-    NWK = 3
-    AF = 4
-    ZDO = 5
-    SAPI = 6
-    UTIL = 7
-    DEBUG = 8
-    APP = 9
-    RESERVED_10 = 10
-    RESERVED_11 = 11
-    RESERVED_12 = 12
-    RESERVED_13 = 13
-    RESERVED_14 = 14
-    RESERVED_15 = 15
-    RESERVED_16 = 16
-    RESERVED_17 = 17
-    RESERVED_18 = 18
-    RESERVED_19 = 19
-    RESERVED_20 = 20
-    RESERVED_21 = 21
-    RESERVED_22 = 22
-    RESERVED_23 = 23
-    RESERVED_24 = 24
-    RESERVED_25 = 25
-    RESERVED_26 = 26
-    RESERVED_27 = 27
-    RESERVED_28 = 28
-    RESERVED_29 = 29
-    RESERVED_30 = 30
-    RESERVED_31 = 31
+    Reserved = 0x00
+    SYS = 0x01
+    MAC = 0x02
+    NWK = 0x03
+    AF = 0x04
+    ZDO = 0x05
+    SAPI = 0x06
+    UTIL = 0x07
+    DEBUG = 0x08
+    APP = 0x09
+    RESERVED_10 = 0x0A
+    RESERVED_11 = 0x0B
+    RESERVED_12 = 0x0C
+    RESERVED_13 = 0x0D
+    RESERVED_14 = 0x0E
+    APPConfig = 0x0F
+    RESERVED_16 = 0x10
+    RESERVED_17 = 0x11
+    RESERVED_18 = 0x12
+    RESERVED_19 = 0x13
+    RESERVED_20 = 0x14
+    ZGP = 0x15
+    RESERVED_22 = 0x16
+    RESERVED_23 = 0x17
+    RESERVED_24 = 0x18
+    RESERVED_25 = 0x19
+    RESERVED_26 = 0x1A
+    RESERVED_27 = 0x1B
+    RESERVED_28 = 0x1C
+    RESERVED_29 = 0x1D
+    RESERVED_30 = 0x1E
+    RESERVED_31 = 0x1F
 
 
 class CallbackSubsystem(t.enum_uint16, enum.IntEnum):
@@ -100,6 +100,8 @@ class CallbackSubsystem(t.enum_uint16, enum.IntEnum):
     MT_UTIL = Subsystem.UTIL << 8
     MT_DEBUG = Subsystem.DEBUG << 8
     MT_APP = Subsystem.APP << 8
+    MT_APPConfig = Subsystem.APPConfig << 8
+    MT_ZGP = Subsystem.ZGP << 8
     ALL = 0xFFFF
 
 
