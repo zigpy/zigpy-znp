@@ -147,7 +147,7 @@ class SAPICommands(enum.Enum):
         rsp_schema=t.Schema(
             (
                 t.Param("Param", t.uint8_t, "The identifier for deice information"),
-                t.Param("Value", t.ShortBytes, "Value"),
+                t.Param("Value", t.uint16_t, "Value"),
             )
         ),
     )
@@ -164,6 +164,7 @@ class SAPICommands(enum.Enum):
         ),
     )
 
+    # SAPI CallBacks
     # this callback is called by the ZigBee stack after a start request
     # operation completes
     ZBStartConfirm = CommandDef(CommandType.AREQ, 0x80, req_schema=STATUS_SCHEMA)
@@ -222,7 +223,7 @@ class SAPICommands(enum.Enum):
                 t.Param(
                     "CommandId", t.uint16_t, "The command id associated with the data"
                 ),
-                t.Param("Data", t.ShortBytes, "Data"),
+                t.Param("Data", t.LongBytes, "Data"),
             )
         ),
     )
