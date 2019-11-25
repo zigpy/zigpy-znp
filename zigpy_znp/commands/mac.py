@@ -4,6 +4,11 @@ from zigpy_znp.commands.types import STATUS_SCHEMA, CommandDef, CommandType
 import zigpy_znp.types as t
 
 
+class AttributeValue(t.FixedList):
+    _itemtype = t.uint8_t
+    _length = 16
+
+
 class MacCommands(enum.Enum):
     # MAC Reset command to reset MAC state machine
     ResetReq = CommandDef(
@@ -134,7 +139,7 @@ class MacCommands(enum.Enum):
                 t.Param("SrcAddrMode", t.AddrMode, "Format of the source address"),
                 t.Param("Handle", t.uint8_t, "Handle of the packet"),
                 # ToDo: Make this a proper Flags Enum
-                t.Param("TxOption", t.uint8_t, "Transmittion options"),
+                t.Param("TxOption", t.uint8_t, "Transmitting options"),
                 t.Param(
                     "LogicalChannel",
                     t.uint8_t,
@@ -242,7 +247,14 @@ class MacCommands(enum.Enum):
                 t.Param("Attribute", t.uint8_t, "MAC PIB Attribute to get"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.Schema(
+            (
+                t.Param(
+                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                ),
+                t.Param("Value", AttributeValue, "Value of the attribute"),
+            )
+        ),
     )
 
     # request the device to write a MAC PIB value
@@ -253,7 +265,7 @@ class MacCommands(enum.Enum):
             (
                 # ToDo: Make this an enum
                 t.Param("Attribute", t.uint8_t, "MAC PIB Attribute to set"),
-                t.Param("Value", t.uint16_t, "PIB attribute value"),
+                t.Param("Value", AttributeValue, "Value of the attribute"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -352,119 +364,7 @@ class MacCommands(enum.Enum):
         rsp_schema=STATUS_SCHEMA,
     )
 
-    # enable AUTOPEND and source address matching
-    SrcMatchEnable = CommandDef(
-        CommandType.SREQ,
-        0x10,
-        req_schema=t.Schema(
-            (
-                t.Param("AddrType", t.AddrMode, "Address types used in AutoPend"),
-                t.Param(
-                    "NumEntries",
-                    t.uint8_t,
-                    "Number of source address table entries to be used",
-                ),
-            )
-        ),
-        rsp_schema=STATUS_SCHEMA,
-    )
-
-    # add a short or extended address to source address table
-    SrcMatchAddEntry = CommandDef(
-        CommandType.SREQ,
-        0x11,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "AddrModeAddress", t.AddrModeAddress, "Address mode and address"
-                ),
-                t.Param(
-                    "PanId",
-                    t.PanId,
-                    "PAN Id of the device. Only use with a short address",
-                ),
-            )
-        ),
-        rsp_schema=STATUS_SCHEMA,
-    )
-
-    # delete a short or extended address to source address table
-    SrcMatchDelEntry = CommandDef(
-        CommandType.SREQ,
-        0x12,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "AddrModeAddress", t.AddrModeAddress, "Address mode and address"
-                ),
-                t.Param(
-                    "PanId",
-                    t.PanId,
-                    "PAN Id of the device. Only use with a short address",
-                ),
-            )
-        ),
-        rsp_schema=STATUS_SCHEMA,
-    )
-
-    # check if a short or extended address is in the source address table
-    SrcMatchCheckSrcAddr = CommandDef(
-        CommandType.SREQ,
-        0x13,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "AddrModeAddress", t.AddrModeAddress, "Address mode and address"
-                ),
-                t.Param(
-                    "PanId",
-                    t.PanId,
-                    "PAN Id of the device. Only use with a short address",
-                ),
-            )
-        ),
-        rsp_schema=STATUS_SCHEMA,
-    )
-
-    # enable/disable acknowledging all packets with pending bit set
-    SrcMatchAckAllPending = CommandDef(
-        CommandType.SREQ,
-        0x14,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "Enabled",
-                    t.Bool,
-                    (
-                        "True - acknowledging all packets with pending field set, "
-                        "False - Otherwise"
-                    ),
-                ),
-            )
-        ),
-        rsp_schema=STATUS_SCHEMA,
-    )
-
-    # check if acknowledging all packets with pending bit set is enabled
-    SrcMatchCheckAllPending = CommandDef(
-        CommandType.SREQ,
-        0x15,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param(
-                    "Enabled",
-                    t.Bool,
-                    (
-                        "True - acknowledging all packets with pending field set, "
-                        "False - Otherwise"
-                    ),
-                ),
-            )
-        ),
-    )
+    # MAC Callbacks
 
     # send (on behalf of the next higher layer) an indication of the synchronization
     # loss
@@ -526,7 +426,7 @@ class MacCommands(enum.Enum):
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
-                t.Param("IEEE", t.EUI64, "Extended address of the device"),
+                t.Param("NWK", t.NWK, "Short address of the device"),
                 t.Param("KeySource", t.KeySource, "Key Source of this data frame"),
                 # ToDo: Make this an enum
                 t.Param(
@@ -561,6 +461,7 @@ class MacCommands(enum.Enum):
                 t.Param("LogicalChannel", t.uint8_t, "The logical channel to use"),
                 t.Param("GTSPermit", t.Bool, "True/False - Permit/Not permit GTS"),
                 t.Param("LQI", t.uint8_t, "Link quality of the message"),
+                t.Param("SecurityFailure", t.uint8_t, "Security failure???"),
                 t.Param("KeySource", t.KeySource, "Key Source of this data frame"),
                 # ToDo: Make this an enum
                 t.Param(
@@ -688,9 +589,7 @@ class MacCommands(enum.Enum):
     )
 
     # send (on behalf of the next higher layer) a MAC poll confirmation
-    PollCnf = CommandDef(
-        CommandType.AREQ, 0x8B, req_schema=STATUS_SCHEMA, rsp_schema=t.Schema(())
-    )
+    PollCnf = CommandDef(CommandType.AREQ, 0x8B, req_schema=STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC scan confirmation
     ScanCnf = CommandDef(
@@ -705,14 +604,14 @@ class MacCommands(enum.Enum):
                 t.Param("ScanType", t.ScanType, "Specifies the scan type"),
                 t.Param("ChannelPage", t.uint8_t, "The channel page to use"),
                 t.Param(
-                    "UnscannedChannelList",
+                    "UnScannedChannelList",
                     t.Channels,
                     "List of the un-scanned channels",
                 ),
                 t.Param(
                     "ResultListCount", t.uint8_t, "Number of items in the result list"
                 ),
-                t.Param("ResultList", t.ShortBytes, "Result list"),
+                t.Param("ResultList", t.LVList(t.uint8_t), "Result list"),
             )
         ),
     )
@@ -745,14 +644,10 @@ class MacCommands(enum.Enum):
     )
 
     # send (on behalf of the next higher layer) a MAC start confirmation
-    StartCnf = CommandDef(
-        CommandType.AREQ, 0x8E, req_schema=STATUS_SCHEMA, rsp_schema=t.Schema(())
-    )
+    StartCnf = CommandDef(CommandType.AREQ, 0x8E, req_schema=STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC Rx enable confirmation
-    RxEnableCnf = CommandDef(
-        CommandType.AREQ, 0x8F, req_schema=STATUS_SCHEMA, rsp_schema=t.Schema(())
-    )
+    RxEnableCnf = CommandDef(CommandType.AREQ, 0x8F, req_schema=STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC purge confirmation
     PurgeCnf = CommandDef(
