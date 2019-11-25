@@ -122,6 +122,9 @@ class Status(basic.uint8_t, enum.Enum):
     Success = 0x00
     Failure = 0x01
     InvalidParameter = 0x02
+    ItemCreated = 0x09
+    ItemNotCreated = 0x0A
+    BadLength = 0x0C
     MemoryFailure = 0x10
     TableFull = 0x011
     MACNoResource = 0x1A
