@@ -2,7 +2,7 @@ import enum
 import typing
 
 import attr
-from zigpy.types import EUI64, NWK
+from zigpy.types import EUI64, NWK, ExtendedPanId, PanId
 
 from . import basic, struct
 
@@ -87,6 +87,24 @@ class Channels(basic.enum_uint32, enum.IntFlag):
     CHANNEL_24 = 0x01000000
     CHANNEL_25 = 0x02000000
     CHANNEL_26 = 0x04000000
+
+
+@attr.s
+class Beacon(struct.Struct):
+    """Beacon message."""
+
+    Src = attr.ib(type=NWK, converter=NWK)
+    PanId = attr.ib(type=PanId, converter=PanId)
+    Channel = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    PermitJoining = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    RouterCapacity = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    DeviceCapacity = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    ProtocolVersion = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    StackProfile = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    LQI = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    Depth = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    UpdateId = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
+    ExtendedPanId = attr.ib(type=ExtendedPanId, converter=ExtendedPanId)
 
 
 def FakeEnum(class_name: str):

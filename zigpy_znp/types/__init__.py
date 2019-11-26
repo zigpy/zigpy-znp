@@ -1,4 +1,12 @@
-from zigpy.types import EUI64, NWK, Bool, ClusterId, ExtendedPanId, PanId  # noqa: F401
+from zigpy.types import (  # noqa: F401
+    EUI64,
+    NWK,
+    Bool,
+    CharacterString,
+    ClusterId,
+    ExtendedPanId,
+    PanId,
+)
 
 from .basic import *  # noqa: F401, F403
 from .named import *  # noqa: F401, F403

@@ -22,6 +22,11 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
+class SecurityEntry(t.FixedList):
+    _itemtype = t.uint8_t
+    _length = 5
+
+
 class StartupState(t.enum_uint8, enum.IntEnum):
     RestoredNetworkState = 0x00
     NewNetworkState = 0x01
@@ -224,12 +229,12 @@ class ZDOCommands(enum.Enum):
         0x0A,
         req_schema=t.Schema(
             (
+                t.Param("NWK", t.NWK, "Short address of the device"),
                 t.Param(
                     "IEEE",
                     t.EUI64,
                     "Extended address of the device generating the request",
                 ),
-                t.Param("NWK", t.NWK, "Short address of the device"),
                 t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
             )
         ),
@@ -243,12 +248,14 @@ class ZDOCommands(enum.Enum):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "IEEE",
-                    t.EUI64,
-                    "Extended address of the device generating the request",
+                    "Dst",
+                    t.NWK,
+                    "network address of the device generating the set request",
                 ),
-                t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param("UserDescriptor", t.LVList(t.uint8_t), "User descriptor array"),
+                t.Param(
+                    "NWK", t.NWK, "NWK address of the destination device being queried"
+                ),
+                t.Param("UserDescriptor", t.ShortBytes, "User descriptor array"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -279,7 +286,14 @@ class ZDOCommands(enum.Enum):
                 t.Param(
                     "Dst", t.NWK, "Short address of the device generating the request"
                 ),
-                t.Param("LocalCoordinator", t.NWK, "Local coordinator's short address"),
+                t.Param(
+                    "LocalCoordinator",
+                    t.NWK,
+                    (
+                        "local coordinator’s short address. In the case of source "
+                        "binding, it’s the short address of the source address"
+                    ),
+                ),
                 t.Param("IEEE", t.EUI64, "Local coordinator's IEEE address"),
                 t.Param("Endpoint", t.uint8_t, "device's endpoint"),
                 t.Param("ProfileId", t.uint16_t, "profile id of the device"),
@@ -302,7 +316,7 @@ class ZDOCommands(enum.Enum):
             (
                 t.Param("Dst", t.NWK, "Short address of the destination device"),
                 t.Param("Src", t.EUI64, "Binding source IEEE address"),
-                t.Param("SrvEndpoint", t.uint8_t, "binding source endpoint"),
+                t.Param("SrcEndpoint", t.uint8_t, "binding source endpoint"),
                 t.Param("ClusterId", t.ClusterId, "Cluster id to match in messages"),
                 t.Param(
                     "Address", zigpy.zdo.types.MultiAddress, "Binding address/endpoint"
@@ -320,11 +334,14 @@ class ZDOCommands(enum.Enum):
             (
                 t.Param("Dst", t.NWK, "Short address of the destination device"),
                 t.Param("Src", t.EUI64, "Binding source IEEE address"),
-                t.Param("SrvEndpoint", t.uint8_t, "binding source endpoint"),
+                t.Param("SrcEndpoint", t.uint8_t, "binding source endpoint"),
                 t.Param("ClusterId", t.ClusterId, "Cluster id to match in messages"),
                 t.Param(
-                    "Address", zigpy.zdo.types.MultiAddress, "Binding address/endpoint"
+                    "Address",
+                    t.AddrModeAddress,
+                    "Binding address mode destination address",
                 ),
+                t.Param("DstEndpoint", t.uint8_t, "Binding destination endpoint"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -437,6 +454,9 @@ class ZDOCommands(enum.Enum):
         0x36,
         req_schema=t.Schema(
             (
+                t.Param(
+                    "AddrMode", t.AddrMode, "Address mode of DST: short or broadcast"
+                ),
                 t.Param("Dst", t.NWK, "Short address of the device to join"),
                 t.Param(
                     "Duration", t.uint8_t, "Specifies the duration to permit joining"
@@ -489,6 +509,22 @@ class ZDOCommands(enum.Enum):
         rsp_schema=STATUS_SCHEMA,
     )
 
+    # de-register for a ZDO callback
+    MsgCallbackRemove = CommandDef(
+        CommandType.SREQ,
+        0x3F,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "ClusterId",
+                    t.ClusterId,
+                    "Cluster id for which to receive ZDO callback",
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
     # starts the device in the network
     StartupFromApp = CommandDef(
         CommandType.SREQ,
@@ -497,20 +533,20 @@ class ZDOCommands(enum.Enum):
         rsp_schema=t.Schema((t.Param("State", StartupState, "State after startup"),)),
     )
 
-    # issue a Match Description Request for the requested endpoint outputs.
-    # This message will generate a broadcast message
-    AutoFindDestination = CommandDef(
-        CommandType.AREQ,
-        0x41,
+    # Extended version of ZDO to indicate to router devices to create
+    # a distributed network
+    StartupFromAppExt = CommandDef(
+        CommandType.SREQ,
+        0x54,
         req_schema=t.Schema(
             (
+                t.Param("StartDelay", t.uint16_t, "Startup delay"),
                 t.Param(
-                    "Endpoint",
-                    t.uint8_t,
-                    "endpoint to issue the End Device bind request",
+                    "Mode", t.Bool, "True -- ZR devices to create a distributed network"
                 ),
             )
         ),
+        rsp_schema=t.Schema((t.Param("State", StartupState, "State after startup"),)),
     )
 
     # set the application link key for a given device
@@ -587,6 +623,276 @@ class ZDOCommands(enum.Enum):
                 t.Param("Depth", t.uint8_t, "Depth of the parent"),
                 t.Param(
                     "StackProfile", t.uint8_t, "Stack profile of the network to use"
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # set rejoin backoff duration and rejoin scan duration for an end device
+    SetRejoinParams = CommandDef(
+        CommandType.SREQ,
+        # in documentation CmdId=0x26 which conflict with discover req
+        0x28,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "BackoffDuraation",
+                    t.uint32_t,
+                    "Rejoin backoff  duration for end device",
+                ),
+                t.Param(
+                    "ScanDuration", t.uint32_t, "Rejoin scan duration for end device"
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handles the ZDO security add link key extension message
+    SecAddLinkKey = CommandDef(
+        CommandType.SREQ,
+        0x42,
+        req_schema=t.Schema(
+            (
+                t.Param("NWK", t.NWK, "Short address of the device"),
+                t.Param("IEEE", t.EUI64, "Extended address of the device"),
+                t.Param("LinkKeyData", zigpy.types.KeyData, "128bit link key"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO security entry lookup extended extension message
+    SecEntryLookupExt = CommandDef(
+        CommandType.SREQ,
+        0x43,
+        req_schema=t.Schema(
+            (
+                t.Param("IEEE", t.EUI64, "Extended address of the device"),
+                t.Param("Entry", SecurityEntry, "Valid entry"),
+            )
+        ),
+        rsp_schema=t.Schema(
+            (
+                t.Param("AMI", t.uint16_t, "Address manager index"),
+                t.Param("KeyNVID", t.uint16_t, "Index to link key table in NV"),
+                t.Param("Option", t.uint8_t, "Authentication option for device"),
+            )
+        ),
+    )
+
+    # handle the ZDO security remove device extended extension message
+    SecDeviceRemove = CommandDef(
+        CommandType.SREQ,
+        0x44,
+        req_schema=t.Schema(
+            (t.Param("IEEE", t.EUI64, "Extended address of the device"),)
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO route discovery extension message
+    ExtRouteDisc = CommandDef(
+        CommandType.SREQ,
+        0x45,
+        req_schema=t.Schema(
+            (
+                t.Param("Dst", t.NWK, "Short address of the destination"),
+                t.Param("Options", t.uint8_t, "Route options"),
+                t.Param("Radius", t.uint8_t, "Broadcast radius"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO route check extension messags
+    ExtRouteChk = CommandDef(
+        CommandType.SREQ,
+        0x46,
+        req_schema=t.Schema(
+            (
+                t.Param("Dst", t.NWK, "Short address of the destination"),
+                t.Param("RtStatus", t.uint8_t, "Status value for routing entries"),
+                t.Param("Options", t.uint8_t, "Route options"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO extended remove group extension message
+    ExtRemoveGroup = CommandDef(
+        CommandType.SREQ,
+        0x47,
+        req_schema=t.Schema(
+            (
+                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+                t.Param("GroupId", t.GroupId, "ID to look for group"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO extended remove all group extension message
+    ExtRemoveAllGroups = CommandDef(
+        CommandType.SREQ,
+        0x48,
+        req_schema=t.Schema((t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),)),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO extension find all groups for endpoint message
+    ExtFindAllGroupsEndpoint = CommandDef(
+        CommandType.SREQ,
+        0x49,
+        req_schema=t.Schema(
+            (
+                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+                # this parameter does not make sense
+                t.Param("Groups", t.uint16_t, "List to hold group IDs"),
+            )
+        ),
+        rsp_schema=t.Schema(
+            (t.Param("Groups", t.LVList(t.GroupId), "List of Group IDs"),)
+        ),
+    )
+
+    # handle the ZDO extension find group message
+    ExtFindGroup = CommandDef(
+        CommandType.SREQ,
+        0x4A,
+        req_schema=t.Schema(
+            (
+                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+                t.Param("GroupId", t.GroupId, "ID to look for group"),
+            )
+        ),
+        rsp_schema=t.Schema((t.Param("Group", t.Bytes, "Group information"),)),
+    )
+
+    # handle the ZDO extension add group message
+    ExtAddGroup = CommandDef(
+        CommandType.SREQ,
+        0x4B,
+        req_schema=t.Schema(
+            (
+                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+                t.Param("GroupId", t.GroupId, "ID to look for group"),
+                t.Param("GroupName", t.CharacterString, "Group name"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO extension count all groups message
+    ExtCountAllGroups = CommandDef(
+        CommandType.SREQ,
+        0x4C,
+        rsp_schema=t.Schema(
+            (t.Param("GroupCount", t.uint8_t, "Total number of groups"),)
+        ),
+    )
+
+    # handle the ZDO extension Get/Set RxOnIdle to ZMac message
+    ExtRxIdle = CommandDef(
+        CommandType.SREQ,
+        0x4D,
+        req_schema=t.Schema(
+            (
+                t.Param("SetFlag", t.uint8_t, "Set or get value"),
+                t.Param("SetValue", t.uint8_t, "Value to be set to ZMac message"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO security update network key extension message
+    ExtUpdateNwkKey = CommandDef(
+        CommandType.SREQ,
+        0x4E,
+        req_schema=t.Schema(
+            (
+                t.Param("Dst", t.NWK, "Short address of the destination"),
+                t.Param("KeySeqNum", t.uint8_t, "Key sequence number"),
+                t.Param("Key", zigpy.types.KeyData, "Network key"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO security switch network key extension message
+    ExtSwitchNwkKey = CommandDef(
+        CommandType.SREQ,
+        0x4F,
+        req_schema=t.Schema(
+            (
+                t.Param("Dst", t.NWK, "Short address of the destination"),
+                t.Param("KeySeqNum", t.uint8_t, "Key sequence number"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle the ZDO extension network message
+    ExtNwkInfo = CommandDef(
+        CommandType.SREQ,
+        0x50,
+        rsp_schema=t.Schema(
+            (
+                t.Param("Dst", t.NWK, "Short address of the destination"),
+                t.Param("PanId", t.PanId, "The PAN Id to join."),
+                t.Param("ParentNWK", t.NWK, "Short address of the parent"),
+                t.Param("Extended PanId", t.ExtendedPanId, "64-bit extended PAN ID"),
+                t.Param("ParentIEEE", t.EUI64, "IEEE address of the parent"),
+                t.Param("Channel", t.Channels, "Current Channel"),
+            )
+        ),
+    )
+
+    # handle the ZDO extension Security Manager APS Remove Request message
+    ExtSecApsRemoveReq = CommandDef(
+        CommandType.SREQ,
+        0x51,
+        req_schema=t.Schema(
+            (
+                t.Param("NWK", t.NWK, "Short address of the device"),
+                t.Param("IEEE", t.EUI64, "IEEE address of the device"),
+                t.Param("ParentNWK", t.NWK, "Short address of the parent"),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # forces a network concentrator change by resetting zgConcentratorEnable and
+    # zgConcentratorDiscoveryTime from NV and set nwk event
+    ForceConcentratorChange = CommandDef(CommandType.SREQ, 0x52)
+
+    # set parameters not settable through NV
+    ExtSetParams = CommandDef(
+        CommandType.SREQ,
+        0x53,
+        req_schema=t.Schema(
+            (t.Param("UseMulticast", t.Bool, "Set or reset of multicast"),)
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # handle ZDO network address of interest request
+    NwkAddrOfInterestReq = CommandDef(
+        CommandType.SREQ,
+        0x29,
+        req_schema=t.Schema(
+            (
+                t.Param("NWK", t.NWK, "Short address of the destination"),
+                t.Param(
+                    "NWKAddrOfInterest",
+                    t.NWK,
+                    "Short address of the device being queried",
+                ),
+                t.Param(
+                    "Cmd",
+                    t.uint8_t,
+                    "A valid Cluser ID command as specified by profile",
                 ),
             )
         ),
@@ -841,6 +1147,8 @@ class ZDOCommands(enum.Enum):
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
+                t.Param("NetworkCount", t.uint8_t, "Total number of entries available"),
+                t.Param("Index", t.uint8_t, "Where the response starts"),
                 t.Param("Networks", t.LVList(Network), "Discovered networks list"),
             )
         ),
@@ -1015,36 +1323,7 @@ class ZDOCommands(enum.Enum):
     BeaconNotifyInd = CommandDef(
         CommandType.AREQ,
         0xC5,
-        req_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "Beacon's source network address"),
-                t.Param("PanId", t.PanId, "Beacon's PAN Id"),
-                t.Param("Channel", t.uint8_t, "PAN's channel"),
-                t.Param(
-                    "PermitJoining",
-                    t.uint8_t,
-                    "Flag whether the device accepts association requests",
-                ),
-                t.Param(
-                    "RouterCapacity",
-                    t.uint8_t,
-                    "Flag whether the devices accepts other routers to associate",
-                ),
-                t.Param(
-                    "DeviceCapacity",
-                    t.uint8_t,
-                    "Flag whether the devices accepts other devices to associate",
-                ),
-                t.Param("ProtocolVersion", t.uint8_t, "Version of the Zigbee protocol"),
-                t.Param("StackProfile", t.uint8_t, "Stack profile of the PAN"),
-                t.Param("LQI", t.uint8_t, "Link quality of the beacon"),
-                t.Param("Depth", t.uint8_t, "Depth of the source device"),
-                t.Param("UpdateId", t.uint8_t, "Update ID of the beacon"),
-                t.Param(
-                    "ExtendedPanId", t.ExtendedPanId, "Extended PAN Id of the beacon"
-                ),
-            )
-        ),
+        req_schema=t.Schema((t.Param("Beacons", t.LVList(t.Beacon), "Beacons list"),)),
     )
 
     # inform the host device of a ZDO join request result
@@ -1064,6 +1343,27 @@ class ZDOCommands(enum.Enum):
 
     # indication to inform host device the completion of network discovery scan
     NwkDiscoveryCnf = CommandDef(CommandType.AREQ, 0xC7, req_schema=STATUS_SCHEMA)
+
+    # an indication to inform the host of a device leaving the network
+    LeaveInd = CommandDef(
+        CommandType.SREQ,
+        0xC9,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "NWK", t.NWK, "Short address of the source of the leave indication"
+                ),
+                t.Param(
+                    "IEEE",
+                    t.EUI64,
+                    "IEEE address of the source of the leave indication",
+                ),
+                t.Param("Request", t.Bool, "True -- request, False -- indication"),
+                t.Param("Remove", t.Bool, "True -- Remove children"),
+                t.Param("Rejoin", t.Bool, "True -- Rejoin"),
+            )
+        ),
+    )
 
     # ZDO callback for a Cluster Id that the host requested to receive
     # with a MsgCallbackRegister request
@@ -1091,4 +1391,24 @@ class ZDOCommands(enum.Enum):
                 ),
             )
         ),
+    )
+
+    # a ZDO callback for TC Device Indication
+    TCDevInd = CommandDef(
+        CommandType.AREQ,
+        0xCA,
+        req_schema=t.Schema(
+            (
+                t.Param("Nwk", t.NWK, "device's network address"),
+                t.Param("IEEE", t.EUI64, "IEEE address of the source"),
+                t.Param("ParentNwk", t.NWK, "Parent's network address"),
+            )
+        ),
+    )
+
+    # a ZDO callback for Permit Join Indication
+    PermitJoinInd = CommandDef(
+        CommandType.AREQ,
+        0xCB,
+        req_schema=t.Schema((t.Param("Duration", t.uint8_t, "Permit join duration"),)),
     )
