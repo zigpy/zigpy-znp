@@ -435,7 +435,7 @@ class SysCommands(enum.Enum):
                 t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
             )
         ),
-        rsp_schema=t.Schema((t.Param())),
+        rsp_schema=t.Schema((t.Param("Length", t.uint8_t, "Length of NV item"),)),
     )
 
     # read an item in non-volatile memory

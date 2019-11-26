@@ -2,6 +2,7 @@
 getting device info, getting NV info, subscribing callbacks…etc."""
 import enum
 
+import zigpy.types
 import zigpy.zdo.types
 
 from zigpy_znp.commands.types import (
@@ -12,6 +13,13 @@ from zigpy_znp.commands.types import (
     DeviceState,
 )
 import zigpy_znp.types as t
+
+
+class BindEntry(t.FixedList):
+    """"The packed BindingEntry_t structure returned by the proxy call."""
+
+    _itemtype = t.uint8_t
+    _length = 14
 
 
 class Device(t.FixedList):
@@ -25,6 +33,11 @@ class Device(t.FixedList):
 class Key(t.FixedList):
     _itemtype = t.uint8_t
     _length = 42
+
+
+class RandomNumbers(t.FixedList):
+    _itemtype = (t.uint8_t,)
+    _length = 0x64
 
 
 class UtilCommands(enum.Enum):
@@ -49,7 +62,7 @@ class UtilCommands(enum.Enum):
     )
 
     # read a block of parameters from Non-Volatile storage of the target device
-    SetPanId = CommandDef(
+    GetNVInfo = CommandDef(
         CommandType.SREQ,
         0x01,
         rsp_schema=t.Schema(
@@ -80,7 +93,7 @@ class UtilCommands(enum.Enum):
     )
 
     # Set PAN ID
-    GetNvInfo = CommandDef(
+    SetPanId = CommandDef(
         CommandType.SREQ,
         0x02,
         req_schema=t.Schema((t.Param("PanId", t.PanId, "The PAN Id to set"),)),
@@ -157,8 +170,8 @@ class UtilCommands(enum.Enum):
         0x07,
         req_schema=t.Schema(
             (
+                t.Param("Keys", t.uint8_t, "Key code bitmask"),
                 t.Param("Shift", t.Bool, "True -- shift, False -- no shift"),
-                t.Param("Key", t.uint8_t, "Value of the key"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -170,8 +183,9 @@ class UtilCommands(enum.Enum):
         0x09,
         rsp_schema=t.Schema(
             (
-                t.Param("Shift", t.Bool, "True -- shift, False -- no shift"),
-                t.Param("Key", t.uint8_t, "Value of the key"),
+                t.Param(
+                    "Seconds", t.uint32_t, "The time of the board's uptime in seconds"
+                ),
             )
         ),
     )
@@ -213,6 +227,120 @@ class UtilCommands(enum.Enum):
         rsp_schema=STATUS_SCHEMA,
     )
 
+    # enable AUTOPEND and source address matching
+    SrcMatchEnable = CommandDef(CommandType.SREQ, 0x20, rsp_schema=STATUS_SCHEMA)
+
+    # add a short or extended address to source address table
+    SrcMatchAddEntry = CommandDef(
+        CommandType.SREQ,
+        0x21,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "AddrModeAddress", t.AddrModeAddress, "Address mode and address"
+                ),
+                t.Param(
+                    "PanId",
+                    t.PanId,
+                    "PAN Id of the device. Only use with a short address",
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # delete a short or extended address to source address table
+    SrcMatchDelEntry = CommandDef(
+        CommandType.SREQ,
+        0x22,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "AddrModeAddress", t.AddrModeAddress, "Address mode and address"
+                ),
+                t.Param(
+                    "PanId",
+                    t.PanId,
+                    "PAN Id of the device. Only use with a short address",
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # check if a short or extended address is in the source address table
+    SrcMatchCheckSrcAddr = CommandDef(
+        CommandType.SREQ,
+        0x23,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "AddrModeAddress", t.AddrModeAddress, "Address mode and address"
+                ),
+                t.Param(
+                    "PanId",
+                    t.PanId,
+                    "PAN Id of the device. Only use with a short address",
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # enable/disable acknowledging all packets with pending bit set
+    SrcMatchAckAllPending = CommandDef(
+        CommandType.SREQ,
+        0x24,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "Enabled",
+                    t.Bool,
+                    (
+                        "True - acknowledging all packets with pending field set, "
+                        "False - Otherwise"
+                    ),
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # check if acknowledging all packets with pending bit set is enabled
+    SrcMatchCheckAllPending = CommandDef(
+        CommandType.SREQ,
+        0x25,
+        rsp_schema=t.Schema(
+            (
+                t.Param(
+                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                ),
+                t.Param(
+                    "Enabled",
+                    t.Bool,
+                    (
+                        "True - acknowledging all packets with pending field set, "
+                        "False - Otherwise"
+                    ),
+                ),
+            )
+        ),
+    )
+
+    # proxy call to the AddrMgrEntryLookupExt() function
+    AddrMgrExtAddrLookup = CommandDef(
+        CommandType.SREQ,
+        0x40,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "IEEE", t.EUI64, "Extended address of the device to lookup the NWK"
+                ),
+            )
+        ),
+        rsp_schema=t.Schema((t.Param("NWK", t.NWK, "NWK address of the device fo"),)),
+    )
+
     # a proxy call to the AddrMgrEntryLookupNwk() function
     AddrMgwNwkAddrLookUp = CommandDef(
         CommandType.SREQ,
@@ -222,6 +350,54 @@ class UtilCommands(enum.Enum):
         ),
         rsp_schema=t.Schema(
             (t.Param("IEEE", t.EUI64, "Extended address of the device"),)
+        ),
+    )
+
+    # retrieve APS link key data, Tx and Rx frame counters
+    APSMELinkKeyDataGet = CommandDef(
+        CommandType.SREQ,
+        0x44,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "IEEE", t.EUI64, "Extended address of the device to get link data"
+                ),
+            )
+        ),
+        rsp_schema=t.Schema(
+            (
+                t.Param(
+                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                ),
+                t.Param("SecKey", zigpy.types.KeyData, "Security Key"),
+                t.Param("TxFrmCntr", t.uint32_t, "On success, the TX frame counter"),
+                t.Param("RxFrmCntr", t.uint32_t, "On success, the RX frame counter"),
+            )
+        ),
+    )
+
+    # a proxy call to the APSME_LinkKeyNvIdGet() function
+    APSMELinkKeyNvIdGet = CommandDef(
+        CommandType.SREQ,
+        0x45,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "IEEE", t.EUI64, "Extended address of the device to get link data"
+                ),
+            )
+        ),
+        rsp_schema=t.Schema(
+            (
+                t.Param(
+                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                ),
+                t.Param(
+                    "LinkKeyNvId",
+                    t.uint16_t,
+                    "On success, link key NV ID, otherwise 0xFFFF",
+                ),
+            )
         ),
     )
 
@@ -282,6 +458,57 @@ class UtilCommands(enum.Enum):
         ),
     )
 
+    # send a request key to the Trust Center from an originator device who wants to
+    # exchange messages with a partner device
+    APSMEREquestKeyCmd = CommandDef(
+        CommandType.SREQ,
+        0x4B,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "IEEE",
+                    t.EUI64,
+                    (
+                        "Specifies the extended address of the partner device the "
+                        "originator wants to exchange messages with"
+                    ),
+                ),
+            )
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
+    # a proxy call to the bindAddEntry() function
+    BindAddEntry = CommandDef(
+        CommandType.SREQ,
+        0x4D,
+        req_schema=t.Schema(
+            (
+                t.Param(
+                    "DstAddrModeAddr",
+                    t.AddrModeAddress,
+                    "Address mode address of the partner",
+                ),
+                t.Param("DstEndpoint", t.uint8_t, "Binding entry destination endpoint"),
+                t.Param(
+                    "ClusterIdList", t.LVList(t.ClusterId), "List of the cluster IDs"
+                ),
+            )
+        ),
+        rsp_schema=t.Schema(
+            (
+                t.Param(
+                    "BindEntry",
+                    BindEntry,
+                    (
+                        "Bind Entry. The dstIdx in the BindEntry is set to "
+                        "INVALID_NODE_ADDR to indicate failure"
+                    ),
+                ),
+            )
+        ),
+    )
+
     # a proxy call to zclGeneral_KeyEstablish_InitiateKeyEstablishment()
     ZCLKeyEstInitEst = CommandDef(
         CommandType.SREQ,
@@ -313,6 +540,18 @@ class UtilCommands(enum.Enum):
                 ),
                 t.Param("Key", Key, "The output key on success"),
             )
+        ),
+    )
+
+    #  generate Secure Random Number. It generates 1,000,000 bits in sets of 100 bytes.
+    #  As in 100 bytes of secure random numbers are generated until 1,000,000 bits are
+    #  generated. 100 bytes are generated 1250 times. So 1250 SRSPs are generated.
+    #  MT_SRNG has to be defined to include this API
+    SRngGen = CommandDef(
+        CommandType.SREQ,
+        0x4C,
+        rsp_schema=t.Schema(
+            (t.Param("RandomNumbers", RandomNumbers, "Secure random numbers list"),)
         ),
     )
 
