@@ -83,6 +83,7 @@ def test_commands_schema():
     for commands in (
         cmds.af.AFCommands,
         cmds.app.APPCommands,
+        cmds.app_config.APPConfigCommands,
         cmds.mac.MacCommands,
         cmds.sapi.SAPICommands,
         cmds.sys.SysCommands,

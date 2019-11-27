@@ -66,6 +66,16 @@ class AddrModeAddress(struct.Struct):
         return cls(mode=mode, address=addr), data
 
 
+class BDBCommissioningMode(basic.enum_uint8, enum.IntEnum):
+    """Commissioning mode."""
+
+    Initialization = 0x00
+    TouchLink = 0x01
+    NetworkSteering = 0x02
+    NetworkFormation = 0x04
+    FindingAndBinding = 0x08
+
+
 class Channels(basic.enum_uint32, enum.IntFlag):
     """Zigbee Channels."""
 
