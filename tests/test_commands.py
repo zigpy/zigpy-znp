@@ -89,5 +89,6 @@ def test_commands_schema():
         cmds.sys.SysCommands,
         cmds.util.UtilCommands,
         cmds.zdo.ZDOCommands,
+        cmds.zgp.ZGPCommands,
     ):
         _test_commands(commands)

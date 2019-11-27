@@ -52,7 +52,7 @@ class ErrorCode(t.uint8_t, enum.Enum):
 
 
 class Subsystem(t.enum_uint8, enum.IntEnum):
-    """Command sybsystem."""
+    """Command subsystem."""
 
     Reserved = 0x00
     SYS = 0x01
