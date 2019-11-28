@@ -1,0 +1,2 @@
+class InvalidFrame(ValueError):
+    pass
