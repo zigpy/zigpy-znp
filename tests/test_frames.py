@@ -1,7 +1,8 @@
 import pytest
 
-import zigpy_znp.api.frames as frames
 import zigpy_znp.commands as commands
+import zigpy_znp.exceptions as zexc
+import zigpy_znp.frames as frames
 import zigpy_znp.types as t
 
 
@@ -29,7 +30,7 @@ def test_general_frame_wrong_data():
 
     # data too short
     data = b"\x04\x00\x00"
-    with pytest.raises(ValueError):
+    with pytest.raises(zexc.InvalidFrame):
         frames.GeneralFrame.deserialize(data)
 
 
@@ -45,10 +46,11 @@ def test_transport_frame():
     assert rest == extra
     assert r.serialize() == sof + payload + fcs
 
-    # bad FCS
-    with pytest.raises(ValueError):
-        frames.TransportFrame.deserialize(sof + payload + bad_fcs + extra)
-
     # wrong SOF
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         frames.TransportFrame.deserialize(bad_sof + payload + fcs + extra)
+
+    # bad FCS
+    r, rest = frames.TransportFrame.deserialize(sof + payload + bad_fcs + extra)
+    assert rest == extra
+    assert r.is_valid is False

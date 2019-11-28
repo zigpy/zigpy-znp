@@ -3,6 +3,7 @@ import functools
 import attr
 
 from zigpy_znp.commands import Command
+from zigpy_znp.exceptions import InvalidFrame
 from zigpy_znp.types import basic as t, struct as struct_t
 
 
@@ -21,7 +22,7 @@ class GeneralFrame(struct_t.Struct):
         """Deserialize frame and sanity checks."""
         length, data = t.uint8_t.deserialize(data)
         if length > 250 or len(data) < length + 2:
-            raise ValueError(f"Data is too short for {cls.__name__}")
+            raise InvalidFrame(f"Data is too short for {cls.__name__}")
         cmd, data = Command.deserialize(data)
         payload, data = data[:length], data[length:]
         return cls(cmd, payload), data
@@ -43,34 +44,30 @@ class TransportFrame(struct_t.Struct):
 
     SOF = t.uint8_t(0xFE)
 
-    frame = attr.ib(
+    payload = attr.ib(
         type=GeneralFrame, converter=struct_t.Struct.converter(GeneralFrame)
     )
+    fcs = attr.ib(default=attr.Factory(lambda self: self.get_fcs(), takes_self=True))
 
     @classmethod
-    def deserialize(cls, data: bytes):
+    def deserialize(cls, data: bytes) -> "TransportFrame":
         """Deserialize frame."""
         sof, data = t.uint8_t.deserialize(data)
-        if sof != cls.SOF:
-            raise ValueError("deserialization error: invalid sof")
+        assert sof == cls.SOF
         gen_frame, data = GeneralFrame.deserialize(data)
-        t_frame = cls(gen_frame)
         fcs, data = t.uint8_t.deserialize(data)
-        if fcs != t_frame.fcs:
-            raise ValueError(
-                (
-                    f"deserialization error: frame 0x{fcs:02x},"
-                    f" calculated fcs 0x{t_frame.fcs:02x}"
-                )
-            )
-        return t_frame, data
+        return cls(gen_frame, fcs), data
 
-    @property
-    def fcs(self):
+    def get_fcs(self) -> t.uint8_t:
         """Calculate FCS on the payload."""
-        fcs = functools.reduce(lambda a, b: a ^ b, self.frame.serialize())
+        fcs = functools.reduce(lambda a, b: a ^ b, self.payload.serialize())
         return t.uint8_t(fcs)
 
-    def serialize(self):
+    @property
+    def is_valid(self) -> bool:
+        """Return True if considered a valid frame."""
+        return self.fcs == self.get_fcs()
+
+    def serialize(self) -> bytes:
         """Serialize data."""
-        return self.SOF.serialize() + self.frame.serialize() + self.fcs.serialize()
+        return self.SOF.serialize() + self.payload.serialize() + self.fcs.serialize()
