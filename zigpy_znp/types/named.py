@@ -199,6 +199,30 @@ class ResetReason(basic.enum_uint8, enum.IntEnum):
     Watchdog = 0x02
 
 
+class ResetType(basic.enum_uint8, enum.IntEnum):
+    Hard = 0x00
+    Soft = 0x01
+
+
 class KeySource(basic.FixedList):
     _length = 8
     _itemtype = basic.uint8_t
+
+
+class StartupOptions(basic.enum_uint8, enum.IntFlag):
+    ClearConfig = 0x01
+    ClearState = 0x02
+
+
+class DeviceLogicalType(basic.enum_uint8, enum.IntFlag):
+    Coordinator = 0x00
+    Router = 0x01
+    EndDevice = 0x02
+
+    # Are these valid?
+    ComplexDescAvail = 0x04
+    UserDescAvail = 0x08
+    Reserved1 = 0x10
+    Reserved2 = 0x20
+    Reserved3 = 0x40
+    Reserved4 = 0x80
