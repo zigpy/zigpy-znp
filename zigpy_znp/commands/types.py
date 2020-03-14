@@ -106,10 +106,10 @@ class CallbackSubsystem(t.enum_uint16, enum.IntEnum):
 
 
 @attr.s
-class Command(t.Struct):
-    """Command class."""
+class CommandHeader(t.Struct):
+    """CommandHeader class."""
 
-    cmd = attr.ib(type=t.uint16_t, converter=t.uint16_t)
+    cmd = attr.ib(type=t.uint16_t, converter=t.uint16_t, repr=lambda c: f'0x{c:04x}')
 
     @property
     def cmd0(self) -> t.uint8_t:
@@ -118,7 +118,7 @@ class Command(t.Struct):
 
     @property
     def id(self) -> t.uint8_t:
-        """Return Command id."""
+        """Return CommandHeader id."""
         return t.uint8_t(self.cmd >> 8)
 
     @id.setter

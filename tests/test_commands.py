@@ -1,16 +1,16 @@
 import zigpy_znp.commands as cmds
 
 
-def test_command():
-    """Test command class."""
+def test_command_header():
+    """Test CommandHeader class."""
     data = b"\x61\x02"
     extra = b"the rest of data\xaa\x55"
-    r, rest = cmds.Command.deserialize(data + extra)
+    r, rest = cmds.CommandHeader.deserialize(data + extra)
     assert rest == extra
     assert r.cmd0 == 0x61
     assert r.id == 0x02
 
-    r = cmds.Command(0x0261)
+    r = cmds.CommandHeader(0x0261)
     assert r.cmd0 == 0x61
     assert r.id == 0x02
 
@@ -26,7 +26,7 @@ def test_command():
 def test_command_subsystem():
     """Test subsystem setter."""
     # setting subsystem shouldn't change type
-    command = cmds.Command(0xFFFF)
+    command = cmds.CommandHeader(0xFFFF)
     for cmd_type in cmds.CommandType:
         command.type = cmd_type
         for subsys in cmds.Subsystem:
@@ -38,7 +38,7 @@ def test_command_subsystem():
 def test_command_type():
     """Test subsystem setter."""
     # setting type shouldn't change subsystem
-    command = cmds.Command(0xFFFF)
+    command = cmds.CommandHeader(0xFFFF)
     for subsys in cmds.Subsystem:
         command.subsystem = subsys
         for cmd_type in cmds.CommandType:

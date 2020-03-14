@@ -2,14 +2,14 @@ import functools
 
 import attr
 
-from zigpy_znp.commands import Command
+from zigpy_znp.commands import CommandHeader
 from zigpy_znp.exceptions import InvalidFrame
 from zigpy_znp.types import basic as t, struct as struct_t
 
 
 @attr.s
 class GeneralFrame(struct_t.Struct):
-    command = attr.ib(type=Command, converter=struct_t.Struct.converter(Command))
+    command = attr.ib(type=CommandHeader, converter=struct_t.Struct.converter(CommandHeader))
     data = attr.ib(factory=t.Bytes, type=t.Bytes, converter=t.Bytes)
 
     @property
@@ -23,7 +23,7 @@ class GeneralFrame(struct_t.Struct):
         length, data = t.uint8_t.deserialize(data)
         if length > 250 or len(data) < length + 2:
             raise InvalidFrame(f"Data is too short for {cls.__name__}")
-        cmd, data = Command.deserialize(data)
+        cmd, data = CommandHeader.deserialize(data)
         payload, data = data[:length], data[length:]
         return cls(cmd, payload), data
 

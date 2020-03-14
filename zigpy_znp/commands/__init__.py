@@ -1,5 +1,5 @@
 from zigpy_znp.commands.types import (  # noqa: F401
-    Command,
+    CommandHeader,
     CommandType,
     ErrorCode,
     Subsystem,
