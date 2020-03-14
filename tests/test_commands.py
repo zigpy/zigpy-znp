@@ -108,6 +108,7 @@ def test_commands_schema():
     for cls in cmds.ALL_COMMANDS:
         _test_commands(cls)
 
+
 def test_command_param_binding():
     # No params
     cmds.sys.SysCommands.Ping.Req()
@@ -147,3 +148,25 @@ def test_command_param_binding():
 
     with pytest.raises(ValueError):
         cmds.sys.SysCommands.Ping.Rsp(Capabilities=0x0001)
+
+    # Parameters can be looked up by name
+    c = cmds.sys.SysCommands.Ping.Rsp(Capabilities=cmds.types.MTCapabilities.CAP_SYS)
+    assert c.Capabilities == cmds.types.MTCapabilities.CAP_SYS
+
+    # Invalid ones cannot
+    with pytest.raises(AttributeError):
+        c.Oops
+
+
+def test_command_serialization():
+    command = cmds.sys.SysCommands.NVWrite.Req(
+        SysId=0x12,
+        ItemId=0x3456,
+        SubId=0x7890,
+        Offset=0x00,
+        Value=b'asdfoo',
+    )
+    frame = command.as_frame()
+
+    assert frame.data == bytes.fromhex('12 5634 9078 00 06') + b'asdfoo'
+
