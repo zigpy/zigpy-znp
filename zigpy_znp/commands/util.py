@@ -1,6 +1,5 @@
 """This interface provides tester supporting functionalities such as setting PanId,
 getting device info, getting NV info, subscribing callbacks…etc."""
-import enum
 
 import zigpy.types
 import zigpy.zdo.types
@@ -11,6 +10,8 @@ from zigpy_znp.commands.types import (
     CommandDef,
     CommandType,
     DeviceState,
+    CommandsBase,
+    Subsystem,
 )
 import zigpy_znp.types as t
 
@@ -40,7 +41,7 @@ class RandomNumbers(t.FixedList):
     _length = 0x64
 
 
-class UtilCommands(enum.Enum):
+class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     # MAC Reset command to reset MAC state machine
     GetDeviceInfo = CommandDef(
         CommandType.SREQ,

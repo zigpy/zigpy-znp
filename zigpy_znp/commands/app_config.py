@@ -1,12 +1,16 @@
 """commands to configure parameters of the device, trust center and BDB subsystem."""
 
-import enum
-
-from zigpy_znp.commands.types import STATUS_SCHEMA, CommandDef, CommandType
+from zigpy_znp.commands.types import (
+    STATUS_SCHEMA,
+    CommandDef,
+    CommandType,
+    CommandsBase,
+    Subsystem,
+)
 import zigpy_znp.types as t
 
 
-class APPConfigCommands(enum.Enum):
+class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
     # sets the network frame counter to the value specified in the Frame Counter Value.
     # For projects with multiple instances of frame counter, the message sets the
     # frame counter of the current network

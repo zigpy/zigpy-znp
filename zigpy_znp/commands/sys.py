@@ -2,18 +2,18 @@
 as reset, read/write memory, read/write extended address…etc.
 """
 
-import enum
-
 from zigpy_znp.commands.types import (
     STATUS_SCHEMA,
     CommandDef,
     CommandType,
     MTCapabilities,
+    CommandsBase,
+    Subsystem,
 )
 import zigpy_znp.types as t
 
 
-class SysCommands(enum.Enum):
+class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     # reset the target device
     ResetReq = CommandDef(
         CommandType.AREQ,

@@ -1,13 +1,18 @@
 """Green Power devices and Green Power infrastructure interface."""
 
-import enum
 import zigpy.types
 
-from zigpy_znp.commands.types import STATUS_SCHEMA, CommandDef, CommandType
+from zigpy_znp.commands.types import (
+    STATUS_SCHEMA,
+    CommandDef,
+    CommandType,
+    CommandsBase,
+    Subsystem,
+)
 import zigpy_znp.types as t
 
 
-class ZGPCommands(enum.Enum):
+class ZGPCommands(CommandsBase, subsystem=Subsystem.ZGP):
     DataReq = CommandDef(
         CommandType.SREQ,
         0x01,

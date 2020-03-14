@@ -18,6 +18,8 @@ from zigpy_znp.commands.types import (
     CommandType,
     DeviceState,
     Network,
+    CommandsBase,
+    Subsystem
 )
 import zigpy_znp.types as t
 
@@ -33,7 +35,7 @@ class StartupState(t.enum_uint8, enum.IntEnum):
     NotStarted = 0x02
 
 
-class ZDOCommands(enum.Enum):
+class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     # send a “Network Address Request”. This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
     # “ZDO Network Address Response” to receive the response to this message

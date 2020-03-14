@@ -1,12 +1,16 @@
 """This interface allows tester to interact with the simple API interface."""
 
-import enum
-
-from zigpy_znp.commands.types import STATUS_SCHEMA, CommandDef, CommandType
+from zigpy_znp.commands.types import (
+    STATUS_SCHEMA,
+    CommandDef,
+    CommandType,
+    CommandsBase,
+    Subsystem,
+)
 import zigpy_znp.types as t
 
 
-class SAPICommands(enum.Enum):
+class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     # reset the device by using a soft reset (i.e. a jump to the reset vector) vice a
     # hardware reset (i.e. watchdog reset.)
     ZBSystemReset = CommandDef(CommandType.AREQ, 0x09)

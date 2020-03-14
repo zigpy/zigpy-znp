@@ -1,10 +1,14 @@
-import enum
-
-from zigpy_znp.commands.types import STATUS_SCHEMA, CommandDef, CommandType
+from zigpy_znp.commands.types import (
+    STATUS_SCHEMA,
+    CommandDef,
+    CommandType,
+    CommandsBase,
+    Subsystem,
+)
 import zigpy_znp.types as t
 
 
-class APPCommands(enum.Enum):
+class APPCommands(CommandsBase, subsystem=Subsystem.APP):
     # This command is sent to the target in order to test the functions defined
     # for individual applications.
     # This command sends a raw data to an application

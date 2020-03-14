@@ -2,7 +2,6 @@ import enum
 
 import attr
 import zigpy.zdo.types
-
 import zigpy_znp.types as t
 
 
@@ -153,6 +152,148 @@ class CommandDef:
     command_id: int = attr.ib()
     req_schema: t.Schema = attr.ib(factory=t.Schema)
     rsp_schema: t.Schema = attr.ib(factory=t.Schema)
+
+
+class CommandsMeta(type):
+    """
+    Metaclass that creates `Command` subclasses out of the `CommandDef` definitions
+    """
+
+    def __new__(cls, name, bases, classdict, *, subsystem):
+        # Ignore CommandsBase
+        if not bases:
+            return type.__new__(cls, name, bases, classdict)
+
+        classdict['_commands'] = []
+
+        for command, definition in classdict.items():
+            if not isinstance(definition, CommandDef):
+                continue
+
+            # We manually create the qualname to match the final object structure
+            qualname = classdict['__qualname__'] + '.' + command
+
+
+            def no_init(self, *args, **kwargs):
+                raise ValueError('There is no point initializing this class, look at its Req and Rsp attributes instead')
+
+            # The object containing the request/response/callback commands is dynamically created
+            helper_class_dict = {
+                'definition': definition,
+                'type': definition.command_type,
+                'subsystem': subsystem,
+                '__qualname__': qualname,
+                '__init__': no_init,
+            }
+
+            header = CommandHeader(0x0000)
+            header.id = definition.command_id
+            header.type = definition.command_type
+            header.subsystem = subsystem.value
+
+            if definition.command_type == CommandType.SREQ:
+                req_header = header
+                rsp_header = CommandHeader(0x0040 + req_header.cmd)
+
+                class Req(CommandBase, header=req_header, schema=definition.req_schema):
+                    pass
+
+                class Rsp(CommandBase, header=rsp_header, schema=definition.rsp_schema):
+                    pass
+
+                Req.__qualname__ = qualname + '.Req'
+                Rsp.__qualname__ = qualname + '.Rsp'
+                helper_class_dict['Req'] = Req
+                helper_class_dict['Rsp'] = Rsp
+            elif definition.command_type == CommandType.AREQ:
+                class Callback(CommandBase, header=header, schema=definition.req_schema):
+                    pass
+
+                Callback.__qualname__ = qualname + '.Callback'
+                helper_class_dict['Callback'] = Callback
+            else:
+                raise ValueError(f'Unknown command type: {definition.command_type}')
+
+            classdict[command] = type(command, (), helper_class_dict)
+            classdict['_commands'].append(classdict[command])
+
+        return type.__new__(cls, name, bases, classdict)
+
+    def __iter__(self):
+        return iter(self._commands)
+
+    def __getitem__(self, key):
+        return self._commands[key]
+
+    def __len__(self):
+        return len(self._commands)
+
+
+class CommandsBase(metaclass=CommandsMeta, subsystem=None):
+    pass
+
+
+class CommandBase:
+    def __init_subclass__(cls, *, header, schema):
+        super().__init_subclass__()
+        cls.header = header
+        cls.schema = schema
+
+    def __init__(self, **params):
+        self.bound_params = self._bind_params(params)
+
+    def _bind_params(self, params):
+        all_params = {param.name for param in self.schema.parameters}
+        given_params = set(params.keys())
+
+        if all_params - given_params:
+            raise KeyError(f'Missing parameters: {all_params - given_params}')
+        elif given_params - all_params:
+            raise KeyError(f'Unexpected parameters: {given_params - all_params}. Expected one of {all_params}')
+
+        bound_params = []
+
+        for param in self.schema.parameters:
+            value = params[param.name]
+
+            if not isinstance(value, param.type):
+                # Coerce only actual numerical types, not enums
+                if isinstance(value, int) and issubclass(param.type, int) and not issubclass(param.type, t.enum_uint8):
+                    value = param.type(value)
+                elif isinstance(value, bytes) and issubclass(param.type, t.ShortBytes):
+                    value = param.type(value)
+                else:
+                    raise ValueError(f"Param {param.name} expects type {param.type}, got {type(value)}")
+
+                try:
+                    # XXX: Break early if a numerical type overflows
+                    value.serialize()
+                except Exception as e:
+                    raise ValueError(f'Invalid parameter value: {param.name}={value!r}') from e
+
+            bound_params.append((param, value))
+
+        return bound_params
+
+    def as_frame(self):
+        from zigpy_znp.frames import GeneralFrame
+
+        data = b''.join(value.serialize() for param, value in self.bound_params)
+        
+        return GeneralFrame(self.header, data)
+
+    def __getattr__(self, key):
+        # XXX: Schema parameters are not hashable so we cannot just use a dict
+        for param, value in self.bound_params:
+            if param.name == key:
+                return value
+
+        raise AttributeError(key)
+
+    def __repr__(self):
+        params = [f'{p.name}={v!r}' for p, v in self.bound_params]
+
+        return f'{self.__class__.__qualname__}({", ".join(params)})'
 
 
 class DeviceState(t.enum_uint8, enum.IntEnum):

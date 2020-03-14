@@ -1,6 +1,10 @@
-import enum
-
-from zigpy_znp.commands.types import STATUS_SCHEMA, CommandDef, CommandType
+from zigpy_znp.commands.types import (
+    STATUS_SCHEMA,
+    CommandDef,
+    CommandType,
+    CommandsBase,
+    Subsystem,
+)
 import zigpy_znp.types as t
 
 
@@ -9,7 +13,7 @@ class AttributeValue(t.FixedList):
     _length = 16
 
 
-class MacCommands(enum.Enum):
+class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     # MAC Reset command to reset MAC state machine
     ResetReq = CommandDef(
         CommandType.SREQ,

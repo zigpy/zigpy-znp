@@ -5,11 +5,13 @@ from zigpy_znp.commands.types import (
     CommandDef,
     CommandType,
     InterPanCommand,
+    CommandsBase,
+    Subsystem,
 )
 import zigpy_znp.types as t
 
 
-class AFCommands(enum.Enum):
+class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     # This command enables the tester to register an application’s endpoint description
     Register = CommandDef(
         CommandType.SREQ,
