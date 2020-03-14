@@ -184,7 +184,7 @@ class Status(basic.uint8_t, enum.Enum):
             return fenum(f"unknown_0x{status:02x}", status), data
 
 
-@attr.s
+@attr.s(frozen=True)
 class Param:
     """Parameter."""
 

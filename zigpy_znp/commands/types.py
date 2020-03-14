@@ -251,7 +251,7 @@ class CommandBase:
         elif given_params - all_params:
             raise KeyError(f'Unexpected parameters: {given_params - all_params}. Expected one of {all_params}')
 
-        bound_params = []
+        bound_params = {}
 
         for param in self.schema.parameters:
             value = params[param.name]
@@ -271,27 +271,26 @@ class CommandBase:
                 except Exception as e:
                     raise ValueError(f'Invalid parameter value: {param.name}={value!r}') from e
 
-            bound_params.append((param, value))
+            bound_params[param.name] = (param, value)
 
         return bound_params
 
     def as_frame(self):
         from zigpy_znp.frames import GeneralFrame
 
-        data = b''.join(value.serialize() for param, value in self.bound_params)
+        data = b''.join(value.serialize() for param, value in self.bound_params.values())
         
         return GeneralFrame(self.header, data)
 
     def __getattr__(self, key):
-        # XXX: Schema parameters are not hashable so we cannot just use a dict
-        for param, value in self.bound_params:
-            if param.name == key:
-                return value
+        if key not in self.bound_params:
+            raise AttributeError(key)
 
-        raise AttributeError(key)
+        param, value = self.bound_params[key]
+        return value
 
     def __repr__(self):
-        params = [f'{p.name}={v!r}' for p, v in self.bound_params]
+        params = [f'{p.name}={v!r}' for p, v in self.bound_params.values()]
 
         return f'{self.__class__.__qualname__}({", ".join(params)})'
 
