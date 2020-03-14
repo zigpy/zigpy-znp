@@ -80,15 +80,5 @@ def _test_commands(commands):
 
 
 def test_commands_schema():
-    for commands in (
-        cmds.af.AFCommands,
-        cmds.app.APPCommands,
-        cmds.app_config.APPConfigCommands,
-        cmds.mac.MacCommands,
-        cmds.sapi.SAPICommands,
-        cmds.sys.SysCommands,
-        cmds.util.UtilCommands,
-        cmds.zdo.ZDOCommands,
-        cmds.zgp.ZGPCommands,
-    ):
+    for commands in cmds.ALL_COMMANDS:
         _test_commands(commands)

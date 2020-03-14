@@ -14,3 +14,15 @@ from . import sys  # noqa: F401
 from . import util  # noqa: F401
 from . import zdo  # noqa: F401
 from . import zgp  # noqa: F401
+
+ALL_COMMANDS = [
+    af.AFCommands,
+    app.APPCommands,
+    app_config.APPConfigCommands,
+    mac.MacCommands,
+    sapi.SAPICommands,
+    sys.SysCommands,
+    util.UtilCommands,
+    zdo.ZDOCommands,
+    zgp.ZGPCommands,
+]
