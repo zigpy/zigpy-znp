@@ -104,46 +104,37 @@ class CallbackSubsystem(t.enum_uint16, enum.IntEnum):
     ALL = 0xFFFF
 
 
-@attr.s
-class CommandHeader(t.Struct):
+class CommandHeader(t.uint16_t):
     """CommandHeader class."""
 
-    cmd = attr.ib(type=t.uint16_t, converter=t.uint16_t, repr=lambda c: f'0x{c:04x}')
-
     @property
-    def cmd0(self) -> t.uint8_t:
-        """Cmd0 of the command."""
-        return t.uint8_t(self.cmd & 0x00FF)
+    def cmd0(self):
+        return t.uint8_t(self & 0x00FF)
 
     @property
     def id(self) -> t.uint8_t:
         """Return CommandHeader id."""
-        return t.uint8_t(self.cmd >> 8)
+        return t.uint8_t(self >> 8)
 
-    @id.setter
-    def id(self, value: int) -> None:
+    def with_id(self, value: int) -> "CommandHeader":
         """command ID setter."""
-        self.cmd = t.uint16_t(self.cmd & 0x00FF | (value & 0xFF) << 8)
+        return type(self)(self & 0x00FF | (value & 0xFF) << 8)
 
     @property
     def subsystem(self) -> Subsystem:
         """Return subsystem of the command."""
         return Subsystem(self.cmd0 & 0x1F)
 
-    @subsystem.setter
-    def subsystem(self, value: int) -> None:
-        """Subsystem setter."""
-        self.cmd = self.cmd & 0xFFE0 | value & 0x1F
+    def with_subsystem(self, value: Subsystem) -> "CommandHeader":
+        return type(self)(self & 0xFFE0 | value & 0x1F)
 
     @property
     def type(self) -> CommandType:
         """Return command type."""
         return CommandType(self.cmd0 >> 5)
 
-    @type.setter
-    def type(self, value) -> None:
-        """Type setter."""
-        self.cmd = self.cmd & 0xFF1F | (value & 0x07) << 5
+    def with_type(self, value) -> "CommandHeader":
+        return type(self)(self & 0xFF1F | (value & 0x07) << 5)
 
 
 @attr.s
@@ -181,14 +172,13 @@ class CommandsMeta(type):
                 '__qualname__': qualname,
             }
 
-            header = CommandHeader(0x0000)
-            header.id = definition.command_id
-            header.type = definition.command_type
-            header.subsystem = subsystem.value
+            header = CommandHeader().with_id(definition.command_id) \
+                                    .with_type(definition.command_type) \
+                                    .with_subsystem(subsystem)
 
             if definition.command_type == CommandType.SREQ:
                 req_header = header
-                rsp_header = CommandHeader(0x0040 + req_header.cmd)
+                rsp_header = CommandHeader(0x0040 + req_header)
 
                 class Req(CommandBase, header=req_header, schema=definition.req_schema):
                     pass
@@ -292,8 +282,8 @@ class CommandBase:
 
     @classmethod
     def from_frame(cls, frame) -> "CommandBase":
-        if frame.command != cls.header:
-            raise ValueError(f'Frame does not contain this command: expected {cls.header}, got {frame.command}')
+        if frame.header != cls.header:
+            raise ValueError(f'Frame does not contain this command: expected {cls.header}, got {frame.header}')
 
         data = frame.data
         params = {}

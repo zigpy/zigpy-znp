@@ -32,21 +32,21 @@ class ZNP:
     def frame_received(self, frame: GeneralFrame):
         LOGGER.debug("Frame received: %s", frame)
 
-        command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.command.cmd]
+        command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.header]
         command = command_cls.from_frame(frame)
 
-        if command.header.cmd not in self._response_futures:
+        if command.header not in self._response_futures:
             LOGGER.warning("Received an unsolicited command: %s", command)
             return
 
-        for partial_commands, future in self._response_futures[command.header.cmd]:
+        for partial_commands, future in self._response_futures[command.header]:
             LOGGER.debug("Testing if %s matches any of %s", command, partial_commands)
 
             for partial_command in partial_commands:
                 if partial_command.matches(command):
                     LOGGER.debug("Match found: %s ~ %s", command, partial_command)
 
-                    self._response_futures[command.header.cmd].remove((partial_commands, future))
+                    self._response_futures[command.header].remove((partial_commands, future))
                     future.set_result(command)
                     break
         else:
@@ -62,7 +62,7 @@ class ZNP:
             raise ValueError(f"Only SRSP and AREQ responses can be waited for. Got: {commands[0].header.type}")
 
         future = asyncio.get_running_loop().create_future()
-        self._response_futures[commands[0].header.cmd].append((commands, future))
+        self._response_futures[commands[0].header].append((commands, future))
 
         return future
 

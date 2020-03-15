@@ -32,9 +32,9 @@ COMMANDS_BY_ID = {}
 for cmds in ALL_COMMANDS:
     for command in cmds:
         if command.type == CommandType.SREQ:
-            COMMANDS_BY_ID[command.Req.header.cmd] = command.Req
-            COMMANDS_BY_ID[command.Rsp.header.cmd] = command.Rsp
+            COMMANDS_BY_ID[command.Req.header] = command.Req
+            COMMANDS_BY_ID[command.Rsp.header] = command.Rsp
         elif command.type == CommandType.AREQ:
-            COMMANDS_BY_ID[command.Callback.header.cmd] = command.Callback
+            COMMANDS_BY_ID[command.Callback.header] = command.Callback
         else:
             raise ValueError(f'Unhandled command type: {command.type}')

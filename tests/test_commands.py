@@ -19,38 +19,27 @@ def test_command_header():
     assert r.cmd0 == 0x61
     assert r.id == 0x02
 
-    r.id = 0xFF
-    assert r.id == 0xFF
-    assert r.cmd0 == 0x61
+    new1 = r.with_id(0xFF)
+    assert new1.id == 0xFF
+    assert new1.cmd0 == 0x61
 
-    r.id = 0x00
-    assert r.id == 0x00
-    assert r.cmd0 == 0x61
+    new2 = r.with_id(0x00)
+    assert new2.id == 0x00
+    assert new2.cmd0 == 0x61
 
 
-def test_command_subsystem():
-    """Test subsystem setter."""
-    # setting subsystem shouldn't change type
+def test_command_setters():
+    """Test setters"""
+    # setting subsystem and type shouldn't change the other
     command = cmds.CommandHeader(0xFFFF)
     for cmd_type in cmds.CommandType:
-        command.type = cmd_type
         for subsys in cmds.Subsystem:
-            command.subsystem = subsys
-            assert command.subsystem == subsys
-            assert command.type == cmd_type
+            new1 = command.with_type(cmd_type).with_subsystem(subsys)
+            new2 = command.with_subsystem(subsys).with_type(cmd_type)
 
-
-def test_command_type():
-    """Test type setter."""
-    # setting type shouldn't change subsystem
-    command = cmds.CommandHeader(0xFFFF)
-    for subsys in cmds.Subsystem:
-        command.subsystem = subsys
-        for cmd_type in cmds.CommandType:
-            command.type = cmd_type
-            assert command.subsystem == subsys
-            assert command.type == cmd_type
-
+            assert new1 == new2
+            assert new1.subsystem == subsys
+            assert new1.type == cmd_type
 
 def test_error_code():
     data = b"\x03"
@@ -93,8 +82,8 @@ def test_commands_schema():
                 _validate_schema(command.Req.schema)
                 _validate_schema(command.Rsp.schema)
 
-                commands_by_id[command.Req.header.cmd].append(command.Req)
-                commands_by_id[command.Rsp.header.cmd].append(command.Rsp)
+                commands_by_id[command.Req.header].append(command.Req)
+                commands_by_id[command.Rsp.header].append(command.Rsp)
             elif command.type == cmds.CommandType.AREQ:
                 assert command.type == command.Callback.header.type
                 assert command.subsystem == command.Callback.header.subsystem
@@ -102,7 +91,7 @@ def test_commands_schema():
 
                 _validate_schema(command.Callback.schema)
 
-                commands_by_id[command.Callback.header.cmd].append(command.Callback)
+                commands_by_id[command.Callback.header].append(command.Callback)
 
     duplicate_commands = {cmd: commands for cmd, commands in commands_by_id.items() if len(commands) > 1}
     assert not duplicate_commands
