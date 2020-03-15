@@ -73,40 +73,41 @@ def _validate_schema(schema):
         assert isinstance(param.description, str)
 
 
-def _test_commands(commands):
+def test_commands_schema():
     commands_by_id = defaultdict(list)
 
-    for command in commands:
-        assert command.type in (cmds.CommandType.SREQ, cmds.CommandType.AREQ)
+    for commands in cmds.ALL_COMMANDS:
+        for command in commands:
+            assert command.type in (cmds.CommandType.SREQ, cmds.CommandType.AREQ)
 
-        if command.type == cmds.CommandType.SREQ:
-            assert command.type == command.Req.header.type
-            assert command.Rsp.header.type == cmds.CommandType.SRSP
-            assert command.subsystem == command.Req.header.subsystem == command.Rsp.header.subsystem
-            assert isinstance(command.Req.header, cmds.CommandHeader)
-            assert isinstance(command.Rsp.header, cmds.CommandHeader)
+            if command.type == cmds.CommandType.SREQ:
+                assert command.type == command.Req.header.type
+                assert command.Rsp.header.type == cmds.CommandType.SRSP
+                assert command.subsystem == command.Req.header.subsystem == command.Rsp.header.subsystem
+                assert isinstance(command.Req.header, cmds.CommandHeader)
+                assert isinstance(command.Rsp.header, cmds.CommandHeader)
 
-            _validate_schema(command.Req.schema)
-            _validate_schema(command.Rsp.schema)
+                assert command.Req.Rsp is command.Rsp
+                assert command.Rsp.Req is command.Req
 
-            commands_by_id[command.Req.header.cmd].append(command.Req)
-            commands_by_id[command.Rsp.header.cmd].append(command.Rsp)
-        elif command.type == cmds.CommandType.AREQ:
-            assert command.type == command.Callback.header.type
-            assert command.subsystem == command.Callback.header.subsystem
-            assert isinstance(command.Callback.header, cmds.CommandHeader)
+                _validate_schema(command.Req.schema)
+                _validate_schema(command.Rsp.schema)
 
-            _validate_schema(command.Callback.schema)
+                commands_by_id[command.Req.header.cmd].append(command.Req)
+                commands_by_id[command.Rsp.header.cmd].append(command.Rsp)
+            elif command.type == cmds.CommandType.AREQ:
+                assert command.type == command.Callback.header.type
+                assert command.subsystem == command.Callback.header.subsystem
+                assert isinstance(command.Callback.header, cmds.CommandHeader)
 
-            commands_by_id[command.Callback.header.cmd].append(command.Callback)
+                _validate_schema(command.Callback.schema)
+
+                commands_by_id[command.Callback.header.cmd].append(command.Callback)
 
     duplicate_commands = {cmd: commands for cmd, commands in commands_by_id.items() if len(commands) > 1}
     assert not duplicate_commands
 
-
-def test_commands_schema():
-    for cls in cmds.ALL_COMMANDS:
-        _test_commands(cls)
+    assert len(commands_by_id.keys()) == len(cmds.COMMANDS_BY_ID.keys())
 
 
 def test_command_param_binding():
@@ -166,7 +167,66 @@ def test_command_serialization():
         Offset=0x00,
         Value=b'asdfoo',
     )
-    frame = command.as_frame()
+    frame = command.to_frame()
 
     assert frame.data == bytes.fromhex('12 5634 9078 00 06') + b'asdfoo'
 
+
+def test_command_equality():
+    command1 = cmds.sys.SysCommands.NVWrite.Req(
+        SysId=0x12,
+        ItemId=0x3456,
+        SubId=0x7890,
+        Offset=0x00,
+        Value=b'asdfoo',
+    )
+
+    command2 = cmds.sys.SysCommands.NVWrite.Req(
+        SysId=0x12,
+        ItemId=0x3456,
+        SubId=0x7890,
+        Offset=0x00,
+        Value=b'asdfoo',
+    )
+
+    command3 = cmds.sys.SysCommands.NVWrite.Req(
+        SysId=0xFF,
+        ItemId=0x3456,
+        SubId=0x7890,
+        Offset=0x00,
+        Value=b'asdfoo',
+    )
+
+    assert command1 == command1
+    assert command1.matches(command1)
+    assert command2 == command1
+    assert command1 == command2
+
+    assert command1 != command3
+    assert command3 != command1
+
+    assert command1.matches(command2)  # Matching is a superset of equality
+    assert command2.matches(command1)
+    assert not command1.matches(command3)
+    assert not command3.matches(command1)
+
+    assert not command1.matches(cmds.sys.SysCommands.NVWrite.Req(partial=True))
+    assert cmds.sys.SysCommands.NVWrite.Req(partial=True).matches(command1)
+
+    # parameters can be specified explicitly as None
+    assert cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=None).matches(command1)
+    assert cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=0x7890).matches(command1)
+    assert not cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=123).matches(command1)
+
+
+def test_command_deserialization():
+    command = cmds.sys.SysCommands.NVWrite.Req(
+        SysId=0x12,
+        ItemId=0x3456,
+        SubId=0x7890,
+        Offset=0x00,
+        Value=b'asdfoo',
+    )
+
+    assert type(command).from_frame(command.to_frame()) == command
+    assert command.to_frame() == type(command).from_frame(command.to_frame()).to_frame()

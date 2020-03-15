@@ -126,7 +126,7 @@ class CommandHeader(t.Struct):
         self.cmd = t.uint16_t(self.cmd & 0x00FF | (value & 0xFF) << 8)
 
     @property
-    def subsystem(self) -> t.uint8_t:
+    def subsystem(self) -> Subsystem:
         """Return subsystem of the command."""
         return Subsystem(self.cmd0 & 0x1F)
 
@@ -136,7 +136,7 @@ class CommandHeader(t.Struct):
         self.cmd = self.cmd & 0xFFE0 | value & 0x1F
 
     @property
-    def type(self) -> t.uint8_t:
+    def type(self) -> CommandType:
         """Return command type."""
         return CommandType(self.cmd0 >> 5)
 
@@ -173,17 +173,12 @@ class CommandsMeta(type):
             # We manually create the qualname to match the final object structure
             qualname = classdict['__qualname__'] + '.' + command
 
-
-            def no_init(self, *args, **kwargs):
-                raise ValueError('There is no point initializing this class, look at its Req and Rsp attributes instead')
-
             # The object containing the request/response/callback commands is dynamically created
             helper_class_dict = {
                 'definition': definition,
                 'type': definition.command_type,
                 'subsystem': subsystem,
                 '__qualname__': qualname,
-                '__init__': no_init,
             }
 
             header = CommandHeader(0x0000)
@@ -202,7 +197,11 @@ class CommandsMeta(type):
                     pass
 
                 Req.__qualname__ = qualname + '.Req'
+                Req.Rsp = Rsp
+
                 Rsp.__qualname__ = qualname + '.Rsp'
+                Rsp.Req = Req
+
                 helper_class_dict['Req'] = Req
                 helper_class_dict['Rsp'] = Rsp
             elif definition.command_type == CommandType.AREQ:
@@ -240,13 +239,13 @@ class CommandBase:
         cls.schema = schema
 
     def __init__(self, **params):
-        self.bound_params = self._bind_params(params)
+        self.bound_params = self._bind_params(params, partial=params.pop('partial', False))
 
-    def _bind_params(self, params):
+    def _bind_params(self, params, partial=False):
         all_params = {param.name for param in self.schema.parameters}
         given_params = set(params.keys())
 
-        if all_params - given_params:
+        if not partial and all_params - given_params:
             raise KeyError(f'Missing parameters: {all_params - given_params}')
         elif given_params - all_params:
             raise KeyError(f'Unexpected parameters: {given_params - all_params}. Expected one of {all_params}')
@@ -254,6 +253,10 @@ class CommandBase:
         bound_params = {}
 
         for param in self.schema.parameters:
+            if partial and params.get(param.name) is None:
+                bound_params[param.name] = (param, None)
+                continue
+
             value = params[param.name]
 
             if not isinstance(value, param.type):
@@ -275,12 +278,54 @@ class CommandBase:
 
         return bound_params
 
-    def as_frame(self):
+    def to_frame(self):
         from zigpy_znp.frames import GeneralFrame
 
-        data = b''.join(value.serialize() for param, value in self.bound_params.values())
+        missing_params = {p.name for p, v in self.bound_params.values() if v is None}
+
+        if missing_params:
+            raise ValueError(f'Cannot serialize a partial frame: missing {missing_params}')
+
+        data = b''.join(v.serialize() for p, v in self.bound_params.values())
         
         return GeneralFrame(self.header, data)
+
+    @classmethod
+    def from_frame(cls, frame) -> "CommandBase":
+        if frame.command != cls.header:
+            raise ValueError(f'Frame does not contain this command: expected {cls.header}, got {frame.command}')
+
+        data = frame.data
+        params = {}
+
+        for param in cls.schema.parameters:
+            params[param.name], data = param.type.deserialize(data)
+
+        if data:
+            raise ValueError(f'Unparsed data remains at the end of the frame: {data!r}')
+
+        return cls(**params)
+
+
+    def matches(self, other: "CommandBase") -> bool:
+        if type(self) is not type(other):
+            return False
+
+        assert self.header == other.header
+
+        param_pairs = zip(self.bound_params.values(), other.bound_params.values())
+
+        for (expected_param, expected_value), (actual_param, actual_value) in param_pairs:
+            assert expected_param == actual_param
+
+            # Only non-None bound params are considered
+            if expected_value is not None and expected_value != actual_value:
+                return False
+
+        return True
+
+    def __eq__(self, other):
+        return type(self) is type(other) and self.bound_params == other.bound_params
 
     def __getattr__(self, key):
         if key not in self.bound_params:
