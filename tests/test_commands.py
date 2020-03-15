@@ -30,16 +30,25 @@ def test_command_header():
 
 def test_command_setters():
     """Test setters"""
-    # setting subsystem and type shouldn't change the other
+    # the setter order should not matter
     command = cmds.CommandHeader(0xFFFF)
     for cmd_type in cmds.CommandType:
         for subsys in cmds.Subsystem:
-            new1 = command.with_type(cmd_type).with_subsystem(subsys)
-            new2 = command.with_subsystem(subsys).with_type(cmd_type)
+            # There's probably no need to iterate over all 256 possible values
+            for cmd_id in (0x00, 0xFF, 0x10, 0x01, 0xF0, 0x0F, 0x22, 0xEE):
+                perms = [
+                    command.with_id(cmd_id).with_type(cmd_type).with_subsystem(subsys),
+                    command.with_type(cmd_type).with_id(cmd_id).with_subsystem(subsys),
+                    command.with_type(cmd_type).with_subsystem(subsys).with_id(cmd_id),
+                    command.with_subsystem(subsys).with_type(cmd_type).with_id(cmd_id),
+                    command.with_subsystem(subsys).with_id(cmd_id).with_type(cmd_type),
+                    command.with_id(cmd_id).with_subsystem(subsys).with_type(cmd_type),
+                ]
 
-            assert new1 == new2
-            assert new1.subsystem == subsys
-            assert new1.type == cmd_type
+                assert len(set(perms)) == 1
+                assert perms[0].id == cmd_id
+                assert perms[0].subsystem == subsys
+                assert perms[0].type == cmd_type
 
 def test_error_code():
     data = b"\x03"
