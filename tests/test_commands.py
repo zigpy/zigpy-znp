@@ -50,6 +50,7 @@ def test_command_setters():
                 assert perms[0].subsystem == subsys
                 assert perms[0].type == cmd_type
 
+
 def test_error_code():
     data = b"\x03"
     extra = b"the rest of the owl\x00\xff"
@@ -81,7 +82,11 @@ def test_commands_schema():
             if command.type == cmds.CommandType.SREQ:
                 assert command.type == command.Req.header.type
                 assert command.Rsp.header.type == cmds.CommandType.SRSP
-                assert command.subsystem == command.Req.header.subsystem == command.Rsp.header.subsystem
+                assert (
+                    command.subsystem
+                    == command.Req.header.subsystem
+                    == command.Rsp.header.subsystem
+                )
                 assert isinstance(command.Req.header, cmds.CommandHeader)
                 assert isinstance(command.Rsp.header, cmds.CommandHeader)
 
@@ -102,7 +107,9 @@ def test_commands_schema():
 
                 commands_by_id[command.Callback.header].append(command.Callback)
 
-    duplicate_commands = {cmd: commands for cmd, commands in commands_by_id.items() if len(commands) > 1}
+    duplicate_commands = {
+        cmd: commands for cmd, commands in commands_by_id.items() if len(commands) > 1
+    }
     assert not duplicate_commands
 
     assert len(commands_by_id.keys()) == len(cmds.COMMANDS_BY_ID.keys())
@@ -113,15 +120,17 @@ def test_command_param_binding():
     cmds.sys.SysCommands.Ping.Req()
 
     # Invalid param name
-    with pytest.raises(KeyError):    
+    with pytest.raises(KeyError):
         cmds.sys.SysCommands.Ping.Rsp(asd=123)
 
     # Valid param name
     cmds.sys.SysCommands.Ping.Rsp(Capabilities=cmds.types.MTCapabilities.CAP_SYS)
 
     # Too many params, one valid
-    with pytest.raises(KeyError):    
-        cmds.sys.SysCommands.Ping.Rsp(foo='asd', Capabilities=cmds.types.MTCapabilities.CAP_SYS)
+    with pytest.raises(KeyError):
+        cmds.sys.SysCommands.Ping.Rsp(
+            foo="asd", Capabilities=cmds.types.MTCapabilities.CAP_SYS
+        )
 
     # Not enough params
     with pytest.raises(KeyError):
@@ -129,7 +138,7 @@ def test_command_param_binding():
 
     # Invalid type
     with pytest.raises(ValueError):
-        cmds.util.UtilCommands.TimeAlive.Rsp(Seconds=b'asd')
+        cmds.util.UtilCommands.TimeAlive.Rsp(Seconds=b"asd")
 
     # Coerced numerical type
     a = cmds.util.UtilCommands.TimeAlive.Rsp(Seconds=12)
@@ -140,7 +149,7 @@ def test_command_param_binding():
 
     # Overflowing integer types
     with pytest.raises(ValueError):
-        cmds.util.UtilCommands.TimeAlive.Rsp(Seconds=10**20)
+        cmds.util.UtilCommands.TimeAlive.Rsp(Seconds=10 ** 20)
 
     # Integers will not be coerced to enums
     assert cmds.types.MTCapabilities.CAP_SYS == 0x0001
@@ -159,40 +168,24 @@ def test_command_param_binding():
 
 def test_command_serialization():
     command = cmds.sys.SysCommands.NVWrite.Req(
-        SysId=0x12,
-        ItemId=0x3456,
-        SubId=0x7890,
-        Offset=0x00,
-        Value=b'asdfoo',
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
     frame = command.to_frame()
 
-    assert frame.data == bytes.fromhex('12 5634 9078 00 06') + b'asdfoo'
+    assert frame.data == bytes.fromhex("12 5634 9078 00 06") + b"asdfoo"
 
 
 def test_command_equality():
     command1 = cmds.sys.SysCommands.NVWrite.Req(
-        SysId=0x12,
-        ItemId=0x3456,
-        SubId=0x7890,
-        Offset=0x00,
-        Value=b'asdfoo',
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
     command2 = cmds.sys.SysCommands.NVWrite.Req(
-        SysId=0x12,
-        ItemId=0x3456,
-        SubId=0x7890,
-        Offset=0x00,
-        Value=b'asdfoo',
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
     command3 = cmds.sys.SysCommands.NVWrite.Req(
-        SysId=0xFF,
-        ItemId=0x3456,
-        SubId=0x7890,
-        Offset=0x00,
-        Value=b'asdfoo',
+        SysId=0xFF, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
     assert command1 == command1
@@ -213,17 +206,17 @@ def test_command_equality():
 
     # parameters can be specified explicitly as None
     assert cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=None).matches(command1)
-    assert cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=0x7890).matches(command1)
-    assert not cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=123).matches(command1)
+    assert cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=0x7890).matches(
+        command1
+    )
+    assert not cmds.sys.SysCommands.NVWrite.Req(partial=True, SubId=123).matches(
+        command1
+    )
 
 
 def test_command_deserialization():
     command = cmds.sys.SysCommands.NVWrite.Req(
-        SysId=0x12,
-        ItemId=0x3456,
-        SubId=0x7890,
-        Offset=0x00,
-        Value=b'asdfoo',
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
     assert type(command).from_frame(command.to_frame()) == command

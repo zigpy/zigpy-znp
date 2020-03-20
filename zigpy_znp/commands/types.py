@@ -155,26 +155,29 @@ class CommandsMeta(type):
         if not bases:
             return type.__new__(cls, name, bases, classdict)
 
-        classdict['_commands'] = []
+        classdict["_commands"] = []
 
         for command, definition in classdict.items():
             if not isinstance(definition, CommandDef):
                 continue
 
             # We manually create the qualname to match the final object structure
-            qualname = classdict['__qualname__'] + '.' + command
+            qualname = classdict["__qualname__"] + "." + command
 
-            # The object containing the request/response/callback commands is dynamically created
+            # The commands class is dynamically created from the definition
             helper_class_dict = {
-                'definition': definition,
-                'type': definition.command_type,
-                'subsystem': subsystem,
-                '__qualname__': qualname,
+                "definition": definition,
+                "type": definition.command_type,
+                "subsystem": subsystem,
+                "__qualname__": qualname,
             }
 
-            header = CommandHeader().with_id(definition.command_id) \
-                                    .with_type(definition.command_type) \
-                                    .with_subsystem(subsystem)
+            header = (
+                CommandHeader()
+                .with_id(definition.command_id)
+                .with_type(definition.command_type)
+                .with_subsystem(subsystem)
+            )
 
             if definition.command_type == CommandType.SREQ:
                 req_header = header
@@ -186,25 +189,28 @@ class CommandsMeta(type):
                 class Rsp(CommandBase, header=rsp_header, schema=definition.rsp_schema):
                     pass
 
-                Req.__qualname__ = qualname + '.Req'
+                Req.__qualname__ = qualname + ".Req"
                 Req.Rsp = Rsp
 
-                Rsp.__qualname__ = qualname + '.Rsp'
+                Rsp.__qualname__ = qualname + ".Rsp"
                 Rsp.Req = Req
 
-                helper_class_dict['Req'] = Req
-                helper_class_dict['Rsp'] = Rsp
+                helper_class_dict["Req"] = Req
+                helper_class_dict["Rsp"] = Rsp
             elif definition.command_type == CommandType.AREQ:
-                class Callback(CommandBase, header=header, schema=definition.req_schema):
+
+                class Callback(
+                    CommandBase, header=header, schema=definition.req_schema
+                ):
                     pass
 
-                Callback.__qualname__ = qualname + '.Callback'
-                helper_class_dict['Callback'] = Callback
+                Callback.__qualname__ = qualname + ".Callback"
+                helper_class_dict["Callback"] = Callback
             else:
-                raise ValueError(f'Unknown command type: {definition.command_type}')
+                raise ValueError(f"Unknown command type: {definition.command_type}")
 
             classdict[command] = type(command, (), helper_class_dict)
-            classdict['_commands'].append(classdict[command])
+            classdict["_commands"].append(classdict[command])
 
         return type.__new__(cls, name, bases, classdict)
 
@@ -229,16 +235,21 @@ class CommandBase:
         cls.schema = schema
 
     def __init__(self, **params):
-        self.bound_params = self._bind_params(params, partial=params.pop('partial', False))
+        self.bound_params = self._bind_params(
+            params, partial=params.pop("partial", False)
+        )
 
     def _bind_params(self, params, partial=False):
         all_params = {param.name for param in self.schema.parameters}
         given_params = set(params.keys())
 
         if not partial and all_params - given_params:
-            raise KeyError(f'Missing parameters: {all_params - given_params}')
+            raise KeyError(f"Missing parameters: {all_params - given_params}")
         elif given_params - all_params:
-            raise KeyError(f'Unexpected parameters: {given_params - all_params}. Expected one of {all_params}')
+            raise KeyError(
+                f"Unexpected parameters: {given_params - all_params}. "
+                f"Expected one of {all_params}"
+            )
 
         bound_params = {}
 
@@ -251,18 +262,26 @@ class CommandBase:
 
             if not isinstance(value, param.type):
                 # Coerce only actual numerical types, not enums
-                if isinstance(value, int) and issubclass(param.type, int) and not issubclass(param.type, t.enum_uint8):
+                if (
+                    isinstance(value, int)
+                    and issubclass(param.type, int)
+                    and not issubclass(param.type, t.enum_uint8)
+                ):
                     value = param.type(value)
                 elif isinstance(value, bytes) and issubclass(param.type, t.ShortBytes):
                     value = param.type(value)
                 else:
-                    raise ValueError(f"Param {param.name} expects type {param.type}, got {type(value)}")
+                    raise ValueError(
+                        f"Param {param.name} is type {param.type}, got {type(value)}"
+                    )
 
                 try:
                     # XXX: Break early if a numerical type overflows
                     value.serialize()
                 except Exception as e:
-                    raise ValueError(f'Invalid parameter value: {param.name}={value!r}') from e
+                    raise ValueError(
+                        f"Invalid parameter value: {param.name}={value!r}"
+                    ) from e
 
             bound_params[param.name] = (param, value)
 
@@ -274,16 +293,20 @@ class CommandBase:
         missing_params = {p.name for p, v in self.bound_params.values() if v is None}
 
         if missing_params:
-            raise ValueError(f'Cannot serialize a partial frame: missing {missing_params}')
+            raise ValueError(
+                f"Cannot serialize a partial frame: missing {missing_params}"
+            )
 
-        data = b''.join(v.serialize() for p, v in self.bound_params.values())
-        
+        data = b"".join(v.serialize() for p, v in self.bound_params.values())
+
         return GeneralFrame(self.header, data)
 
     @classmethod
     def from_frame(cls, frame) -> "CommandBase":
         if frame.header != cls.header:
-            raise ValueError(f'Frame does not contain this command: expected {cls.header}, got {frame.header}')
+            raise ValueError(
+                f"Wrong frame header: expected {cls.header}, got {frame.header}"
+            )
 
         data = frame.data
         params = {}
@@ -292,10 +315,9 @@ class CommandBase:
             params[param.name], data = param.type.deserialize(data)
 
         if data:
-            raise ValueError(f'Unparsed data remains at the end of the frame: {data!r}')
+            raise ValueError(f"Unparsed data remains at the end of the frame: {data!r}")
 
         return cls(**params)
-
 
     def matches(self, other: "CommandBase") -> bool:
         if type(self) is not type(other):
@@ -305,7 +327,10 @@ class CommandBase:
 
         param_pairs = zip(self.bound_params.values(), other.bound_params.values())
 
-        for (expected_param, expected_value), (actual_param, actual_value) in param_pairs:
+        for (
+            (expected_param, expected_value),
+            (actual_param, actual_value),
+        ) in param_pairs:
             assert expected_param == actual_param
 
             # Only non-None bound params are considered
@@ -325,7 +350,7 @@ class CommandBase:
         return value
 
     def __repr__(self):
-        params = [f'{p.name}={v!r}' for p, v in self.bound_params.values()]
+        params = [f"{p.name}={v!r}" for p, v in self.bound_params.values()]
 
         return f'{self.__class__.__qualname__}({", ".join(params)})'
 

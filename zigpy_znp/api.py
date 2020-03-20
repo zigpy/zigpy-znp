@@ -46,7 +46,9 @@ class ZNP:
                 if partial_command.matches(command):
                     LOGGER.debug("Match found: %s ~ %s", command, partial_command)
 
-                    self._response_futures[command.header].remove((partial_commands, future))
+                    self._response_futures[command.header].remove(
+                        (partial_commands, future)
+                    )
                     future.set_result(command)
                     break
         else:
@@ -56,10 +58,15 @@ class ZNP:
         if len({type(c) for c in commands}) != 1:
             raise ValueError(f"All partial commands must be the same type: {commands}")
 
-        response_types = (zigpy_znp.commands.types.CommandType.SRSP, zigpy_znp.commands.types.CommandType.AREQ)
+        response_types = (
+            zigpy_znp.commands.types.CommandType.SRSP,
+            zigpy_znp.commands.types.CommandType.AREQ,
+        )
 
         if commands[0].header.type not in response_types:
-            raise ValueError(f"Only SRSP and AREQ responses can be waited for. Got: {commands[0].header.type}")
+            raise ValueError(
+                f"Can only wait for SRSPs and AREQs. Got: {commands[0].header.type}"
+            )
 
         future = asyncio.get_running_loop().create_future()
         self._response_futures[commands[0].header].append((commands, future))
@@ -81,8 +88,12 @@ class ZNP:
         # By default, wait for any corresponding response to our request
         return await self.wait_for_response(command.Rsp(partial=True))
 
-    async def nvram_write(self, nv_id: t.uint16_t, value, *, offset: t.uint8_t=0):
+    async def nvram_write(self, nv_id: t.uint16_t, value, *, offset: t.uint8_t = 0):
         if not isinstance(value, bytes):
             value = value.serialize()
 
-        return await self.command(SysCommands.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)))
+        return await self.command(
+            SysCommands.OSALNVWrite.Req(
+                Id=nv_id, Offset=offset, Value=t.ShortBytes(value)
+            )
+        )

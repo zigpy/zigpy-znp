@@ -1,5 +1,3 @@
-import enum
-
 from zigpy_znp.commands.types import (
     STATUS_SCHEMA,
     CommandDef,

@@ -104,7 +104,9 @@ class Channels(basic.enum_uint32, enum.IntFlag):
 
         for channel in channels:
             if not 11 <= channel <= 26:
-                raise ValueError(f"Invalid channel number {channel}. Must be between 11 and 26.")
+                raise ValueError(
+                    f"Invalid channel number {channel}. Must be between 11 and 26."
+                )
 
             mask |= cls[f"CHANNEL_{channel}"]
 

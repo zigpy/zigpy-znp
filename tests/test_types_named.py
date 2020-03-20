@@ -65,7 +65,10 @@ def test_channels():
 
     assert t.Channels.from_channel_list([]) == t.Channels.NO_CHANNELS
     assert t.Channels.from_channel_list(range(11, 26 + 1)) == t.Channels.ALL_CHANNELS
-    assert t.Channels.from_channel_list([11, 21]) == t.Channels.CHANNEL_11 | t.Channels.CHANNEL_21
+    assert (
+        t.Channels.from_channel_list([11, 21])
+        == t.Channels.CHANNEL_11 | t.Channels.CHANNEL_21
+    )
 
     with pytest.raises(ValueError):
         t.Channels.from_channel_list([11, 13, 10])  # 10 is not a valid channel

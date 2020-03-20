@@ -19,7 +19,7 @@ from zigpy_znp.commands.types import (
     DeviceState,
     Network,
     CommandsBase,
-    Subsystem
+    Subsystem,
 )
 import zigpy_znp.types as t
 
