@@ -7,7 +7,7 @@ import zigpy_znp.commands
 import zigpy_znp.types as t
 
 from zigpy_znp import uart
-from zigpy_znp.commands.sys import SysCommands
+from zigpy_znp.commands import SysCommands
 from zigpy_znp.frames import GeneralFrame
 
 

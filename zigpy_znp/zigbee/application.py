@@ -8,10 +8,9 @@ from zigpy.types import ExtendedPanId
 import zigpy_znp.types as t
 
 from zigpy_znp.types.nvids import NvIds
+from zigpy_znp.commands import ZDOCommands, APPConfigCommands, SysCommands
+from zigpy_znp.commands.zdo import StartupState
 from zigpy_znp.commands.types import DeviceState
-from zigpy_znp.commands.zdo import ZDOCommands, StartupState
-from zigpy_znp.commands.app_config import APPConfigCommands
-from zigpy_znp.commands.sys import SysCommands
 
 
 LOGGER = logging.getLogger(__name__)

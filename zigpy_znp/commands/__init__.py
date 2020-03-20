@@ -5,26 +5,26 @@ from zigpy_znp.commands.types import (  # noqa: F401
     Subsystem,
 )
 
-from . import af  # noqa: F401
-from . import app  # noqa: F401
-from . import app_config  # noqa: F401
-from . import mac  # noqa: F401
-from . import sapi  # noqa: F401
-from . import sys  # noqa: F401
-from . import util  # noqa: F401
-from . import zdo  # noqa: F401
-from . import zgp  # noqa: F401
+from .af import AFCommands
+from .app import APPCommands
+from .app_config import APPConfigCommands
+from .mac import MacCommands
+from .sapi import SAPICommands
+from .sys import SysCommands
+from .util import UtilCommands
+from .zdo import ZDOCommands
+from .zgp import ZGPCommands
 
 ALL_COMMANDS = [
-    af.AFCommands,
-    app.APPCommands,
-    app_config.APPConfigCommands,
-    mac.MacCommands,
-    sapi.SAPICommands,
-    sys.SysCommands,
-    util.UtilCommands,
-    zdo.ZDOCommands,
-    zgp.ZGPCommands,
+    AFCommands,
+    APPCommands,
+    APPConfigCommands,
+    MacCommands,
+    SAPICommands,
+    SysCommands,
+    UtilCommands,
+    ZDOCommands,
+    ZGPCommands,
 ]
 
 COMMANDS_BY_ID = {}
