@@ -21,8 +21,13 @@ class GeneralFrame(struct_t.Struct):
     def deserialize(cls, data):
         """Deserialize frame and sanity checks."""
         length, data = t.uint8_t.deserialize(data)
-        if length > 250 or len(data) < length + 2:
+
+        if length > 250:
+            raise InvalidFrame(f"Frame length cannot exceed 250 bytes. Got: {length}")
+
+        if len(data) < length + 2:
             raise InvalidFrame(f"Data is too short for {cls.__name__}")
+
         header, data = CommandHeader.deserialize(data)
         payload, data = data[:length], data[length:]
         return cls(header, payload), data
