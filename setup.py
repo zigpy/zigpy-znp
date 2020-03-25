@@ -13,6 +13,11 @@ setup(
     author_email="alexei.chetroi@outlook.com",
     license="GPL-3.0",
     packages=find_packages(exclude=["*.tests"]),
-    install_requires=["attrs", "pyserial-asyncio", "zigpy-homeassistant >= 0.10.0"],
+    install_requires=[
+        "attrs",
+        "pyserial-asyncio",
+        "zigpy-homeassistant >= 0.10.0",
+        "async_timeout",
+    ],
     tests_require=["asynctest", "pytest", "pytest-asyncio", "asyncmock"],
 )
