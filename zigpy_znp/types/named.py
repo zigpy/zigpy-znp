@@ -197,7 +197,7 @@ class Param:
 
 class ResetReason(basic.enum_uint8, enum.IntEnum):
     PowerUp = 0x00
-    Externam = 0x01
+    External = 0x01
     Watchdog = 0x02
 
 
