@@ -147,17 +147,21 @@ class ZNP:
     ) -> asyncio.Future:
         return self.wait_for_responses([command])
 
-    async def command(self, command, *, ignore_response=False):
+    async def command(self, command, *, ignore_response=False, **response_params):
+        if ignore_response and response_params:
+            raise KeyError(f"Cannot have both response_params and ignore_response")
+
         if command.header.type != zigpy_znp.commands.types.CommandType.SREQ:
             raise ValueError(f"Cannot send a command that isn't a request: {command!r}")
 
+        # Construct our response before we send the request, ensuring we fail early
+        response = command.Rsp(partial=True, **response_params)
         self._uart.send(command.to_frame())
 
         if ignore_response:
             return
 
-        # By default, wait for any corresponding response to our request
-        return await self.wait_for_response(command.Rsp(partial=True))
+        return await self.wait_for_response(response)
 
     async def nvram_write(self, nv_id: t.uint16_t, value, *, offset: t.uint8_t = 0):
         if not isinstance(value, bytes):

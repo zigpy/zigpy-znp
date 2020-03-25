@@ -1,5 +1,7 @@
 import pytest
 import asyncio
+import functools
+import async_timeout
 
 from unittest.mock import Mock
 
@@ -12,6 +14,20 @@ import zigpy_znp.commands as c
 import zigpy_znp.types as t
 
 from zigpy_znp.api import ZNP
+from zigpy_znp.frames import TransportFrame
+
+
+def pytest_mark_asyncio_timeout(*, seconds=1):
+    def decorator(func):
+        @pytest.mark.asyncio
+        @functools.wraps(func)
+        async def replacement(*args, **kwargs):
+            async with async_timeout.timeout(seconds):
+                return await func(*args, **kwargs)
+
+        return replacement
+
+    return decorator
 
 
 @pytest.fixture
@@ -19,7 +35,7 @@ def znp():
     return ZNP()
 
 
-@pytest.mark.asyncio
+@pytest_mark_asyncio_timeout()
 async def test_znp_responses(znp):
     assert not znp._response_listeners
 
@@ -42,7 +58,7 @@ async def test_znp_responses(znp):
     assert (await future) == response
 
 
-@pytest.mark.asyncio
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_matching_partial(znp):
     future = znp.wait_for_response(
         c.SysCommands.ResetInd.Callback(
@@ -80,7 +96,7 @@ async def test_znp_response_matching_partial(znp):
     assert (await future) == response2
 
 
-@pytest.mark.asyncio
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_matching_exact(znp):
     response1 = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -115,7 +131,7 @@ async def test_znp_response_matching_exact(znp):
     assert (await future) == response2
 
 
-@pytest.mark.asyncio
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_not_matching_out_of_order(znp):
     response = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -133,7 +149,7 @@ async def test_znp_response_not_matching_out_of_order(znp):
     assert not future.done()
 
 
-@pytest.mark.asyncio
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_callbacks(znp, event_loop):
     sync_callback = Mock()
     bad_sync_callback = Mock(
@@ -181,3 +197,22 @@ async def test_znp_response_callbacks(znp, event_loop):
     await asyncio.sleep(0.1, loop=event_loop)
     # assert async_callback.call_count == 2  # XXX: this always returns zero
     assert len(async_callback_responses) == 2
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_uart(znp, event_loop):
+    znp._uart = Mock()
+
+    with pytest.raises(KeyError):
+        await znp.command(c.SysCommands.Ping.Req(), foo=0x01)
+
+    ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+
+    event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
+    response = await znp.command(c.SysCommands.Ping.Req())
+
+    assert ping_rsp == response
+
+    frame, _ = TransportFrame.deserialize(bytes.fromhex("FE   00   21 01   20"))
+
+    znp._uart.send.assert_called_once_with(frame.payload)
