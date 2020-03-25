@@ -76,36 +76,36 @@ def test_commands_schema():
     commands_by_id = defaultdict(list)
 
     for commands in c.ALL_COMMANDS:
-        for command in commands:
-            assert command.type in (c.CommandType.SREQ, c.CommandType.AREQ)
+        for cmd in commands:
+            assert cmd.type in (c.CommandType.SREQ, c.CommandType.AREQ)
 
-            if command.type == c.CommandType.SREQ:
-                assert command.type == command.Req.header.type
-                assert command.Rsp.header.type == c.CommandType.SRSP
+            if cmd.type == c.CommandType.SREQ:
+                assert cmd.type == cmd.Req.header.type
+                assert cmd.Rsp.header.type == c.CommandType.SRSP
                 assert (
-                    command.subsystem
-                    == command.Req.header.subsystem
-                    == command.Rsp.header.subsystem
+                    cmd.subsystem
+                    == cmd.Req.header.subsystem
+                    == cmd.Rsp.header.subsystem
                 )
-                assert isinstance(command.Req.header, c.CommandHeader)
-                assert isinstance(command.Rsp.header, c.CommandHeader)
+                assert isinstance(cmd.Req.header, c.CommandHeader)
+                assert isinstance(cmd.Rsp.header, c.CommandHeader)
 
-                assert command.Req.Rsp is command.Rsp
-                assert command.Rsp.Req is command.Req
+                assert cmd.Req.Rsp is cmd.Rsp
+                assert cmd.Rsp.Req is cmd.Req
 
-                _validate_schema(command.Req.schema)
-                _validate_schema(command.Rsp.schema)
+                _validate_schema(cmd.Req.schema)
+                _validate_schema(cmd.Rsp.schema)
 
-                commands_by_id[command.Req.header].append(command.Req)
-                commands_by_id[command.Rsp.header].append(command.Rsp)
-            elif command.type == c.CommandType.AREQ:
-                assert command.type == command.Callback.header.type
-                assert command.subsystem == command.Callback.header.subsystem
-                assert isinstance(command.Callback.header, c.CommandHeader)
+                commands_by_id[cmd.Req.header].append(cmd.Req)
+                commands_by_id[cmd.Rsp.header].append(cmd.Rsp)
+            elif cmd.type == c.CommandType.AREQ:
+                assert cmd.type == cmd.Callback.header.type
+                assert cmd.subsystem == cmd.Callback.header.subsystem
+                assert isinstance(cmd.Callback.header, c.CommandHeader)
 
-                _validate_schema(command.Callback.schema)
+                _validate_schema(cmd.Callback.schema)
 
-                commands_by_id[command.Callback.header].append(command.Callback)
+                commands_by_id[cmd.Callback.header].append(cmd.Callback)
 
     duplicate_commands = {
         cmd: commands for cmd, commands in commands_by_id.items() if len(commands) > 1
