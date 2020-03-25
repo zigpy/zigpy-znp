@@ -1,3 +1,5 @@
+import attr
+import typing
 import asyncio
 import logging
 
@@ -8,10 +10,72 @@ import zigpy_znp.types as t
 
 from zigpy_znp import uart
 from zigpy_znp.commands import SysCommands
+from zigpy_znp.commands.types import CommandBase
 from zigpy_znp.frames import GeneralFrame
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+@attr.s(frozen=True)
+class BaseResponseListener:
+    matching_commands: typing.Iterable[CommandBase] = attr.ib()
+
+    @matching_commands.validator
+    def check(self, attribute, commands):
+        if len({type(c) for c in commands}) != 1:
+            raise ValueError(f"All partial commands must be the same type: {commands}")
+
+        response_types = (
+            zigpy_znp.commands.types.CommandType.SRSP,
+            zigpy_znp.commands.types.CommandType.AREQ,
+        )
+
+        if commands[0].header.type not in response_types:
+            raise ValueError(
+                f"Can only wait for SRSPs and AREQs. Got: {commands[0].header.type}"
+            )
+
+    @property
+    def matching_header(self):
+        return self.matching_commands[0].header
+
+    def resolve(self, command: CommandBase) -> bool:
+        if not any(c.matches(command) for c in self.matching_commands):
+            return False
+
+        self._resolve(command)
+        return True
+
+    def _resolve(self, command: CommandBase) -> None:
+        raise NotImplementedError()
+
+
+@attr.s(frozen=True)
+class OneShotResponseListener(BaseResponseListener):
+    future: asyncio.Future = attr.ib(
+        default=attr.Factory(lambda: asyncio.get_running_loop().create_future())
+    )
+
+    def _resolve(self, command: CommandBase) -> None:
+        self.future.set_result(command)
+
+
+@attr.s(frozen=True)
+class CallbackResponseListener(BaseResponseListener):
+    callback: typing.Callable[[CommandBase], typing.Any] = attr.ib()
+
+    def _resolve(self, command: CommandBase) -> None:
+        try:
+            result = self.callback(command)
+
+            # Run coroutines in the background
+            if asyncio.iscoroutine(result):
+                asyncio.create_task(result)
+        except Exception:
+            LOGGER.warning(
+                "Caught an exception while executing callback", exc_info=True
+            )
 
 
 class ZNP:
@@ -39,41 +103,48 @@ class ZNP:
             LOGGER.warning("Received an unsolicited command: %s", command)
             return
 
-        for partial_commands, future in self._response_futures[command.header]:
-            LOGGER.debug("Testing if %s matches any of %s", command, partial_commands)
+        removed_listeners = []
 
-            for partial_command in partial_commands:
-                if partial_command.matches(command):
-                    LOGGER.debug("Match found: %s ~ %s", command, partial_command)
+        for listener in self._response_futures[command.header]:
+            LOGGER.debug("Testing if %s matches %s", command, listener)
 
-                    self._response_futures[command.header].remove(
-                        (partial_commands, future)
-                    )
-                    future.set_result(command)
-                    break
-        else:
-            LOGGER.warning("No listener matched command: %s", command)
+            if not listener.resolve(command):
+                continue
 
-    def wait_for_responses(self, commands):
-        if len({type(c) for c in commands}) != 1:
-            raise ValueError(f"All partial commands must be the same type: {commands}")
+            LOGGER.debug("Match found: %s ~ %s", command, listener)
 
-        response_types = (
-            zigpy_znp.commands.types.CommandType.SRSP,
-            zigpy_znp.commands.types.CommandType.AREQ,
-        )
+            # Callbacks never expire
+            if isinstance(listener, CallbackResponseListener):
+                continue
 
-        if commands[0].header.type not in response_types:
-            raise ValueError(
-                f"Can only wait for SRSPs and AREQs. Got: {commands[0].header.type}"
-            )
+            # We can't just break on the first match because we have callbacks
+            removed_listeners.append(listener)
 
-        future = asyncio.get_running_loop().create_future()
-        self._response_futures[commands[0].header].append((commands, future))
+        # Remove our dead listeners after we've gone through all the rest
+        for listener in removed_listeners:
+            LOGGER.debug("Removing listener %s", listener)
+            self._response_futures[command.header].remove(listener)
 
-        return future
+        # Clean up if we have no more listeners for this command
+        if not self._response_futures[command.header]:
+            del self._response_futures[command.header]
 
-    def wait_for_response(self, command: zigpy_znp.commands.types.CommandBase):
+    def callback_for_responses(self, commands, callback) -> None:
+        listener = CallbackResponseListener(commands, callback=callback)
+        self._response_futures[listener.matching_header].append(listener)
+
+    def callback_for_response(self, command, callback) -> None:
+        return self.callback_for_responses([command], callback)
+
+    def wait_for_responses(self, commands) -> asyncio.Future:
+        listener = OneShotResponseListener(commands)
+        self._response_futures[listener.matching_header].append(listener)
+
+        return listener.future
+
+    def wait_for_response(
+        self, command: zigpy_znp.commands.types.CommandBase
+    ) -> asyncio.Future:
         return self.wait_for_responses([command])
 
     async def command(self, command, *, ignore_response=False):
