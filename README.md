@@ -1,7 +1,7 @@
 # zigpy-ZNP
 
 [![Build Status](https://travis-ci.com/puddly/zigpy-znp.svg?branch=dev)](https://travis-ci.com/puddly/zigpy-znp)
-[![Coverage Status](https://coveralls.io/repos/github/puddly/casserole/badge.svg?branch=dev)](https://coveralls.io/github/puddly/casserole?branch=dev)
+[![Coverage Status](https://coveralls.io/repos/github/puddly/zigpy-znp/badge.svg?branch=dev)](https://coveralls.io/github/puddly/zigpy-znp?branch=dev)
 
 [zigpy-znp](https://github.com/puddly/zigpy-zhp/) adds support for common [Texas Instruments Zigbee Network Processors](http://dev.ti.com/tirex/content/simplelink_zigbee_sdk_plugin_2_20_00_06/docs/zigbee_user_guide/html/zigbee/developing_zigbee_applications/znp_interface/znp_interface.html) to the [Zigpy](https://github.com/zigpy/) project, implementing a Zigbee stack.
 
