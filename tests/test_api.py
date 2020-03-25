@@ -21,14 +21,23 @@ def znp():
 
 @pytest.mark.asyncio
 async def test_znp_responses(znp):
+    assert not znp._response_listeners
+
     # Can't wait for non-response types
     with pytest.raises(ValueError):
         await znp.wait_for_response(c.SysCommands.Ping.Req())
 
+    assert not znp._response_listeners
+
     future = znp.wait_for_response(c.SysCommands.Ping.Rsp(partial=True))
+
+    assert znp._response_listeners
 
     response = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
     znp.frame_received(response.to_frame())
+
+    # Our listener should have been cleaned up here
+    assert not znp._response_listeners
 
     assert (await future) == response
 

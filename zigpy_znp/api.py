@@ -81,7 +81,7 @@ class CallbackResponseListener(BaseResponseListener):
 class ZNP:
     def __init__(self):
         self._uart = None
-        self._response_futures = defaultdict(list)
+        self._response_listeners = defaultdict(list)
 
     def set_application(self, app):
         self._app = app
@@ -99,13 +99,13 @@ class ZNP:
         command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.header]
         command = command_cls.from_frame(frame)
 
-        if command.header not in self._response_futures:
+        if command.header not in self._response_listeners:
             LOGGER.warning("Received an unsolicited command: %s", command)
             return
 
         removed_listeners = []
 
-        for listener in self._response_futures[command.header]:
+        for listener in self._response_listeners[command.header]:
             LOGGER.debug("Testing if %s matches %s", command, listener)
 
             if not listener.resolve(command):
@@ -123,22 +123,22 @@ class ZNP:
         # Remove our dead listeners after we've gone through all the rest
         for listener in removed_listeners:
             LOGGER.debug("Removing listener %s", listener)
-            self._response_futures[command.header].remove(listener)
+            self._response_listeners[command.header].remove(listener)
 
         # Clean up if we have no more listeners for this command
-        if not self._response_futures[command.header]:
-            del self._response_futures[command.header]
+        if not self._response_listeners[command.header]:
+            del self._response_listeners[command.header]
 
     def callback_for_responses(self, commands, callback) -> None:
         listener = CallbackResponseListener(commands, callback=callback)
-        self._response_futures[listener.matching_header].append(listener)
+        self._response_listeners[listener.matching_header].append(listener)
 
     def callback_for_response(self, command, callback) -> None:
         return self.callback_for_responses([command], callback)
 
     def wait_for_responses(self, commands) -> asyncio.Future:
         listener = OneShotResponseListener(commands)
-        self._response_futures[listener.matching_header].append(listener)
+        self._response_listeners[listener.matching_header].append(listener)
 
         return listener.future
 
