@@ -19,5 +19,5 @@ setup(
         "zigpy-homeassistant >= 0.10.0",
         "async_timeout",
     ],
-    tests_require=["asynctest", "pytest", "pytest-asyncio", "asyncmock"],
+    tests_require=["asynctest", "pytest==5.3.5", "pytest-asyncio", "asyncmock"],
 )
