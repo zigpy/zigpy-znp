@@ -153,7 +153,7 @@ class ScanType(basic.enum_uint8, enum.IntEnum):
     Orphan = 0x03
 
 
-@attr.s
+@attr.s(frozen=True)
 class Schema:
     """List of Parameters."""
 

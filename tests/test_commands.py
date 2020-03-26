@@ -164,6 +164,30 @@ def test_command_param_binding():
         ping_rsp.Oops
 
 
+def test_command_immutability():
+    command1 = c.SysCommands.NVWrite.Req(
+        partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
+    )
+
+    command2 = c.SysCommands.NVWrite.Req(
+        partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
+    )
+
+    d = {command1: True}
+
+    assert command2 in d
+    assert {command1: True} == {command2: True}
+
+    with pytest.raises(RuntimeError):
+        command1.partial = False
+
+    with pytest.raises(RuntimeError):
+        command1.SysId = 0x10
+
+    with pytest.raises(RuntimeError):
+        command1.ItemId = 0x1234
+
+
 def test_command_serialization():
     command = c.SysCommands.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"

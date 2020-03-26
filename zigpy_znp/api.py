@@ -19,13 +19,10 @@ LOGGER = logging.getLogger(__name__)
 
 @attr.s(frozen=True)
 class BaseResponseListener:
-    matching_commands: typing.Iterable[CommandBase] = attr.ib()
+    matching_commands: typing.Tuple[CommandBase] = attr.ib(converter=tuple)
 
     @matching_commands.validator
     def check(self, attribute, commands):
-        if len({type(c) for c in commands}) != 1:
-            raise ValueError(f"All partial commands must be the same type: {commands}")
-
         response_types = (
             zigpy_znp.commands.types.CommandType.SRSP,
             zigpy_znp.commands.types.CommandType.AREQ,
@@ -36,9 +33,9 @@ class BaseResponseListener:
                 f"Can only wait for SRSPs and AREQs. Got: {commands[0].header.type}"
             )
 
-    @property
-    def matching_header(self):
-        return self.matching_commands[0].header
+    def matching_headers(self):
+        for command in self.matching_commands:
+            yield command.header
 
     def resolve(self, command: CommandBase) -> bool:
         if not any(c.matches(command) for c in self.matching_commands):
@@ -107,12 +104,21 @@ class ZNP:
             return
 
         removed_listeners = []
+        matched_listeners = set()
 
         for listener in self._response_listeners[command.header]:
             LOGGER.debug("Testing if %s matches %s", command, listener)
 
+            if listener in matched_listeners:
+                LOGGER.debug(
+                    "Listener %s has already been triggered. Ignoring...", listener
+                )
+                continue
+
             if not listener.resolve(command):
                 continue
+
+            matched_listeners.add(listener)
 
             LOGGER.debug("Match found: %s ~ %s", command, listener)
 
@@ -126,22 +132,27 @@ class ZNP:
         # Remove our dead listeners after we've gone through all the rest
         for listener in removed_listeners:
             LOGGER.debug("Removing listener %s", listener)
-            self._response_listeners[command.header].remove(listener)
 
-        # Clean up if we have no more listeners for this command
-        if not self._response_listeners[command.header]:
-            del self._response_listeners[command.header]
+            for header in listener.matching_headers():
+                self._response_listeners[header].remove(listener)
+
+                if not self._response_listeners[header]:
+                    del self._response_listeners[header]
 
     def callback_for_responses(self, commands, callback) -> None:
         listener = CallbackResponseListener(commands, callback=callback)
-        self._response_listeners[listener.matching_header].append(listener)
+
+        for header in listener.matching_headers():
+            self._response_listeners[header].append(listener)
 
     def callback_for_response(self, command, callback) -> None:
         return self.callback_for_responses([command], callback)
 
     def wait_for_responses(self, commands) -> asyncio.Future:
         listener = OneShotResponseListener(commands)
-        self._response_listeners[listener.matching_header].append(listener)
+
+        for header in listener.matching_headers():
+            self._response_listeners[header].append(listener)
 
         return listener.future
 

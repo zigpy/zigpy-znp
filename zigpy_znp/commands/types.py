@@ -235,8 +235,9 @@ class CommandBase:
         cls.schema = schema
 
     def __init__(self, **params):
-        self.bound_params = self._bind_params(
-            params, partial=params.pop("partial", False)
+        super().__setattr__(
+            "_bound_params",
+            self._bind_params(params, partial=params.pop("partial", False)),
         )
 
     def _bind_params(self, params, partial=False):
@@ -290,14 +291,14 @@ class CommandBase:
     def to_frame(self):
         from zigpy_znp.frames import GeneralFrame
 
-        missing_params = {p.name for p, v in self.bound_params.values() if v is None}
+        missing_params = {p.name for p, v in self._bound_params.values() if v is None}
 
         if missing_params:
             raise ValueError(
                 f"Cannot serialize a partial frame: missing {missing_params}"
             )
 
-        data = b"".join(v.serialize() for p, v in self.bound_params.values())
+        data = b"".join(v.serialize() for p, v in self._bound_params.values())
 
         return GeneralFrame(self.header, data)
 
@@ -325,7 +326,7 @@ class CommandBase:
 
         assert self.header == other.header
 
-        param_pairs = zip(self.bound_params.values(), other.bound_params.values())
+        param_pairs = zip(self._bound_params.values(), other._bound_params.values())
 
         for (
             (expected_param, expected_value),
@@ -340,17 +341,27 @@ class CommandBase:
         return True
 
     def __eq__(self, other):
-        return type(self) is type(other) and self.bound_params == other.bound_params
+        return type(self) is type(other) and self._bound_params == other._bound_params
+
+    def __hash__(self):
+        params = tuple(self._bound_params.items())
+        return hash((type(self), self.header, self.schema, params))
 
     def __getattr__(self, key):
-        if key not in self.bound_params:
+        if key not in self._bound_params:
             raise AttributeError(key)
 
-        param, value = self.bound_params[key]
+        param, value = self._bound_params[key]
         return value
 
+    def __setattr__(self, key, value):
+        raise RuntimeError("Command instances are immutable")
+
+    def __delattr__(self, key):
+        raise RuntimeError("Command instances are immutable")
+
     def __repr__(self):
-        params = [f"{p.name}={v!r}" for p, v in self.bound_params.values()]
+        params = [f"{p.name}={v!r}" for p, v in self._bound_params.values()]
 
         return f'{self.__class__.__qualname__}({", ".join(params)})'
 
