@@ -142,8 +142,9 @@ def test_command_param_binding():
     a = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
     b = c.UtilCommands.TimeAlive.Rsp(Seconds=t.uint32_t(12))
 
+    assert a == b
     assert a.Seconds == b.Seconds
-    assert type(a) == type(b)
+    assert type(a.Seconds) == type(b.Seconds) == t.uint32_t  # noqa: E721
 
     # Overflowing integer types
     with pytest.raises(ValueError):
@@ -175,6 +176,7 @@ def test_command_immutability():
 
     d = {command1: True}
 
+    assert command1 == command2
     assert command2 in d
     assert {command1: True} == {command2: True}
 
@@ -186,6 +188,11 @@ def test_command_immutability():
 
     with pytest.raises(RuntimeError):
         command1.ItemId = 0x1234
+
+    with pytest.raises(RuntimeError):
+        del command1.ItemId
+
+    assert command1 == command2
 
 
 def test_command_serialization():

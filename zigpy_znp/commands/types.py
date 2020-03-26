@@ -1,8 +1,12 @@
 import enum
+import logging
 
 import attr
 import zigpy.zdo.types
 import zigpy_znp.types as t
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @attr.s
@@ -234,13 +238,7 @@ class CommandBase:
         cls.header = header
         cls.schema = schema
 
-    def __init__(self, **params):
-        super().__setattr__(
-            "_bound_params",
-            self._bind_params(params, partial=params.pop("partial", False)),
-        )
-
-    def _bind_params(self, params, partial=False):
+    def __init__(self, *, partial=False, **params):
         all_params = {param.name for param in self.schema.parameters}
         given_params = set(params.keys())
 
@@ -286,7 +284,10 @@ class CommandBase:
 
             bound_params[param.name] = (param, value)
 
-        return bound_params
+        super().__setattr__("_bound_params", bound_params)
+
+        if partial and all_params == given_params:
+            LOGGER.warning("Partial command has no unbound parameters: %s", self)
 
     def to_frame(self):
         from zigpy_znp.frames import GeneralFrame
