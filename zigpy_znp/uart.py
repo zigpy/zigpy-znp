@@ -18,19 +18,26 @@ class BufferTooShort(Exception):
 
 class Gateway(asyncio.Protocol):
     def __init__(self, api):
-        self._buffer = b""
+        self._buffer = bytearray()
         self._api = api
         self._transport = None
 
     def close(self) -> None:
         """Closes the port."""
+        self._buffer.clear()
         self.transport.close()
 
     def connection_lost(self, exc: typing.Optional[Exception]) -> None:
         """Connection lost."""
+
+        self._buffer.clear()
+
         if exc is not None:
-            LOGGER.info("Lost connection to %s: %s", self._transport.serial.name, exc)
+            LOGGER.warning(
+                "Lost connection to %s", self._transport.serial.name, exc_info=exc
+            )
             self._api.connection_lost(exc)
+
         LOGGER.debug("Closing %s serial port", self._transport.serial.name)
 
     def connection_made(self, transport: serial_asyncio.SerialTransport) -> None:
@@ -76,9 +83,9 @@ class Gateway(asyncio.Protocol):
 
                 if sof_index < 0:
                     # If we don't have a SoF in the buffer, drop everything
-                    self._buffer = b""
+                    self._buffer.clear()
                 else:
-                    self._buffer = self._buffer[sof_index:]
+                    del self._buffer[:sof_index]
 
     def _extract_frame(self) -> typing.Optional[frames.TransportFrame]:
         """Extracts a single frame from the buffer."""
@@ -114,8 +121,8 @@ class Gateway(asyncio.Protocol):
             )
             raise InvalidFrame()
 
-        # Finally, we have a valid frame
-        self._buffer = rest
+        # We finally have a valid frame. Update the buffer.
+        del self._buffer[: len(self._buffer) - len(rest)]
 
         return frame
 
