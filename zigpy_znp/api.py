@@ -90,6 +90,9 @@ class ZNP:
         assert self._uart is None
         self._uart = await uart.connect(device, baudrate, self)
 
+    def connection_lost(self, exc):
+        raise NotImplementedError()
+
     def close(self):
         return self._uart.close()
 

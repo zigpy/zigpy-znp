@@ -6,6 +6,8 @@ import typing
 import serial
 import serial_asyncio
 
+from serial.tools.list_ports import comports as list_com_ports
+
 import zigpy_znp.frames as frames
 from zigpy_znp.exceptions import InvalidFrame
 
@@ -127,9 +129,38 @@ class Gateway(asyncio.Protocol):
         return frame
 
 
+def guess_port():
+    """Picks the first USB port with a Texas Instruments vendor ID."""
+    candidates = []
+
+    for port in list_com_ports(include_links=True):
+        # Add only TI devices
+        if port.vid == 0x0451:
+            candidates.append(port)
+
+    if not candidates:
+        raise RuntimeError("Could not auto detect any TI ports")
+
+    # Is there no better heuristic than picking the first TI device?
+    candidates.sort(key=lambda p: p.location)
+    device = candidates[0].device
+
+    if len(candidates) > 1:
+        LOGGER.warning(
+            "Found multiple Texas Instruments devices: %s",
+            [c.__dict__ for c in candidates],
+        )
+        LOGGER.warning("Picking the first one: %s", device)
+
+    return device
+
+
 async def connect(port, baudrate, api, loop=None):
     if loop is None:
         loop = asyncio.get_event_loop()
+
+    if port == "auto":
+        port = guess_port()
 
     transport, protocol = await serial_asyncio.create_serial_connection(
         loop,
