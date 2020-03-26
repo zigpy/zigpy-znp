@@ -166,6 +166,7 @@ async def test_znp_response_callbacks(znp, event_loop):
 
     good_command1 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
     good_command2 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_APP)
+    good_command3 = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
     bad_command1 = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
     bad_command2 = c.SysCommands.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
@@ -180,8 +181,11 @@ async def test_znp_response_callbacks(znp, event_loop):
                 # Duplicating matching commands shouldn't do anything
                 c.SysCommands.Ping.Rsp(partial=True),
                 c.SysCommands.Ping.Rsp(partial=True),
+                # Matching against different command types should also work
+                c.UtilCommands.TimeAlive.Rsp(Seconds=12),
                 c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
                 c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
+                c.UtilCommands.TimeAlive.Rsp(Seconds=10),
             ],
             callback,
         )
@@ -190,13 +194,78 @@ async def test_znp_response_callbacks(znp, event_loop):
     znp.frame_received(bad_command1.to_frame())
     znp.frame_received(good_command2.to_frame())
     znp.frame_received(bad_command2.to_frame())
+    znp.frame_received(good_command3.to_frame())
 
-    assert sync_callback.call_count == 2
-    assert bad_sync_callback.call_count == 2
+    assert sync_callback.call_count == 3
+    assert bad_sync_callback.call_count == 3
 
     await asyncio.sleep(0.1, loop=event_loop)
-    # assert async_callback.call_count == 2  # XXX: this always returns zero
-    assert len(async_callback_responses) == 2
+    # assert async_callback.call_count == 3  # XXX: this always returns zero
+    assert len(async_callback_responses) == 3
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_wait_for_responses(znp, event_loop):
+    command1 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    command2 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_APP)
+    command3 = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
+    command4 = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
+    command5 = c.SysCommands.NVWrite.Req(
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
+    )
+
+    # We shouldn't see any effects from receiving a frame early
+    znp.frame_received(command1.to_frame())
+
+    future1 = znp.wait_for_responses(
+        [c.SysCommands.Ping.Rsp(partial=True), c.SysCommands.Ping.Rsp(partial=True)]
+    )
+
+    future2 = znp.wait_for_responses(
+        [
+            c.UtilCommands.TimeAlive.Rsp(Seconds=12),
+            c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_UTIL),
+        ]
+    )
+
+    future3 = znp.wait_for_responses([c.UtilCommands.TimeAlive.Rsp(Seconds=10)])
+
+    future4 = znp.wait_for_responses(
+        [
+            # Duplicating matching commands shouldn't do anything
+            c.SysCommands.Ping.Rsp(partial=True),
+            c.SysCommands.Ping.Rsp(partial=True),
+            # Matching against different command types should also work
+            c.UtilCommands.TimeAlive.Rsp(Seconds=12),
+            c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
+            c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
+            c.UtilCommands.TimeAlive.Rsp(Seconds=10),
+        ]
+    )
+
+    znp.frame_received(command1.to_frame())
+    znp.frame_received(command2.to_frame())
+    znp.frame_received(command3.to_frame())
+    znp.frame_received(command4.to_frame())
+    znp.frame_received(command5.to_frame())
+    znp.frame_received(command1.to_frame())
+    znp.frame_received(command2.to_frame())
+    znp.frame_received(command3.to_frame())
+    znp.frame_received(command4.to_frame())
+    znp.frame_received(command5.to_frame())
+
+    assert future1.done()
+    assert future2.done()
+    assert not future3.done()
+    assert future4.done()
+
+    assert (await future1) == command1
+    assert (await future2) == command3
+    assert (await future4) == command1
+
+    znp.frame_received(c.UtilCommands.TimeAlive.Rsp(Seconds=10).to_frame())
+    assert future3.done()
+    assert (await future3) == c.UtilCommands.TimeAlive.Rsp(Seconds=10)
 
 
 @pytest_mark_asyncio_timeout()
