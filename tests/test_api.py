@@ -150,6 +150,22 @@ async def test_znp_response_not_matching_out_of_order(znp):
 
 
 @pytest_mark_asyncio_timeout()
+async def test_znp_response_callback_simple(znp, event_loop):
+    sync_callback = Mock()
+
+    good_command = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Failure)
+    bad_command = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
+
+    znp.callback_for_response(good_command, sync_callback)
+
+    znp.frame_received(bad_command.to_frame())
+    assert sync_callback.call_count == 0
+
+    znp.frame_received(good_command.to_frame())
+    sync_callback.assert_called_once_with(good_command)
+
+
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_callbacks(znp, event_loop):
     sync_callback = Mock()
     bad_sync_callback = Mock(
@@ -274,6 +290,36 @@ async def test_znp_uart(znp, event_loop):
 
     with pytest.raises(KeyError):
         await znp.command(c.SysCommands.Ping.Req(), foo=0x01)
+
+    # You cannot ignore the response and specify response params
+    with pytest.raises(KeyError):
+        await znp.command(
+            c.SysCommands.Ping.Req(),
+            ignore_response=True,
+            Capabilities=c.types.MTCapabilities.CAP_SYS,
+        )
+
+    # You cannot send anything but requests
+    with pytest.raises(ValueError):
+        await znp.command(
+            c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+        )
+
+    with pytest.raises(ValueError):
+        await znp.command(
+            c.SysCommands.ResetInd.Callback(
+                Reason=t.ResetReason.PowerUp,
+                TransportRev=0x00,
+                MajorRel=0x01,
+                MinorRel=0x02,
+                HwRev=0x03,
+            )
+        )
+
+    assert (await znp.command(c.SysCommands.Ping.Req(), ignore_response=True)) is None
+    znp._uart.send.assert_called_once_with(c.SysCommands.Ping.Req().to_frame())
+
+    znp._uart.send.reset_mock()
 
     ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
 

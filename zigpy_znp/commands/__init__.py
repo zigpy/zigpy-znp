@@ -37,4 +37,6 @@ for cmds in ALL_COMMANDS:
         elif command.type == CommandType.AREQ:
             COMMANDS_BY_ID[command.Callback.header] = command.Callback
         else:
-            raise ValueError(f"Unhandled command type: {command.type}")
+            raise ValueError(
+                f"Unhandled command type: {command.type}"
+            )  # pragma: no cover

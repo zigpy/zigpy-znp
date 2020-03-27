@@ -112,7 +112,7 @@ class CommandHeader(t.uint16_t):
     """CommandHeader class."""
 
     @property
-    def cmd0(self):
+    def cmd0(self) -> t.uint8_t:
         return t.uint8_t(self & 0x00FF)
 
     @property
@@ -211,7 +211,9 @@ class CommandsMeta(type):
                 Callback.__qualname__ = qualname + ".Callback"
                 helper_class_dict["Callback"] = Callback
             else:
-                raise ValueError(f"Unknown command type: {definition.command_type}")
+                raise ValueError(
+                    f"Unknown command type: {definition.command_type}"
+                )  # pragma: no cover
 
             classdict[command] = type(command, (), helper_class_dict)
             classdict["_commands"].append(classdict[command])

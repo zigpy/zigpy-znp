@@ -45,7 +45,8 @@ class BaseResponseListener:
         return True
 
     def _resolve(self, command: CommandBase) -> None:
-        raise NotImplementedError()
+        """Implemented by subclasses to handle matched commands."""
+        raise NotImplementedError()  # pragma: no cover
 
 
 @attr.s(frozen=True)
