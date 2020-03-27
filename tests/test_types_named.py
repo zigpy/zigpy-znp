@@ -75,3 +75,9 @@ def test_channels():
 
     with pytest.raises(ValueError):
         t.Channels.from_channel_list([27, 13, 15, 18])  # 27 is not a valid channel
+
+
+def test_missing_status_enum():
+    assert 0xFF not in list(t.Status)
+    assert isinstance(t.Status(0xFF), t.Status)
+    assert t.Status(0xFF).value == 0xFF

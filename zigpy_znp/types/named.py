@@ -1,10 +1,14 @@
 import enum
 import typing
+import logging
 
 import attr
 from zigpy.types import EUI64, NWK, ExtendedPanId, PanId
 
 from . import basic, struct
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class _EnumEq:
@@ -168,22 +172,32 @@ class Status(basic.uint8_t, enum.Enum):
     ItemNotCreated = 0x0A
     BadLength = 0x0C
     MemoryFailure = 0x10
-    TableFull = 0x011
+    TableFull = 0x11
     MACNoResource = 0x1A
     InvalidRequest = 0xC2
+
+    NwkTableFull = 0xC7
+    NwkNoRoute = 0xCD
+
+    MacChannelAccessFailure = 0xE1
+
     UnknownDevice = 0xC8
     ZMACInvalidParameter = 0xE8
     ZMACNoBeacon = 0xEA
     MACScanInProgress = 0xFC
 
     @classmethod
-    def deserialize(cls, data, byteorder="little"):
-        try:
-            return super().deserialize(data, byteorder)
-        except ValueError:
-            fenum = FakeEnum(cls.__name__)
-            status, data = basic.uint8_t.deserialize(data, byteorder)
-            return fenum(f"unknown_0x{status:02x}", status), data
+    def _missing_(cls, value):
+        if not isinstance(value, int) or value < 0 or value > 0xFF:
+            return None
+
+        new_member = basic.uint8_t.__new__(cls, value)
+        new_member._name_ = f"unknown_0x{value:02X}"
+        new_member._value_ = value
+
+        LOGGER.warning("Unhandled Status value: %s", new_member)
+
+        return new_member
 
 
 @attr.s(frozen=True)
