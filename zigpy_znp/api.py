@@ -34,7 +34,7 @@ def _deduplicate_commands(commands):
                 break
             else:
                 # Otherwise, we keep looking
-                pass
+                pass  # pragma: no cover
         else:
             # If we matched nothing and nothing matched us, we extend the list
             maximal_commands.append(command)

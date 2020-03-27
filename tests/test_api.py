@@ -184,6 +184,13 @@ async def test_znp_response_not_matching_out_of_order(znp):
 
 
 @pytest_mark_asyncio_timeout()
+async def test_znp_wait_responses_empty(znp):
+    # You shouldn't be able to wait for an empty list of responses
+    with pytest.raises(ValueError):
+        await znp.wait_for_responses([])
+
+
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_callback_simple(znp, event_loop):
     sync_callback = Mock()
 
