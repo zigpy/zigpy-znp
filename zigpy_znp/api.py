@@ -7,6 +7,7 @@ from collections import defaultdict
 
 import zigpy_znp.commands
 import zigpy_znp.types as t
+from zigpy_znp.types import nvids
 
 from zigpy_znp import uart
 from zigpy_znp.commands import SysCommands
@@ -217,9 +218,34 @@ class ZNP:
 
         return await self.wait_for_response(response)
 
-    async def nvram_write(self, nv_id: t.uint16_t, value, *, offset: t.uint8_t = 0):
+    async def nvram_write(
+        self, nv_id: nvids.BaseNvIds, value, *, offset: t.uint8_t = 0
+    ):
+        # While unpythonic, explicit type checking here means we can detect overflows
+        if not isinstance(nv_id, nvids.BaseNvIds):
+            raise ValueError(
+                "The nv_id param must be an instance of BaseNvIds. "
+                "Extend one of the tables in zigpy_znp.types.nvids."
+            )
+
         if not isinstance(value, bytes):
             value = value.serialize()
+
+        # Find the next NVID in the table to check that our write doesn't overflow
+        # It's not foolproof, but it will catch simple mistakes
+        all_enum_values = list(type(nv_id))
+        index = all_enum_values.index(nv_id)
+
+        if index == len(all_enum_values) - 1:
+            LOGGER.warning(
+                "NVID is at end of table, cannot check for overflow"
+            )  # pragma: no cover
+        else:
+            next_nvid = all_enum_values[index + 1]
+            end_address = nv_id + offset + len(value)
+
+            if end_address > next_nvid:
+                raise ValueError("OSALNVWrite command overflows into %s", next_nvid)
 
         return await self.command(
             SysCommands.OSALNVWrite.Req(

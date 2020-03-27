@@ -13,6 +13,8 @@ except ImportError:
 import zigpy_znp.commands as c
 import zigpy_znp.types as t
 
+from zigpy_znp.types import nvids
+
 from zigpy_znp.api import ZNP, _deduplicate_commands
 from zigpy_znp.frames import TransportFrame
 
@@ -417,3 +419,64 @@ async def test_znp_uart(znp, event_loop):
     frame, _ = TransportFrame.deserialize(bytes.fromhex("FE   00   21 01   20"))
 
     znp._uart.send.assert_called_once_with(frame.payload)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_nvram_writes(znp, event_loop):
+    znp._uart = Mock()
+
+    # Passing numerical addresses is disallowed because we can't check for overflows
+    with pytest.raises(ValueError):
+        await znp.nvram_write(0x0003, t.uint8_t(0xAB))
+
+    # Neither is passing in untyped integers
+    with pytest.raises(AttributeError):
+        await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, 0xAB)
+
+    # This, however, should work
+    assert nvids.NvIds.STARTUP_OPTION == 0x0003
+
+    event_loop.call_soon(
+        znp.frame_received,
+        c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
+    )
+    await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, t.uint8_t(0xAB))
+    znp._uart.send.assert_called_once_with(
+        c.SysCommands.OSALNVWrite.Req(
+            Id=0x0003, Offset=0x00, Value=t.ShortBytes(b"\xAB")
+        ).to_frame()
+    )
+
+    znp._uart.send.reset_mock()
+
+    # As should explicitly serializing the value to bytes
+    event_loop.call_soon(
+        znp.frame_received,
+        c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
+    )
+    await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, t.uint8_t(0xAB).serialize())
+    znp._uart.send.assert_called_once_with(
+        c.SysCommands.OSALNVWrite.Req(
+            Id=0x0003, Offset=0x00, Value=t.ShortBytes(b"\xAB")
+        ).to_frame()
+    )
+
+    znp._uart.send.reset_mock()
+
+    # And passing in bytes directly
+    event_loop.call_soon(
+        znp.frame_received,
+        c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
+    )
+    await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, b"\xAB")
+    znp._uart.send.assert_called_once_with(
+        c.SysCommands.OSALNVWrite.Req(
+            Id=0x0003, Offset=0x00, Value=t.ShortBytes(b"\xAB")
+        ).to_frame()
+    )
+
+    znp._uart.send.reset_mock()
+
+    # Writing too big of a value should fail
+    with pytest.raises(ValueError):
+        await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, t.uint16_t(0xAABB))

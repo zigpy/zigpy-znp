@@ -3,14 +3,18 @@ import enum
 from zigpy_znp.types import basic
 
 
-class ZclPortNvIds(basic.enum_uint16, enum.IntEnum):
+class BaseNvIds(basic.enum_uint16, enum.IntEnum):
+    pass
+
+
+class ZclPortNvIds(BaseNvIds):
     # ZCL Port NV IDs (Application Layer NV Items)
     SCENE_TABLE = 0x0001
     PROXY_TABLE = 0x0002
     SINK_TABLE = 0x0003
 
 
-class ExtendedNvIds(basic.enum_uint16, enum.IntEnum):
+class ExtendedNvIds(BaseNvIds):
     # OSAL NV Item IDs
     LEGACY = 0x0000
     ADDRMGR = 0x0001
@@ -25,7 +29,7 @@ class ExtendedNvIds(basic.enum_uint16, enum.IntEnum):
     ZNP_HAS_CONFIGURED_ZSTACK3 = 0x0060
 
 
-class NvIds(basic.enum_uint16, enum.IntEnum):
+class NvIds(BaseNvIds):
     # OSAL NV item IDs
     EXTADDR = 0x0001
     BOOTCOUNTER = 0x0002
