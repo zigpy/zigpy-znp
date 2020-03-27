@@ -162,7 +162,12 @@ class ZNP:
         LOGGER.debug("Frame received: %s", frame)
 
         command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.header]
-        command = command_cls.from_frame(frame)
+
+        # Compiling with INCLUDE_REVISION_INFORMATION appends undocumented info
+        if command_cls == zigpy_znp.commands.sys.SysCommands.Version.Rsp:
+            command = command_cls.from_frame(frame, ignore_unparsed=True)
+        else:
+            command = command_cls.from_frame(frame)
 
         LOGGER.debug("Command received: %s", command)
 

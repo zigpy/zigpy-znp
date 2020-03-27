@@ -267,7 +267,8 @@ class CommandBase:
                     value = param.type(value)
                 else:
                     raise ValueError(
-                        f"Param {param.name} is type {param.type}, got {type(value)}"
+                        f"In {type(self)}, param {param.name} is "
+                        f"type {param.type}, got {type(value)}"
                     )
 
                 try:
@@ -300,10 +301,10 @@ class CommandBase:
         return GeneralFrame(self.header, data)
 
     @classmethod
-    def from_frame(cls, frame) -> "CommandBase":
+    def from_frame(cls, frame, *, ignore_unparsed=False) -> "CommandBase":
         if frame.header != cls.header:
             raise ValueError(
-                f"Wrong frame header: expected {cls.header}, got {frame.header}"
+                f"Wrong frame header in {cls}: {cls.header} != {frame.header}"
             )
 
         data = frame.data
@@ -313,7 +314,14 @@ class CommandBase:
             params[param.name], data = param.type.deserialize(data)
 
         if data:
-            raise ValueError(f"Unparsed data remains at the end of the frame: {data!r}")
+            if ignore_unparsed:
+                LOGGER.warning(
+                    f"Unparsed data remains in {cls} at the end of the frame: {data!r}"
+                )
+            else:
+                raise ValueError(
+                    f"Unparsed data remains in {cls} at the end of the frame: {data!r}"
+                )
 
         return cls(**params)
 

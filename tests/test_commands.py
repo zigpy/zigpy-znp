@@ -1,4 +1,5 @@
 import pytest
+import logging
 
 import zigpy_znp.commands as c
 from zigpy_znp import types as t
@@ -256,7 +257,7 @@ def test_command_equality():
     )
 
 
-def test_command_deserialization():
+def test_command_deserialization(caplog):
     command = c.SysCommands.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
@@ -270,6 +271,15 @@ def test_command_deserialization():
         bad_frame.data += b"\x00"
 
         type(command).from_frame(bad_frame)
+
+    # But it does succeed with a warning if you explicitly allow it
+    with pytest.warns(None):
+        True
+
+    with caplog.at_level(logging.WARNING):
+        type(command).from_frame(bad_frame, ignore_unparsed=True)
+
+    assert "Unparsed" in caplog.text
 
     # Deserialization fails if you attempt to deserialize the wrong frame
     with pytest.raises(ValueError):
