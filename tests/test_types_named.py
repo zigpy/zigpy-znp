@@ -81,3 +81,7 @@ def test_missing_status_enum():
     assert 0xFF not in list(t.Status)
     assert isinstance(t.Status(0xFF), t.Status)
     assert t.Status(0xFF).value == 0xFF
+
+    # Status values that don't fit can't be created
+    with pytest.raises(ValueError):
+        t.Status(0xFF + 1)
