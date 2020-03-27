@@ -221,12 +221,6 @@ class CommandsMeta(type):
     def __iter__(self):
         return iter(self._commands)
 
-    def __getitem__(self, key):
-        return self._commands[key]
-
-    def __len__(self):
-        return len(self._commands)
-
 
 class CommandsBase(metaclass=CommandsMeta, subsystem=None):
     pass
