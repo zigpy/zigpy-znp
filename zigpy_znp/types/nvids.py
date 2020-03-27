@@ -1,6 +1,6 @@
 import enum
 
-from zigpy_cc.types import basic
+from zigpy_znp.types import basic
 
 
 class ZclPortNvIds(basic.enum_uint16, enum.IntEnum):
