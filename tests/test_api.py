@@ -13,7 +13,7 @@ except ImportError:
 import zigpy_znp.commands as c
 import zigpy_znp.types as t
 
-from zigpy_znp.api import ZNP
+from zigpy_znp.api import ZNP, _deduplicate_commands
 from zigpy_znp.frames import TransportFrame
 
 
@@ -52,10 +52,44 @@ async def test_znp_responses(znp):
     response = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
     znp.frame_received(response.to_frame())
 
-    # Our listener should have been cleaned up here
+    assert (await future) == response
+
+    # Our listener will have been cleaned up after a step
+    await asyncio.sleep(0)
     assert not znp._response_listeners
 
-    assert (await future) == response
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_response_timeouts(znp):
+    response = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+
+    async def send_soon(delay):
+        await asyncio.sleep(delay)
+        znp.frame_received(response.to_frame())
+
+    asyncio.create_task(send_soon(0.1))
+
+    async with async_timeout.timeout(0.5):
+        assert (
+            await znp.wait_for_response(c.SysCommands.Ping.Rsp(partial=True))
+        ) == response
+
+    # The response was successfully received so we should have no outstanding listeners
+    await asyncio.sleep(0)
+    assert not znp._response_listeners
+
+    asyncio.create_task(send_soon(0.6))
+
+    with pytest.raises(asyncio.TimeoutError):
+        async with async_timeout.timeout(0.5):
+            assert (
+                await znp.wait_for_response(c.SysCommands.Ping.Rsp(partial=True))
+            ) == response
+
+    # Our future still completed, albeit unsuccesfully.
+    # We should have no leaked listeners here.
+    await asyncio.sleep(0)
+    assert not znp._response_listeners
 
 
 @pytest_mark_asyncio_timeout()
@@ -165,6 +199,44 @@ async def test_znp_response_callback_simple(znp, event_loop):
     sync_callback.assert_called_once_with(good_command)
 
 
+def test_command_deduplication():
+    result = _deduplicate_commands(
+        [
+            c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
+            # Duplicating matching commands shouldn't do anything
+            c.SysCommands.Ping.Rsp(partial=True),
+            c.SysCommands.Ping.Rsp(partial=True),
+            # Matching against different command types should also work
+            c.UtilCommands.TimeAlive.Rsp(Seconds=12),
+            c.UtilCommands.TimeAlive.Rsp(Seconds=10),
+            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+                partial=True, Status=0x01
+            ),
+            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+                partial=True, Status=0x01, Mode=0x02
+            ),
+            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+                partial=True, Status=0x01, Mode=0x02, RemainingMode=0x3
+            ),
+            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+                partial=True, RemainingMode=0x3
+            ),
+        ]
+    )
+
+    assert set(result) == {
+        c.SysCommands.Ping.Rsp(partial=True),
+        c.UtilCommands.TimeAlive.Rsp(Seconds=12),
+        c.UtilCommands.TimeAlive.Rsp(Seconds=10),
+        c.APPConfigCommands.BDBCommissioningNotification.Callback(
+            partial=True, Status=0x01
+        ),
+        c.APPConfigCommands.BDBCommissioningNotification.Callback(
+            partial=True, RemainingMode=0x3
+        ),
+    }
+
+
 @pytest_mark_asyncio_timeout()
 async def test_znp_response_callbacks(znp, event_loop):
     sync_callback = Mock()
@@ -177,7 +249,7 @@ async def test_znp_response_callbacks(znp, event_loop):
     # XXX: I can't get AsyncMock().call_count to work, even though
     # the callback is definitely being called
     async def async_callback(response):
-        await asyncio.sleep(0, loop=event_loop)
+        await asyncio.sleep(0)
         async_callback_responses.append(response)
 
     good_command1 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
@@ -188,23 +260,28 @@ async def test_znp_response_callbacks(znp, event_loop):
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
+    responses = [
+        # Duplicating matching commands shouldn't do anything
+        c.SysCommands.Ping.Rsp(partial=True),
+        c.SysCommands.Ping.Rsp(partial=True),
+        # Matching against different command types should also work
+        c.UtilCommands.TimeAlive.Rsp(Seconds=12),
+        c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
+        c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
+        c.UtilCommands.TimeAlive.Rsp(Seconds=10),
+    ]
+
+    assert set(_deduplicate_commands(responses)) == {
+        c.SysCommands.Ping.Rsp(partial=True),
+        c.UtilCommands.TimeAlive.Rsp(Seconds=12),
+        c.UtilCommands.TimeAlive.Rsp(Seconds=10),
+    }
+
     # We shouldn't see any effects from receiving a frame early
     znp.frame_received(good_command1.to_frame())
 
     for callback in [bad_sync_callback, async_callback, sync_callback]:
-        znp.callback_for_responses(
-            [
-                # Duplicating matching commands shouldn't do anything
-                c.SysCommands.Ping.Rsp(partial=True),
-                c.SysCommands.Ping.Rsp(partial=True),
-                # Matching against different command types should also work
-                c.UtilCommands.TimeAlive.Rsp(Seconds=12),
-                c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
-                c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
-                c.UtilCommands.TimeAlive.Rsp(Seconds=10),
-            ],
-            callback,
-        )
+        znp.callback_for_responses(responses, callback)
 
     znp.frame_received(good_command1.to_frame())
     znp.frame_received(bad_command1.to_frame())
@@ -212,10 +289,12 @@ async def test_znp_response_callbacks(znp, event_loop):
     znp.frame_received(bad_command2.to_frame())
     znp.frame_received(good_command3.to_frame())
 
+    await asyncio.sleep(0)
+
     assert sync_callback.call_count == 3
     assert bad_sync_callback.call_count == 3
 
-    await asyncio.sleep(0.1, loop=event_loop)
+    await asyncio.sleep(0.1)
     # assert async_callback.call_count == 3  # XXX: this always returns zero
     assert len(async_callback_responses) == 3
 

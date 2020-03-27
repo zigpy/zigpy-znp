@@ -17,12 +17,43 @@ from zigpy_znp.frames import GeneralFrame
 LOGGER = logging.getLogger(__name__)
 
 
+def _deduplicate_commands(commands):
+    # Command matching as a relation forms a partially ordered set.
+    # To avoid triggering our callbacks multiple times per packet, we
+    # should remove redundant partial commands.
+    maximal_commands = []
+
+    for command in commands:
+        for index, other_command in enumerate(maximal_commands):
+            if other_command.matches(command):
+                # If the other command matches us, we are redundant
+                break
+            elif command.matches(other_command):
+                # If we match another command, we replace it
+                maximal_commands[index] = command
+                break
+            else:
+                # Otherwise, we keep looking
+                pass
+        else:
+            # If we matched nothing and nothing matched us, we extend the list
+            maximal_commands.append(command)
+
+    # The start of each chain is the maximal element
+    return tuple(maximal_commands)
+
+
 @attr.s(frozen=True)
 class BaseResponseListener:
-    matching_commands: typing.Tuple[CommandBase] = attr.ib(converter=tuple)
+    matching_commands: typing.Tuple[CommandBase] = attr.ib(
+        converter=_deduplicate_commands
+    )
 
     @matching_commands.validator
     def check(self, attribute, commands):
+        if not commands:
+            raise ValueError("Listener must have at least one command")
+
         response_types = (
             zigpy_znp.commands.types.CommandType.SRSP,
             zigpy_znp.commands.types.CommandType.AREQ,
@@ -34,18 +65,24 @@ class BaseResponseListener:
             )
 
     def matching_headers(self):
-        for command in self.matching_commands:
-            yield command.header
+        return {command.header for command in self.matching_commands}
 
     def resolve(self, command: CommandBase) -> bool:
         if not any(c.matches(command) for c in self.matching_commands):
             return False
 
-        self._resolve(command)
+        if not self._resolve(command):
+            return False
+
         return True
 
-    def _resolve(self, command: CommandBase) -> None:
-        """Implemented by subclasses to handle matched commands."""
+    def _resolve(self, command: CommandBase) -> bool:
+        """
+        Implemented by subclasses to handle matched commands.
+
+        Return value indicates whether or not the listener has actually resolved,
+        which can sometimes be unavoidable.
+        """
         raise NotImplementedError()  # pragma: no cover
 
 
@@ -55,15 +92,24 @@ class OneShotResponseListener(BaseResponseListener):
         default=attr.Factory(lambda: asyncio.get_running_loop().create_future())
     )
 
-    def _resolve(self, command: CommandBase) -> None:
+    def _resolve(self, command: CommandBase) -> bool:
+        if self.future.done():
+            # This happens if the UART receives multiple packets during the same
+            # event loop step and all of them match this listener. Our Future's
+            # add_done_callback will not fire synchronously and thus the listener
+            # is never properly removed. This isn't going to break anything.
+            LOGGER.debug("Future already has a result set: %s", self.future)
+            return False
+
         self.future.set_result(command)
+        return True
 
 
 @attr.s(frozen=True)
 class CallbackResponseListener(BaseResponseListener):
     callback: typing.Callable[[CommandBase], typing.Any] = attr.ib()
 
-    def _resolve(self, command: CommandBase) -> None:
+    def _resolve(self, command: CommandBase) -> bool:
         try:
             result = self.callback(command)
 
@@ -74,6 +120,9 @@ class CallbackResponseListener(BaseResponseListener):
             LOGGER.warning(
                 "Caught an exception while executing callback", exc_info=True
             )
+
+        # Returning False could cause our callback to be called multiple times in a row
+        return True
 
 
 class ZNP:
@@ -94,51 +143,38 @@ class ZNP:
     def close(self):
         return self._uart.close()
 
-    def frame_received(self, frame: GeneralFrame):
+    def _remove_listener(self, listener: BaseResponseListener) -> None:
+        LOGGER.debug("Removing listener %s", listener)
+
+        for header in listener.matching_headers():
+            self._response_listeners[header].remove(listener)
+
+            if not self._response_listeners[header]:
+                del self._response_listeners[header]
+
+    def frame_received(self, frame: GeneralFrame) -> None:
+        """
+        Called when a frame has been received.
+        Can be called multiple times in a single step.
+        """
+
         LOGGER.debug("Frame received: %s", frame)
 
         command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.header]
         command = command_cls.from_frame(frame)
 
+        LOGGER.debug("Command received: %s", command)
+
         if command.header not in self._response_listeners:
             LOGGER.warning("Received an unsolicited command: %s", command)
             return
 
-        removed_listeners = []
-        matched_listeners = set()
-
         for listener in self._response_listeners[command.header]:
-            LOGGER.debug("Testing if %s matches %s", command, listener)
-
-            if listener in matched_listeners:
-                LOGGER.debug(
-                    "Listener %s has already been triggered. Ignoring...", listener
-                )
-                continue
-
             if not listener.resolve(command):
+                LOGGER.debug("%s does not match %s", command, listener)
                 continue
 
-            matched_listeners.add(listener)
-
-            LOGGER.debug("Match found: %s ~ %s", command, listener)
-
-            # Callbacks never expire
-            if isinstance(listener, CallbackResponseListener):
-                continue
-
-            # We can't just break on the first match because we have callbacks
-            removed_listeners.append(listener)
-
-        # Remove our dead listeners after we've gone through all the rest
-        for listener in removed_listeners:
-            LOGGER.debug("Removing listener %s", listener)
-
-            for header in listener.matching_headers():
-                self._response_listeners[header].remove(listener)
-
-                if not self._response_listeners[header]:
-                    del self._response_listeners[header]
+            LOGGER.debug("%s matches %s", command, listener)
 
     def callback_for_responses(self, commands, callback) -> None:
         listener = CallbackResponseListener(commands, callback=callback)
@@ -154,6 +190,9 @@ class ZNP:
 
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
+
+        # Remove the listener when the future is done, not only when it gets a result
+        listener.future.add_done_callback(lambda _: self._remove_listener(listener))
 
         return listener.future
 
