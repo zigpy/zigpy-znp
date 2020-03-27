@@ -1,17 +1,21 @@
-from unittest.mock import Mock
+import pytest
+
+from unittest import mock
 
 import zigpy_znp.commands as c
 import zigpy_znp.types as t
 
-from zigpy_znp.uart import Gateway
+from zigpy_znp import uart as znp_uart
 from zigpy_znp.frames import TransportFrame
+
+from serial.tools.list_ports_common import ListPortInfo
 
 
 def test_uart_rx_basic():
-    api = Mock()
-    transport = Mock()
+    api = mock.Mock()
+    transport = mock.Mock()
 
-    uart = Gateway(api)
+    uart = znp_uart.Gateway(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -30,10 +34,10 @@ def test_uart_rx_basic():
 
 
 def test_uart_rx_byte_by_byte():
-    api = Mock()
-    transport = Mock()
+    api = mock.Mock()
+    transport = mock.Mock()
 
-    uart = Gateway(api)
+    uart = znp_uart.Gateway(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -53,10 +57,10 @@ def test_uart_rx_byte_by_byte():
 
 
 def test_uart_rx_byte_by_byte_garbage():
-    api = Mock()
-    transport = Mock()
+    api = mock.Mock()
+    transport = mock.Mock()
 
-    uart = Gateway(api)
+    uart = znp_uart.Gateway(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -86,10 +90,10 @@ def test_uart_rx_byte_by_byte_garbage():
 
 
 def test_uart_rx_big_garbage():
-    api = Mock()
-    transport = Mock()
+    api = mock.Mock()
+    transport = mock.Mock()
 
-    uart = Gateway(api)
+    uart = znp_uart.Gateway(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -118,10 +122,10 @@ def test_uart_rx_big_garbage():
 
 
 def test_uart_rx_corrupted_fcs():
-    api = Mock()
-    transport = Mock()
+    api = mock.Mock()
+    transport = mock.Mock()
 
-    uart = Gateway(api)
+    uart = znp_uart.Gateway(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -142,10 +146,10 @@ def test_uart_rx_corrupted_fcs():
 
 
 def test_uart_rx_sof_stress():
-    api = Mock()
-    transport = Mock()
+    api = mock.Mock()
+    transport = mock.Mock()
 
-    uart = Gateway(api)
+    uart = znp_uart.Gateway(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -165,3 +169,143 @@ def test_uart_rx_sof_stress():
 
     # We should see the valid frame exactly once
     api.frame_received.assert_called_once_with(test_frame)
+
+
+PORT_INFO = [
+    {
+        "device": "/dev/ttyUSB1",
+        "name": "ttyUSB1",
+        "description": "HubZ Smart Home Controller",
+        "hwid": "USB VID:PID=10C4:8A2A SER=C0F0034E LOCATION=3-1.2.3:1.1",
+        "vid": 4292,
+        "pid": 35370,
+        "serial_number": "C0F0034E",
+        "location": "3-1.2.3:1.1",
+        "manufacturer": "Silicon Labs",
+        "product": "HubZ Smart Home Controller",
+        "interface": None,
+        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3",  # noqa: E501
+        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.1/ttyUSB1",  # noqa: E501
+        "subsystem": "usb-serial",
+        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.1",  # noqa: E501
+    },
+    {
+        "device": "/dev/ttyUSB0",
+        "name": "ttyUSB0",
+        "description": "HubZ Smart Home Controller",
+        "hwid": "USB VID:PID=10C4:8A2A SER=C0F0034E LOCATION=3-1.2.3:1.0",
+        "vid": 4292,
+        "pid": 35370,
+        "serial_number": "C0F0034E",
+        "location": "3-1.2.3:1.0",
+        "manufacturer": "Silicon Labs",
+        "product": "HubZ Smart Home Controller",
+        "interface": None,
+        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3",  # noqa: E501
+        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0/ttyUSB0",  # noqa: E501
+        "subsystem": "usb-serial",
+        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0",  # noqa: E501
+    },
+    {
+        "device": "/dev/ttyACM1",
+        "name": "ttyACM1",
+        "description": "XDS110 (03.00.00.05) Embed with CMSIS-DAP",
+        "hwid": "USB VID:PID=0451:BEF3 SER=L1100H86 LOCATION=3-1.2.2:1.3",
+        "vid": 1105,
+        "pid": 48883,
+        "serial_number": "L1100H86",
+        "location": "3-1.2.2:1.3",
+        "manufacturer": "Texas Instruments",
+        "product": "XDS110 (03.00.00.05) Embed with CMSIS-DAP",
+        "interface": None,
+        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.2",  # noqa: E501
+        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.2/3-1.2.2:1.3",  # noqa: E501
+        "subsystem": "usb",
+        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.2/3-1.2.2:1.3",  # noqa: E501
+    },
+    {
+        "device": "/dev/ttyACM0",
+        "name": "ttyACM0",
+        "description": "XDS110 (03.00.00.05) Embed with CMSIS-DAP",
+        "hwid": "USB VID:PID=0451:BEF3 SER=L1100H86 LOCATION=3-1.2.2:1.0",
+        "vid": 1105,
+        "pid": 48883,
+        "serial_number": "L1100H86",
+        "location": "3-1.2.2:1.0",
+        "manufacturer": "Texas Instruments",
+        "product": "XDS110 (03.00.00.05) Embed with CMSIS-DAP",
+        "interface": None,
+        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.2",  # noqa: E501
+        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.2/3-1.2.2:1.0",  # noqa: E501
+        "subsystem": "usb",
+        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.2/3-1.2.2:1.0",  # noqa: E501
+    },
+    {
+        "device": "/dev/zwave",
+        "name": "ttyUSB0",
+        "description": "HubZ Smart Home Controller",
+        "hwid": "USB VID:PID=10C4:8A2A SER=C0F0034E LOCATION=3-1.2.3:1.0 LINK=/dev/ttyUSB0",  # noqa: E501
+        "vid": 4292,
+        "pid": 35370,
+        "serial_number": "C0F0034E",
+        "location": "3-1.2.3:1.0",
+        "manufacturer": "Silicon Labs",
+        "product": "HubZ Smart Home Controller",
+        "interface": None,
+        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3",  # noqa: E501
+        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0/ttyUSB0",  # noqa: E501
+        "subsystem": "usb-serial",
+        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0",  # noqa: E501
+    },
+    {
+        "device": "/dev/zigbee",
+        "name": "ttyUSB1",
+        "description": "HubZ Smart Home Controller",
+        "hwid": "USB VID:PID=10C4:8A2A SER=C0F0034E LOCATION=3-1.2.3:1.1 LINK=/dev/ttyUSB1",  # noqa: E501
+        "vid": 4292,
+        "pid": 35370,
+        "serial_number": "C0F0034E",
+        "location": "3-1.2.3:1.1",
+        "manufacturer": "Silicon Labs",
+        "product": "HubZ Smart Home Controller",
+        "interface": None,
+        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3",  # noqa: E501
+        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.1/ttyUSB1",  # noqa: E501
+        "subsystem": "usb-serial",
+        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.1",  # noqa: E501
+    },
+]
+
+
+def comports_from_dicts(info_dicts):
+    ports = []
+
+    for info_dict in info_dicts:
+        info = ListPortInfo()
+
+        for key, value in info_dict.items():
+            setattr(info, key, value)
+
+        ports.append(info)
+
+    return ports
+
+
+def test_guess_port():
+    with mock.patch(
+        "zigpy_znp.uart.list_com_ports", return_value=comports_from_dicts(PORT_INFO)
+    ):
+        assert znp_uart.guess_port() == "/dev/ttyACM0"
+
+    # The order should not matter
+    with mock.patch(
+        "zigpy_znp.uart.list_com_ports",
+        return_value=comports_from_dicts(PORT_INFO[::-1]),
+    ):
+        assert znp_uart.guess_port() == "/dev/ttyACM0"
+
+    with mock.patch(
+        "zigpy_znp.uart.list_com_ports", return_value=comports_from_dicts([])
+    ):
+        with pytest.raises(RuntimeError):
+            znp_uart.guess_port()
