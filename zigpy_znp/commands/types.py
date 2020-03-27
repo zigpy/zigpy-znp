@@ -36,22 +36,13 @@ class CommandType(enum.IntEnum):
     RESERVED_7 = 7
 
 
-class ErrorCode(t.uint8_t, enum.Enum):
+class ErrorCode(t.uint8_t, t.MissingEnumMixin, enum.Enum):
     """Error code."""
 
     INVALID_SUBSYSTEM = 0x01
     INVALID_COMMAND_ID = 0x02
     INVALID_PARAMETER = 0x03
     INVALID_LENGTH = 0x04
-
-    @classmethod
-    def deserialize(cls, data, byteorder="little"):
-        try:
-            return super().deserialize(data, byteorder)
-        except ValueError:
-            code, data = t.uint8_t.deserialize(data, byteorder)
-            fake_enum = t.FakeEnum("ErrorCode")
-            return fake_enum(f"unknown_0x{code:02x}", code), data
 
 
 class Subsystem(t.enum_uint8, enum.IntEnum):

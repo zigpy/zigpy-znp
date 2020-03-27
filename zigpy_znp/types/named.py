@@ -11,14 +11,6 @@ from . import basic, struct
 LOGGER = logging.getLogger(__name__)
 
 
-class _EnumEq:
-    def __eq__(self, other):
-        return self.value == other
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-
 class ADCChannel(basic.enum_uint8, enum.IntEnum):
     """The ADC channel."""
 
@@ -135,15 +127,6 @@ class Beacon(struct.Struct):
     ExtendedPanId = attr.ib(type=ExtendedPanId, converter=ExtendedPanId)
 
 
-def FakeEnum(class_name: str):
-    return attr.make_class(
-        class_name,
-        {"name": attr.ib(converter=str), "value": attr.ib()},
-        bases=(_EnumEq,),
-        eq=False,
-    )
-
-
 class GroupId(basic.HexRepr, basic.uint16_t):
     """"Group ID class"""
 
@@ -164,7 +147,24 @@ class Schema:
     parameters = attr.ib(factory=tuple, converter=tuple)
 
 
-class Status(basic.uint8_t, enum.Enum):
+class MissingEnumMixin:
+    @classmethod
+    def _missing_(cls, value):
+        if not isinstance(value, int) or value < 0 or value > 0xFF:
+            # `return None` works with Python 3.7.7, breaks with 3.7.1
+            raise ValueError("%r is not a valid %r", value, cls.__name__)
+
+        # XXX: infer type from enum
+        new_member = basic.uint8_t.__new__(cls, value)
+        new_member._name_ = f"unknown_0x{value:02X}"
+        new_member._value_ = value
+
+        LOGGER.warning("Unhandled Status value: %s", new_member)
+
+        return new_member
+
+
+class Status(basic.uint8_t, MissingEnumMixin, enum.Enum):
     Success = 0x00
     Failure = 0x01
     InvalidParameter = 0x02
@@ -185,19 +185,6 @@ class Status(basic.uint8_t, enum.Enum):
     ZMACInvalidParameter = 0xE8
     ZMACNoBeacon = 0xEA
     MACScanInProgress = 0xFC
-
-    @classmethod
-    def _missing_(cls, value):
-        if not isinstance(value, int) or value < 0 or value > 0xFF:
-            return None
-
-        new_member = basic.uint8_t.__new__(cls, value)
-        new_member._name_ = f"unknown_0x{value:02X}"
-        new_member._value_ = value
-
-        LOGGER.warning("Unhandled Status value: %s", new_member)
-
-        return new_member
 
 
 @attr.s(frozen=True)
