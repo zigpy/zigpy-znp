@@ -18,6 +18,13 @@ class Bytes(bytes):
     def deserialize(cls, data):
         return cls(data), b""
 
+    def __repr__(self):
+        # Reading byte sequences like \x200\x21 is extremely annoying
+        # compared to \x20\x30\x21
+        escaped = "".join(f"\\x{b:02X}" for b in self)
+
+        return f"b'{escaped}'"
+
 
 class int_t(int):
     _signed = True
@@ -103,7 +110,7 @@ class uint64_t(uint_t):
     _size = 8
 
 
-class ShortBytes(bytes):
+class ShortBytes(Bytes):
     _header = uint8_t
 
     def serialize(self):

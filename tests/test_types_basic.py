@@ -1,3 +1,4 @@
+import ast
 import enum
 
 import pytest
@@ -49,6 +50,14 @@ def test_bytes():
     assert r == data
 
     assert r.serialize() == data
+
+    assert repr(r) == "b'\\x61\\x62\\x63\\x64\\x65\\x00\\xFF'"
+
+    # Ensure we don't make any mistakes formatting the bytes
+    all_bytes = t.Bytes(bytes(range(0, 255 + 1)))
+    long_repr = repr(all_bytes)
+    assert ast.literal_eval(long_repr) == ast.literal_eval(bytes.__repr__(all_bytes))
+    assert all_bytes == ast.literal_eval(long_repr)
 
 
 def test_longbytes():
