@@ -188,10 +188,10 @@ class FixedList(List):
 
 class HexRepr:
     def __repr__(self):
-        return ("0x{:0" + str(self._size * 2) + "x}").format(self)
+        return ("0x{:0" + str(self._size * 2) + "X}").format(self)
 
     def __str__(self):
-        return ("0x{:0" + str(self._size * 2) + "x}").format(self)
+        return ("0x{:0" + str(self._size * 2) + "X}").format(self)
 
 
 class enum_uint8:
