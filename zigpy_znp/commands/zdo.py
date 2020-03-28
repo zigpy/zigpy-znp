@@ -1348,7 +1348,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
 
     # an indication to inform the host of a device leaving the network
     LeaveInd = CommandDef(
-        CommandType.SREQ,
+        CommandType.AREQ,
         0xC9,
         req_schema=t.Schema(
             (
