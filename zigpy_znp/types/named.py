@@ -35,6 +35,28 @@ class ADCResolution(basic.enum_uint8, enum.IntEnum):
     bits_14 = 0x03
 
 
+class GpioOperation(basic.enum_uint8, enum.IntEnum):
+    """Specifies the type of operation to perform on the GPIO pins."""
+
+    SetDirection = 0x00
+    SetInputMode = 0x01
+    Set = 0x02
+    Clear = 0x03
+    Toggle = 0x04
+    Read = 0x05
+
+
+class StackTuneOperation(basic.enum_uint8, enum.IntEnum):
+    """The tuning operation to be executed."""
+
+    PowerLevel = 0x00  # XXX: [Value] should correspond to the valid values
+    # specified by the ZMacTransmitPower_t
+    # enumeration (0xFD – 0x16)
+
+    SetRxOnWhenIdle = 0x01  # Set RxOnWhenIdle off/on if the value of Value is 0/1;
+    # otherwise return the 0x01 current setting of RxOnWhenIdle.
+
+
 class AddrMode(basic.uint8_t, enum.Enum):
     """Address mode."""
 

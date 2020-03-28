@@ -198,11 +198,11 @@ def test_command_immutability():
 
 def test_command_serialization():
     command = c.SysCommands.NVWrite.Req(
-        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x0000, Value=b"asdfoo"
     )
     frame = command.to_frame()
 
-    assert frame.data == bytes.fromhex("12 5634 9078 00 06") + b"asdfoo"
+    assert frame.data == bytes.fromhex("12 5634 9078 0000 06") + b"asdfoo"
 
     # Partial frames cannot be serialized
     with pytest.raises(ValueError):

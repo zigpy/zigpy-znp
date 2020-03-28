@@ -26,7 +26,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                     (
                         "This command will reset the device by using a hardware reset "
                         "(i.e. watchdog reset) if ‘Type’ is zero. Otherwise a soft "
-                        "reset(i.e. a jump to the reset vector) vice is effected. This "
+                        "reset (i.e. a jump to the reset vector) is done. This "
                         "is especially useful in the CC2531, for instance, so that the "
                         "USB host does not have to contend with the USB H/W resetting "
                         "(and thus causing the USB host to reenumerate the device "
@@ -79,7 +79,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # get the extended address of the device
-    getExtAddr = CommandDef(
+    GetExtAddr = CommandDef(
         CommandType.SREQ,
         0x04,
         req_schema=STATUS_SCHEMA,
@@ -223,7 +223,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         0x0A,
         req_schema=t.Schema(
             (
-                t.Param("Id", t.uint16_t, "The Id of the timer event (0-3)"),
+                t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),
                 t.Param("Timeout", t.uint16_t, "Timer timeout in millliseconds"),
             )
         ),
@@ -235,7 +235,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         CommandType.SREQ,
         0x0B,
         req_schema=t.Schema(
-            (t.Param("Id", t.uint16_t, "The Id of the timer event (0-3)"),)
+            (t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),)
         ),
         rsp_schema=STATUS_SCHEMA,
     )
@@ -271,7 +271,9 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Operation", t.uint8_t, "Specifies type of operation on GPIO pins"
+                    "Operation",
+                    t.GpioOperation,
+                    "Specifies type of operation on GPIO pins",
                 ),
                 t.Param("Value", t.uint8_t, "GPIO value for specified operation"),
             )
@@ -286,7 +288,9 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Operation", t.uint8_t, "Specifies type of operation on GPIO pins"
+                    "Operation",
+                    t.StackTuneOperation,
+                    "Specifies type of operation on GPIO pins",
                 ),
                 t.Param("Value", t.uint8_t, "Tuning value"),
             )
@@ -317,6 +321,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Year", t.uint16_t, "Year (2000 -- )"),
             )
         ),
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # get the target system date and time. The time is returned in
@@ -348,11 +353,12 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         CommandType.SREQ,
         0x14,
         req_schema=t.Schema(
-            (t.Param("TXPower", t.uint8_t, "Requested TX power setting in dBm"),)
+            (t.Param("TXPower", t.uint8_t, "Requested TX power setting, in dBm"),)
         ),
-        rsp_schema=t.Schema(
-            (t.Param("TXPower", t.uint8_t, "Actual TX power setting in dBm"),)
-        ),
+        # While the docs say "the returned TX power is the actual setting applied to
+        # the radio – nearest characterized value for the specific radio.", the code
+        # matches the documentation.
+        rsp_schema=STATUS_SCHEMA,
     )
 
     # initialize the statistics table in NV memory
@@ -376,6 +382,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         CommandType.SREQ,
         0x19,
         req_schema=t.Schema(
+            # as defined in ZDiags.h
             (t.Param("AttributeId", t.uint16_t, "System diagnostics attribute ID"),)
         ),
         rsp_schema=t.Schema(
@@ -449,7 +456,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
                 t.Param(
                     "Offset",
-                    t.uint8_t,
+                    t.uint16_t,
                     "Number of bytes offset from the beginning of the NV value",
                 ),
                 t.Param("Length", t.uint8_t, "Length of data to read"),
@@ -476,9 +483,11 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
                 t.Param(
                     "Offset",
-                    t.uint8_t,
+                    t.uint16_t,
                     "Number of bytes offset from the beginning of the NV value",
                 ),
+                # XXX: the spec has length as a a 16-bit integer but then shows it as
+                # an 8-bit integer in the table below, which matches the code
                 t.Param("Value", t.ShortBytes, "Value of the NV item to write"),
             )
         ),
@@ -537,6 +546,6 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         CommandType.AREQ,
         0x81,
         req_schema=t.Schema(
-            (t.Param("Id", t.uint16_t, "The Id of the timer event (0-3)"),)
+            (t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),)
         ),
     )
