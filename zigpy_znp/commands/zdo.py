@@ -42,14 +42,14 @@ class RouteDiscoveryOptions(t.enum_uint8, enum.IntEnum):
 
 
 class MACCapabilities(t.enum_uint8, enum.IntFlag):
-    AlternatePANCoordinator = 0b00000001
-    DeviceTypeIsRouter = 0b00000010
-    PowerSourceIsMains = 0b00000100
-    ReceiverOnWhenIdle = 0b00001000
+    PANCoordinator = 0b00000001
+    Router = 0b00000010
+    MainsPowered = 0b00000100
+    RXWhenIdle = 0b00001000
     Reserved5 = 0b00010000
     Reserved6 = 0b00100000
-    SecurityCapability = 0b01000000
-    Reserved8 = 0b10000000
+    SecurityCapable = 0b01000000
+    AllocateShortAddrDuringAssocNeeded = 0b10000000
 
 
 class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
