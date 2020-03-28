@@ -240,14 +240,6 @@ class StartupOptions(basic.enum_uint8, enum.IntFlag):
 
 
 class DeviceLogicalType(basic.enum_uint8, enum.IntFlag):
-    Coordinator = 0x00
-    Router = 0x01
-    EndDevice = 0x02
-
-    # Are these valid?
-    ComplexDescAvail = 0x04
-    UserDescAvail = 0x08
-    Reserved1 = 0x10
-    Reserved2 = 0x20
-    Reserved3 = 0x40
-    Reserved4 = 0x80
+    Coordinator = 0b00000001
+    Router = 0b00000010
+    EndDevice = 0b00000100

@@ -53,7 +53,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
                 t.Param("IEEE", t.EUI64, "Extended address of the device"),
                 t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param("DeviceType", zigpy.zdo.types.LogicalType, "Device type"),
+                t.Param("DeviceType", t.DeviceLogicalType, "Device type"),
                 t.Param(
                     "DeviceState", DeviceState, "Indicated the state of the device"
                 ),
