@@ -1,5 +1,6 @@
 """commands to configure parameters of the device, trust center and BDB subsystem."""
 
+import enum
 from zigpy_znp.commands.types import (
     STATUS_SCHEMA,
     CommandDef,
@@ -10,6 +11,70 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
+class TimeoutIndex(t.uint8_t, enum.Enum):
+    Seconds_10 = 0x00
+
+    Minutes_2 = 0x01
+    Minutes_4 = 0x02
+    Minutes_8 = 0x03
+    Minutes_16 = 0x04
+    Minutes_32 = 0x05
+    Minutes_64 = 0x06
+    Minutes_128 = 0x07
+    Minutes_256 = 0x08
+    Minutes_512 = 0x09
+    Minutes_1024 = 0x0A
+    Minutes_2048 = 0x0B
+    Minutes_4096 = 0x0C
+    Minutes_8192 = 0x0D
+    Minutes_16384 = 0x0E
+
+
+class CentralizedLinkKeyMode(t.uint8_t, enum.Enum):
+    UseDefault = 0x00
+    UseProvidedInstallCode = 0x01
+    UseProvidedInstallCodeAndFallbackToDefault = 0x02
+    UseProvidedAPSLinkKey = 0x03
+    UseProvidedAPSLinkKeyAndFallbackToDefault = 0x04
+
+
+class BDBCommissioningStatus(t.uint8_t, enum.Enum):
+    Success = 0x00
+    InProgress = 0x01
+    NoNetwork = 0x02
+    TLTargetFailure = 0x03
+    TLNotAaCapable = 0x04
+    TLNoScanResponse = 0x05
+    TLNotPermitted = 0x06
+    TCLKExFailure = 0x07
+    FormationFailure = 0x08
+    Initialization = 0x00
+    FBTargetInProgress = 0x09
+    FBInitiatorInProgress = 0x0A
+    FBNoIdentifyQueryResponse = 0x0B
+    FBBindingTableFull = 0x0C
+    NetworkRestored = 0x0D
+    Failure = 0x0E
+
+
+class BDBCommissioningMode(t.uint8_t, enum.Enum):
+    Initialization = 0x00
+    NwkSteering = 0x01
+    Formation = 0x02
+    FindingBinding = 0x03
+    Touchlink = 0x04
+    ParentLost = 0x05
+
+
+class BDBRemainingCommissioningModes(t.uint8_t, enum.Flag):
+    InitiatorTl = 0x01
+    NwkSteering = 0x02
+    NwkFormation = 0x04
+    FindingBinding = 0x08
+    Initialization = 0x10
+    ParentLost = 0x20
+
+
 class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
     # sets the network frame counter to the value specified in the Frame Counter Value.
     # For projects with multiple instances of frame counter, the message sets the
@@ -18,7 +83,9 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
         CommandType.SREQ,
         0xFF,
         req_schema=t.Schema(
-            (t.Param("FrameCounterValue", t.uint32_t, "network frame counter"),)
+            (
+                t.Param("FrameCounterValue", t.uint32_t, "network frame counter"),
+            )  # XXX: check source for actual size
         ),
         rsp_schema=STATUS_SCHEMA,
     )
@@ -28,7 +95,11 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
         CommandType.SREQ,
         0x01,
         req_schema=t.Schema(
-            (t.Param("TimeoutIndex", t.uint8_t, "0x00 -- 10s otherwise 2^^N minutes"),)
+            (
+                t.Param(
+                    "TimeoutIndex", TimeoutIndex, "0x00 -- 10s otherwise 2^N minutes"
+                ),
+            )
         ),
         rsp_schema=STATUS_SCHEMA,
     )
@@ -38,7 +109,11 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
         CommandType.SREQ,
         0x02,
         req_schema=t.Schema(
-            (t.Param("TimeoutIndex", t.uint8_t, "0x00 -- 10s otherwise 2^^N minutes"),)
+            (
+                t.Param(
+                    "TimeoutIndex", TimeoutIndex, "0x00 -- 10s otherwise 2^N minutes"
+                ),
+            )
         ),
         rsp_schema=STATUS_SCHEMA,
     )
@@ -51,7 +126,7 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
             (
                 t.Param(
                     "AllowRejoin",
-                    t.uint8_t,
+                    t.Bool,
                     "whether or not the Trust center allows rejoins",
                 ),
             )
@@ -139,14 +214,14 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "UseGlobal",
-                    t.Bool,
+                    "CentralizedLinkKeyModes",
+                    CentralizedLinkKeyMode,
                     (
-                        "True -- device uses default global key, "
-                        "False -- device uses install code"
+                        "which key will be used when performing association "
+                        "to a centralized network"
                     ),
                 ),
-                t.Param("InstallCode", t.Bytes, "Install code + CRC"),
+                t.Param("InstallCode", t.Bytes, "key in any of its formats"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -165,14 +240,18 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Status", t.uint8_t, "Status of the commissioning mode notified"
+                    "Status",
+                    BDBCommissioningStatus,
+                    "Status of the commissioning mode notified",
                 ),
                 t.Param(
-                    "Mode", t.uint8_t, "Commissioning mode to which status is related"
+                    "Mode",
+                    BDBCommissioningMode,
+                    "Commissioning mode to which status is related",
                 ),
                 t.Param(
-                    "RemainingMode",
-                    t.uint8_t,
+                    "RemainingModes",
+                    BDBRemainingCommissioningModes,
                     (
                         "Bitmask of the remaining commissioning modes after "
                         "this notification"

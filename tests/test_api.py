@@ -225,10 +225,10 @@ def test_command_deduplication():
                 partial=True, Status=0x01, Mode=0x02
             ),
             c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                partial=True, Status=0x01, Mode=0x02, RemainingMode=0x3
+                partial=True, Status=0x01, Mode=0x02, RemainingModes=0x1
             ),
             c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                partial=True, RemainingMode=0x3
+                partial=True, RemainingModes=0x1
             ),
         ]
     )
@@ -241,7 +241,7 @@ def test_command_deduplication():
             partial=True, Status=0x01
         ),
         c.APPConfigCommands.BDBCommissioningNotification.Callback(
-            partial=True, RemainingMode=0x3
+            partial=True, RemainingModes=0x1
         ),
     }
 
