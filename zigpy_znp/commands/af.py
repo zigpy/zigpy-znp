@@ -12,6 +12,8 @@ import zigpy_znp.types as t
 
 
 class TransmitOptions(t.enum_uint8, enum.IntFlag):
+    NONE = 0b00000000
+
     Reserved1 = 0b00000001
     Reserved2 = 0b00000010
     Reserved3 = 0b00000100
@@ -294,12 +296,10 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("SrcEndpoint", t.uint8_t, "Endpoint of the source device"),
                 t.Param("DstEndpoint", t.uint8_t, "Endpoint of the destination device"),
                 t.Param(
-                    "WasBroadcast",
-                    t.uint8_t,
-                    "Was the incoming message broadcast or not",
+                    "WasBroadcast", t.Bool, "Was the incoming message broadcast or not"
                 ),
                 t.Param("LQI", t.uint8_t, "Link quality measured during reception"),
-                t.Param("SecurityUse", t.uint8_t, "Is security in use or not"),
+                t.Param("SecurityUse", t.Bool, "Is security in use or not"),
                 t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
                 t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
                 t.Param("Data", t.ShortBytes, "Data"),
