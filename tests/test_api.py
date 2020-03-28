@@ -431,19 +431,19 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # Neither is passing in untyped integers
     with pytest.raises(AttributeError):
-        await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, 0xAB)
+        await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, 0xAB)
 
     # This, however, should work
-    assert nvids.NvIds.STARTUP_OPTION == 0x0003
+    assert nvids.NwkNvIds.STARTUP_OPTION == 0x0003
 
     event_loop.call_soon(
         znp.frame_received,
         c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
     )
-    await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, t.uint8_t(0xAB))
+    await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint8_t(0xAB))
     znp._uart.send.assert_called_once_with(
         c.SysCommands.OSALNVWrite.Req(
-            Id=0x0003, Offset=0x00, Value=t.ShortBytes(b"\xAB")
+            Id=nvids.NwkNvIds.STARTUP_OPTION, Offset=0x00, Value=t.ShortBytes(b"\xAB")
         ).to_frame()
     )
 
@@ -454,10 +454,10 @@ async def test_znp_nvram_writes(znp, event_loop):
         znp.frame_received,
         c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
     )
-    await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, t.uint8_t(0xAB).serialize())
+    await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint8_t(0xAB).serialize())
     znp._uart.send.assert_called_once_with(
         c.SysCommands.OSALNVWrite.Req(
-            Id=0x0003, Offset=0x00, Value=t.ShortBytes(b"\xAB")
+            Id=nvids.NwkNvIds.STARTUP_OPTION, Offset=0x00, Value=t.ShortBytes(b"\xAB")
         ).to_frame()
     )
 
@@ -468,10 +468,10 @@ async def test_znp_nvram_writes(znp, event_loop):
         znp.frame_received,
         c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
     )
-    await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, b"\xAB")
+    await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, b"\xAB")
     znp._uart.send.assert_called_once_with(
         c.SysCommands.OSALNVWrite.Req(
-            Id=0x0003, Offset=0x00, Value=t.ShortBytes(b"\xAB")
+            Id=nvids.NwkNvIds.STARTUP_OPTION, Offset=0x00, Value=t.ShortBytes(b"\xAB")
         ).to_frame()
     )
 
@@ -479,4 +479,4 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # Writing too big of a value should fail
     with pytest.raises(ValueError):
-        await znp.nvram_write(nvids.NvIds.STARTUP_OPTION, t.uint16_t(0xAABB))
+        await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint16_t(0xAABB))

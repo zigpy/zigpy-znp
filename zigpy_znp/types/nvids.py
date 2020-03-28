@@ -14,7 +14,7 @@ class ZclPortNvIds(BaseNvIds):
     SINK_TABLE = 0x0003
 
 
-class ExtendedNvIds(BaseNvIds):
+class OsalExNvIds(BaseNvIds):
     # OSAL NV Item IDs
     LEGACY = 0x0000
     ADDRMGR = 0x0001
@@ -25,11 +25,8 @@ class ExtendedNvIds(BaseNvIds):
     APS_KEY_DATA_TABLE = 0x0006
     NWK_SEC_MATERIAL_TABLE = 0x0007
 
-    ZNP_HAS_CONFIGURED_ZSTACK1 = 0x0F00
-    ZNP_HAS_CONFIGURED_ZSTACK3 = 0x0060
 
-
-class NvIds(BaseNvIds):
+class NwkNvIds(BaseNvIds):
     # OSAL NV item IDs
     EXTADDR = 0x0001
     BOOTCOUNTER = 0x0002
@@ -98,6 +95,10 @@ class NvIds(BaseNvIds):
 
     BDBNODEISONANETWORK = 0x0055  # bdbNodeIsOnANetwork attribute
     BDBREPORTINGCONFIG = 0x0056
+
+    # XXX: these are not documented or found anywhere but in the Z2M codebase
+    ZNP_HAS_CONFIGURED_ZSTACK1 = 0x0F00
+    ZNP_HAS_CONFIGURED_ZSTACK3 = 0x0060
 
     # Security NV Item IDs
     SECURITY_LEVEL = 0x0061

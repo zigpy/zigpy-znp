@@ -11,6 +11,7 @@ from zigpy_znp.commands.types import (
     Subsystem,
 )
 import zigpy_znp.types as t
+from zigpy_znp.types import nvids
 
 
 class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
@@ -137,7 +138,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         0x07,
         req_schema=t.Schema(
             (
-                t.Param("Id", t.uint16_t, "The Id of the NV Item"),
+                t.Param("Id", nvids.NwkNvIds, "The Id of the NV Item"),
                 t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
                 t.Param("Value", t.ShortBytes, "The value of the NV item"),
             )
@@ -153,7 +154,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         0x08,
         req_schema=t.Schema(
             (
-                t.Param("Id", t.uint16_t, "The Id of the NV item"),
+                t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
                 t.Param(
                     "Offset",
                     t.uint8_t,
@@ -179,7 +180,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         0x09,
         req_schema=t.Schema(
             (
-                t.Param("Id", t.uint16_t, "The Id of the NV item"),
+                t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
                 t.Param(
                     "Offset",
                     t.uint8_t,
@@ -198,7 +199,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         0x12,
         req_schema=t.Schema(
             (
-                t.Param("Id", t.uint16_t, "The Id of the NV item"),
+                t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
                 t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
             )
         ),
@@ -210,7 +211,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     OSALNVLength = CommandDef(
         CommandType.SREQ,
         0x13,
-        req_schema=t.Schema((t.Param("Id", t.uint16_t, "The Id of the NV item"),)),
+        req_schema=t.Schema((t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),)),
         rsp_schema=t.Schema(
             (t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),)
         ),
