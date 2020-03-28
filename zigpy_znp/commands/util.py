@@ -57,7 +57,14 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 t.Param(
                     "DeviceState", DeviceState, "Indicated the state of the device"
                 ),
-                t.Param("Childs", t.LVList(t.NWK), "List of child devices"),
+                t.Param(
+                    "AssociatedDevices",
+                    t.LVList(t.NWK),
+                    (
+                        "Network addresses of Reduce Function Devices associated "
+                        "to the local device."
+                    ),
+                ),
             )
         ),
     )

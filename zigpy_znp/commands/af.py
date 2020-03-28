@@ -1,3 +1,5 @@
+import enum
+
 from zigpy_znp.commands.types import (
     STATUS_SCHEMA,
     CommandDef,
@@ -7,6 +9,18 @@ from zigpy_znp.commands.types import (
     Subsystem,
 )
 import zigpy_znp.types as t
+
+
+class TransmitOptions(t.enum_uint8, enum.IntFlag):
+    Reserved1 = 0b00000001
+    Reserved2 = 0b00000010
+    Reserved3 = 0b00000100
+    Reserved4 = 0b00001000
+
+    APSAck = 0b00010000
+    RouteDiscovery = 0b00100000
+    APSSecurity = 0b01000000
+    SkipRouting = 0b10000000
 
 
 class AFCommands(CommandsBase, subsystem=Subsystem.AF):
@@ -49,7 +63,7 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
                 t.Param(
                     "Options",
-                    t.uint8_t,
+                    TransmitOptions,
                     (
                         "Transmit options bitmask: bit 4 -- APS Ack, "
                         "bit 5 -- Route Discovery, "

@@ -35,6 +35,23 @@ class StartupState(t.enum_uint8, enum.IntEnum):
     NotStarted = 0x02
 
 
+class RouteDiscoveryOptions(t.enum_uint8, enum.IntEnum):
+    Suppress = 0x00
+    Enable = 0x01
+    Force = 0x02
+
+
+class MACCapabilities(t.enum_uint8, enum.IntFlag):
+    AlternatePANCoordinator = 0b00000001
+    DeviceTypeIsRouter = 0b00000010
+    PowerSourceIsMains = 0b00000100
+    ReceiverOnWhenIdle = 0b00001000
+    Reserved5 = 0b00010000
+    Reserved6 = 0b00100000
+    SecurityCapability = 0b01000000
+    Reserved8 = 0b10000000
+
+
 class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     # send a “Network Address Request”. This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
@@ -147,7 +164,9 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the inquiry"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the inquiry",
                 ),
                 t.Param(
                     "NWKAddrOfInterest",
@@ -701,7 +720,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param("Dst", t.NWK, "Short address of the destination"),
-                t.Param("Options", t.uint8_t, "Route options"),
+                t.Param("Options", RouteDiscoveryOptions, "Route options"),
                 t.Param("Radius", t.uint8_t, "Broadcast radius"),
             )
         ),
@@ -1014,7 +1033,9 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("Endpoints", t.LVList(t.uint8_t), "Active endpoints list"),
+                t.Param(
+                    "ActiveEndpoints", t.LVList(t.uint8_t), "Active endpoints list"
+                ),
             )
         ),
     )
@@ -1262,14 +1283,14 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
         0xC1,
         req_schema=t.Schema(
             (
-                t.Param("Src", t.NWK, "message's source network address"),
+                t.Param("Src", t.NWK, "Source address of the message."),
+                t.Param("NWK", t.NWK, "Specifies the device’s short address"),
                 t.Param(
                     "IEEE",
                     t.EUI64,
                     "Extended address of the device generating the request",
                 ),
-                t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
+                t.Param("Capabilities", MACCapabilities, "MAC Capabilities"),
             )
         ),
     )
@@ -1306,7 +1327,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     )
 
     # indication to inform host device the receipt of a source route to a given device
-    SrceRtgInd = CommandDef(
+    SrcRtgInd = CommandDef(
         CommandType.AREQ,
         0xC4,
         req_schema=t.Schema(
@@ -1316,7 +1337,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     t.NWK,
                     "Network address of the destination of the source route",
                 ),
-                t.Param("Hops", t.LVList(t.NWK), "List of relay devices"),
+                t.Param("Relays", t.LVList(t.NWK), "List of relay devices"),
             )
         ),
     )
@@ -1401,8 +1422,8 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
         0xCA,
         req_schema=t.Schema(
             (
-                t.Param("Nwk", t.NWK, "device's network address"),
-                t.Param("IEEE", t.EUI64, "IEEE address of the source"),
+                t.Param("SrcNwk", t.NWK, "device's network address"),
+                t.Param("SrcIEEE", t.EUI64, "IEEE address of the source"),
                 t.Param("ParentNwk", t.NWK, "Parent's network address"),
             )
         ),
