@@ -99,8 +99,25 @@ class CallbackSubsystem(t.enum_uint16, enum.IntEnum):
     ALL = 0xFFFF
 
 
+SENTINEL = object()
+
+
 class CommandHeader(t.uint16_t):
     """CommandHeader class."""
+
+    def __new__(cls, value=0x0000, *, id=SENTINEL, subsystem=SENTINEL, type=SENTINEL):
+        instance = super().__new__(cls, value)
+
+        if id is not SENTINEL:
+            instance = instance.with_id(id)
+
+        if subsystem is not SENTINEL:
+            instance = instance.with_subsystem(subsystem)
+
+        if type is not SENTINEL:
+            instance = instance.with_type(type)
+
+        return instance
 
     @property
     def cmd0(self) -> t.uint8_t:
@@ -130,6 +147,15 @@ class CommandHeader(t.uint16_t):
 
     def with_type(self, value) -> "CommandHeader":
         return type(self)(self & 0xFF1F | (value & 0x07) << 5)
+
+    def __repr__(self):
+        return (
+            f"{type(self).__name__}("
+            f"id=0x{self.id:02X}, "
+            f"subsystem={self.subsystem!s}, "
+            f"type={self.type!s}"
+            ")"
+        )
 
 
 @attr.s

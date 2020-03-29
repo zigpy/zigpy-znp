@@ -44,6 +44,7 @@ def test_command_setters():
                     command.with_subsystem(subsys).with_type(cmd_type).with_id(cmd_id),
                     command.with_subsystem(subsys).with_id(cmd_id).with_type(cmd_type),
                     command.with_id(cmd_id).with_subsystem(subsys).with_type(cmd_type),
+                    c.CommandHeader(0xFFFF, id=cmd_id, subsystem=subsys, type=cmd_type),
                 ]
 
                 assert len(set(perms)) == 1
