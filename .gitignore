@@ -74,3 +74,5 @@ ENV/
 
 .DS_Store
 .mypy_cache/
+
+TI Z-Stack/
