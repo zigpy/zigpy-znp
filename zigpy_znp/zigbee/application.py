@@ -1,5 +1,6 @@
 import os
 import logging
+import async_timeout
 
 import zigpy.types
 import zigpy.application
@@ -211,11 +212,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     "Failed to send a message after discovering route",
                 )
 
-        response = await self._api.wait_for_response(
-            c.AFCommands.DataConfirm.Callback(
-                partial=True, Endpoint=dst_ep, TSN=sequence
+        async with async_timeout.timeout(10):
+            response = await self._api.wait_for_response(
+                c.AFCommands.DataConfirm.Callback(
+                    partial=True, Endpoint=dst_ep, TSN=sequence
+                )
             )
-        )
 
         LOGGER.info("Received a data request confirmation: %s", response)
 
