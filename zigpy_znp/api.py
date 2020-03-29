@@ -216,6 +216,8 @@ class ZNP:
 
         # Construct our response before we send the request, ensuring we fail early
         response = command.Rsp(partial=True, **response_params)
+
+        LOGGER.debug("Sending command %s", command)
         self._uart.send(command.to_frame())
 
         if ignore_response:

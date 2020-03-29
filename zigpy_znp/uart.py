@@ -23,6 +23,12 @@ class Gateway(asyncio.Protocol):
         self._buffer = bytearray()
         self._api = api
         self._transport = None
+        self._connected_event = asyncio.Event()
+
+    @property
+    def transport(self) -> typing.Optional[serial_asyncio.SerialTransport]:
+        """Return current transport."""
+        return self._transport
 
     def close(self) -> None:
         """Closes the port."""
@@ -47,6 +53,8 @@ class Gateway(asyncio.Protocol):
         self._transport = transport
         LOGGER.debug("Opened %s serial port", transport.serial.name)
 
+        self._connected_event.set()
+
     def data_received(self, data: bytes) -> None:
         """Callback when data is received."""
         self._buffer += data
@@ -65,11 +73,6 @@ class Gateway(asyncio.Protocol):
         """Send magic byte to skip Serial Boot Loader."""
         LOGGER.debug("Skipping bootloader: 0xFE")
         self.transport.write(b"\xFE")
-
-    @property
-    def transport(self) -> typing.Optional[serial_asyncio.SerialTransport]:
-        """Return current transport."""
-        return self._transport
 
     def _extract_frames(self):
         """Extracts frames from the buffer until it is exhausted."""
@@ -171,5 +174,7 @@ async def connect(port, baudrate, api, loop=None):
         stopbits=serial.STOPBITS_ONE,
         xonxoff=False,
     )
+
+    await protocol._connected_event.wait()
 
     return protocol
