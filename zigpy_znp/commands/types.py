@@ -229,13 +229,13 @@ class CommandBase:
         all_params = {param.name for param in self.schema.parameters}
         given_params = set(params.keys())
 
-        if not partial and all_params - given_params:
-            raise KeyError(f"Missing parameters: {all_params - given_params}")
-        elif given_params - all_params:
+        if given_params - all_params:
             raise KeyError(
                 f"Unexpected parameters: {given_params - all_params}. "
                 f"Expected one of {all_params}"
             )
+        elif not partial and all_params - given_params:
+            raise KeyError(f"Missing parameters: {all_params - given_params}")
 
         bound_params = {}
 
