@@ -314,6 +314,9 @@ class CommandBase:
                     value = param.type(value)
                 elif isinstance(value, bytes) and issubclass(param.type, t.ShortBytes):
                     value = param.type(value)
+                elif issubclass(param.type, t.List):
+                    # XXX: Type information is lost with t.LVList being a function
+                    value = param.type(value)
                 else:
                     raise ValueError(
                         f"In {type(self)}, param {param.name} is "

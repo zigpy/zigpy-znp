@@ -2,8 +2,13 @@ import os
 import logging
 import async_timeout
 
+from typing import Optional
+
+import zigpy.util
 import zigpy.types
 import zigpy.application
+import zigpy.profiles
+from zigpy.zcl.clusters.security import IasZone
 
 import zigpy.zdo.types as zdo_t
 from zigpy.types import ExtendedPanId
@@ -12,7 +17,6 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
 from zigpy_znp.types.nvids import NwkNvIds
-from zigpy_znp.commands.zdo import StartupState
 from zigpy_znp.commands.types import DeviceState
 
 
@@ -65,27 +69,153 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def startup(self, auto_form=False):
         """Perform a complete application startup"""
+        await self._reset()
+
         should_form = [False]
 
         if auto_form and any(should_form):
             await self.form_network()
 
-        startup_rsp = await self._api.command(
-            c.ZDOCommands.StartupFromApp.Req(StartDelay=100)
+        await self._api.command(c.ZDOCommands.StartupFromApp.Req(StartDelay=100))
+
+        await self._api.wait_for_response(
+            c.ZDOCommands.StateChangeInd.Callback(
+                State=DeviceState.StartedAsCoordinator
+            )
         )
 
-        if startup_rsp.State == StartupState.NotStarted:
-            raise RuntimeError("Network failed to start")
+        # Get our active endpoints
+        await self._api.command(
+            c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000)
+        )
 
-        # await self._api.wait_for_response(
-        #    c.ZDOCommands.StateChangeInd.Callback(State=DeviceState.StartedAsCoordinator)
-        # )
+        endpoints = await self._api.wait_for_response(
+            c.ZDOCommands.ActiveEpRsp.Callback(partial=True)
+        )
 
-    async def form_network(self, channel=15, pan_id=None, extended_pan_id=None):
+        # Clear out the list of active endpoints
+        for endpoint in endpoints.ActiveEndpoints:
+            await self._api.command(c.AFCommands.Delete(Endpoint=endpoint))
+
+        # Register our own
+        await self._api.command(
+            c.AFCommands.Register.Req(
+                Endpoint=1,
+                ProfileId=zigpy.profiles.zha.PROFILE_ID,
+                DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
+                DeviceVersion=0x00,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=t.LVList(t.ClusterId)([]),
+                OutputClusters=t.LVList(t.ClusterId)([]),
+            )
+        )
+        await self._api.command(
+            c.AFCommands.Register.Req(
+                Endpoint=8,
+                ProfileId=zigpy.profiles.zha.PROFILE_ID,
+                DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
+                DeviceVersion=0x00,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=t.LVList(t.ClusterId)([]),
+                OutputClusters=t.LVList(t.ClusterId)([IasZone.cluster_id]),
+            )
+        )
+        await self._api.command(
+            c.AFCommands.Register.Req(
+                Endpoint=11,
+                ProfileId=zigpy.profiles.zha.PROFILE_ID,
+                DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
+                DeviceVersion=0x00,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=t.LVList(t.ClusterId)([]),
+                OutputClusters=t.LVList(t.ClusterId)([]),
+            )
+        )
+        await self._api.command(
+            c.AFCommands.Register.Req(
+                Endpoint=12,
+                ProfileId=zigpy.profiles.zha.PROFILE_ID,
+                DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
+                DeviceVersion=0x00,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=t.LVList(t.ClusterId)([]),
+                OutputClusters=t.LVList(t.ClusterId)([]),
+            )
+        )
+        await self._api.command(
+            c.AFCommands.Register.Req(
+                Endpoint=100,
+                ProfileId=zigpy.profiles.zll.PROFILE_ID,
+                DeviceId=0x0005,
+                DeviceVersion=0x00,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=[],
+                OutputClusters=[],
+            )
+        )
+
+        await self._api.wait_for_response(
+            c.APPConfigCommands.BDBCommissioningNotification.Callback(partial=True)
+        )
+
+    async def update_network(
+        self,
+        *,
+        channel: Optional[t.uint8_t] = None,
+        channels: Optional[t.Channels] = None,
+        pan_id: Optional[t.PanId] = None,
+        extended_pan_id: Optional[zigpy.types.ExtendedPanId] = None,
+        network_key: Optional[zigpy.types.KeyData] = None,
+        reset: bool = True
+    ):
+        if channel is None:
+            raise NotImplementedError("Cannot set a specific channel")
+
+        if channels is not None:
+            await self._api.command(c.UtilCommands.SetChannels(Channels=channels))
+            await self._api.command(
+                c.APPConfigCommands.BDBSetChannel(IsPrimary=True, Channel=channels)
+            )
+            await self._api.command(
+                c.APPConfigCommands.BDBSetChannel(
+                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
+                )
+            )
+
+        if pan_id is not None:
+            await self._api.command(c.UtilCommands.SetPanId(PanId=pan_id))
+
+        if extended_pan_id is not None:
+            # There is no Util command to do this
+            await self._api.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
+
+        if network_key is not None:
+            await self._api.command(
+                c.UtilCommands.SetPreConfigKey(PreConfigKey=network_key)
+            )
+
+            # XXX: The Util command does not actually write to this NV address
+            await self._api.nvram_write(
+                NwkNvIds.PRECFGKEYS_ENABLE, zigpy.types.bool(True)
+            )
+
+        if reset:
+            # We have to reset afterwards
+            await self._reset()
+
+    async def _reset(self):
+        await self._api.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
+        return await self._api.wait_for_response(
+            c.SysCommands.ResetInd.Callback(partial=True)
+        )
+
+    async def form_network(self, channels=[15], pan_id=None, extended_pan_id=None):
         # These options are read only on startup so we perform a soft reset right after
         await self._api.nvram_write(
             NwkNvIds.STARTUP_OPTION, t.StartupOptions.ClearState
         )
+
+        # XXX: the undocumented `znpBasicCfg` command can do this
         await self._api.nvram_write(
             NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
         )
@@ -97,36 +227,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # joining devices. The key is sent in the clear over the last hop. Upon reset,
         # the device will retrieve the pre-configured key from NV memory if the NV_INIT
         # compile option is defined (the NV item is called ZCD_NV_PRECFGKEY).
-        network_key = zigpy.types.KeyData(os.urandom(16))
-        await self._api.nvram_write(NwkNvIds.PRECFGKEY, network_key)
-        await self._api.nvram_write(NwkNvIds.PRECFGKEYS_ENABLE, zigpy.types.bool(True))
 
-        channel_mask = t.Channels.from_channels([channel])
-        await self._api.nvram_write(NwkNvIds.CHANLIST, channel_mask)
+        await self.update_network(
+            channel=None,
+            channels=t.Channels.from_channel_list(channels),
+            pan_id=0xFFFF if pan_id is None else pan_id,
+            extended_pan_id=ExtendedPanId(
+                os.urandom(8) if extended_pan_id is None else extended_pan_id
+            ),
+            network_key=zigpy.types.KeyData(os.urandom(16)),
+            reset=False,
+        )
 
         # Receive verbose callbacks
         await self._api.nvram_write(NwkNvIds.ZDO_DIRECT_CB, zigpy.types.bool(True))
 
-        # 0xFFFF means "don't care", according to the documentation
-        pan_id = t.PanId(0xFFFF if pan_id is None else pan_id)
-        await self._api.nvram_write(NwkNvIds.PANID, pan_id)
-
-        extended_pan_id = ExtendedPanId(
-            os.urandom(8) if extended_pan_id is None else extended_pan_id
-        )
-        await self._api.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
-
         await self._api.command(
-            c.APPConfigCommands.BDBSetChannel(IsPrimary=True, Channel=channel_mask)
-        )
-        await self._api.command(
-            c.APPConfigCommands.BDBSetChannel(
-                IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-            )
-        )
-
-        await self._api.command(
-            c.APPConfigCommands.BDBStartCommissioning(
+            c.APPConfigCommands.BDBStartCommissioning.Req(
                 Mode=t.BDBCommissioningMode.NetworkFormation
             )
         )
@@ -138,11 +255,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         await self._api.command(
-            c.APPConfigCommands.BDBStartCommissioning(
+            c.APPConfigCommands.BDBStartCommissioning.Req(
                 Mode=t.BDBCommissioningMode.NetworkSteering
             )
         )
 
+    @zigpy.util.retryable_request
     async def request(
         self,
         device,
@@ -176,6 +294,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # if expect_reply:
         #    tx_options |= c.af.TransmitOptions.APSAck
+
+        # TODO: c.AFCommands.DataRequestSrcRtg
 
         data_request = c.AFCommands.DataRequest.Req(
             DstAddr=device.nwk,
@@ -212,7 +332,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     "Failed to send a message after discovering route",
                 )
 
-        async with async_timeout.timeout(10):
+        async with async_timeout.timeout(2):
             response = await self._api.wait_for_response(
                 c.AFCommands.DataConfirm.Callback(
                     partial=True, Endpoint=dst_ep, TSN=sequence
