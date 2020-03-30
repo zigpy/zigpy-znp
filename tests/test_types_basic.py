@@ -109,6 +109,8 @@ def test_lvlist():
     assert d == list(map(ord, "1234"))
     assert t.LVList(t.uint8_t).serialize(d) == b"\x041234"
 
+    assert isinstance(d, t.LVList(t.uint8_t))
+
 
 def test_lvlist_too_short():
     with pytest.raises(ValueError):

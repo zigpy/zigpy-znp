@@ -164,10 +164,21 @@ class _LVList(List):
         return r, data
 
 
+# So that isinstance(LVList(uint8_t)([]), LVList(uint8_t)) is True
+# XXX: This is not a "real" solution, it just passes unit tests.
+#      Namely, it is not pickleable.
+LVLIST_SINGLETON_CACHE = {}
+
+
 def LVList(itemtype, headertype=uint8_t):
+    if (itemtype, headertype) in LVLIST_SINGLETON_CACHE:
+        return LVLIST_SINGLETON_CACHE[(itemtype, headertype)]
+
     class LVList(_LVList):
         _header = headertype
         _itemtype = itemtype
+
+    LVLIST_SINGLETON_CACHE[(itemtype, headertype)] = LVList
 
     return LVList
 

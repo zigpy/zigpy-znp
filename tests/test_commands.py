@@ -186,6 +186,12 @@ def test_command_param_binding():
     with pytest.raises(AttributeError):
         ping_rsp.Oops
 
+    # bytes are converted into t.ShortBytes
+    cmd = c.SysCommands.NVWrite.Req(
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x0000, Value=b"asdfoo"
+    )
+    assert isinstance(cmd.Value, t.ShortBytes)
+
 
 def test_command_immutability():
     command1 = c.SysCommands.NVWrite.Req(

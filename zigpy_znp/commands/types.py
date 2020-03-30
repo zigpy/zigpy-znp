@@ -207,6 +207,8 @@ class CommandsMeta(type):
 
             rsp_header = header
 
+            # TODO: explore __set_name__
+
             if definition.req_schema is not None:
                 # AREQ doesn't necessarily mean it's a callback
                 # Some requests don't have any response at all
@@ -312,10 +314,9 @@ class CommandBase:
                     and not issubclass(param.type, t.enum_uint8)
                 ):
                     value = param.type(value)
-                elif isinstance(value, bytes) and issubclass(param.type, t.ShortBytes):
-                    value = param.type(value)
-                elif issubclass(param.type, t.List):
-                    # XXX: Type information is lost with t.LVList being a function
+                elif isinstance(value, bytes) and issubclass(
+                    param.type, (t.ShortBytes, t.LongBytes)
+                ):
                     value = param.type(value)
                 else:
                     raise ValueError(
