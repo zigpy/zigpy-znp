@@ -169,6 +169,16 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
         rsp_schema=STATUS_SCHEMA,
     )
 
+    # XXX: UNDOCUMENTED
+    Delete = CommandDef(
+        CommandType.SREQ,
+        0x04,
+        req_schema=t.Schema(
+            (t.Param("Endpoint", t.uint8_t, "Application Endpoint to delete"),)
+        ),
+        rsp_schema=STATUS_SCHEMA,
+    )
+
     # Inter-Pan control command and data
     InterPanCtl = CommandDef(
         CommandType.SREQ,
