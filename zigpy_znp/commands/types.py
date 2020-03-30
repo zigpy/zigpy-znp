@@ -1,4 +1,5 @@
 import enum
+import typing
 import logging
 
 import attr
@@ -159,8 +160,12 @@ class CommandHeader(t.uint16_t):
 class CommandDef:
     command_type: CommandType = attr.ib()
     command_id: int = attr.ib()
-    req_schema: t.Schema = attr.ib(factory=t.Schema)
-    rsp_schema: t.Schema = attr.ib(factory=t.Schema)
+    req_schema: typing.Optional[t.Schema] = attr.ib(
+        factory=lambda *v: None if not v else t.Schema(*v)
+    )
+    rsp_schema: typing.Optional[t.Schema] = attr.ib(
+        factory=lambda *v: None if not v else t.Schema(*v)
+    )
 
 
 class CommandsMeta(type):
@@ -188,6 +193,9 @@ class CommandsMeta(type):
                 "type": definition.command_type,
                 "subsystem": subsystem,
                 "__qualname__": qualname,
+                "Req": None,
+                "Rsp": None,
+                "Callback": None,
             }
 
             header = (
@@ -197,37 +205,60 @@ class CommandsMeta(type):
                 .with_subsystem(subsystem)
             )
 
-            if definition.command_type == CommandType.SREQ:
-                req_header = header
-                rsp_header = CommandHeader(0x0040 + req_header)
+            rsp_header = header
 
-                class Req(CommandBase, header=req_header, schema=definition.req_schema):
-                    pass
+            if definition.req_schema is not None:
+                # AREQ doesn't necessarily mean it's a callback
+                # Some requests don't have any response at all
+                if definition.command_type == CommandType.AREQ:
 
-                class Rsp(CommandBase, header=rsp_header, schema=definition.rsp_schema):
-                    pass
+                    class Req(CommandBase, header=header, schema=definition.req_schema):
+                        pass
 
-                Req.__qualname__ = qualname + ".Req"
-                Req.Rsp = Rsp
+                    Req.__qualname__ = qualname + ".Req"
+                    Req.Req = Req
+                    Req.Rsp = None
+                    Req.Callback = None
+                    helper_class_dict["Req"] = Req
+                else:
+                    req_header = header
+                    rsp_header = CommandHeader(0x0040 + req_header)
 
-                Rsp.__qualname__ = qualname + ".Rsp"
-                Rsp.Req = Req
+                    class Req(
+                        CommandBase, header=req_header, schema=definition.req_schema
+                    ):
+                        pass
 
-                helper_class_dict["Req"] = Req
-                helper_class_dict["Rsp"] = Rsp
-            elif definition.command_type == CommandType.AREQ:
+                    class Rsp(
+                        CommandBase, header=rsp_header, schema=definition.rsp_schema
+                    ):
+                        pass
 
+                    Req.__qualname__ = qualname + ".Req"
+                    Req.Req = Req
+                    Req.Rsp = Rsp
+                    Req.Callback = None
+                    helper_class_dict["Req"] = Req
+
+                    Rsp.__qualname__ = qualname + ".Rsp"
+                    Rsp.Req = Rsp
+                    Rsp.Req = Req
+                    Rsp.Callback = None
+                    helper_class_dict["Rsp"] = Rsp
+            else:
+                assert definition.rsp_schema is not None, definition
+
+                # If there is no request schema, this is a callback
                 class Callback(
-                    CommandBase, header=header, schema=definition.req_schema
+                    CommandBase, header=header, schema=definition.rsp_schema
                 ):
                     pass
 
                 Callback.__qualname__ = qualname + ".Callback"
+                Callback.Req = None
+                Callback.Rsp = None
+                Callback.Callback = Callback
                 helper_class_dict["Callback"] = Callback
-            else:
-                raise ValueError(
-                    f"Unknown command type: {definition.command_type}"
-                )  # pragma: no cover
 
             classdict[command] = type(command, (), helper_class_dict)
             classdict["_commands"].append(classdict[command])
@@ -243,6 +274,10 @@ class CommandsBase(metaclass=CommandsMeta, subsystem=None):
 
 
 class CommandBase:
+    Req = None
+    Rsp = None
+    Callback = None
+
     def __init_subclass__(cls, *, header, schema):
         super().__init_subclass__()
         cls.header = header

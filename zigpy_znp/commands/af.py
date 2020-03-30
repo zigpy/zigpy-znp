@@ -270,7 +270,7 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     DataConfirm = CommandDef(
         CommandType.AREQ,
         0x80,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -286,7 +286,7 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     IncomingMsg = CommandDef(
         CommandType.AREQ,
         0x81,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("GroupId", t.GroupId, "The group ID of the device"),
                 t.Param("ClusterId", t.ClusterId, "Cluster ID"),
@@ -318,7 +318,7 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     IncomingMsgExt = CommandDef(
         CommandType.AREQ,
         0x82,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("GroupId", t.GroupId, "The group ID of the device"),
                 t.Param("ClusterId", t.ClusterId, "Cluster ID"),
@@ -347,7 +347,7 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     ReflectError = CommandDef(
         CommandType.AREQ,
         0x83,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"

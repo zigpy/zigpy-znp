@@ -31,12 +31,11 @@ COMMANDS_BY_ID = {}
 
 for cmds in ALL_COMMANDS:
     for command in cmds:
-        if command.type == CommandType.SREQ:
+        if command.Req is not None:
             COMMANDS_BY_ID[command.Req.header] = command.Req
+
+        if command.Rsp is not None:
             COMMANDS_BY_ID[command.Rsp.header] = command.Rsp
-        elif command.type == CommandType.AREQ:
+
+        if command.Callback is not None:
             COMMANDS_BY_ID[command.Callback.header] = command.Callback
-        else:
-            raise ValueError(
-                f"Unhandled command type: {command.type}"
-            )  # pragma: no cover

@@ -231,7 +231,7 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
 
     # Instruct the ZED to try to rejoin its previews network. Use only in ZED devices
     BDBZedAttemptRecoverNWK = CommandDef(
-        CommandType.SREQ, 0x0A, rsp_schema=STATUS_SCHEMA
+        CommandType.SREQ, 0x0A, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
     )
 
     # MT_APP_CONFIG Callbacks
@@ -239,7 +239,7 @@ class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
     BDBCommissioningNotification = CommandDef(
         CommandType.AREQ,
         0x80,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status",

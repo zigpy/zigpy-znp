@@ -31,7 +31,9 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # initialize the MAC
-    Init = CommandDef(CommandType.SREQ, 0x02, rsp_schema=STATUS_SCHEMA)
+    Init = CommandDef(
+        CommandType.SREQ, 0x02, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    )
 
     # start the MAC as a coordinator or end device
     StartReq = CommandDef(
@@ -375,7 +377,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     SyncLossInd = CommandDef(
         CommandType.AREQ,
         0x80,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -403,7 +405,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     AssociateInd = CommandDef(
         CommandType.AREQ,
         0x81,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("IEEE", t.EUI64, "Extended address of the device"),
                 t.Param(
@@ -425,7 +427,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     AssociateCnf = CommandDef(
         CommandType.AREQ,
         0x82,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -447,7 +449,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     BeaconNotifyInd = CommandDef(
         CommandType.AREQ,
         0x83,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("BSN", t.uint8_t, "BSN"),
                 t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
@@ -489,7 +491,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     DataCnf = CommandDef(
         CommandType.AREQ,
         0x84,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -499,14 +501,13 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("TimeStamp2", t.uint16_t, "16 bit timestamp of the message"),
             )
         ),
-        rsp_schema=t.Schema(()),
     )
 
     # send (on behalf of the next higher layer) a MAC data indication
     DataInd = CommandDef(
         CommandType.AREQ,
         0x85,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("SrcAddrModeAddr", t.AddrModeAddress, "Source address"),
                 t.Param("DstAddrModeAddr", t.AddrModeAddress, "Destination address"),
@@ -535,7 +536,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     DisassociateReq = CommandDef(
         CommandType.AREQ,
         0x86,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "IEEE", t.EUI64, "EUI64 address of the device leaving the network"
@@ -558,7 +559,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     DisassociateCnf = CommandDef(
         CommandType.AREQ,
         0x87,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -577,7 +578,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     OrphanInd = CommandDef(
         CommandType.AREQ,
         0x8A,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("IEEE", t.EUI64, "Extended address of the orphan device"),
                 t.Param("KeySource", t.KeySource, "Key Source of this data frame"),
@@ -593,13 +594,13 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC poll confirmation
-    PollCnf = CommandDef(CommandType.AREQ, 0x8B, req_schema=STATUS_SCHEMA)
+    PollCnf = CommandDef(CommandType.AREQ, 0x8B, rsp_schema=STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC scan confirmation
     ScanCnf = CommandDef(
         CommandType.AREQ,
         0x8C,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -624,7 +625,7 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     CommStatusInd = CommandDef(
         CommandType.AREQ,
         0x8D,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -648,16 +649,16 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC start confirmation
-    StartCnf = CommandDef(CommandType.AREQ, 0x8E, req_schema=STATUS_SCHEMA)
+    StartCnf = CommandDef(CommandType.AREQ, 0x8E, rsp_schema=STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC Rx enable confirmation
-    RxEnableCnf = CommandDef(CommandType.AREQ, 0x8F, req_schema=STATUS_SCHEMA)
+    RxEnableCnf = CommandDef(CommandType.AREQ, 0x8F, rsp_schema=STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC purge confirmation
     PurgeCnf = CommandDef(
         CommandType.AREQ,
         0x9A,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"

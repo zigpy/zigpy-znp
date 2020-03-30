@@ -46,6 +46,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     GetDeviceInfo = CommandDef(
         CommandType.SREQ,
         0x00,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param(
@@ -73,6 +74,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     GetNVInfo = CommandDef(
         CommandType.SREQ,
         0x01,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param(
@@ -189,6 +191,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     TimeAlive = CommandDef(
         CommandType.SREQ,
         0x09,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param(
@@ -236,7 +239,9 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # enable AUTOPEND and source address matching
-    SrcMatchEnable = CommandDef(CommandType.SREQ, 0x20, rsp_schema=STATUS_SCHEMA)
+    SrcMatchEnable = CommandDef(
+        CommandType.SREQ, 0x20, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    )
 
     # add a short or extended address to source address table
     SrcMatchAddEntry = CommandDef(
@@ -318,6 +323,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     SrcMatchCheckAllPending = CommandDef(
         CommandType.SREQ,
         0x25,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param(
@@ -558,6 +564,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     SRngGen = CommandDef(
         CommandType.SREQ,
         0x4C,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (t.Param("RandomNumbers", RandomNumbers, "Secure random numbers list"),)
         ),
@@ -565,13 +572,15 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
 
     # UTIL Callbacks
     # asynchronous request/response handshake
-    SyncReq = CommandDef(CommandType.AREQ, 0xE0)
+    # XXX: This command is ambiguously defined.
+    #      We see an example of how it behaves.
+    # SyncReq = CommandDef(CommandType.AREQ, 0xE0)
 
     # RPC proxy indication for a ZCL_KEY_ESTABLISH_IND
     ZCLKeyEstInd = CommandDef(
         CommandType.AREQ,
         0xE1,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "TaskId",

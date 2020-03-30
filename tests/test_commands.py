@@ -94,6 +94,7 @@ def test_commands_schema():
 
                 assert cmd.Req.Rsp is cmd.Rsp
                 assert cmd.Rsp.Req is cmd.Req
+                assert cmd.Callback is None
 
                 _validate_schema(cmd.Req.schema)
                 _validate_schema(cmd.Rsp.schema)
@@ -101,13 +102,32 @@ def test_commands_schema():
                 commands_by_id[cmd.Req.header].append(cmd.Req)
                 commands_by_id[cmd.Rsp.header].append(cmd.Rsp)
             elif cmd.type == c.CommandType.AREQ:
-                assert cmd.type == cmd.Callback.header.type
-                assert cmd.subsystem == cmd.Callback.header.subsystem
-                assert isinstance(cmd.Callback.header, c.CommandHeader)
+                # we call the AREQ Rsp a Callback
+                assert cmd.Rsp is None
 
-                _validate_schema(cmd.Callback.schema)
+                # only one of them can be set
+                assert (cmd.Callback is not None) ^ (cmd.Req is not None)
 
-                commands_by_id[cmd.Callback.header].append(cmd.Callback)
+                if cmd.Callback is not None:
+                    assert cmd.type == cmd.Callback.header.type
+                    assert cmd.subsystem == cmd.Callback.header.subsystem
+                    assert isinstance(cmd.Callback.header, c.CommandHeader)
+
+                    _validate_schema(cmd.Callback.schema)
+
+                    commands_by_id[cmd.Callback.header].append(cmd.Callback)
+                elif cmd.Req is not None:
+                    assert cmd.type == cmd.Req.header.type
+                    assert cmd.subsystem == cmd.Req.header.subsystem
+                    assert isinstance(cmd.Req.header, c.CommandHeader)
+
+                    _validate_schema(cmd.Req.schema)
+
+                    commands_by_id[cmd.Req.header].append(cmd.Req)
+                else:
+                    assert False, "Command is empty"
+            else:
+                assert False, "Command has unknown type"
 
     duplicate_commands = {
         cmd: commands for cmd, commands in commands_by_id.items() if len(commands) > 1

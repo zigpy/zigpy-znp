@@ -43,6 +43,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     Ping = CommandDef(
         CommandType.SREQ,
         0x01,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param(
@@ -58,6 +59,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     Version = CommandDef(
         CommandType.SREQ,
         0x02,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param("TransportRev", t.uint8_t, "Transport protocol revision"),
@@ -245,6 +247,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     Random = CommandDef(
         CommandType.SREQ,
         0x0C,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema((t.Param("Value", t.uint16_t, "The random value"),)),
     )
 
@@ -330,6 +333,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     GetTime = CommandDef(
         CommandType.SREQ,
         0x11,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param(
@@ -363,7 +367,9 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # initialize the statistics table in NV memory
-    ZDiagsInitStats = CommandDef(CommandType.SREQ, 0x17, rsp_schema=STATUS_SCHEMA)
+    ZDiagsInitStats = CommandDef(
+        CommandType.SREQ, 0x17, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    )
 
     # clear the statistics table. To clear data in NV (including the Boot
     # Counter) the clearNV flag shall be set to TRUE
@@ -392,12 +398,15 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # restore the statistics table from NV into the RAM table
-    ZDiagsRestoreStatsNV = CommandDef(CommandType.SREQ, 0x1A, rsp_schema=STATUS_SCHEMA)
+    ZDiagsRestoreStatsNV = CommandDef(
+        CommandType.SREQ, 0x1A, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    )
 
     # save the statistics table from RAM to NV
     ZDiagsSaveStatsToNV = CommandDef(
         CommandType.SREQ,
         0x1B,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (t.Param("SycClock", t.uint32_t, "Milliseconds since last reset"),)
         ),
@@ -531,7 +540,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     ResetInd = CommandDef(
         CommandType.AREQ,
         0x80,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Reason", t.ResetReason, "Reason for the reset"),
                 t.Param("TransportRev", t.uint8_t, "Transport protocol revision"),
@@ -546,7 +555,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     OSALTimerExpired = CommandDef(
         CommandType.AREQ,
         0x81,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),)
         ),
     )

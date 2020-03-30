@@ -211,7 +211,7 @@ class ZNP:
         if ignore_response and response_params:
             raise KeyError(f"Cannot have both response_params and ignore_response")
 
-        if command.header.type != zigpy_znp.commands.types.CommandType.SREQ:
+        if type(command) is not command.Req:
             raise ValueError(f"Cannot send a command that isn't a request: {command!r}")
 
         # Construct our response before we send the request, ensuring we fail early

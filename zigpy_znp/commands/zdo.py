@@ -809,6 +809,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     ExtCountAllGroups = CommandDef(
         CommandType.SREQ,
         0x4C,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (t.Param("GroupCount", t.uint8_t, "Total number of groups"),)
         ),
@@ -858,6 +859,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     ExtNwkInfo = CommandDef(
         CommandType.SREQ,
         0x50,
+        req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param("Dst", t.NWK, "Short address of the destination"),
@@ -886,7 +888,9 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
 
     # forces a network concentrator change by resetting zgConcentratorEnable and
     # zgConcentratorDiscoveryTime from NV and set nwk event
-    ForceConcentratorChange = CommandDef(CommandType.SREQ, 0x52)
+    ForceConcentratorChange = CommandDef(
+        CommandType.SREQ, 0x52, req_schema=t.Schema(), rsp_schema=t.Schema()
+    )
 
     # set parameters not settable through NV
     ExtSetParams = CommandDef(
@@ -925,7 +929,8 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     NwkAddrRsp = CommandDef(
         CommandType.AREQ,
         0x80,
-        req_schema=t.Schema(
+        req_schema=t.Schema(),
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -946,7 +951,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     IEEEAddrRsp = CommandDef(
         CommandType.AREQ,
         0x81,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -967,7 +972,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     NodeDescRsp = CommandDef(
         CommandType.AREQ,
         0x82,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -985,7 +990,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     PowerDescRsp = CommandDef(
         CommandType.AREQ,
         0x83,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1005,7 +1010,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     SimpleDescRsp = CommandDef(
         CommandType.AREQ,
         0x84,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1026,7 +1031,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     ActiveEpRsp = CommandDef(
         CommandType.AREQ,
         0x85,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1044,7 +1049,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MatchDescRsp = CommandDef(
         CommandType.AREQ,
         0x86,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1060,7 +1065,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     ComplexDescRsp = CommandDef(
         CommandType.AREQ,
         0x87,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1076,7 +1081,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     UserDescRsp = CommandDef(
         CommandType.AREQ,
         0x88,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1092,7 +1097,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     UserDescCnf = CommandDef(
         CommandType.AREQ,
         0x89,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1107,7 +1112,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     ServerDiscRsp = CommandDef(
         CommandType.AREQ,
         0x8A,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1122,7 +1127,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     EndDeviceBindRsp = CommandDef(
         CommandType.AREQ,
         0xA0,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1136,7 +1141,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     BindRsp = CommandDef(
         CommandType.AREQ,
         0xA1,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1150,7 +1155,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     UnBindRsp = CommandDef(
         CommandType.AREQ,
         0xA2,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1164,7 +1169,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MgmtNwkDiscRsp = CommandDef(
         CommandType.AREQ,
         0xB0,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1181,7 +1186,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MgmtLqiRsp = CommandDef(
         CommandType.AREQ,
         0xB1,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1196,7 +1201,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MgmtRtgRsp = CommandDef(
         CommandType.AREQ,
         0xB2,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1211,7 +1216,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MgmtBindRsp = CommandDef(
         CommandType.AREQ,
         0xB3,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1232,7 +1237,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MgmtLeaveRsp = CommandDef(
         CommandType.AREQ,
         0xB4,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1246,7 +1251,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MgmtDirectJoinRsp = CommandDef(
         CommandType.AREQ,
         0xB5,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1260,7 +1265,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MgmtPermitJoinRsp = CommandDef(
         CommandType.AREQ,
         0xB6,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1274,14 +1279,14 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     StateChangeInd = CommandDef(
         CommandType.AREQ,
         0xC0,
-        req_schema=t.Schema((t.Param("State", DeviceState, "New ZDO state"),)),
+        rsp_schema=t.Schema((t.Param("State", DeviceState, "New ZDO state"),)),
     )
 
     # indicates the ZDO End Device Announce
     EndDeviceAnnceInd = CommandDef(
         CommandType.AREQ,
         0xC1,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "Source address of the message."),
                 t.Param("NWK", t.NWK, "Specifies the device’s short address"),
@@ -1299,7 +1304,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MatchDescRspSent = CommandDef(
         CommandType.AREQ,
         0xC2,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("NWK", t.NWK, "Device's network address"),
                 t.Param(
@@ -1316,7 +1321,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     StatusErrorRsp = CommandDef(
         CommandType.AREQ,
         0xC3,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
@@ -1330,7 +1335,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     SrcRtgInd = CommandDef(
         CommandType.AREQ,
         0xC4,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Dst",
@@ -1346,14 +1351,14 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     BeaconNotifyInd = CommandDef(
         CommandType.AREQ,
         0xC5,
-        req_schema=t.Schema((t.Param("Beacons", t.LVList(t.Beacon), "Beacons list"),)),
+        rsp_schema=t.Schema((t.Param("Beacons", t.LVList(t.Beacon), "Beacons list"),)),
     )
 
     # inform the host device of a ZDO join request result
     JoinCnf = CommandDef(
         CommandType.AREQ,
         0xC6,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
@@ -1365,13 +1370,13 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     )
 
     # indication to inform host device the completion of network discovery scan
-    NwkDiscoveryCnf = CommandDef(CommandType.AREQ, 0xC7, req_schema=STATUS_SCHEMA)
+    NwkDiscoveryCnf = CommandDef(CommandType.AREQ, 0xC7, rsp_schema=STATUS_SCHEMA)
 
     # an indication to inform the host of a device leaving the network
     LeaveInd = CommandDef(
         CommandType.AREQ,
         0xC9,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param(
                     "NWK", t.NWK, "Short address of the source of the leave indication"
@@ -1393,7 +1398,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     MsgCbIncoming = CommandDef(
         CommandType.AREQ,
         0xFF,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "Source address of the ZDO message"),
                 t.Param(
@@ -1420,7 +1425,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     TCDevInd = CommandDef(
         CommandType.AREQ,
         0xCA,
-        req_schema=t.Schema(
+        rsp_schema=t.Schema(
             (
                 t.Param("SrcNwk", t.NWK, "device's network address"),
                 t.Param("SrcIEEE", t.EUI64, "IEEE address of the source"),
@@ -1433,5 +1438,5 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     PermitJoinInd = CommandDef(
         CommandType.AREQ,
         0xCB,
-        req_schema=t.Schema((t.Param("Duration", t.uint8_t, "Permit join duration"),)),
+        rsp_schema=t.Schema((t.Param("Duration", t.uint8_t, "Permit join duration"),)),
     )
