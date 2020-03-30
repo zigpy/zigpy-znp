@@ -25,6 +25,12 @@ class TransmitOptions(t.enum_uint8, enum.IntFlag):
     SkipRouting = 0b10000000
 
 
+class LatencyReq(t.uint8_t, enum.Enum):
+    NoLatencyReqs = 0x00
+    FastBeacons = 0x01
+    SlowBeacons = 0x02
+
+
 class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     # This command enables the tester to register an application’s endpoint description
     Register = CommandDef(
@@ -38,9 +44,9 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("DeviceVersion", t.uint8_t, "Device version number"),
                 t.Param(
                     "LatencyReq",
-                    t.uint8_t,
+                    LatencyReq,
                     (
-                        "Specifies latency: 0x00 - No latency, "
+                        "Specifies latency reqs: 0x00 - None, "
                         "0x01 -- fast beacons, "
                         "0x02 -- slow beacons"
                     ),
