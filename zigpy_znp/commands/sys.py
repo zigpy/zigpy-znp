@@ -544,9 +544,10 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
             (
                 t.Param("Reason", t.ResetReason, "Reason for the reset"),
                 t.Param("TransportRev", t.uint8_t, "Transport protocol revision"),
+                t.Param("ProductId", t.uint8_t, "Product ID"),
                 t.Param("MajorRel", t.uint8_t, "Software major release number"),
                 t.Param("MinorRel", t.uint8_t, "Software minor release number"),
-                t.Param("HwRev", t.uint8_t, "Chip hardware revision"),
+                t.Param("MaintRel", t.uint8_t, "Software maintenance release number"),
             )
         ),
     )
