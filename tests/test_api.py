@@ -387,12 +387,29 @@ async def test_znp_uart(znp, event_loop):
         await znp.command(c.SysCommands.Ping.Req(), foo=0x01)
 
     # You cannot ignore the response and specify response params
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError):
         await znp.command(
             c.SysCommands.Ping.Req(),
             ignore_response=True,
             Capabilities=c.types.MTCapabilities.CAP_SYS,
         )
+
+    # Commands with no response (not an empty response!) can still be sent
+    response = await znp.command(
+        c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), ignore_response=True
+    )
+
+    znp._uart.send.assert_called_once_with(
+        c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft).to_frame()
+    )
+
+    assert response is None
+
+    znp._uart.send.reset_mock()
+
+    # Commands with no response cannot be sent without explicitly ignoring it
+    with pytest.raises(ValueError):
+        await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
 
     # You cannot send anything but requests
     with pytest.raises(ValueError):

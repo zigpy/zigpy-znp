@@ -209,18 +209,21 @@ class ZNP:
 
     async def command(self, command, *, ignore_response=False, **response_params):
         if ignore_response and response_params:
-            raise KeyError(f"Cannot have both response_params and ignore_response")
+            raise ValueError(f"Cannot have both response_params and ignore_response")
 
         if type(command) is not command.Req:
             raise ValueError(f"Cannot send a command that isn't a request: {command!r}")
 
-        # Construct our response before we send the request, ensuring we fail early
-        response = command.Rsp(partial=True, **response_params)
+        if command.Rsp is not None:
+            # Construct our response before we send the request so that we fail early
+            response = command.Rsp(partial=True, **response_params)
+        elif not ignore_response:
+            raise ValueError("This command has no response to ignore")
 
         LOGGER.debug("Sending command %s", command)
         self._uart.send(command.to_frame())
 
-        if ignore_response:
+        if command.Rsp is None or ignore_response:
             return
 
         return await self.wait_for_response(response)
