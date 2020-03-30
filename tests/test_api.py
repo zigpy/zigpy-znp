@@ -98,30 +98,33 @@ async def test_znp_response_timeouts(znp):
 async def test_znp_response_matching_partial(znp):
     future = znp.wait_for_response(
         c.SysCommands.ResetInd.Callback(
-            partial=True, Reason=t.ResetReason.PowerUp, HwRev=0x04
+            partial=True, Reason=t.ResetReason.PowerUp, MaintRel=0x04
         )
     )
 
     response1 = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x12,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     response2 = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x12,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x04,
+        MaintRel=0x04,
     )
     response3 = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.External,
         TransportRev=0x00,
+        ProductId=0x12,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x04,
+        MaintRel=0x04,
     )
 
     znp.frame_received(response1.to_frame())
@@ -137,23 +140,26 @@ async def test_znp_response_matching_exact(znp):
     response1 = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x12,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     response2 = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x12,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x04,
+        MaintRel=0x04,
     )
     response3 = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.External,
         TransportRev=0x00,
+        ProductId=0x12,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x04,
+        MaintRel=0x04,
     )
 
     future = znp.wait_for_response(response2)
@@ -172,9 +178,10 @@ async def test_znp_response_not_matching_out_of_order(znp):
     response = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x12,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     znp.frame_received(response.to_frame())
 
@@ -398,9 +405,10 @@ async def test_znp_uart(znp, event_loop):
             c.SysCommands.ResetInd.Callback(
                 Reason=t.ResetReason.PowerUp,
                 TransportRev=0x00,
+                ProductId=0x12,
                 MajorRel=0x01,
                 MinorRel=0x02,
-                HwRev=0x03,
+                MaintRel=0x03,
             )
         )
 

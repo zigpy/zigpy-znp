@@ -21,9 +21,10 @@ def test_uart_rx_basic():
     test_command = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x45,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     test_frame = test_command.to_frame()
     test_frame_bytes = TransportFrame(test_frame).serialize()
@@ -43,9 +44,10 @@ def test_uart_rx_byte_by_byte():
     test_command = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x45,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     test_frame = test_command.to_frame()
     test_frame_bytes = TransportFrame(test_frame).serialize()
@@ -66,9 +68,10 @@ def test_uart_rx_byte_by_byte_garbage():
     test_command = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x45,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     test_frame = test_command.to_frame()
     test_frame_bytes = TransportFrame(test_frame).serialize()
@@ -99,9 +102,10 @@ def test_uart_rx_big_garbage():
     test_command = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x45,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     test_frame = test_command.to_frame()
     test_frame_bytes = TransportFrame(test_frame).serialize()
@@ -131,9 +135,10 @@ def test_uart_rx_corrupted_fcs():
     test_command = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x45,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     test_frame = test_command.to_frame()
     test_frame_bytes = TransportFrame(test_frame).serialize()
@@ -155,9 +160,10 @@ def test_uart_rx_sof_stress():
     test_command = c.SysCommands.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
+        ProductId=0x45,
         MajorRel=0x01,
         MinorRel=0x02,
-        HwRev=0x03,
+        MaintRel=0x03,
     )
     test_frame = test_command.to_frame()
     test_frame_bytes = TransportFrame(test_frame).serialize()
