@@ -437,13 +437,6 @@ async def test_znp_command_kwargs(znp):
 async def test_znp_uart(znp, event_loop):
     znp._uart = Mock()
 
-    znp._uart.send.reset_mock()
-
-    assert (await znp.command(c.SysCommands.Ping.Req(), ignore_response=True)) is None
-    znp._uart.send.assert_called_once_with(c.SysCommands.Ping.Req().to_frame())
-
-    znp._uart.send.reset_mock()
-
     ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
 
     event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
