@@ -20,6 +20,7 @@ from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.commands.types import DeviceState
 
 
+DATA_CONFIRM_TIMEOUT = 5  # seconds
 LOGGER = logging.getLogger(__name__)
 
 
@@ -307,39 +308,33 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             Radius=30,
             Data=data,
         )
-        response = await self._api.command(data_request)
 
-        # XXX: sometimes routes need to be re-discovered
-        if response.Status == t.Status.NwkNoRoute:
-            LOGGER.warning(
-                "No route to %s. Forcibly discovering a route and re-sending request",
-                device.nwk,
-            )
+        await self._api.command(data_request, Status=t.Status.Success)
 
-            await self._api.command(
-                c.ZDOCommands.ExtRouteDisc.Req(
-                    Dst=device.ieee,
-                    Options=c.zdo.RouteDiscoveryOptions.Force,
-                    Radius=2 * 0x0F,
-                )
-            )
-
-            response = await self._api.command(data_request)
-
-            if response.Status != t.Status.Success:
-                return (
-                    response.Status,
-                    "Failed to send a message after discovering route",
-                )
-
-        async with async_timeout.timeout(2):
+        async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
             response = await self._api.wait_for_response(
                 c.AFCommands.DataConfirm.Callback(
                     partial=True, Endpoint=dst_ep, TSN=sequence
                 )
             )
 
-        LOGGER.info("Received a data request confirmation: %s", response)
+        # XXX: sometimes routes need to be re-discovered
+        if response.Status == t.Status.NwkNoRoute:
+            LOGGER.warning(
+                "No route to %s. Discovering a route before failing.", device.nwk
+            )
+
+            await self._api.command(
+                c.ZDOCommands.ExtRouteDisc.Req(
+                    Dst=device.nwk,
+                    Options=c.zdo.RouteDiscoveryOptions.Force,
+                    Radius=2 * 0x0F,
+                )
+            )
+
+            return (response.Status, "Failed to send a message after discovering route")
+
+        LOGGER.debug("Received a data request confirmation: %s", response)
 
         if response.Status != t.Status.Success:
             return response.Status, "Invalid response status"
