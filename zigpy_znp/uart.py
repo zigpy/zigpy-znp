@@ -1,14 +1,16 @@
 import asyncio
-import binascii
 import logging
 import typing
 
 import serial
+import serial.tools
 import serial_asyncio
 
 from serial.tools.list_ports import comports as list_com_ports
 
 import zigpy_znp.frames as frames
+
+from zigpy_znp.types import Bytes
 from zigpy_znp.exceptions import InvalidFrame
 
 LOGGER = logging.getLogger(__name__)
@@ -18,7 +20,7 @@ class BufferTooShort(Exception):
     pass
 
 
-class Gateway(asyncio.Protocol):
+class ZnpMtProtocol(asyncio.Protocol):
     def __init__(self, api):
         self._buffer = bytearray()
         self._api = api
@@ -59,14 +61,16 @@ class Gateway(asyncio.Protocol):
         """Callback when data is received."""
         self._buffer += data
 
+        LOGGER.debug("Received data: %s", Bytes.__repr__(data))
+
         for frame in self._extract_frames():
-            LOGGER.debug("Received frame: %s", frame)
+            LOGGER.debug("Parsed frame: %s", frame)
             self._api.frame_received(frame.payload)
 
     def send(self, payload: frames.GeneralFrame) -> None:
         """Sends data taking care of framing."""
         data = frames.TransportFrame(payload).serialize()
-        LOGGER.debug("Sending: %s", binascii.hexlify(data))
+        LOGGER.debug("Sending data: %s", Bytes.__repr__(data))
         self.transport.write(data)
 
     def skip_bootloader(self) -> None:
@@ -74,7 +78,7 @@ class Gateway(asyncio.Protocol):
         LOGGER.debug("Skipping bootloader: 0xFE")
         self.transport.write(b"\xFE")
 
-    def _extract_frames(self):
+    def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""
         while True:
             try:
@@ -92,7 +96,7 @@ class Gateway(asyncio.Protocol):
                 else:
                     del self._buffer[:sof_index]
 
-    def _extract_frame(self) -> typing.Optional[frames.TransportFrame]:
+    def _extract_frame(self) -> frames.TransportFrame:
         """Extracts a single frame from the buffer."""
 
         # The shortest possible frame is 5 bytes long
@@ -132,7 +136,7 @@ class Gateway(asyncio.Protocol):
         return frame
 
 
-def guess_port():
+def guess_port() -> serial.tools.list_ports_common.ListPortInfo:
     """Picks the first USB port with a Texas Instruments vendor ID."""
     candidates = []
 
@@ -158,16 +162,18 @@ def guess_port():
     return device
 
 
-async def connect(port, baudrate, api, loop=None):
+async def connect(port, baudrate, api, loop=None) -> typing.Tuple[ZnpMtProtocol, str]:
     if loop is None:
         loop = asyncio.get_event_loop()
 
     if port == "auto":
         port = guess_port()
 
+    LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
+
     transport, protocol = await serial_asyncio.create_serial_connection(
         loop,
-        lambda: Gateway(api),
+        lambda: ZnpMtProtocol(api),
         url=port,
         baudrate=baudrate,
         parity=serial.PARITY_NONE,

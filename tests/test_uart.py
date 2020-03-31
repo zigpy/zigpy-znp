@@ -15,7 +15,7 @@ def test_uart_rx_basic():
     api = mock.Mock()
     transport = mock.Mock()
 
-    uart = znp_uart.Gateway(api)
+    uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -38,7 +38,7 @@ def test_uart_rx_byte_by_byte():
     api = mock.Mock()
     transport = mock.Mock()
 
-    uart = znp_uart.Gateway(api)
+    uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -62,7 +62,7 @@ def test_uart_rx_byte_by_byte_garbage():
     api = mock.Mock()
     transport = mock.Mock()
 
-    uart = znp_uart.Gateway(api)
+    uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -96,7 +96,7 @@ def test_uart_rx_big_garbage():
     api = mock.Mock()
     transport = mock.Mock()
 
-    uart = znp_uart.Gateway(api)
+    uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -129,7 +129,7 @@ def test_uart_rx_corrupted_fcs():
     api = mock.Mock()
     transport = mock.Mock()
 
-    uart = znp_uart.Gateway(api)
+    uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
@@ -154,7 +154,7 @@ def test_uart_rx_sof_stress():
     api = mock.Mock()
     transport = mock.Mock()
 
-    uart = znp_uart.Gateway(api)
+    uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
     test_command = c.SysCommands.ResetInd.Callback(
