@@ -380,7 +380,7 @@ async def test_znp_wait_for_responses(znp, event_loop):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_znp_uart(znp, event_loop):
+async def test_znp_command_kwargs(znp):
     znp._uart = Mock()
 
     with pytest.raises(KeyError):
@@ -395,9 +395,7 @@ async def test_znp_uart(znp, event_loop):
         )
 
     # Commands with no response (not an empty response!) can still be sent
-    response = await znp.command(
-        c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), ignore_response=True
-    )
+    response = await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
 
     znp._uart.send.assert_called_once_with(
         c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft).to_frame()
@@ -405,11 +403,11 @@ async def test_znp_uart(znp, event_loop):
 
     assert response is None
 
-    znp._uart.send.reset_mock()
-
-    # Commands with no response cannot be sent without explicitly ignoring it
+    # Commands with no response cannot have their response ignored
     with pytest.raises(ValueError):
-        await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
+        await znp.command(
+            c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), ignore_response=True
+        )
 
     # You cannot send anything but requests
     with pytest.raises(ValueError):
@@ -428,6 +426,13 @@ async def test_znp_uart(znp, event_loop):
                 MaintRel=0x03,
             )
         )
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_uart(znp, event_loop):
+    znp._uart = Mock()
+
+    znp._uart.send.reset_mock()
 
     assert (await znp.command(c.SysCommands.Ping.Req(), ignore_response=True)) is None
     znp._uart.send.assert_called_once_with(c.SysCommands.Ping.Req().to_frame())

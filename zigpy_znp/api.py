@@ -217,7 +217,7 @@ class ZNP:
         if command.Rsp is not None:
             # Construct our response before we send the request so that we fail early
             response = command.Rsp(partial=True, **response_params)
-        elif not ignore_response:
+        elif ignore_response:
             raise ValueError("This command has no response to ignore")
 
         LOGGER.debug("Sending command %s", command)
