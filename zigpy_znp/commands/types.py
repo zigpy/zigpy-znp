@@ -318,6 +318,8 @@ class CommandBase:
                     param.type, (t.ShortBytes, t.LongBytes)
                 ):
                     value = param.type(value)
+                elif isinstance(value, list) and issubclass(param.type, list):
+                    value = param.type(value)
                 else:
                     raise ValueError(
                         f"In {type(self)}, param {param.name} is "

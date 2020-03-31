@@ -192,6 +192,21 @@ def test_command_param_binding():
     )
     assert isinstance(cmd.Value, t.ShortBytes)
 
+    # Lists are converted to typed LVLists
+    c.UtilCommands.BindAddEntry.Req(
+        DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
+        DstEndpoint=0x56,
+        ClusterIdList=[0x12, 0x45],
+    )
+
+    # Type errors within containers are also caught
+    with pytest.raises(ValueError):
+        c.UtilCommands.BindAddEntry.Req(
+            DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
+            DstEndpoint=0x56,
+            ClusterIdList=[0x12, 0x457890],  # 0x457890 doesn't fit into a uint8_t
+        )
+
 
 def test_command_immutability():
     command1 = c.SysCommands.NVWrite.Req(

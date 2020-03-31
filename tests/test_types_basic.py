@@ -111,6 +111,9 @@ def test_lvlist():
 
     assert isinstance(d, t.LVList(t.uint8_t))
 
+    with pytest.raises(OverflowError):
+        t.LVList(t.uint8_t)([1, 2, 0xFFFF, 4]).serialize()
+
 
 def test_lvlist_too_short():
     with pytest.raises(ValueError):
