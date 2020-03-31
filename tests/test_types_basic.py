@@ -51,7 +51,7 @@ def test_bytes():
 
     assert r.serialize() == data
 
-    assert repr(r) == "b'\\x61\\x62\\x63\\x64\\x65\\x00\\xFF'"
+    assert str(r) == repr(r) == "b'\\x61\\x62\\x63\\x64\\x65\\x00\\xFF'"
 
     # Ensure we don't make any mistakes formatting the bytes
     all_bytes = t.Bytes(bytes(range(0, 255 + 1)))
@@ -130,6 +130,9 @@ def test_hex_repr():
     nwk = NwkAsHex(0x123A)
     assert str(nwk) == "0x123A"
     assert repr(nwk) == "0x123A"
+
+    assert str([nwk]) == "[0x123A]"
+    assert repr([nwk]) == "[0x123A]"
 
 
 def test_fixed_list():

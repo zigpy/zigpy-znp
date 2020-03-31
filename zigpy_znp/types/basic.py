@@ -25,6 +25,8 @@ class Bytes(bytes):
 
         return f"b'{escaped}'"
 
+    __str__ = __repr__
+
 
 class int_t(int):
     _signed = True
@@ -198,11 +200,10 @@ class FixedList(List):
 
 
 class HexRepr:
-    def __repr__(self):
-        return ("0x{:0" + str(self._size * 2) + "X}").format(self)
-
     def __str__(self):
         return ("0x{:0" + str(self._size * 2) + "X}").format(self)
+
+    __repr__ = __str__
 
 
 class enum_uint8:
