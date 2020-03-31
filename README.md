@@ -1,6 +1,6 @@
 # zigpy-znp
 
-[![Build Status](https://travis-ci.com/zha-ng/zigpy-znp.svg?branch=dev)](https://travis-ci.com/zha-ng/zigpy-znp)
+[![Build Status](https://travis-ci.org/zha-ng/zigpy-znp.svg?branch=dev)](https://travis-ci.org/zha-ng/zigpy-znp)
 [![Coverage Status](https://coveralls.io/repos/github/zha-ng/zigpy-znp/badge.svg?branch=dev)](https://coveralls.io/github/zha-ng/zigpy-znp?branch=dev)
 
 [zigpy-znp](https://github.com/zha-ng/zigpy-zhp/) is a Python library implemention which adds support for common [Texas Instruments ZNP (Zigbee Network Processors)](http://dev.ti.com/tirex/content/simplelink_zigbee_sdk_plugin_2_20_00_06/docs/zigbee_user_guide/html/zigbee/developing_zigbee_applications/znp_interface/znp_interface.html) based [Zigbee](https://www.zigbee.org) radio module chips hardware to [Zigpy](https://github.com/zigpy/), a Python Zigbee stack project. 
