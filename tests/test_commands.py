@@ -2,6 +2,7 @@ import pytest
 import logging
 
 import zigpy_znp.commands as c
+import zigpy_znp.frames as frames
 from zigpy_znp import types as t
 
 from collections import defaultdict
@@ -79,8 +80,6 @@ def test_commands_schema():
 
     for commands in c.ALL_COMMANDS:
         for cmd in commands:
-            assert cmd.type in (c.CommandType.SREQ, c.CommandType.AREQ)
-
             if cmd.type == c.CommandType.SREQ:
                 assert cmd.type == cmd.Req.header.type
                 assert cmd.Rsp.header.type == c.CommandType.SRSP
@@ -126,6 +125,20 @@ def test_commands_schema():
                     commands_by_id[cmd.Req.header].append(cmd.Req)
                 else:
                     assert False, "Command is empty"
+            elif cmd.type == c.CommandType.SRSP:
+                # The one command like this is RPCError
+                assert cmd is c.RPCErrorCommands.CommandNotRecognized
+
+                assert cmd.type == cmd.Rsp.header.type
+                assert cmd.Req is None
+                assert cmd.Callback is None
+                assert cmd.Rsp.header.type == c.CommandType.SRSP
+                assert cmd.subsystem == cmd.Rsp.header.subsystem
+                assert isinstance(cmd.Rsp.header, c.CommandHeader)
+
+                _validate_schema(cmd.Rsp.schema)
+
+                commands_by_id[cmd.Rsp.header].append(cmd.Rsp)
             else:
                 assert False, "Command has unknown type"
 
@@ -326,3 +339,14 @@ def test_command_deserialization(caplog):
     # Deserialization fails if you attempt to deserialize the wrong frame
     with pytest.raises(ValueError):
         c.SysCommands.NVWrite.Req.from_frame(c.SysCommands.Ping.Req().to_frame())
+
+
+def test_command_not_recognized():
+    command = c.RPCErrorCommands.CommandNotRecognized.Rsp(
+        ErrorCode=c.rpc_error.ErrorCode.InvalidSubsystem,
+        RequestHeader=c.types.CommandHeader(0xABCD),
+    )
+
+    transport_frame = frames.TransportFrame(command.to_frame())
+
+    assert transport_frame.serialize()[:-1] == bytes.fromhex("FE  03  60 00  01  CD AB")

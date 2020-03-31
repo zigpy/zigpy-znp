@@ -49,7 +49,7 @@ class ErrorCode(t.uint8_t, t.MissingEnumMixin, enum.Enum):
 class Subsystem(t.enum_uint8, enum.IntEnum):
     """Command subsystem."""
 
-    Reserved = 0x00
+    RPCError = 0x00
     SYS = 0x01
     MAC = 0x02
     NWK = 0x03
@@ -146,7 +146,7 @@ class CommandHeader(t.uint16_t):
     def with_type(self, value) -> "CommandHeader":
         return type(self)(self & 0xFF1F | (value & 0x07) << 5)
 
-    def __repr__(self):
+    def __str__(self):
         return (
             f"{type(self).__name__}("
             f"id=0x{self.id:02X}, "
@@ -250,17 +250,41 @@ class CommandsMeta(type):
             else:
                 assert definition.rsp_schema is not None, definition
 
-                # If there is no request schema, this is a callback
-                class Callback(
-                    CommandBase, header=header, schema=definition.rsp_schema
-                ):
-                    pass
+                if definition.command_type == CommandType.AREQ:
+                    # If there is no request schema, this is a callback
+                    class Callback(
+                        CommandBase, header=header, schema=definition.rsp_schema
+                    ):
+                        pass
 
-                Callback.__qualname__ = qualname + ".Callback"
-                Callback.Req = None
-                Callback.Rsp = None
-                Callback.Callback = Callback
-                helper_class_dict["Callback"] = Callback
+                    Callback.__qualname__ = qualname + ".Callback"
+                    Callback.Req = None
+                    Callback.Rsp = None
+                    Callback.Callback = Callback
+                    helper_class_dict["Callback"] = Callback
+                elif definition.command_type == CommandType.SRSP:
+                    # XXX: This is the only command like this
+                    #      everything else should be an error!
+                    if header != CommandHeader(
+                        subsystem=Subsystem.RPCError, id=0x00, type=CommandType.SRSP
+                    ):
+                        raise RuntimeError(
+                            f"Invalid command definition {command} = {definition}"
+                        )  # pragma: no cover
+
+                    # If there is no request, this is a just a response
+                    class Rsp(CommandBase, header=header, schema=definition.rsp_schema):
+                        pass
+
+                    Rsp.__qualname__ = qualname + ".Rsp"
+                    Rsp.Req = None
+                    Rsp.Rsp = Rsp
+                    Rsp.Callback = None
+                    helper_class_dict["Rsp"] = Rsp
+                else:
+                    raise RuntimeError(
+                        f"Invalid command definition {command} = {definition}"
+                    )  # pragma: no cover
 
             classdict[command] = type(command, (), helper_class_dict)
             classdict["_commands"].append(classdict[command])
@@ -420,7 +444,7 @@ class CommandBase:
     def __delattr__(self, key):
         raise RuntimeError("Command instances are immutable")
 
-    def __repr__(self):
+    def __str__(self):
         params = [f"{p.name}={v!r}" for p, v in self._bound_params.values()]
 
         return f'{self.__class__.__qualname__}({", ".join(params)})'

@@ -5,6 +5,7 @@ from zigpy_znp.commands.types import (  # noqa: F401
     Subsystem,
 )
 
+from .rpc_error import RPCErrorCommands
 from .af import AFCommands
 from .app import APPCommands
 from .app_config import APPConfigCommands
@@ -16,6 +17,7 @@ from .zdo import ZDOCommands
 from .zgp import ZGPCommands
 
 ALL_COMMANDS = [
+    RPCErrorCommands,
     AFCommands,
     APPCommands,
     APPConfigCommands,
