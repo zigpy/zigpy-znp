@@ -204,7 +204,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._reset()
 
     async def _reset(self):
-        await self._api.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
+        await self._api.command(
+            c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), ignore_response=False
+        )
         return await self._api.wait_for_response(
             c.SysCommands.ResetInd.Callback(partial=True)
         )
@@ -219,7 +221,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._api.nvram_write(
             NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
         )
-        await self._api.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
+        await self._reset()
 
         # If zgPreConfigKeys is set to TRUE, all devices should use the same
         # pre-configured security key. If zgPreConfigKeys is set to FALSE, the
