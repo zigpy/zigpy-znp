@@ -5,15 +5,12 @@ import async_timeout
 
 from unittest.mock import Mock, call
 
-try:
-    from unittest.mock import AsyncMock  # noqa: F401
-except ImportError:
-    from asyncmock import AsyncMock  # noqa: F401
-
+import zigpy_znp
 import zigpy_znp.commands as c
 import zigpy_znp.types as t
 
 from zigpy_znp.types import nvids
+from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import (
     ZNP,
@@ -38,8 +35,56 @@ def pytest_mark_asyncio_timeout(*, seconds=1):
 
 
 @pytest.fixture
-def znp():
-    return ZNP()
+def znp(mocker):
+    api = ZNP()
+    transport = mocker.Mock()
+
+    api._uart = ZnpMtProtocol(api)
+    api._uart.send = mocker.Mock(wraps=api._uart.send)
+    api._uart.connection_made(transport)
+
+    return api
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_connect(mocker, event_loop):
+    device = "/dev/ttyUSB1"
+    transport = mocker.Mock()
+
+    def dummy_create_serial_connection(loop, protocol_factory, url, *args, **kwargs):
+        fut = loop.create_future()
+        assert url == device
+
+        protocol = protocol_factory()
+        protocol.connection_made(transport)
+
+        fut.set_result((transport, protocol))
+
+        return fut
+
+    mocker.patch(
+        "serial_asyncio.create_serial_connection", new=dummy_create_serial_connection
+    )
+    mocker.patch("zigpy_znp.uart.connect", wraps=zigpy_znp.uart.connect)
+
+    api = ZNP()
+    connect_fut = event_loop.create_future()
+    connect_task = asyncio.create_task(api.connect(device, baudrate=1234_5678))
+    connect_task.add_done_callback(lambda _: connect_fut.set_result(None))
+
+    while transport.write.call_count == 0:
+        await asyncio.sleep(0.01)  # XXX: not ideal
+
+    transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
+
+    # Send a ping response
+    api._uart.data_received(bytes.fromhex("FE  02  61 01  00 01  63"))
+
+    # Wait to connect
+    await connect_fut
+
+    assert api._device == device
+    assert api._baudrate == 1234_5678
 
 
 @pytest_mark_asyncio_timeout()
@@ -386,18 +431,8 @@ async def test_znp_wait_for_responses(znp, event_loop):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_command_kwargs(znp):
-    znp._uart = Mock()
-
     with pytest.raises(KeyError):
         await znp.command(c.SysCommands.Ping.Req(), foo=0x01)
-
-    # You cannot ignore the response and specify response params
-    with pytest.raises(ValueError):
-        await znp.command(
-            c.SysCommands.Ping.Req(),
-            ignore_response=True,
-            Capabilities=c.types.MTCapabilities.CAP_SYS,
-        )
 
     # Commands with no response (not an empty response!) can still be sent
     response = await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
@@ -407,12 +442,6 @@ async def test_znp_command_kwargs(znp):
     )
 
     assert response is None
-
-    # Commands with no response cannot have their response ignored
-    with pytest.raises(ValueError):
-        await znp.command(
-            c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), ignore_response=True
-        )
 
     # You cannot send anything but requests
     with pytest.raises(ValueError):
@@ -435,7 +464,6 @@ async def test_znp_command_kwargs(znp):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_uart(znp, event_loop):
-    znp._uart = Mock()
 
     ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
 
@@ -450,9 +478,22 @@ async def test_znp_uart(znp, event_loop):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_znp_nvram_writes(znp, event_loop):
-    znp._uart = Mock()
+async def test_znp_sreq_srsp(znp, event_loop):
 
+    # Each SREQ must have a corresponding SRSP, so this will fail
+    with pytest.raises(asyncio.TimeoutError):
+        with async_timeout.timeout(0.5):
+            await znp.command(c.SysCommands.Ping.Req())
+
+    # This will work
+    ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
+
+    await znp.command(c.SysCommands.Ping.Req())
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_nvram_writes(znp, event_loop):
     # Passing numerical addresses is disallowed because we can't check for overflows
     with pytest.raises(ValueError):
         await znp.nvram_write(0x0003, t.uint8_t(0xAB))
