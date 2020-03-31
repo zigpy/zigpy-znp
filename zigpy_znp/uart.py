@@ -177,4 +177,4 @@ async def connect(port, baudrate, api, loop=None):
 
     await protocol._connected_event.wait()
 
-    return protocol
+    return protocol, port

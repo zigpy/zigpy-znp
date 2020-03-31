@@ -2,11 +2,13 @@ import attr
 import typing
 import asyncio
 import logging
+import async_timeout
 
 from collections import defaultdict
 
 import zigpy_znp.commands
 import zigpy_znp.types as t
+import zigpy_znp.commands as c
 from zigpy_znp.types import nvids
 
 from zigpy_znp import uart
@@ -16,6 +18,7 @@ from zigpy_znp.frames import GeneralFrame
 
 
 LOGGER = logging.getLogger(__name__)
+RECONNECT_RETRY_TIME = 5  # seconds
 
 
 def _deduplicate_commands(commands):
@@ -145,19 +148,67 @@ class CallbackResponseListener(BaseResponseListener):
 
 
 class ZNP:
-    def __init__(self):
+    def __init__(self, *, auto_reconnect=True):
         self._uart = None
         self._response_listeners = defaultdict(list)
+
+        self._auto_reconnect = auto_reconnect
+        self._device = None
+        self._baudrate = None
+
+        self._reconnect_task = None
 
     def set_application(self, app):
         self._app = app
 
     async def connect(self, device, baudrate=115_200):
         assert self._uart is None
-        self._uart = await uart.connect(device, baudrate, self)
+
+        self._uart, device = await uart.connect(device, baudrate, self)
+
+        # Make sure that our port works
+        with async_timeout.timeout(2):
+            await self.command(c.SysCommands.Ping.Req())
+
+        # We want to reuse the same device when reconnecting
+        self._device = device
+        self._baudrate = baudrate
+
+    def _cancel_all_listeners(self):
+        for header, listeners in self._response_listeners.items():
+            for listener in listeners:
+                listener.cancel()
+
+    async def _reconnect(self):
+        while True:
+            assert self._device is not None and self._baudrate is not None
+            assert self._uart is None
+
+            try:
+                self._cancel_all_listeners()
+
+                await self.connect(self._device, self._baudrate)
+                await self._app.startup()
+
+                self._reconnect_task = None
+                break
+            except Exception as e:
+                LOGGER.error("Failed to reconnect", exc_info=e)
+                await asyncio.sleep(RECONNECT_RETRY_TIME)
 
     def connection_lost(self, exc):
-        raise NotImplementedError()
+        self._uart = None
+
+        if not self._auto_reconnect:
+            return
+
+        self._cancel_all_listeners()
+
+        assert self._reconnect_task is None
+
+        # Reconnect in the background using our previous device info
+        # Note that this will reuse the same port as before
+        self._reconnect_task = asyncio.create_task(self._reconnect())
 
     def close(self):
         return self._uart.close()
