@@ -12,13 +12,14 @@ import zigpy_znp.commands as c
 from zigpy_znp.types import nvids
 
 from zigpy_znp import uart
-from zigpy_znp.commands import SysCommands
+from zigpy_znp.commands import SysCommands, RPCErrorCommands
 from zigpy_znp.commands.types import CommandBase
 from zigpy_znp.frames import GeneralFrame
 
 
 LOGGER = logging.getLogger(__name__)
 RECONNECT_RETRY_TIME = 5  # seconds
+SREQ_TIMEOUT = 5  # seconds
 
 
 def _deduplicate_commands(commands):
@@ -157,6 +158,7 @@ class ZNP:
         self._baudrate = None
 
         self._reconnect_task = None
+        self._sync_request_lock = asyncio.Lock()
 
     def set_application(self, app):
         self._app = app
@@ -166,8 +168,10 @@ class ZNP:
 
         self._uart, device = await uart.connect(device, baudrate, self)
 
+        LOGGER.debug("Testing connection to %s", device)
+
         # Make sure that our port works
-        with async_timeout.timeout(2):
+        async with async_timeout.timeout(2):
             await self.command(c.SysCommands.Ping.Req())
 
         # We want to reuse the same device when reconnecting
@@ -220,6 +224,7 @@ class ZNP:
             self._response_listeners[header].remove(listener)
 
             if not self._response_listeners[header]:
+                LOGGER.debug("Cleaning up empty listener list for header %s", header)
                 del self._response_listeners[header]
 
     def frame_received(self, frame: GeneralFrame) -> None:
@@ -228,17 +233,10 @@ class ZNP:
         Can be called multiple times in a single step.
         """
 
-        LOGGER.debug("Frame received: %s", frame)
-
         command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.header]
+        command = command_cls.from_frame(frame)
 
-        # Compiling with INCLUDE_REVISION_INFORMATION appends undocumented info
-        if command_cls == zigpy_znp.commands.sys.SysCommands.Version.Rsp:
-            command = command_cls.from_frame(frame, ignore_unparsed=True)
-        else:
-            command = command_cls.from_frame(frame)
-
-        LOGGER.debug("Command received: %s", command)
+        LOGGER.debug("Received command: %s", command)
 
         if command.header not in self._response_listeners:
             LOGGER.warning("Received an unsolicited command: %s", command)
@@ -276,26 +274,50 @@ class ZNP:
     ) -> asyncio.Future:
         return self.wait_for_responses([command])
 
-    async def command(self, command, *, ignore_response=False, **response_params):
-        if ignore_response and response_params:
-            raise ValueError(f"Cannot have both response_params and ignore_response")
-
+    async def command(self, command, **response_params):
         if type(command) is not command.Req:
             raise ValueError(f"Cannot send a command that isn't a request: {command!r}")
 
-        if command.Rsp is not None:
+        if command.Rsp:
             # Construct our response before we send the request so that we fail early
-            response = command.Rsp(partial=True, **response_params)
-        elif ignore_response:
-            raise ValueError("This command has no response to ignore")
+            partial_response = command.Rsp(partial=True, **response_params)
 
-        LOGGER.debug("Sending command %s", command)
-        self._uart.send(command.to_frame())
+        LOGGER.debug("Sending command: %s", command)
 
-        if command.Rsp is None or ignore_response:
+        # Only SREQ commands have responses
+        if command.header.type != zigpy_znp.commands.types.CommandType.SREQ:
+            self._uart.send(command.to_frame())
             return
 
-        return await self.wait_for_response(response)
+        # We should only be sending one SREQ at a time, according to the spec
+        async with self._sync_request_lock:
+            self._uart.send(command.to_frame())
+
+            # We should get a SRSP in a reasonable amount of time
+            async with async_timeout.timeout(SREQ_TIMEOUT):
+                # We lock until either a sync response is seen or an error occurs
+                response = await self.wait_for_responses(
+                    [
+                        command.Rsp(partial=True),
+                        RPCErrorCommands.CommandNotRecognized.Rsp(
+                            partial=True, RequestHeader=command.header
+                        ),
+                    ]
+                )
+
+        if not command.Rsp:
+            return
+
+        if isinstance(response, RPCErrorCommands.CommandNotRecognized):
+            raise RuntimeError(f"Fatal command error: {response}")
+
+        # If the sync response we got is not what we wanted, this is an error
+        if not partial_response.matches(response):
+            raise RuntimeError(
+                f"SRSP was not what we expected: {response} !~ {partial_response}"
+            )
+
+        return response
 
     async def nvram_write(
         self, nv_id: nvids.BaseNvIds, value, *, offset: t.uint8_t = 0

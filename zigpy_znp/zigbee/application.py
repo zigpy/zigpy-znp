@@ -204,9 +204,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._reset()
 
     async def _reset(self):
-        await self._api.command(
-            c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), ignore_response=False
-        )
+        await self._api.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
         return await self._api.wait_for_response(
             c.SysCommands.ResetInd.Callback(partial=True)
         )
