@@ -3,7 +3,7 @@ import asyncio
 import functools
 import async_timeout
 
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 try:
     from unittest.mock import AsyncMock  # noqa: F401
@@ -15,7 +15,12 @@ import zigpy_znp.types as t
 
 from zigpy_znp.types import nvids
 
-from zigpy_znp.api import ZNP, _deduplicate_commands
+from zigpy_znp.api import (
+    ZNP,
+    _deduplicate_commands,
+    OneShotResponseListener,
+    CallbackResponseListener,
+)
 from zigpy_znp.frames import TransportFrame
 
 
@@ -510,3 +515,81 @@ async def test_znp_nvram_writes(znp, event_loop):
     # Writing too big of a value should fail
     with pytest.raises(ValueError):
         await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint16_t(0xAABB))
+
+
+@pytest_mark_asyncio_timeout()
+async def test_listeners_resolve(event_loop):
+    callback = Mock()
+    callback_listener = CallbackResponseListener(
+        [c.SysCommands.Ping.Rsp(partial=True)], callback
+    )
+
+    future = event_loop.create_future()
+    one_shot_listener = OneShotResponseListener(
+        [c.SysCommands.Ping.Rsp(partial=True)], future
+    )
+
+    match = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    no_match = c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)
+
+    assert callback_listener.resolve(match)
+    assert not callback_listener.resolve(no_match)
+    assert callback_listener.resolve(match)
+    assert not callback_listener.resolve(no_match)
+
+    assert one_shot_listener.resolve(match)
+    assert not one_shot_listener.resolve(no_match)
+
+    callback.assert_has_calls([call(match), call(match)])
+    assert callback.call_count == 2
+
+    assert (await future) == match
+
+    # Cancelling a callback will have no effect
+    assert not callback_listener.cancel()
+
+    # Cancelling a one-shot listener does not throw any errors
+    assert one_shot_listener.cancel()
+    assert one_shot_listener.cancel()
+    assert one_shot_listener.cancel()
+
+
+@pytest_mark_asyncio_timeout()
+async def test_listener_cancel(event_loop):
+    # Cancelling a one-shot listener prevents it from being fired
+    future = event_loop.create_future()
+    one_shot_listener = OneShotResponseListener(
+        [c.SysCommands.Ping.Rsp(partial=True)], future
+    )
+    one_shot_listener.cancel()
+
+    match = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    assert not one_shot_listener.resolve(match)
+
+    with pytest.raises(asyncio.CancelledError):
+        await future
+
+
+@pytest_mark_asyncio_timeout()
+async def test_listeners_cancel(event_loop):
+    callback = Mock()
+    callback_listener = CallbackResponseListener(
+        [c.SysCommands.Ping.Rsp(partial=True)], callback
+    )
+
+    future = event_loop.create_future()
+    one_shot_listener = OneShotResponseListener(
+        [c.SysCommands.Ping.Rsp(partial=True)], future
+    )
+
+    match = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    no_match = c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)
+
+    assert callback_listener.resolve(match)
+    assert not callback_listener.resolve(no_match)
+
+    assert one_shot_listener.resolve(match)
+    assert not one_shot_listener.resolve(no_match)
+
+    callback.assert_called_once_with(match)
+    assert (await future) == match

@@ -86,6 +86,14 @@ class BaseResponseListener:
         """
         raise NotImplementedError()  # pragma: no cover
 
+    def cancel(self):
+        """
+        Implement by subclasses to cancel the listener.
+
+        Return value indicates whether or not the listener is cancelable.
+        """
+        raise NotImplementedError()  # pragma: no cover
+
 
 @attr.s(frozen=True)
 class OneShotResponseListener(BaseResponseListener):
@@ -103,6 +111,12 @@ class OneShotResponseListener(BaseResponseListener):
             return False
 
         self.future.set_result(command)
+        return True
+
+    def cancel(self):
+        if not self.future.done():
+            self.future.cancel()
+
         return True
 
 
@@ -124,6 +138,10 @@ class CallbackResponseListener(BaseResponseListener):
 
         # Returning False could cause our callback to be called multiple times in a row
         return True
+
+    def cancel(self):
+        # You can't cancel a callback
+        return False
 
 
 class ZNP:
