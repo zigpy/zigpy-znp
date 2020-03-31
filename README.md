@@ -54,7 +54,7 @@ Again, using Texas Instruments CC253x based adapters/boards as a Z-Stack 3 coord
 
 - To configure __usb__ port path for your TI CC serial device, just specify the TTY (serial com) port, example : `/dev/ttyACM0`
 
-Developers hould note that that Texas Instruments recommends different baud rates for UART interface of different TI CC chips.
+Developers should note that that Texas Instruments recommends different baud rates for UART interface of different TI CC chips.
   - CC13x2 and CC26x2 supports flexible UART baud rate generation up to a maximum of 1.5 Mbps.
   - CC2538 also supports flexible UART baud rate generation but only up to a maximum of 460800 baud.
   - CC2530 and CC2531 default recommended UART baud rate is 115200 baud.
@@ -81,4 +81,4 @@ If you are looking to make a code or documentation contribution to this project 
 # Related projects
 
 ### Zigpy
-**[zigpy](https://github.com/zigpy/zigpy)** is **[Zigbee protocol stack](https://en.wikipedia.org/wiki/Zigbee)** integration project to implement the **[Zigbee Home Automation](https://www.zigbee.org/)** standard as a Python 3 library. Zigbee Home Automation integration with zigpy allows you to connect one of many off-the-shelf Zigbee adapters using one of the available Zigbee radio library modules compatible with zigpy to control Zigbee based devices. There is currently support for controlling Zigbee device types such as binary sensors (e.g., motion and door sensors), sensors (e.g., temperature sensors), lightbulbs, switches, and fans. A working implementation of zigbe exist in **[Home Assistant](https://www.home-assistant.io)** (Python based open source home automation software) as part of its **[ZHA component](https://www.home-assistant.io/components/zha/)**
+**[zigpy](https://github.com/zigpy/zigpy)** is **[Zigbee protocol stack](https://en.wikipedia.org/wiki/Zigbee)** integration project to implement the **[Zigbee Home Automation](https://www.zigbee.org/)** standard as a Python 3 library. Zigbee Home Automation integration with zigpy allows you to connect one of many off-the-shelf Zigbee adapters using one of the available Zigbee radio library modules compatible with zigpy to control Zigbee based devices. There is currently support for controlling Zigbee device types such as binary sensors (e.g., motion and door sensors), sensors (e.g., temperature sensors), lightbulbs, switches, and fans. A working implementation of zigpy exist in **[Home Assistant](https://www.home-assistant.io)** (Python based open source home automation software) as part of its **[ZHA component](https://www.home-assistant.io/components/zha/)**
