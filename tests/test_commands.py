@@ -221,6 +221,17 @@ def test_command_param_binding():
         )
 
 
+def test_command_str_repr():
+    command = c.UtilCommands.BindAddEntry.Req(
+        DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
+        DstEndpoint=0x56,
+        ClusterIdList=[0x12, 0x34],
+    )
+
+    assert repr(command) == str(command)
+    assert str([command]) == f"[{str(command)}]"
+
+
 def test_command_immutability():
     command1 = c.SysCommands.NVWrite.Req(
         partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None

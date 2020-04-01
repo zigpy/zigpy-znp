@@ -444,10 +444,12 @@ class CommandBase:
     def __delattr__(self, key):
         raise RuntimeError("Command instances are immutable")
 
-    def __str__(self):
+    def __repr__(self):
         params = [f"{p.name}={v!r}" for p, v in self._bound_params.values()]
 
         return f'{self.__class__.__qualname__}({", ".join(params)})'
+
+    __str__ = __repr__
 
 
 class DeviceState(t.enum_uint8, enum.IntEnum):
