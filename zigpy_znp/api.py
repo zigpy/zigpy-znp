@@ -157,7 +157,7 @@ class ZNP:
         self._response_listeners = defaultdict(list)
 
         self._auto_reconnect = auto_reconnect
-        self._device = None
+        self._port_path = None
         self._baudrate = None
 
         self._reconnect_task = None
@@ -166,12 +166,28 @@ class ZNP:
     def set_application(self, app):
         self._app = app
 
-    async def connect(self, device, baudrate=115_200):
+    @classmethod
+    async def probe(cls, serial_port_path, baudrate) -> bool:
+        LOGGER.debug("Probing %s at %d baud", serial_port_path, baudrate)
+
+        znp = cls(auto_reconnect=False)
+
+        try:
+            await znp.connect(serial_port_path, baudrate)
+            return True
+        except Exception:
+            return False
+        finally:
+            znp.close()
+
+    async def connect(self, serial_port_path, baudrate=115_200) -> None:
         assert self._uart is None
 
-        self._uart, device = await uart.connect(device, baudrate, self)
+        self._uart, serial_port_path = await uart.connect(
+            serial_port_path, baudrate, self
+        )
 
-        LOGGER.debug("Testing connection to %s", device)
+        LOGGER.debug("Testing connection to %s", serial_port_path)
 
         try:
             # Make sure that our port works
@@ -181,11 +197,11 @@ class ZNP:
             self._uart = None
             raise
 
-        # We want to reuse the same device when reconnecting
-        self._device = device
+        # We want to reuse the same serial_port_path when reconnecting
+        self._port_path = serial_port_path
         self._baudrate = baudrate
 
-        LOGGER.debug("Connected to %s at %s baud", self._device, self._baudrate)
+        LOGGER.debug("Connected to %s at %s baud", self._port_path, self._baudrate)
 
     def _cancel_all_listeners(self) -> None:
         for header, listeners in self._response_listeners.items():
@@ -194,16 +210,18 @@ class ZNP:
 
     async def _reconnect(self) -> None:
         for attempt in itertools.count(start=1):
-            LOGGER.debug("Trying to reconnect to %s, attempt %d", self._device, attempt)
+            LOGGER.debug(
+                "Trying to reconnect to %s, attempt %d", self._port_path, attempt
+            )
 
             assert self._uart is None
-            assert self._device is not None
+            assert self._port_path is not None
             assert self._baudrate is not None
 
             try:
                 self._cancel_all_listeners()
 
-                await self.connect(self._device, self._baudrate)
+                await self.connect(self._port_path, self._baudrate)
                 await self._app.startup()
 
                 return
@@ -212,7 +230,7 @@ class ZNP:
                 await asyncio.sleep(RECONNECT_RETRY_TIME)
 
     def connection_lost(self, exc) -> None:
-        LOGGER.debug("We were disconnected from %s: %s", self._device, exc)
+        LOGGER.debug("We were disconnected from %s: %s", self._port_path, exc)
 
         self._uart = None
         self._cancel_all_listeners()
@@ -226,13 +244,15 @@ class ZNP:
             LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
             return
 
-        # Reconnect in the background using our previous device info
+        # Reconnect in the background using our previous port path
         # Note that this will reuse the same port as before
         LOGGER.debug("Starting background reconnection task")
         self._reconnect_task = asyncio.create_task(self._reconnect())
 
     def close(self) -> None:
-        return self._uart.close()
+        if self._uart is not None:
+            self._uart.close()
+            self._uart = None
 
     def _remove_listener(self, listener: BaseResponseListener) -> None:
         LOGGER.debug("Removing listener %s", listener)
@@ -316,19 +336,21 @@ class ZNP:
 
         # We should only be sending one SREQ at a time, according to the spec
         async with self._sync_request_lock:
+            # We need to create the response listener before we send the request
+            response_future = self.wait_for_responses(
+                [
+                    command.Rsp(partial=True),
+                    RPCErrorCommands.CommandNotRecognized.Rsp(
+                        partial=True, RequestHeader=command.header
+                    ),
+                ]
+            )
             self._uart.send(command.to_frame())
 
             # We should get a SRSP in a reasonable amount of time
             async with async_timeout.timeout(SREQ_TIMEOUT):
                 # We lock until either a sync response is seen or an error occurs
-                response = await self.wait_for_responses(
-                    [
-                        command.Rsp(partial=True),
-                        RPCErrorCommands.CommandNotRecognized.Rsp(
-                            partial=True, RequestHeader=command.header
-                        ),
-                    ]
-                )
+                response = await response_future
 
         if isinstance(response, RPCErrorCommands.CommandNotRecognized.Rsp):
             raise CommandNotRecognized(f"Fatal command error: {response}")
