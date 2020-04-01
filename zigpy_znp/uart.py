@@ -73,11 +73,6 @@ class ZnpMtProtocol(asyncio.Protocol):
         LOGGER.debug("Sending data: %s", Bytes.__repr__(data))
         self.transport.write(data)
 
-    def skip_bootloader(self) -> None:
-        """Send magic byte to skip Serial Boot Loader."""
-        LOGGER.debug("Skipping bootloader: 0xFE")
-        self.transport.write(b"\xFE")
-
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""
         while True:

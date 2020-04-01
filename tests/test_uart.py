@@ -10,6 +10,8 @@ from zigpy_znp.frames import TransportFrame
 
 from serial.tools.list_ports_common import ListPortInfo
 
+from test_api import pytest_mark_asyncio_timeout
+
 
 def test_uart_rx_basic():
     api = mock.Mock()
@@ -315,3 +317,26 @@ def test_guess_port():
     ):
         with pytest.raises(RuntimeError):
             znp_uart.guess_port()
+
+
+@pytest_mark_asyncio_timeout()
+async def test_connect_auto(mocker):
+    device = "/dev/ttyACM0"
+
+    def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
+        fut = loop.create_future()
+        assert url == device
+
+        transport = mock.Mock()
+        protocol = protocol_factory()
+        protocol.connection_made(transport)
+
+        fut.set_result((transport, protocol))
+
+        return fut
+
+    mocker.patch("zigpy_znp.uart.guess_port", return_value=device)
+    mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
+
+    api = mock.Mock()
+    await znp_uart.connect(port="auto", baudrate=115_200, api=api)
