@@ -244,10 +244,13 @@ class ZNP:
                 LOGGER.debug("Cleaning up empty listener list for header %s", header)
                 del self._response_listeners[header]
 
+        total_listeners = sum(len(l) for l in self._response_listeners.values())
+        LOGGER.debug("There are %d listeners remaining", total_listeners)
+
     def frame_received(self, frame: GeneralFrame) -> None:
         """
         Called when a frame has been received.
-        Can be called multiple times in a single step.
+        Can be called multiple times in a single event loop step.
         """
 
         command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.header]

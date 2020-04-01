@@ -309,14 +309,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             Data=data,
         )
 
-        await self._api.command(data_request, Status=t.Status.Success)
+        # XXX: Multiple responses can be received in a single event loop step.
+        #      We have to create listeners before actually sending anything.
+        data_request_response = self._api.command(data_request, Status=t.Status.Success)
+        data_confirm_response = self._api.wait_for_response(
+            c.AFCommands.DataConfirm.Callback(
+                partial=True, Endpoint=dst_ep, TSN=sequence
+            )
+        )
+
+        await data_request_response
 
         async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-            response = await self._api.wait_for_response(
-                c.AFCommands.DataConfirm.Callback(
-                    partial=True, Endpoint=dst_ep, TSN=sequence
-                )
-            )
+            response = await data_confirm_response
 
         # XXX: sometimes routes need to be re-discovered
         if response.Status == t.Status.NwkNoRoute:
