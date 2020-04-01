@@ -661,3 +661,29 @@ async def test_listeners_cancel(event_loop):
 
     callback.assert_called_once_with(match)
     assert (await future) == match
+
+
+@pytest_mark_asyncio_timeout()
+async def test_api_cancel_all_listeners(znp, event_loop):
+    callback = Mock()
+
+    znp.callback_for_response(
+        c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS), callback
+    )
+    future = znp.wait_for_responses(
+        [
+            c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
+            c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success),
+        ]
+    )
+
+    assert not future.done()
+    znp._cancel_all_listeners()
+
+    with pytest.raises(asyncio.CancelledError):
+        await future
+
+    # add_done_callback won't be executed immediately
+    await asyncio.sleep(0.1)
+
+    assert len(znp._response_listeners) == 1

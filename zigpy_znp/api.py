@@ -152,6 +152,7 @@ class CallbackResponseListener(BaseResponseListener):
 class ZNP:
     def __init__(self, *, auto_reconnect=True):
         self._uart = None
+        self._app = None
         self._response_listeners = defaultdict(list)
 
         self._auto_reconnect = auto_reconnect
