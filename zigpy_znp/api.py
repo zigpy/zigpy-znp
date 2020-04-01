@@ -15,6 +15,7 @@ from zigpy_znp import uart
 from zigpy_znp.commands import SysCommands, RPCErrorCommands
 from zigpy_znp.commands.types import CommandBase
 from zigpy_znp.frames import GeneralFrame
+from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 
 LOGGER = logging.getLogger(__name__)
@@ -281,11 +282,16 @@ class ZNP:
         if command.Rsp:
             # Construct our response before we send the request so that we fail early
             partial_response = command.Rsp(partial=True, **response_params)
+        elif response_params:
+            raise ValueError(
+                f"Command has no response so response_params={response_params}"
+                f"will have no effect"
+            )
 
         LOGGER.debug("Sending command: %s", command)
 
-        # Only SREQ commands have responses
-        if command.header.type != zigpy_znp.commands.types.CommandType.SREQ:
+        # If our command has no response, we cannot wait for one
+        if not command.Rsp:
             self._uart.send(command.to_frame())
             return
 
@@ -305,15 +311,12 @@ class ZNP:
                     ]
                 )
 
-        if not command.Rsp:
-            return
-
-        if isinstance(response, RPCErrorCommands.CommandNotRecognized):
-            raise RuntimeError(f"Fatal command error: {response}")
+        if isinstance(response, RPCErrorCommands.CommandNotRecognized.Rsp):
+            raise CommandNotRecognized(f"Fatal command error: {response}")
 
         # If the sync response we got is not what we wanted, this is an error
         if not partial_response.matches(response):
-            raise RuntimeError(
+            raise InvalidCommandResponse(
                 f"SRSP was not what we expected: {response} !~ {partial_response}"
             )
 

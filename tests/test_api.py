@@ -19,6 +19,7 @@ from zigpy_znp.api import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import TransportFrame
+from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 
 def pytest_mark_asyncio_timeout(*, seconds=1):
@@ -449,6 +450,7 @@ async def test_znp_command_kwargs(znp):
             c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
         )
 
+    # You cannot send callbacks
     with pytest.raises(ValueError):
         await znp.command(
             c.SysCommands.ResetInd.Callback(
@@ -459,6 +461,38 @@ async def test_znp_command_kwargs(znp):
                 MinorRel=0x02,
                 MaintRel=0x03,
             )
+        )
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_command_not_recognized(znp, event_loop):
+    # An error is raise when a bad command is sent
+    command = c.SysCommands.Ping.Req()
+    unknown_rsp = c.RPCErrorCommands.CommandNotRecognized.Rsp(
+        ErrorCode=c.rpc_error.ErrorCode.InvalidCommandId, RequestHeader=command.header
+    )
+
+    with pytest.raises(CommandNotRecognized):
+        event_loop.call_soon(znp.frame_received, unknown_rsp.to_frame())
+        await znp.command(command)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_command_wrong_params(znp, event_loop):
+    # You cannot specify response kwargs for commands with no response
+    with pytest.raises(ValueError):
+        await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), foo=0x01)
+
+    # An error is raised when a command with bad params is received
+    with pytest.raises(InvalidCommandResponse):
+        event_loop.call_soon(
+            znp.frame_received,
+            c.SysCommands.Ping.Rsp(
+                Capabilities=c.types.MTCapabilities.CAP_SYS
+            ).to_frame(),
+        )
+        await znp.command(
+            c.SysCommands.Ping.Req(), Capabilities=c.types.MTCapabilities.CAP_APP
         )
 
 
