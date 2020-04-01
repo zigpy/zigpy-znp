@@ -8,6 +8,7 @@ import zigpy_znp.types as t
 from zigpy_znp import uart as znp_uart
 from zigpy_znp.frames import TransportFrame
 
+from serial_asyncio import SerialTransport
 from serial.tools.list_ports_common import ListPortInfo
 
 from test_api import pytest_mark_asyncio_timeout
@@ -340,3 +341,53 @@ async def test_connect_auto(mocker):
 
     api = mock.Mock()
     await znp_uart.connect(port="auto", baudrate=115_200, api=api)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_connection_lost(mocker, event_loop):
+    device = "/dev/ttyACM0"
+    serial_interface = mock.Mock()
+
+    def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
+        fut = loop.create_future()
+        assert url == device
+
+        protocol = protocol_factory()
+
+        # Our event loop doesn't really do anything
+        event_loop.add_writer = lambda *args, **kwargs: None
+        event_loop.add_reader = lambda *args, **kwargs: None
+        event_loop.remove_writer = lambda *args, **kwargs: None
+        event_loop.remove_reader = lambda *args, **kwargs: None
+
+        transport = SerialTransport(event_loop, protocol, serial_interface)
+
+        protocol.connection_made(transport)
+
+        fut.set_result((transport, protocol))
+
+        return fut
+
+    mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
+
+    api = mock.Mock()
+    conn_lost_fut = event_loop.create_future()
+    api.connection_lost = conn_lost_fut.set_result
+
+    protocol, _ = await znp_uart.connect(port=device, baudrate=115_200, api=api)
+
+    exception = RuntimeError("Uh oh, something broke")
+    protocol.connection_lost(exception)
+
+    # Losing a connection propagates up to the api
+    assert (await conn_lost_fut) == exception
+
+    api.reset_mock()
+    conn_closed_fut = event_loop.create_future()
+    api.connection_lost = conn_closed_fut.set_result
+
+    protocol, _ = await znp_uart.connect(port=device, baudrate=115_200, api=api)
+    protocol.close()
+
+    # Closing a connection does as well
+    assert (await conn_closed_fut) is None

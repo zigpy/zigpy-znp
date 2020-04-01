@@ -46,7 +46,8 @@ class ZnpMtProtocol(asyncio.Protocol):
             LOGGER.warning(
                 "Lost connection to %s", self._transport.serial.name, exc_info=exc
             )
-            self._api.connection_lost(exc)
+
+        self._api.connection_lost(exc)
 
         LOGGER.debug("Closing %s serial port", self._transport.serial.name)
 

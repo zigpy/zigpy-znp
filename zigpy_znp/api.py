@@ -203,13 +203,15 @@ class ZNP:
 
     def connection_lost(self, exc):
         self._uart = None
-
-        if not self._auto_reconnect:
-            return
-
         self._cancel_all_listeners()
 
-        assert self._reconnect_task is None
+        # Cancel the existing reconnect task, if any
+        if not self._reconnect_task.done():
+            self._reconnect_task.cancel()
+
+        # exc=None means that the connection was closed
+        if not self._auto_reconnect or exc is None:
+            return
 
         # Reconnect in the background using our previous device info
         # Note that this will reuse the same port as before
