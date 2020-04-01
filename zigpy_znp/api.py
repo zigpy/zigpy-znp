@@ -2,6 +2,7 @@ import attr
 import typing
 import asyncio
 import logging
+import itertools
 import async_timeout
 
 from collections import defaultdict
@@ -172,23 +173,32 @@ class ZNP:
 
         LOGGER.debug("Testing connection to %s", device)
 
-        # Make sure that our port works
-        async with async_timeout.timeout(2):
-            await self.command(c.SysCommands.Ping.Req())
+        try:
+            # Make sure that our port works
+            async with async_timeout.timeout(2):
+                await self.command(c.SysCommands.Ping.Req())
+        except Exception:
+            self._uart = None
+            raise
 
         # We want to reuse the same device when reconnecting
         self._device = device
         self._baudrate = baudrate
 
-    def _cancel_all_listeners(self):
+        LOGGER.debug("Connected to %s at %s baud", self._device, self._baudrate)
+
+    def _cancel_all_listeners(self) -> None:
         for header, listeners in self._response_listeners.items():
             for listener in listeners:
                 listener.cancel()
 
-    async def _reconnect(self):
-        while True:
-            assert self._device is not None and self._baudrate is not None
+    async def _reconnect(self) -> None:
+        for attempt in itertools.count(start=1):
+            LOGGER.debug("Trying to reconnect to %s, attempt %d", self._device, attempt)
+
             assert self._uart is None
+            assert self._device is not None
+            assert self._baudrate is not None
 
             try:
                 self._cancel_all_listeners()
@@ -196,29 +206,32 @@ class ZNP:
                 await self.connect(self._device, self._baudrate)
                 await self._app.startup()
 
-                self._reconnect_task = None
-                break
+                return
             except Exception as e:
                 LOGGER.error("Failed to reconnect", exc_info=e)
                 await asyncio.sleep(RECONNECT_RETRY_TIME)
 
-    def connection_lost(self, exc):
+    def connection_lost(self, exc) -> None:
+        LOGGER.debug("We were disconnected from %s: %s", self._device, exc)
+
         self._uart = None
         self._cancel_all_listeners()
 
         # Cancel the existing reconnect task, if any
-        if not self._reconnect_task.done():
+        if self._reconnect_task is not None and not self._reconnect_task.done():
             self._reconnect_task.cancel()
 
         # exc=None means that the connection was closed
         if not self._auto_reconnect or exc is None:
+            LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
             return
 
         # Reconnect in the background using our previous device info
         # Note that this will reuse the same port as before
+        LOGGER.debug("Starting background reconnection task")
         self._reconnect_task = asyncio.create_task(self._reconnect())
 
-    def close(self):
+    def close(self) -> None:
         return self._uart.close()
 
     def _remove_listener(self, listener: BaseResponseListener) -> None:

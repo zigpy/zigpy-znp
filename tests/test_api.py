@@ -39,6 +39,7 @@ def pytest_mark_asyncio_timeout(*, seconds=1):
 def znp(mocker):
     api = ZNP()
     transport = mocker.Mock()
+    transport.close = lambda: api._uart.connection_lost(exc=None)
 
     api._uart = ZnpMtProtocol(api)
     api._uart.send = mocker.Mock(wraps=api._uart.send)
@@ -52,7 +53,7 @@ async def test_znp_connect(mocker, event_loop):
     device = "/dev/ttyUSB1"
     transport = mocker.Mock()
 
-    def dummy_create_serial_connection(loop, protocol_factory, url, *args, **kwargs):
+    def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
         fut = loop.create_future()
         assert url == device
 
@@ -63,9 +64,7 @@ async def test_znp_connect(mocker, event_loop):
 
         return fut
 
-    mocker.patch(
-        "serial_asyncio.create_serial_connection", new=dummy_create_serial_connection
-    )
+    mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
     mocker.patch("zigpy_znp.uart.connect", wraps=zigpy_znp.uart.connect)
 
     api = ZNP()
@@ -73,7 +72,7 @@ async def test_znp_connect(mocker, event_loop):
     connect_task = asyncio.create_task(api.connect(device, baudrate=1234_5678))
     connect_task.add_done_callback(lambda _: connect_fut.set_result(None))
 
-    while transport.write.call_count == 0:
+    while transport.write.call_count != 1:
         await asyncio.sleep(0.01)  # XXX: not ideal
 
     transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
@@ -687,3 +686,115 @@ async def test_api_cancel_all_listeners(znp, event_loop):
     await asyncio.sleep(0.1)
 
     assert len(znp._response_listeners) == 1
+
+
+@pytest_mark_asyncio_timeout()
+async def test_api_close(znp, event_loop):
+    closed_future = event_loop.create_future()
+
+    znp_connection_lost = znp.connection_lost
+
+    def intercepted_connection_lost(exc):
+        closed_future.set_result(exc)
+        return znp_connection_lost(exc)
+
+    znp._reconnect_task = Mock()
+    znp._reconnect_task.done = lambda: False
+    znp.connection_lost = intercepted_connection_lost
+    znp.close()
+
+    # connection_lost with no exc indicates the port was closed
+    assert (await closed_future) is None
+
+    # Make sure our UART was actually closed and we aren't going to try reconnecting
+    assert znp._uart is None
+    assert znp._reconnect_task is None or znp._reconnect_task.cancel.call_count == 1
+
+
+@pytest_mark_asyncio_timeout()
+async def test_api_reconnect(event_loop, mocker):
+    SREQ_TIMEOUT = 0.2
+    mocker.patch("zigpy_znp.api.SREQ_TIMEOUT", new=SREQ_TIMEOUT)
+    mocker.patch("zigpy_znp.api.RECONNECT_RETRY_TIME", new=0.01)
+
+    device = "/dev/ttyUSB1"
+    transport = mocker.Mock()
+
+    def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
+        fut = loop.create_future()
+        assert url == device
+
+        protocol = protocol_factory()
+        protocol.connection_made(transport)
+
+        fut.set_result((transport, protocol))
+
+        return fut
+
+    mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
+    mocker.patch("zigpy_znp.uart.connect", wraps=zigpy_znp.uart.connect)
+
+    api = ZNP()
+    api.set_application(mocker.Mock())
+    api._app.startup = Mock(return_value=asyncio.sleep(0))
+
+    connect_fut = event_loop.create_future()
+    connect_task = asyncio.create_task(api.connect(device, baudrate=1234_5678))
+    connect_task.add_done_callback(lambda _: connect_fut.set_result(None))
+
+    while transport.write.call_count != 1:
+        await asyncio.sleep(0.01)  # XXX: not ideal
+
+    # We should have receiving a ping
+    transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
+
+    # Send a ping response
+    api._uart.data_received(bytes.fromhex("FE  02  61 01  00 01  63"))
+
+    # Wait to connect
+    await connect_fut
+
+    assert api._device == device
+    assert api._baudrate == 1234_5678
+
+    transport.reset_mock()
+
+    # Now that we're connected, close the connection due to an error
+    assert transport.write.call_count == 0
+    api.connection_lost(RuntimeError("Uh oh"))
+
+    # We should get another ping request soon
+    while transport.write.call_count != 1:
+        await asyncio.sleep(0.01)  # XXX: not ideal
+
+    transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
+
+    # Reply incorrectly to the ping request
+    api._uart.data_received(b"bad response")
+
+    # We should still have the old connection info
+    assert api._device == device
+    assert api._baudrate == 1234_5678
+
+    # Wait for the SREQ_TIMEOUT to pass, we should fail to reconnect
+    await asyncio.sleep(SREQ_TIMEOUT + 0.1)
+
+    transport.reset_mock()
+
+    # We wait a bit again for another ping
+    while transport.write.call_count != 1:
+        await asyncio.sleep(0.01)  # XXX: not ideal
+
+    transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
+
+    # Our reconnect task should complete after we send the ping reply
+    reconnect_fut = event_loop.create_future()
+    api._reconnect_task.add_done_callback(lambda _: reconnect_fut.set_result(None))
+
+    # App re-startup should not have happened, we've never reconnected before
+    assert api._app.startup.call_count == 0
+    api._uart.data_received(bytes.fromhex("FE  02  61 01  00 01  63"))
+
+    # We should be reconnected soon and the app should have been restarted
+    await reconnect_fut
+    assert api._app.startup.call_count == 1
