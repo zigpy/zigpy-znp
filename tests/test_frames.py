@@ -47,10 +47,16 @@ def test_transport_frame():
     assert r.serialize() == sof + payload + fcs
 
     # wrong SOF
-    with pytest.raises(AssertionError):
+    with pytest.raises(zexc.InvalidFrame):
         frames.TransportFrame.deserialize(bad_sof + payload + fcs + extra)
 
     # bad FCS
-    r, rest = frames.TransportFrame.deserialize(sof + payload + bad_fcs + extra)
+    with pytest.raises(zexc.InvalidFrame):
+        frames.TransportFrame.deserialize(sof + payload + bad_fcs + extra)
+
+    # extra
+    r, rest = frames.TransportFrame.deserialize(sof + payload + fcs + extra)
     assert rest == extra
-    assert r.is_valid is False
+
+    # constructor
+    assert frames.TransportFrame(r.payload) == r

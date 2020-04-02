@@ -115,18 +115,10 @@ class ZnpMtProtocol(asyncio.Protocol):
             raise BufferTooShort()
 
         # At this point we should have a complete frame
+        # If not, deserialization will fail and the error will propapate up
         frame, rest = frames.TransportFrame.deserialize(self._buffer)
 
-        if not frame.is_valid:
-            LOGGER.warning(
-                "Received an invalid frame: %s. Correct FCS is 0x%02X, got 0x%02X.",
-                frame,
-                frame.get_fcs(),
-                frame.fcs,
-            )
-            raise InvalidFrame()
-
-        # We finally have a valid frame. Update the buffer.
+        # If we get this far then we have a valid frame. Update the buffer.
         del self._buffer[: len(self._buffer) - len(rest)]
 
         return frame

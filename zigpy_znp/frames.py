@@ -4,13 +4,13 @@ import attr
 
 from zigpy_znp.commands import CommandHeader
 from zigpy_znp.exceptions import InvalidFrame
-from zigpy_znp.types import basic as t, struct as struct_t
+from zigpy_znp.types import basic as t
 
 
 @attr.s
-class GeneralFrame(struct_t.Struct):
-    header = attr.ib(type=CommandHeader, converter=CommandHeader)
-    data = attr.ib(factory=t.Bytes, type=t.Bytes, converter=t.Bytes)
+class GeneralFrame:
+    header: CommandHeader = attr.ib(converter=CommandHeader)
+    data: t.Bytes = attr.ib(factory=t.Bytes, converter=t.Bytes)
 
     @property
     def length(self) -> t.uint8_t:
@@ -40,39 +40,49 @@ class GeneralFrame(struct_t.Struct):
 
     def serialize(self):
         """Serialize Frame."""
-        return self.length.serialize() + super().serialize()
+        return self.length.serialize() + self.header.serialize() + self.data.serialize()
 
 
 @attr.s
-class TransportFrame(struct_t.Struct):
+class TransportFrame:
     """Transport frame."""
 
     SOF = t.uint8_t(0xFE)
 
-    payload = attr.ib(
-        type=GeneralFrame, converter=struct_t.Struct.converter(GeneralFrame)
-    )
-    fcs = attr.ib(default=attr.Factory(lambda self: self.get_fcs(), takes_self=True))
+    payload: GeneralFrame = attr.ib()
 
     @classmethod
     def deserialize(cls, data: bytes) -> "TransportFrame":
         """Deserialize frame."""
         sof, data = t.uint8_t.deserialize(data)
-        assert sof == cls.SOF
+
+        if sof != cls.SOF:
+            raise InvalidFrame(
+                f"Expected frame to start with SOF 0x{cls.SOF:02X}, got 0x{sof:02X}"
+            )
+
         gen_frame, data = GeneralFrame.deserialize(data)
-        fcs, data = t.uint8_t.deserialize(data)
-        return cls(gen_frame, fcs), data
+        checksum, data = t.uint8_t.deserialize(data)
 
-    def get_fcs(self) -> t.uint8_t:
+        frame = cls(gen_frame)
+
+        if frame.checksum() != checksum:
+            raise InvalidFrame(
+                f"Invalid frame checksum for data {gen_frame}: "
+                f"expected 0x{frame.checksum():02X}, got 0x{checksum:02X}"
+            )
+
+        return frame, data
+
+    def checksum(self) -> t.uint8_t:
         """Calculate FCS on the payload."""
-        fcs = functools.reduce(lambda a, b: a ^ b, self.payload.serialize())
-        return t.uint8_t(fcs)
-
-    @property
-    def is_valid(self) -> bool:
-        """Return True if considered a valid frame."""
-        return self.fcs == self.get_fcs()
+        checksum = functools.reduce(lambda a, b: a ^ b, self.payload.serialize())
+        return t.uint8_t(checksum)
 
     def serialize(self) -> bytes:
         """Serialize data."""
-        return self.SOF.serialize() + self.payload.serialize() + self.fcs.serialize()
+        return (
+            self.SOF.serialize()
+            + self.payload.serialize()
+            + self.checksum().serialize()
+        )
