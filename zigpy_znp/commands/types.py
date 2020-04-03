@@ -155,6 +155,8 @@ class CommandHeader(t.uint16_t):
             ")"
         )
 
+    __repr__ = __str__
+
 
 @attr.s
 class CommandDef:

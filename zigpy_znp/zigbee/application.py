@@ -34,7 +34,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.AFCommands.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
-    def on_af_message(self, msg):
+    def on_af_message(self, msg: c.AFCommands.IncomingMsg.Callback) -> None:
         if msg.ClusterId == zdo_t.ZDOCmd.Device_annce and msg.DstEndpoint == 0:
             # [Sequence Number] + [16-bit address] + [64-bit address] + [Capability]
             sequence, data = t.uint8_t.deserialize(msg.Data)
@@ -44,6 +44,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
             LOGGER.info("ZDO Device announce: 0x%04x, %s, %s", nwk, ieee, capability)
             self.handle_join(nwk, ieee, parent_nwk=0x0000)
+            return
 
         try:
             device = self.get_device(nwk=msg.SrcAddr)
@@ -167,7 +168,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         pan_id: Optional[t.PanId] = None,
         extended_pan_id: Optional[zigpy.types.ExtendedPanId] = None,
         network_key: Optional[zigpy.types.KeyData] = None,
-        reset: bool = True
+        reset: bool = True,
     ):
         if channel is None:
             raise NotImplementedError("Cannot set a specific channel")
@@ -356,7 +357,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         data,
         *,
         hops=0,
-        non_member_radius=3
+        non_member_radius=3,
     ):
         """Submit and send data out as a multicast transmission.
         :param group_id: destination multicast address
@@ -408,16 +409,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         raise NotImplementedError()
 
     async def permit_ncp(self, time_s):
-        response = await self._api.request(
+        permit_join_req = await self._api.command(
             c.ZDOCommands.MgmtPermitJoinReq.Req(
-                AddrMode=0x0F,  # docs say 0xFF for broadcast, everybody uses 0x0F ???
-                DstAddr=zigpy.types.BroadcastAddress.ALL_DEVICES,
+                AddrMode=t.AddrMode.Broadcast,
+                Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
                 Duration=time_s,
                 TCSignificance=0,
             )
         )
 
-        if response.Status != t.Status.Success:
+        if permit_join_req.Status != t.Status.Success:
             raise ValueError(
-                "Permit join request failed with status: %s", response.Status
+                f"Permit join request failed with status: {permit_join_req.Status}"
+            )
+
+        permit_join_rsp = await self._api.wait_for_response(
+            c.ZDOCommands.MgmtPermitJoinRsp.Callback(partial=True)
+        )
+
+        if permit_join_rsp.Status != t.Status.Success:
+            raise ValueError(
+                f"Permit join failed with status: {permit_join_rsp.Status}"
             )

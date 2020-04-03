@@ -482,7 +482,11 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                 t.Param(
                     "Duration", t.uint8_t, "Specifies the duration to permit joining"
                 ),
-                t.Param("TCSignificance", t.uint8_t, "Trust Center Significance"),
+                t.Param(
+                    "TCSignificance",
+                    t.uint8_t,
+                    "Trust Center Significance  -- unused in the code!",
+                ),
             )
         ),
         rsp_schema=STATUS_SCHEMA,

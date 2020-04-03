@@ -64,7 +64,8 @@ class AddrMode(basic.uint8_t, enum.Enum):
     Group = 0x01
     NWK = 0x02
     IEEE = 0x03
-    Broadcast = 0xFF
+
+    Broadcast = 0x0F
 
 
 @attr.s
