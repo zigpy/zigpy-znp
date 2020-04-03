@@ -6,6 +6,7 @@ from zigpy.types import (  # noqa: F401
     ClusterId,
     ExtendedPanId,
     PanId,
+    Channels,
 )
 
 from .basic import *  # noqa: F401, F403
