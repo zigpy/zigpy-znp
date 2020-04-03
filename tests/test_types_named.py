@@ -73,23 +73,6 @@ def test_addr_mode_address():
     assert r3 != r4
 
 
-def test_channels():
-    """Test Channel enum."""
-
-    assert t.Channels.from_channel_list([]) == t.Channels.NO_CHANNELS
-    assert t.Channels.from_channel_list(range(11, 26 + 1)) == t.Channels.ALL_CHANNELS
-    assert (
-        t.Channels.from_channel_list([11, 21])
-        == t.Channels.CHANNEL_11 | t.Channels.CHANNEL_21
-    )
-
-    with pytest.raises(ValueError):
-        t.Channels.from_channel_list([11, 13, 10])  # 10 is not a valid channel
-
-    with pytest.raises(ValueError):
-        t.Channels.from_channel_list([27, 13, 15, 18])  # 27 is not a valid channel
-
-
 def test_missing_status_enum():
     assert 0xFF not in list(t.Status)
     assert isinstance(t.Status(0xFF), t.Status)

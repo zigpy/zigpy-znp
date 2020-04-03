@@ -16,7 +16,7 @@ setup(
     install_requires=[
         "attrs",
         "pyserial-asyncio",
-        "zigpy-homeassistant >= 0.10.0",
+        "zigpy-homeassistant >= 0.18.0",
         "async_timeout",
     ],
     tests_require=[
