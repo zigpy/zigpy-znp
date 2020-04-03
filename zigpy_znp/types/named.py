@@ -78,11 +78,25 @@ class AddrModeAddress(struct.Struct):
         """Deserialize data."""
         mode, data = AddrMode.deserialize(data)
         if mode == AddrMode.NWK:
-            addr, data = basic.uint64_t.deserialize(data)
-            addr = basic.uint64_t(addr & 0xFFFF)
+            # a value of 2 indicates 2-byte (16-bit) address mode,
+            # using only the 2 LSB’s of the DstAddr field to form
+            # a 2-byte short address.
+            addr64, data = basic.uint64_t.deserialize(data)
+            addr = NWK(addr64 & 0xFFFF)
         elif mode == AddrMode.IEEE:
             addr, data = EUI64.deserialize(data)
+        else:
+            raise ValueError(f"Unknown address mode: {mode}")
+
         return cls(mode=mode, address=addr), data
+
+    def serialize(self):
+        if self.mode == AddrMode.NWK:
+            return self.mode.serialize() + basic.uint64_t(self.address).serialize()
+        elif self.mode == AddrMode.IEEE:
+            return self.mode.serialize() + self.address.serialize()
+        else:
+            raise ValueError(f"Unknown address mode: {self.mode}")  # pragma: no cover
 
 
 class BDBCommissioningMode(basic.enum_uint8, enum.IntEnum):

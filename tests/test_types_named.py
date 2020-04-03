@@ -45,7 +45,13 @@ def test_addr_mode_address():
     assert len(r.serialize()) == 9
 
     with pytest.raises(ValueError):
+        # 0x0f is broadcast mode
         data = b"\x0f\xaa\x55\x02\x03\x04\x05\x06\x07"
+        t.AddrModeAddress.deserialize(data)
+
+    with pytest.raises(ValueError):
+        # 0xab is not a valid mode
+        data = b"\xAB\xaa\x55\x02\x03\x04\x05\x06\x07"
         t.AddrModeAddress.deserialize(data)
 
 
