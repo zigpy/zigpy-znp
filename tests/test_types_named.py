@@ -54,6 +54,24 @@ def test_addr_mode_address():
         data = b"\xAB\xaa\x55\x02\x03\x04\x05\x06\x07"
         t.AddrModeAddress.deserialize(data)
 
+    data1 = b"\x02\x0E\xAD" + b"\xC0\x8C\x97\x83\xB0\x20\x33"
+    data2 = b"\x02\x0E\xAD" + b"\x3F\xB9\x5B\x64\x20\x86\xD6"
+
+    r1, _ = t.AddrModeAddress.deserialize(data1)
+    r2, _ = t.AddrModeAddress.deserialize(data2)
+
+    # Bytes at the end for NWK address mode are ignored
+    assert r1 == r2
+
+    data1 = b"\x02\x0E\xAD\xC0\x8C\x97\x83\xB0\x20\x33"
+    data2 = b"\x02\x0E\xAD\x3F\xB9\x5B\x64\x20\x86\xD6"
+
+    r3, _ = t.AddrModeAddress.deserialize(b"\x03" + data1[1:])
+    r4, _ = t.AddrModeAddress.deserialize(b"\x03" + data2[1:])
+
+    # All of the bytes are used for IEEE address mode
+    assert r3 != r4
+
 
 def test_channels():
     """Test Channel enum."""
