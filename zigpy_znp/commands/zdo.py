@@ -52,6 +52,12 @@ class MACCapabilities(t.enum_uint8, enum.IntFlag):
     AllocateShortAddrDuringAssocNeeded = 0b10000000
 
 
+class LeaveOptions(t.enum_uint8, enum.IntFlag):
+    NONE = 0b00000000
+    Rejoin = 0b00000001
+    RemoveChildren = 0b00000010
+
+
 class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     # send a “Network Address Request”. This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
@@ -446,10 +452,26 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the request"
+                    "Dst",
+                    t.NWK,
+                    "Short address of the device that will process the "
+                    "mgmt leave (remote or self)",
                 ),
-                t.Param("IEEE", t.EUI64, "IEEE address of the device to leave"),
-                t.Param("LeaveOptions", t.uint8_t, "Leave options"),
+                t.Param(
+                    "IEEE",
+                    t.EUI64,
+                    (
+                        "The 64-bit IEEE address of the entity to be removed from the "
+                        "network or 0x0000000000000000 if the device removes itself "
+                        "from the network."
+                    ),
+                ),
+                t.Param(
+                    "RemoveChildren_Rejoin",
+                    LeaveOptions,
+                    "Specifies actions to be performed by "
+                    "device when leaving the network.",
+                ),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
