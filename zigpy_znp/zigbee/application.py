@@ -424,9 +424,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         raise NotImplementedError()
 
-    async def force_remove(self, dev):
+    async def force_remove(self, device):
         """Forcibly remove device from NCP."""
-        raise NotImplementedError()
+        await self._api.command(
+            c.ZDOCommands.MgmtLeaveReq(
+                Dst=device.nwk, IEEE=device.ieee, LeaveOptions=c.zdo.LeaveOptions.NONE
+            ),
+            RspStatus=t.Status.Success,
+        )
+
+        # TODO: do we wait for a c.ZDOCommands.LeaveInd?
 
     async def permit_ncp(self, time_s):
         await self._api.command(
