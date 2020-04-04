@@ -552,6 +552,19 @@ async def test_znp_sreq_srsp(znp, event_loop):
 
 
 @pytest_mark_asyncio_timeout()
+async def test_znp_nvram_wrong_order(znp, event_loop):
+    class TestNvIds(nvids.BaseNvIds):
+        SECOND = 0x0002
+        FIRST = 0x0001
+        LAST = 0x0004
+        THIRD = 0x0003
+
+    # Writing too big of a value should fail, regardless of the definition order
+    with pytest.raises(ValueError):
+        await znp.nvram_write(TestNvIds.THIRD, t.uint16_t(0xAABB))
+
+
+@pytest_mark_asyncio_timeout()
 async def test_znp_nvram_writes(znp, event_loop):
     # Passing numerical addresses is disallowed because we can't check for overflows
     with pytest.raises(ValueError):

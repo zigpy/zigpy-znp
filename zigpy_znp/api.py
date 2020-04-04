@@ -403,6 +403,7 @@ class ZNP:
         # Find the next NVID in the table to check that our write doesn't overflow
         # It's not foolproof, but it will catch simple mistakes
         all_enum_values = list(type(nv_id))
+        all_enum_values.sort(key=lambda i: i.value)
         index = all_enum_values.index(nv_id)
 
         if index == len(all_enum_values) - 1:
