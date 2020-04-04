@@ -159,7 +159,7 @@ class MissingEnumMixin:
         new_member._name_ = f"unknown_0x{value:02X}"
         new_member._value_ = value
 
-        LOGGER.warning("Unhandled Status value: %s", new_member)
+        LOGGER.warning("Unhandled %s value: %s", cls.__name__, new_member)
 
         return new_member
 
