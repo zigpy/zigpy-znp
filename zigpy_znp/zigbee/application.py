@@ -78,7 +78,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if auto_form and any(should_form):
             await self.form_network()
 
-        await self._api.command(c.ZDOCommands.StartupFromApp.Req(StartDelay=0))
+        await self._api.request(c.ZDOCommands.StartupFromApp.Req(StartDelay=0))
 
         await self._api.wait_for_response(
             c.ZDOCommands.StateChangeInd.Callback(
@@ -87,7 +87,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # Get our active endpoints
-        endpoints = await self._api.command_callback_rsp(
+        endpoints = await self._api.request_callback_rsp(
             request=c.ZDOCommands.ActiveEpReq.Req(
                 DstAddr=0x0000, NWKAddrOfInterest=0x0000
             ),
@@ -97,12 +97,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Clear out the list of active endpoints
         for endpoint in endpoints.ActiveEndpoints:
-            await self._api.command(
+            await self._api.request(
                 c.AFCommands.Delete(Endpoint=endpoint), RspStatus=t.Status.Success
             )
 
         # Register our own
-        await self._api.command(
+        await self._api.request(
             c.AFCommands.Register.Req(
                 Endpoint=1,
                 ProfileId=zigpy.profiles.zha.PROFILE_ID,
@@ -114,7 +114,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
             RspStatus=t.Status.Success,
         )
-        await self._api.command(
+        await self._api.request(
             c.AFCommands.Register.Req(
                 Endpoint=8,
                 ProfileId=zigpy.profiles.zha.PROFILE_ID,
@@ -126,7 +126,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
             RspStatus=t.Status.Success,
         )
-        await self._api.command(
+        await self._api.request(
             c.AFCommands.Register.Req(
                 Endpoint=11,
                 ProfileId=zigpy.profiles.zha.PROFILE_ID,
@@ -138,7 +138,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
             RspStatus=t.Status.Success,
         )
-        await self._api.command(
+        await self._api.request(
             c.AFCommands.Register.Req(
                 Endpoint=12,
                 ProfileId=zigpy.profiles.zha.PROFILE_ID,
@@ -150,7 +150,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
             RspStatus=t.Status.Success,
         )
-        await self._api.command(
+        await self._api.request(
             c.AFCommands.Register.Req(
                 Endpoint=100,
                 ProfileId=zigpy.profiles.zll.PROFILE_ID,
@@ -181,15 +181,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             raise NotImplementedError("Cannot set a specific channel")
 
         if channels is not None:
-            await self._api.command(
+            await self._api.request(
                 c.UtilCommands.SetChannels(Channels=channels),
                 RspStatus=t.Status.Success,
             )
-            await self._api.command(
+            await self._api.request(
                 c.APPConfigCommands.BDBSetChannel(IsPrimary=True, Channel=channels),
                 RspStatus=t.Status.Success,
             )
-            await self._api.command(
+            await self._api.request(
                 c.APPConfigCommands.BDBSetChannel(
                     IsPrimary=False, Channel=t.Channels.NO_CHANNELS
                 ),
@@ -197,21 +197,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
         if pan_id is not None:
-            await self._api.command(
+            await self._api.request(
                 c.UtilCommands.SetPanId(PanId=pan_id), RspStatus=t.Status.Success
             )
 
         if extended_pan_id is not None:
-            # There is no Util command to do this
+            # There is no Util request to do this
             await self._api.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
 
         if network_key is not None:
-            await self._api.command(
+            await self._api.request(
                 c.UtilCommands.SetPreConfigKey(PreConfigKey=network_key),
                 RspStatus=t.Status.Success,
             )
 
-            # XXX: The Util command does not actually write to this NV address
+            # XXX: The Util request does not actually write to this NV address
             await self._api.nvram_write(
                 NwkNvIds.PRECFGKEYS_ENABLE, zigpy.types.bool(True)
             )
@@ -221,7 +221,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._reset()
 
     async def _reset(self):
-        await self._api.command_callback_rsp(
+        await self._api.request_callback_rsp(
             request=c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft),
             callback=c.SysCommands.ResetInd.Callback(partial=True),
         )
@@ -232,7 +232,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             NwkNvIds.STARTUP_OPTION, t.StartupOptions.ClearState
         )
 
-        # XXX: the undocumented `znpBasicCfg` command can do this
+        # XXX: the undocumented `znpBasicCfg` request can do this
         await self._api.nvram_write(
             NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
         )
@@ -259,7 +259,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Receive verbose callbacks
         await self._api.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
 
-        await self._api.command(
+        await self._api.request(
             c.APPConfigCommands.BDBStartCommissioning.Req(
                 Mode=t.BDBCommissioningMode.NetworkFormation
             ),
@@ -272,7 +272,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDOCommands.StateChangeInd.Rsp(State=DeviceState.StartedAsCoordinator)
         )
 
-        await self._api.command(
+        await self._api.request(
             c.APPConfigCommands.BDBStartCommissioning.Req(
                 Mode=t.BDBCommissioningMode.NetworkSteering
             ),
@@ -317,7 +317,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # TODO: c.AFCommands.DataRequestSrcRtg
 
         async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-            response = await self._api.command_callback_rsp(
+            response = await self._api.request_callback_rsp(
                 request=c.AFCommands.DataRequest.Req(
                     DstAddr=device.nwk,
                     DstEndpoint=dst_ep,
@@ -400,7 +400,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def force_remove(self, device):
         """Forcibly remove device from NCP."""
-        await self._api.command(
+        await self._api.request(
             c.ZDOCommands.MgmtLeaveReq(
                 Dst=device.nwk, IEEE=device.ieee, LeaveOptions=c.zdo.LeaveOptions.NONE
             ),
@@ -410,7 +410,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # TODO: do we wait for a c.ZDOCommands.LeaveInd?
 
     async def permit_ncp(self, time_s):
-        await self._api.command(
+        await self._api.request(
             c.ZDOCommands.MgmtPermitJoinReq.Req(
                 AddrMode=t.AddrMode.Broadcast,
                 Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,

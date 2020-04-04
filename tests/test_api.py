@@ -264,16 +264,16 @@ async def test_znp_wait_responses_empty(znp):
 async def test_znp_response_callback_simple(znp, event_loop):
     sync_callback = Mock()
 
-    good_command = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Failure)
-    bad_command = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
+    good_response = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Failure)
+    bad_response = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
 
-    znp.callback_for_response(good_command, sync_callback)
+    znp.callback_for_response(good_response, sync_callback)
 
-    znp.frame_received(bad_command.to_frame())
+    znp.frame_received(bad_response.to_frame())
     assert sync_callback.call_count == 0
 
-    znp.frame_received(good_command.to_frame())
-    sync_callback.assert_called_once_with(good_command)
+    znp.frame_received(good_response.to_frame())
+    sync_callback.assert_called_once_with(good_response)
 
 
 def test_command_deduplication():
@@ -329,19 +329,19 @@ async def test_znp_response_callbacks(znp, event_loop):
         await asyncio.sleep(0)
         async_callback_responses.append(response)
 
-    good_command1 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
-    good_command2 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_APP)
-    good_command3 = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
-    bad_command1 = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
-    bad_command2 = c.SysCommands.NVWrite.Req(
+    good_response1 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    good_response2 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_APP)
+    good_response3 = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
+    bad_response1 = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
+    bad_response2 = c.SysCommands.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
     responses = [
-        # Duplicating matching commands shouldn't do anything
+        # Duplicating matching responses shouldn't do anything
         c.SysCommands.Ping.Rsp(partial=True),
         c.SysCommands.Ping.Rsp(partial=True),
-        # Matching against different command types should also work
+        # Matching against different response types should also work
         c.UtilCommands.TimeAlive.Rsp(Seconds=12),
         c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
         c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
@@ -355,16 +355,16 @@ async def test_znp_response_callbacks(znp, event_loop):
     }
 
     # We shouldn't see any effects from receiving a frame early
-    znp.frame_received(good_command1.to_frame())
+    znp.frame_received(good_response1.to_frame())
 
     for callback in [bad_sync_callback, async_callback, sync_callback]:
         znp.callback_for_responses(responses, callback)
 
-    znp.frame_received(good_command1.to_frame())
-    znp.frame_received(bad_command1.to_frame())
-    znp.frame_received(good_command2.to_frame())
-    znp.frame_received(bad_command2.to_frame())
-    znp.frame_received(good_command3.to_frame())
+    znp.frame_received(good_response1.to_frame())
+    znp.frame_received(bad_response1.to_frame())
+    znp.frame_received(good_response2.to_frame())
+    znp.frame_received(bad_response2.to_frame())
+    znp.frame_received(good_response3.to_frame())
 
     await asyncio.sleep(0)
 
@@ -378,16 +378,16 @@ async def test_znp_response_callbacks(znp, event_loop):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_wait_for_responses(znp, event_loop):
-    command1 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
-    command2 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_APP)
-    command3 = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
-    command4 = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
-    command5 = c.SysCommands.NVWrite.Req(
+    response1 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    response2 = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_APP)
+    response3 = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
+    response4 = c.SysCommands.SetExtAddr.Rsp(Status=t.Status.Success)
+    response5 = c.SysCommands.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
     # We shouldn't see any effects from receiving a frame early
-    znp.frame_received(command1.to_frame())
+    znp.frame_received(response1.to_frame())
 
     future1 = znp.wait_for_responses(
         [c.SysCommands.Ping.Rsp(partial=True), c.SysCommands.Ping.Rsp(partial=True)]
@@ -404,10 +404,10 @@ async def test_znp_wait_for_responses(znp, event_loop):
 
     future4 = znp.wait_for_responses(
         [
-            # Duplicating matching commands shouldn't do anything
+            # Duplicating matching responses shouldn't do anything
             c.SysCommands.Ping.Rsp(partial=True),
             c.SysCommands.Ping.Rsp(partial=True),
-            # Matching against different command types should also work
+            # Matching against different response types should also work
             c.UtilCommands.TimeAlive.Rsp(Seconds=12),
             c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
             c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS),
@@ -415,25 +415,25 @@ async def test_znp_wait_for_responses(znp, event_loop):
         ]
     )
 
-    znp.frame_received(command1.to_frame())
-    znp.frame_received(command2.to_frame())
-    znp.frame_received(command3.to_frame())
-    znp.frame_received(command4.to_frame())
-    znp.frame_received(command5.to_frame())
-    znp.frame_received(command1.to_frame())
-    znp.frame_received(command2.to_frame())
-    znp.frame_received(command3.to_frame())
-    znp.frame_received(command4.to_frame())
-    znp.frame_received(command5.to_frame())
+    znp.frame_received(response1.to_frame())
+    znp.frame_received(response2.to_frame())
+    znp.frame_received(response3.to_frame())
+    znp.frame_received(response4.to_frame())
+    znp.frame_received(response5.to_frame())
+    znp.frame_received(response1.to_frame())
+    znp.frame_received(response2.to_frame())
+    znp.frame_received(response3.to_frame())
+    znp.frame_received(response4.to_frame())
+    znp.frame_received(response5.to_frame())
 
     assert future1.done()
     assert future2.done()
     assert not future3.done()
     assert future4.done()
 
-    assert (await future1) == command1
-    assert (await future2) == command3
-    assert (await future4) == command1
+    assert (await future1) == response1
+    assert (await future2) == response3
+    assert (await future4) == response1
 
     znp.frame_received(c.UtilCommands.TimeAlive.Rsp(Seconds=10).to_frame())
     assert future3.done()
@@ -441,27 +441,27 @@ async def test_znp_wait_for_responses(znp, event_loop):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_znp_command_kwargs(znp, event_loop):
+async def test_znp_request_kwargs(znp, event_loop):
     # Invalid format
     with pytest.raises(KeyError):
-        await znp.command(c.SysCommands.Ping.Req(), foo=0x01)
+        await znp.request(c.SysCommands.Ping.Req(), foo=0x01)
 
     # Valid format, invalid name
     with pytest.raises(KeyError):
-        await znp.command(c.SysCommands.Ping.Req(), RspFoo=0x01)
+        await znp.request(c.SysCommands.Ping.Req(), RspFoo=0x01)
 
     # Valid format, valid name
     event_loop.call_soon(
         znp.frame_received,
         c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS).to_frame(),
     )
-    await znp.command(
+    await znp.request(
         c.SysCommands.Ping.Req(), RspCapabilities=c.types.MTCapabilities.CAP_SYS
     )
     znp._uart.send.reset_mock()
 
     # Commands with no response (not an empty response!) can still be sent
-    response = await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
+    response = await znp.request(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
 
     znp._uart.send.assert_called_once_with(
         c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft).to_frame()
@@ -471,13 +471,13 @@ async def test_znp_command_kwargs(znp, event_loop):
 
     # You cannot send anything but requests
     with pytest.raises(ValueError):
-        await znp.command(
+        await znp.request(
             c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
         )
 
     # You cannot send callbacks
     with pytest.raises(ValueError):
-        await znp.command(
+        await znp.request(
             c.SysCommands.ResetInd.Callback(
                 Reason=t.ResetReason.PowerUp,
                 TransportRev=0x00,
@@ -490,25 +490,25 @@ async def test_znp_command_kwargs(znp, event_loop):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_znp_command_not_recognized(znp, event_loop):
-    # An error is raise when a bad command is sent
-    command = c.SysCommands.Ping.Req()
+async def test_znp_request_not_recognized(znp, event_loop):
+    # An error is raise when a bad request is sent
+    request = c.SysCommands.Ping.Req()
     unknown_rsp = c.RPCErrorCommands.CommandNotRecognized.Rsp(
-        ErrorCode=c.rpc_error.ErrorCode.InvalidCommandId, RequestHeader=command.header
+        ErrorCode=c.rpc_error.ErrorCode.InvalidCommandId, RequestHeader=request.header
     )
 
     with pytest.raises(CommandNotRecognized):
         event_loop.call_soon(znp.frame_received, unknown_rsp.to_frame())
-        await znp.command(command)
+        await znp.request(request)
 
 
 @pytest_mark_asyncio_timeout()
-async def test_znp_command_wrong_params(znp, event_loop):
-    # You cannot specify response kwargs for commands with no response
+async def test_znp_request_wrong_params(znp, event_loop):
+    # You cannot specify response kwargs for responses with no response
     with pytest.raises(ValueError):
-        await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), foo=0x01)
+        await znp.request(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft), foo=0x01)
 
-    # An error is raised when a command with bad params is received
+    # An error is raised when a response with bad params is received
     with pytest.raises(InvalidCommandResponse):
         event_loop.call_soon(
             znp.frame_received,
@@ -516,18 +516,17 @@ async def test_znp_command_wrong_params(znp, event_loop):
                 Capabilities=c.types.MTCapabilities.CAP_SYS
             ).to_frame(),
         )
-        await znp.command(
+        await znp.request(
             c.SysCommands.Ping.Req(), RspCapabilities=c.types.MTCapabilities.CAP_APP
         )
 
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_uart(znp, event_loop):
-
     ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
 
     event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
-    response = await znp.command(c.SysCommands.Ping.Req())
+    response = await znp.request(c.SysCommands.Ping.Req())
 
     assert ping_rsp == response
 
@@ -542,13 +541,13 @@ async def test_znp_sreq_srsp(znp, event_loop):
     # Each SREQ must have a corresponding SRSP, so this will fail
     with pytest.raises(asyncio.TimeoutError):
         with async_timeout.timeout(0.5):
-            await znp.command(c.SysCommands.Ping.Req())
+            await znp.request(c.SysCommands.Ping.Req())
 
     # This will work
     ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
     event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
 
-    await znp.command(c.SysCommands.Ping.Req())
+    await znp.request(c.SysCommands.Ping.Req())
 
 
 @pytest_mark_asyncio_timeout()
@@ -863,7 +862,7 @@ async def test_probe(pingable_serial_port):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_command_callback_rsp(pingable_serial_port, event_loop):
+async def test_request_callback_rsp(pingable_serial_port, event_loop):
     api = ZNP()
     await api.connect(pingable_serial_port, baudrate=1234_5678)
 
@@ -883,7 +882,7 @@ async def test_command_callback_rsp(pingable_serial_port, event_loop):
 
     # The UART sometimes replies with a SRSP and an AREQ faster than
     # we can register callbacks for both. This method is a workaround.
-    response = await api.command_callback_rsp(
+    response = await api.request_callback_rsp(
         request=c.AFCommands.DataRequest.Req(
             DstAddr=0x1234,
             DstEndpoint=56,

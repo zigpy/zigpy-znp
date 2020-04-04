@@ -72,18 +72,18 @@ class BaseResponseListener:
             )
 
     def matching_headers(self):
-        return {command.header for command in self.matching_commands}
+        return {response.header for response in self.matching_commands}
 
-    def resolve(self, command: CommandBase) -> bool:
-        if not any(c.matches(command) for c in self.matching_commands):
+    def resolve(self, response: CommandBase) -> bool:
+        if not any(c.matches(response) for c in self.matching_commands):
             return False
 
-        if not self._resolve(command):
+        if not self._resolve(response):
             return False
 
         return True
 
-    def _resolve(self, command: CommandBase) -> bool:
+    def _resolve(self, response: CommandBase) -> bool:
         """
         Implemented by subclasses to handle matched commands.
 
@@ -107,7 +107,7 @@ class OneShotResponseListener(BaseResponseListener):
         default=attr.Factory(lambda: asyncio.get_running_loop().create_future())
     )
 
-    def _resolve(self, command: CommandBase) -> bool:
+    def _resolve(self, response: CommandBase) -> bool:
         if self.future.done():
             # This happens if the UART receives multiple packets during the same
             # event loop step and all of them match this listener. Our Future's
@@ -116,7 +116,7 @@ class OneShotResponseListener(BaseResponseListener):
             LOGGER.debug("Future already has a result set: %s", self.future)
             return False
 
-        self.future.set_result(command)
+        self.future.set_result(response)
         return True
 
     def cancel(self):
@@ -130,9 +130,9 @@ class OneShotResponseListener(BaseResponseListener):
 class CallbackResponseListener(BaseResponseListener):
     callback: typing.Callable[[CommandBase], typing.Any] = attr.ib()
 
-    def _resolve(self, command: CommandBase) -> bool:
+    def _resolve(self, response: CommandBase) -> bool:
         try:
-            result = self.callback(command)
+            result = self.callback(response)
 
             # Run coroutines in the background
             if asyncio.iscoroutine(result):
@@ -192,7 +192,7 @@ class ZNP:
         try:
             # Make sure that our port works
             async with async_timeout.timeout(2):
-                await self.command(c.SysCommands.Ping.Req())
+                await self.request(c.SysCommands.Ping.Req())
         except Exception:
             self._uart = None
             raise
@@ -289,17 +289,17 @@ class ZNP:
 
             LOGGER.debug("%s matches %s", command, listener)
 
-    def callback_for_responses(self, commands, callback) -> None:
-        listener = CallbackResponseListener(commands, callback=callback)
+    def callback_for_responses(self, responses, callback) -> None:
+        listener = CallbackResponseListener(responses, callback=callback)
 
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
 
-    def callback_for_response(self, command, callback) -> None:
-        return self.callback_for_responses([command], callback)
+    def callback_for_response(self, response, callback) -> None:
+        return self.callback_for_responses([response], callback)
 
-    def wait_for_responses(self, commands) -> asyncio.Future:
-        listener = OneShotResponseListener(commands)
+    def wait_for_responses(self, responses) -> asyncio.Future:
+        listener = OneShotResponseListener(responses)
 
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
@@ -310,15 +310,15 @@ class ZNP:
         return listener.future
 
     def wait_for_response(
-        self, command: zigpy_znp.commands.types.CommandBase
+        self, response: zigpy_znp.commands.types.CommandBase
     ) -> asyncio.Future:
-        return self.wait_for_responses([command])
+        return self.wait_for_responses([response])
 
-    async def command(self, command, **response_params):
-        if type(command) is not command.Req:
-            raise ValueError(f"Cannot send a command that isn't a request: {command!r}")
+    async def request(self, request, **response_params):
+        if type(request) is not request.Req:
+            raise ValueError(f"Cannot send a command that isn't a request: {request!r}")
 
-        if command.Rsp:
+        if request.Rsp:
             renamed_response_params = {}
 
             for param, value in response_params.items():
@@ -330,18 +330,18 @@ class ZNP:
                 renamed_response_params[param.replace("Rsp", "", 1)] = value
 
             # Construct our response before we send the request so that we fail early
-            partial_response = command.Rsp(partial=True, **renamed_response_params)
+            partial_response = request.Rsp(partial=True, **renamed_response_params)
         elif response_params:
             raise ValueError(
                 f"Command has no response so response_params={response_params}"
                 f"will have no effect"
             )
 
-        LOGGER.debug("Sending command: %s", command)
+        LOGGER.debug("Sending request: %s", request)
 
-        # If our command has no response, we cannot wait for one
-        if not command.Rsp:
-            self._uart.send(command.to_frame())
+        # If our request has no response, we cannot wait for one
+        if not request.Rsp:
+            self._uart.send(request.to_frame())
             return
 
         # We should only be sending one SREQ at a time, according to the spec
@@ -349,13 +349,13 @@ class ZNP:
             # We need to create the response listener before we send the request
             response_future = self.wait_for_responses(
                 [
-                    command.Rsp(partial=True),
+                    request.Rsp(partial=True),
                     RPCErrorCommands.CommandNotRecognized.Rsp(
-                        partial=True, RequestHeader=command.header
+                        partial=True, RequestHeader=request.header
                     ),
                 ]
             )
-            self._uart.send(command.to_frame())
+            self._uart.send(request.to_frame())
 
             # We should get a SRSP in a reasonable amount of time
             async with async_timeout.timeout(SREQ_TIMEOUT):
@@ -363,7 +363,7 @@ class ZNP:
                 response = await response_future
 
         if isinstance(response, RPCErrorCommands.CommandNotRecognized.Rsp):
-            raise CommandNotRecognized(f"Fatal command error: {response}")
+            raise CommandNotRecognized(f"Fatal request error: {response}")
 
         # If the sync response we got is not what we wanted, this is an error
         if not partial_response.matches(response):
@@ -373,7 +373,7 @@ class ZNP:
 
         return response
 
-    async def command_callback_rsp(self, *, request, callback, **response_params):
+    async def request_callback_rsp(self, *, request, callback, **response_params):
         """
         Sends a [SA]REQ request and waits for its AREQ response. A bug-free version of:
 
@@ -382,7 +382,7 @@ class ZNP:
         """
 
         callback_response = self.wait_for_response(callback)
-        response = self.command(request, **response_params)
+        response = self.request(request, **response_params)
 
         await response
         return await callback_response
@@ -415,9 +415,9 @@ class ZNP:
             end_address = nv_id + offset + len(value)
 
             if end_address > next_nvid:
-                raise ValueError("OSALNVWrite command overflows into %s", next_nvid)
+                raise ValueError("OSALNVWrite request overflows into %s", next_nvid)
 
-        return await self.command(
+        return await self.request(
             SysCommands.OSALNVWrite.Req(
                 Id=nv_id, Offset=offset, Value=t.ShortBytes(value)
             ),
