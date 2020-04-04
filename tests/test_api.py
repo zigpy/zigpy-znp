@@ -441,9 +441,24 @@ async def test_znp_wait_for_responses(znp, event_loop):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_znp_command_kwargs(znp):
+async def test_znp_command_kwargs(znp, event_loop):
+    # Invalid format
     with pytest.raises(KeyError):
         await znp.command(c.SysCommands.Ping.Req(), foo=0x01)
+
+    # Valid format, invalid name
+    with pytest.raises(KeyError):
+        await znp.command(c.SysCommands.Ping.Req(), RspFoo=0x01)
+
+    # Valid format, valid name
+    event_loop.call_soon(
+        znp.frame_received,
+        c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS).to_frame(),
+    )
+    await znp.command(
+        c.SysCommands.Ping.Req(), RspCapabilities=c.types.MTCapabilities.CAP_SYS
+    )
+    znp._uart.send.reset_mock()
 
     # Commands with no response (not an empty response!) can still be sent
     response = await znp.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
@@ -502,7 +517,7 @@ async def test_znp_command_wrong_params(znp, event_loop):
             ).to_frame(),
         )
         await znp.command(
-            c.SysCommands.Ping.Req(), Capabilities=c.types.MTCapabilities.CAP_APP
+            c.SysCommands.Ping.Req(), RspCapabilities=c.types.MTCapabilities.CAP_APP
         )
 
 

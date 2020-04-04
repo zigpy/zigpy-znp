@@ -319,8 +319,18 @@ class ZNP:
             raise ValueError(f"Cannot send a command that isn't a request: {command!r}")
 
         if command.Rsp:
+            renamed_response_params = {}
+
+            for param, value in response_params.items():
+                if not param.startswith("Rsp"):
+                    raise KeyError(
+                        f"All response params must start with 'Rsp': {param!r}"
+                    )
+
+                renamed_response_params[param.replace("Rsp", "", 1)] = value
+
             # Construct our response before we send the request so that we fail early
-            partial_response = command.Rsp(partial=True, **response_params)
+            partial_response = command.Rsp(partial=True, **renamed_response_params)
         elif response_params:
             raise ValueError(
                 f"Command has no response so response_params={response_params}"

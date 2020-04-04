@@ -78,7 +78,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if auto_form and any(should_form):
             await self.form_network()
 
-        await self._api.command(c.ZDOCommands.StartupFromApp.Req(StartDelay=100))
+        await self._api.command(c.ZDOCommands.StartupFromApp.Req(StartDelay=0))
 
         await self._api.wait_for_response(
             c.ZDOCommands.StateChangeInd.Callback(
@@ -88,7 +88,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Get our active endpoints
         await self._api.command(
-            c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000)
+            c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
+            RspStatus=t.Status.Success,
         )
 
         endpoints = await self._api.wait_for_response(
@@ -97,7 +98,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Clear out the list of active endpoints
         for endpoint in endpoints.ActiveEndpoints:
-            await self._api.command(c.AFCommands.Delete(Endpoint=endpoint))
+            await self._api.command(
+                c.AFCommands.Delete(Endpoint=endpoint), RspStatus=t.Status.Success
+            )
 
         # Register our own
         await self._api.command(
@@ -109,7 +112,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
                 InputClusters=t.LVList(t.ClusterId)([]),
                 OutputClusters=t.LVList(t.ClusterId)([]),
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
         await self._api.command(
             c.AFCommands.Register.Req(
@@ -120,7 +124,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
                 InputClusters=t.LVList(t.ClusterId)([]),
                 OutputClusters=t.LVList(t.ClusterId)([IasZone.cluster_id]),
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
         await self._api.command(
             c.AFCommands.Register.Req(
@@ -131,7 +136,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
                 InputClusters=t.LVList(t.ClusterId)([]),
                 OutputClusters=t.LVList(t.ClusterId)([]),
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
         await self._api.command(
             c.AFCommands.Register.Req(
@@ -142,7 +148,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
                 InputClusters=t.LVList(t.ClusterId)([]),
                 OutputClusters=t.LVList(t.ClusterId)([]),
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
         await self._api.command(
             c.AFCommands.Register.Req(
@@ -153,7 +160,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
                 InputClusters=[],
                 OutputClusters=[],
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
 
         await self._api.wait_for_response(
@@ -174,18 +182,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             raise NotImplementedError("Cannot set a specific channel")
 
         if channels is not None:
-            await self._api.command(c.UtilCommands.SetChannels(Channels=channels))
             await self._api.command(
-                c.APPConfigCommands.BDBSetChannel(IsPrimary=True, Channel=channels)
+                c.UtilCommands.SetChannels(Channels=channels),
+                RspStatus=t.Status.Success,
+            )
+            await self._api.command(
+                c.APPConfigCommands.BDBSetChannel(IsPrimary=True, Channel=channels),
+                RspStatus=t.Status.Success,
             )
             await self._api.command(
                 c.APPConfigCommands.BDBSetChannel(
                     IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-                )
+                ),
+                RspStatus=t.Status.Success,
             )
 
         if pan_id is not None:
-            await self._api.command(c.UtilCommands.SetPanId(PanId=pan_id))
+            await self._api.command(
+                c.UtilCommands.SetPanId(PanId=pan_id), RspStatus=t.Status.Success
+            )
 
         if extended_pan_id is not None:
             # There is no Util command to do this
@@ -193,7 +208,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if network_key is not None:
             await self._api.command(
-                c.UtilCommands.SetPreConfigKey(PreConfigKey=network_key)
+                c.UtilCommands.SetPreConfigKey(PreConfigKey=network_key),
+                RspStatus=t.Status.Success,
             )
 
             # XXX: The Util command does not actually write to this NV address
@@ -247,7 +263,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._api.command(
             c.APPConfigCommands.BDBStartCommissioning.Req(
                 Mode=t.BDBCommissioningMode.NetworkFormation
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
 
         # This may take a while because of some sort of background scanning.
@@ -259,7 +276,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._api.command(
             c.APPConfigCommands.BDBStartCommissioning.Req(
                 Mode=t.BDBCommissioningMode.NetworkSteering
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
 
     @zigpy.util.retryable_request
@@ -312,7 +330,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # XXX: Multiple responses can be received in a single event loop step.
         #      We have to create listeners before actually sending anything.
-        data_request_response = self._api.command(data_request, Status=t.Status.Success)
+        data_request_response = self._api.command(
+            data_request, RspStatus=t.Status.Success
+        )
         data_confirm_response = self._api.wait_for_response(
             c.AFCommands.DataConfirm.Callback(
                 partial=True, Endpoint=dst_ep, TSN=sequence
@@ -409,25 +429,17 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         raise NotImplementedError()
 
     async def permit_ncp(self, time_s):
-        permit_join_req = await self._api.command(
+        await self._api.command(
             c.ZDOCommands.MgmtPermitJoinReq.Req(
                 AddrMode=t.AddrMode.Broadcast,
                 Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
                 Duration=time_s,
                 TCSignificance=0,
-            )
+            ),
+            RspStatus=t.Status.Success,
         )
 
-        if permit_join_req.Status != t.Status.Success:
-            raise ValueError(
-                f"Permit join request failed with status: {permit_join_req.Status}"
-            )
-
-        permit_join_rsp = await self._api.wait_for_response(
-            c.ZDOCommands.MgmtPermitJoinRsp.Callback(partial=True)
+        await self._api.wait_for_response(
+            c.ZDOCommands.MgmtPermitJoinRsp.Callback(partial=True),
+            RspStatus=t.Status.Success,
         )
-
-        if permit_join_rsp.Status != t.Status.Success:
-            raise ValueError(
-                f"Permit join failed with status: {permit_join_rsp.Status}"
-            )
