@@ -435,7 +435,7 @@ class CommandBase:
 
     def __getattr__(self, key):
         if key not in self._bound_params:
-            raise AttributeError(key)
+            raise AttributeError(f"{self} has no attribute {key!r}")
 
         param, value = self._bound_params[key]
         return value

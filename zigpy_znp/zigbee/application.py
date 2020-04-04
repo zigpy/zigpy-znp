@@ -87,13 +87,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # Get our active endpoints
-        await self._api.command(
-            c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
+        endpoints = await self._api.command_callback_rsp(
+            request=c.ZDOCommands.ActiveEpReq.Req(
+                DstAddr=0x0000, NWKAddrOfInterest=0x0000
+            ),
             RspStatus=t.Status.Success,
-        )
-
-        endpoints = await self._api.wait_for_response(
-            c.ZDOCommands.ActiveEpRsp.Callback(partial=True)
+            callback=c.ZDOCommands.ActiveEpRsp.Callback(partial=True),
         )
 
         # Clear out the list of active endpoints
@@ -222,9 +221,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._reset()
 
     async def _reset(self):
-        await self._api.command(c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft))
-        return await self._api.wait_for_response(
-            c.SysCommands.ResetInd.Callback(partial=True)
+        await self._api.command_callback_rsp(
+            request=c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft),
+            callback=c.SysCommands.ResetInd.Callback(partial=True),
         )
 
     async def form_network(self, channels=[15], pan_id=None, extended_pan_id=None):
@@ -258,7 +257,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # Receive verbose callbacks
-        await self._api.nvram_write(NwkNvIds.ZDO_DIRECT_CB, zigpy.types.bool(True))
+        await self._api.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
 
         await self._api.command(
             c.APPConfigCommands.BDBStartCommissioning.Req(
@@ -310,55 +309,30 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if use_ieee:
             raise ValueError("use_ieee: AFCommands.DataRequestExt is not supported yet")
 
-        tx_options = c.af.TransmitOptions.NONE
+        tx_options = c.af.TransmitOptions.RouteDiscovery
 
         # if expect_reply:
         #    tx_options |= c.af.TransmitOptions.APSAck
 
         # TODO: c.AFCommands.DataRequestSrcRtg
 
-        data_request = c.AFCommands.DataRequest.Req(
-            DstAddr=device.nwk,
-            DstEndpoint=dst_ep,
-            SrcEndpoint=src_ep,
-            ClusterId=cluster,
-            TSN=sequence,
-            Options=tx_options,
-            Radius=30,
-            Data=data,
-        )
-
-        # XXX: Multiple responses can be received in a single event loop step.
-        #      We have to create listeners before actually sending anything.
-        data_request_response = self._api.command(
-            data_request, RspStatus=t.Status.Success
-        )
-        data_confirm_response = self._api.wait_for_response(
-            c.AFCommands.DataConfirm.Callback(
-                partial=True, Endpoint=dst_ep, TSN=sequence
-            )
-        )
-
-        await data_request_response
-
         async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-            response = await data_confirm_response
-
-        # XXX: sometimes routes need to be re-discovered
-        if response.Status == t.Status.NwkNoRoute:
-            LOGGER.warning(
-                "No route to %s. Discovering a route before failing.", device.nwk
+            response = await self._api.command_callback_rsp(
+                request=c.AFCommands.DataRequest.Req(
+                    DstAddr=device.nwk,
+                    DstEndpoint=dst_ep,
+                    SrcEndpoint=src_ep,
+                    ClusterId=cluster,
+                    TSN=sequence,
+                    Options=tx_options,
+                    Radius=30,
+                    Data=data,
+                ),
+                RspStatus=t.Status.Success,
+                callback=c.AFCommands.DataConfirm.Callback(
+                    partial=True, Endpoint=dst_ep, TSN=sequence
+                ),
             )
-
-            await self._api.command(
-                c.ZDOCommands.ExtRouteDisc.Req(
-                    Dst=device.nwk,
-                    Options=c.zdo.RouteDiscoveryOptions.Force,
-                    Radius=2 * 0x0F,
-                )
-            )
-
-            return (response.Status, "Failed to send a message after discovering route")
 
         LOGGER.debug("Received a data request confirmation: %s", response)
 

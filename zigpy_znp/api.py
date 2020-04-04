@@ -373,6 +373,20 @@ class ZNP:
 
         return response
 
+    async def command_callback_rsp(self, *, request, callback, **response_params):
+        """
+        Sends a [SA]REQ request and waits for its AREQ response. A bug-free version of:
+
+            req_rsp = await req
+            callback_rsp = await req_callback
+        """
+
+        callback_response = self.wait_for_response(callback)
+        response = self.command(request, **response_params)
+
+        await response
+        return await callback_response
+
     async def nvram_write(
         self, nv_id: nvids.BaseNvIds, value, *, offset: t.uint8_t = 0
     ):
@@ -405,5 +419,6 @@ class ZNP:
         return await self.command(
             SysCommands.OSALNVWrite.Req(
                 Id=nv_id, Offset=offset, Value=t.ShortBytes(value)
-            )
+            ),
+            RspStatus=t.Status.Success,
         )

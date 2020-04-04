@@ -609,6 +609,15 @@ async def test_znp_nvram_writes(znp, event_loop):
     with pytest.raises(ValueError):
         await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint16_t(0xAABB))
 
+    # The SYS_OSAL_NV_WRITE response status should be checked
+    event_loop.call_soon(
+        znp.frame_received,
+        c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Failure).to_frame(),
+    )
+
+    with pytest.raises(InvalidCommandResponse):
+        await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint8_t(0xAB))
+
 
 @pytest_mark_asyncio_timeout()
 async def test_listeners_resolve(event_loop):
@@ -838,3 +847,45 @@ async def test_api_reconnect(event_loop, mocker):
 async def test_probe(pingable_serial_port):
     assert not (await ZNP.probe("/dev/null", 12345))
     assert await ZNP.probe(pingable_serial_port, 12345)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_command_callback_rsp(pingable_serial_port, event_loop):
+    api = ZNP()
+    await api.connect(pingable_serial_port, baudrate=1234_5678)
+
+    def send_responses():
+        api._uart.data_received(
+            TransportFrame(
+                c.AFCommands.DataRequest.Rsp(Status=t.Status.Success).to_frame()
+            ).serialize()
+            + TransportFrame(
+                c.AFCommands.DataConfirm.Callback(
+                    Endpoint=56, TSN=1, Status=t.Status.Success
+                ).to_frame()
+            ).serialize()
+        )
+
+    event_loop.call_later(0.1, send_responses)
+
+    # The UART sometimes replies with a SRSP and an AREQ faster than
+    # we can register callbacks for both. This method is a workaround.
+    response = await api.command_callback_rsp(
+        request=c.AFCommands.DataRequest.Req(
+            DstAddr=0x1234,
+            DstEndpoint=56,
+            SrcEndpoint=78,
+            ClusterId=90,
+            TSN=1,
+            Options=c.af.TransmitOptions.RouteDiscovery,
+            Radius=30,
+            Data=b"hello",
+        ),
+        RspStatus=t.Status.Success,
+        callback=c.AFCommands.DataConfirm.Callback(partial=True, Endpoint=56, TSN=1),
+    )
+
+    # Our response is the callback, not the confirmation response
+    assert response == c.AFCommands.DataConfirm.Callback(
+        Endpoint=56, TSN=1, Status=t.Status.Success
+    )

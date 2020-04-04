@@ -38,7 +38,7 @@ class GeneralFrame:
         if len(value) > 250:
             raise ValueError(f"data length: {len(value)} exceeds max 250")
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         """Serialize Frame."""
         return self.length.serialize() + self.header.serialize() + self.data.serialize()
 
