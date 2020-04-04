@@ -123,6 +123,9 @@ class ZnpMtProtocol(asyncio.Protocol):
 
         return frame
 
+    def __repr__(self):
+        return f"<{type(self).__name__} for {self._api}>"
+
 
 def guess_port() -> serial.tools.list_ports_common.ListPortInfo:
     """Picks the first USB port with a Texas Instruments vendor ID."""
@@ -170,5 +173,7 @@ async def connect(port, baudrate, api, loop=None) -> typing.Tuple[ZnpMtProtocol,
     )
 
     await protocol._connected_event.wait()
+
+    LOGGER.debug("Connected to %s at %s baud", port, baudrate)
 
     return protocol, port

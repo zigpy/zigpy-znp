@@ -102,12 +102,6 @@ async def test_znp_connect(mocker, event_loop, pingable_serial_port):
 async def test_znp_responses(znp):
     assert not znp._response_listeners
 
-    # Can't wait for non-response types
-    with pytest.raises(ValueError):
-        await znp.wait_for_response(c.SysCommands.Ping.Req())
-
-    assert not znp._response_listeners
-
     future = znp.wait_for_response(c.SysCommands.Ping.Rsp(partial=True))
 
     assert znp._response_listeners

@@ -61,16 +61,6 @@ class BaseResponseListener:
         if not commands:
             raise ValueError("Listener must have at least one command")
 
-        response_types = (
-            zigpy_znp.commands.types.CommandType.SRSP,
-            zigpy_znp.commands.types.CommandType.AREQ,
-        )
-
-        if commands[0].header.type not in response_types:
-            raise ValueError(
-                f"Can only wait for SRSPs and AREQs. Got: {commands[0].header.type}"
-            )
-
     def matching_headers(self):
         return {response.header for response in self.matching_commands}
 
@@ -292,6 +282,8 @@ class ZNP:
     def callback_for_responses(self, responses, callback) -> None:
         listener = CallbackResponseListener(responses, callback=callback)
 
+        LOGGER.debug("Creating callback %s", listener)
+
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
 
@@ -300,6 +292,8 @@ class ZNP:
 
     def wait_for_responses(self, responses) -> asyncio.Future:
         listener = OneShotResponseListener(responses)
+
+        LOGGER.debug("Creating one-shot listener %s", listener)
 
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
@@ -341,6 +335,7 @@ class ZNP:
 
         # If our request has no response, we cannot wait for one
         if not request.Rsp:
+            LOGGER.debug("Request has no response, not waiting for one.")
             self._uart.send(request.to_frame())
             return
 
