@@ -12,17 +12,17 @@ import zigpy_znp.types as t
 
 
 class TransmitOptions(t.enum_uint8, enum.IntFlag):
-    NONE = 0b00000000
+    NONE = 0
 
-    Reserved1 = 0b00000001
-    Reserved2 = 0b00000010
-    Reserved3 = 0b00000100
-    Reserved4 = 0b00001000
+    Reserved1 = 1 << 0
+    Reserved2 = 1 << 1
+    Reserved3 = 1 << 2
+    Reserved4 = 1 << 3
 
-    APSAck = 0b00010000
-    RouteDiscovery = 0b00100000
-    APSSecurity = 0b01000000
-    SkipRouting = 0b10000000
+    APSAck = 1 << 4
+    RouteDiscovery = 1 << 5
+    APSSecurity = 1 << 6
+    SkipRouting = 1 << 7
 
 
 class LatencyReq(t.uint8_t, enum.Enum):

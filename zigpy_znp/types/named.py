@@ -218,6 +218,6 @@ class StartupOptions(basic.enum_uint8, enum.IntFlag):
 
 
 class DeviceLogicalType(basic.enum_uint8, enum.IntFlag):
-    Coordinator = 0b00000001
-    Router = 0b00000010
-    EndDevice = 0b00000100
+    Coordinator = 1 << 0
+    Router = 1 << 1
+    EndDevice = 1 << 2

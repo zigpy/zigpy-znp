@@ -42,20 +42,20 @@ class RouteDiscoveryOptions(t.enum_uint8, enum.IntEnum):
 
 
 class MACCapabilities(t.enum_uint8, enum.IntFlag):
-    PANCoordinator = 0b00000001
-    Router = 0b00000010
-    MainsPowered = 0b00000100
-    RXWhenIdle = 0b00001000
-    Reserved5 = 0b00010000
-    Reserved6 = 0b00100000
-    SecurityCapable = 0b01000000
-    AllocateShortAddrDuringAssocNeeded = 0b10000000
+    PANCoordinator = 1 << 0
+    Router = 1 << 1
+    MainsPowered = 1 << 2
+    RXWhenIdle = 1 << 3
+    Reserved5 = 1 << 4
+    Reserved6 = 1 << 5
+    SecurityCapable = 1 << 6
+    AllocateShortAddrDuringAssocNeeded = 1 << 7
 
 
 class LeaveOptions(t.enum_uint8, enum.IntFlag):
-    NONE = 0b00000000
-    Rejoin = 0b00000001
-    RemoveChildren = 0b00000010
+    NONE = 0
+    Rejoin = 1 << 0
+    RemoveChildren = 1 << 1
 
 
 class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):

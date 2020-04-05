@@ -67,14 +67,14 @@ class BDBCommissioningMode(t.uint8_t, enum.Enum):
 
 
 class BDBRemainingCommissioningModes(t.uint8_t, enum.Flag):
-    NONE = 0b00000000
+    NONE = 0
 
-    InitiatorTl = 0b00000001
-    NwkSteering = 0b00000010
-    NwkFormation = 0b00000100
-    FindingBinding = 0b00001000
-    Initialization = 0b00010000
-    ParentLost = 0b00100000
+    InitiatorTl = 1 << 0
+    NwkSteering = 1 << 1
+    NwkFormation = 1 << 2
+    FindingBinding = 1 << 3
+    Initialization = 1 << 4
+    ParentLost = 1 << 5
 
 
 class APPConfigCommands(CommandsBase, subsystem=Subsystem.APPConfig):
