@@ -213,8 +213,9 @@ class KeySource(basic.FixedList):
 
 
 class StartupOptions(basic.enum_uint8, enum.IntFlag):
-    ClearConfig = 0x01
-    ClearState = 0x02
+    ClearConfig = 1 << 1
+    ClearState = 1 << 2
+    AutoStart = 1 << 3
 
 
 class DeviceLogicalType(basic.enum_uint8, enum.IntFlag):
