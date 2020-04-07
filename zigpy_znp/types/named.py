@@ -184,6 +184,7 @@ class Status(basic.uint8_t, MissingEnumMixin, enum.Enum):
     UnknownDevice = 0xC8
     ZMACInvalidParameter = 0xE8
     ZMACNoBeacon = 0xEA
+    ZMACTransactionExpired = 0xF0
     MACScanInProgress = 0xFC
 
 

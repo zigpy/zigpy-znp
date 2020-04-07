@@ -8,10 +8,9 @@ import zigpy.util
 import zigpy.types
 import zigpy.application
 import zigpy.profiles
-from zigpy.zcl.clusters.security import IasZone
 
-import zigpy.zdo.types as zdo_t
 from zigpy.types import ExtendedPanId
+from zigpy.zcl.clusters.security import IasZone
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
@@ -34,18 +33,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.AFCommands.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
+        self._api.callback_for_response(
+            c.ZDOCommands.EndDeviceAnnceInd.Callback(partial=True),
+            self.on_device_announce,
+        )
+
+        self._api.callback_for_response(
+            c.ZDOCommands.LeaveInd.Callback(partial=True), self.on_device_leave
+        )
+
+    def on_device_announce(self, msg: c.ZDOCommands.EndDeviceAnnceInd.Callback) -> None:
+        LOGGER.info("ZDO device announce: %s", msg)
+        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=0x0000)
+
+    def on_device_leave(self, msg: c.ZDOCommands.LeaveInd.Callback) -> None:
+        LOGGER.info("ZDO device left: %s", msg)
+        self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
+
     def on_af_message(self, msg: c.AFCommands.IncomingMsg.Callback) -> None:
-        if msg.ClusterId == zdo_t.ZDOCmd.Device_annce and msg.DstEndpoint == 0:
-            # [Sequence Number] + [16-bit address] + [64-bit address] + [Capability]
-            sequence, data = t.uint8_t.deserialize(msg.Data)
-            nwk, data = t.NWK.deserialize(data)
-            ieee, data = t.EUI64.deserialize(data)
-            capability = data
-
-            LOGGER.info("ZDO Device announce: 0x%04x, %s, %s", nwk, ieee, capability)
-            self.handle_join(nwk, ieee, parent_nwk=0x0000)
-            return
-
         try:
             device = self.get_device(nwk=msg.SrcAddr)
         except KeyError:
@@ -196,14 +201,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 RspStatus=t.Status.Success,
             )
 
+            self._channels = channels
+
         if pan_id is not None:
             await self._api.request(
                 c.UtilCommands.SetPanId(PanId=pan_id), RspStatus=t.Status.Success
             )
 
+            self._pan_id = pan_id
+
         if extended_pan_id is not None:
             # There is no Util request to do this
             await self._api.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
+
+            self._extended_pan_id = extended_pan_id
 
         if network_key is not None:
             await self._api.request(
@@ -410,17 +421,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # TODO: do we wait for a c.ZDOCommands.LeaveInd?
 
     async def permit_ncp(self, time_s):
-        await self._api.request(
-            c.ZDOCommands.MgmtPermitJoinReq.Req(
+        response = await self._api.request_callback_rsp(
+            request=c.ZDOCommands.MgmtPermitJoinReq.Req(
                 AddrMode=t.AddrMode.Broadcast,
                 Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
                 Duration=time_s,
                 TCSignificance=0,
             ),
             RspStatus=t.Status.Success,
+            callback=c.ZDOCommands.MgmtPermitJoinRsp.Callback(partial=True),
         )
 
-        await self._api.wait_for_response(
-            c.ZDOCommands.MgmtPermitJoinRsp.Callback(partial=True),
-            RspStatus=t.Status.Success,
-        )
+        if response.Status != t.Status.Success:
+            raise RuntimeError(f"Permit join response failure: {response}")

@@ -268,16 +268,18 @@ class ZNP:
 
         LOGGER.debug("Received command: %s", command)
 
-        if command.header not in self._response_listeners:
-            LOGGER.warning("Received an unsolicited command: %s", command)
-            return
+        matched = False
 
         for listener in self._response_listeners[command.header]:
             if not listener.resolve(command):
                 LOGGER.debug("%s does not match %s", command, listener)
                 continue
 
+            matched = True
             LOGGER.debug("%s matches %s", command, listener)
+
+        if not matched:
+            LOGGER.warning("Received an unhandled command: %s", command)
 
     def callback_for_responses(self, responses, callback) -> None:
         listener = CallbackResponseListener(responses, callback=callback)
@@ -327,7 +329,7 @@ class ZNP:
             partial_response = request.Rsp(partial=True, **renamed_response_params)
         elif response_params:
             raise ValueError(
-                f"Command has no response so response_params={response_params}"
+                f"Command has no response so response_params={response_params} "
                 f"will have no effect"
             )
 
