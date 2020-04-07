@@ -290,6 +290,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.Success,
         )
 
+    async def _send_request(
+        self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
+    ):
+        async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+            response = await self._api.request_callback_rsp(
+                request=c.AFCommands.DataRequestExt.Req(
+                    DstAddrModeAddress=dst_addr,
+                    DstEndpoint=dst_ep,
+                    DstPanId=0x0000,
+                    SrcEndpoint=src_ep,
+                    ClusterId=cluster,
+                    TSN=sequence,
+                    Options=options,
+                    Radius=radius,
+                    Data=data,
+                ),
+                RspStatus=t.Status.Success,
+                callback=c.AFCommands.DataConfirm.Callback(
+                    partial=True, Endpoint=dst_ep, TSN=sequence
+                ),
+            )
+
+        LOGGER.debug("Received a data request confirmation: %s", response)
+
+        if response.Status != t.Status.Success:
+            return response.Status, "Invalid response status"
+
+        return response.Status, "Request sent successfully"
+
     @zigpy.util.retryable_request
     async def request(
         self,
@@ -327,31 +356,53 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         else:
             destination = t.AddrModeAddress(mode=t.AddrMode.NWK, address=device.nwk)
 
-        async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-            response = await self._api.request_callback_rsp(
-                request=c.AFCommands.DataRequestExt.Req(
-                    DstAddrModeAddress=destination,
-                    DstEndpoint=dst_ep,
-                    DstPanId=0x0000,
-                    SrcEndpoint=src_ep,
-                    ClusterId=cluster,
-                    TSN=sequence,
-                    Options=tx_options,
-                    Radius=30,
-                    Data=data,
-                ),
-                RspStatus=t.Status.Success,
-                callback=c.AFCommands.DataConfirm.Callback(
-                    partial=True, Endpoint=dst_ep, TSN=sequence
-                ),
-            )
+        return await self._send_request(
+            dst_addr=destination,
+            dst_ep=dst_ep,
+            src_ep=src_ep,
+            cluster=cluster,
+            sequence=sequence,
+            options=tx_options,
+            radius=30,
+            data=data,
+        )
 
-        LOGGER.debug("Received a data request confirmation: %s", response)
+    async def broadcast(
+        self,
+        profile,
+        cluster,
+        src_ep,
+        dst_ep,
+        grpid,
+        radius,
+        sequence,
+        data,
+        broadcast_address=zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
+    ):
+        """Submit and send data out as an broadcast transmission.
+        :param profile: Zigbee Profile ID to use for outgoing message
+        :param cluster: cluster id where the message is being sent
+        :param src_ep: source endpoint id
+        :param dst_ep: destination endpoint id
+        :param grpid: group id to address the broadcast to
+        :param radius: max radius of the broadcast
+        :param sequence: transaction sequence number of the message
+        :param data: zigbee message payload
+        :param broadcast_address: broadcast address.
+        :returns: return a tuple of a status and an error_message. Original requestor
+                  has more context to provide a more meaningful error message
+        """
 
-        if response.Status != t.Status.Success:
-            return response.Status, "Invalid response status"
-
-        return response.Status, "Request sent successfully"
+        return await self._send_request(
+            dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=grpid),
+            dst_ep=dst_ep,
+            src_ep=src_ep,
+            cluster=cluster,
+            sequence=sequence,
+            options=c.af.TransmitOptions.NONE,
+            radius=radius,
+            data=data,
+        )
 
     async def mrequest(
         self,
@@ -381,60 +432,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                   has more context to provide a more meaningful error message
         """
         raise NotImplementedError()
-
-    async def broadcast(
-        self,
-        profile,
-        cluster,
-        src_ep,
-        dst_ep,
-        grpid,
-        radius,
-        sequence,
-        data,
-        broadcast_address=zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
-    ):
-        """Submit and send data out as an broadcast transmission.
-        :param profile: Zigbee Profile ID to use for outgoing message
-        :param cluster: cluster id where the message is being sent
-        :param src_ep: source endpoint id
-        :param dst_ep: destination endpoint id
-        :param grpid: group id to address the broadcast to
-        :param radius: max radius of the broadcast
-        :param sequence: transaction sequence number of the message
-        :param data: zigbee message payload
-        :param broadcast_address: broadcast address.
-        :returns: return a tuple of a status and an error_message. Original requestor
-                  has more context to provide a more meaningful error message
-        """
-
-        async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-            response = await self._api.request_callback_rsp(
-                request=c.AFCommands.DataRequestExt.Req(
-                    DstAddrModeAddress=t.AddrModeAddress(
-                        mode=t.AddrMode.Group, address=grpid
-                    ),
-                    DstEndpoint=dst_ep,
-                    DstPanId=0x0000,
-                    SrcEndpoint=src_ep,
-                    ClusterId=cluster,
-                    TSN=sequence,
-                    Options=c.af.TransmitOptions.NONE,
-                    Radius=radius,
-                    Data=data,
-                ),
-                RspStatus=t.Status.Success,
-                callback=c.AFCommands.DataConfirm.Callback(
-                    partial=True, Endpoint=dst_ep, TSN=sequence
-                ),
-            )
-
-        LOGGER.debug("Received a data request confirmation: %s", response)
-
-        if response.Status != t.Status.Success:
-            return response.Status, "Invalid response status"
-
-        return response.Status, "Request sent successfully"
 
     async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
