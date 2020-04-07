@@ -317,21 +317,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                   has more context to provide a more meaningful error message
         """
 
-        if use_ieee:
-            raise ValueError("use_ieee: AFCommands.DataRequestExt is not supported yet")
-
         tx_options = c.af.TransmitOptions.RouteDiscovery
 
         # if expect_reply:
         #    tx_options |= c.af.TransmitOptions.APSAck
 
-        # TODO: c.AFCommands.DataRequestSrcRtg
+        if use_ieee:
+            destination = t.AddrModeAddress(mode=t.AddrMode.IEEE, address=device.ieee)
+        else:
+            destination = t.AddrModeAddress(mode=t.AddrMode.NWK, address=device.nwk)
 
         async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
             response = await self._api.request_callback_rsp(
-                request=c.AFCommands.DataRequest.Req(
-                    DstAddr=device.nwk,
+                request=c.AFCommands.DataRequestExt.Req(
+                    DstAddrModeAddress=destination,
                     DstEndpoint=dst_ep,
+                    DstPanId=0x0000,
                     SrcEndpoint=src_ep,
                     ClusterId=cluster,
                     TSN=sequence,
@@ -407,9 +408,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                   has more context to provide a more meaningful error message
         """
 
-        raise NotImplementedError()
+        async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+            response = await self._api.request_callback_rsp(
+                request=c.AFCommands.DataRequestExt.Req(
+                    DstAddrModeAddress=t.AddrModeAddress(
+                        mode=t.AddrMode.Group, address=grpid
+                    ),
+                    DstEndpoint=dst_ep,
+                    DstPanId=0x0000,
+                    SrcEndpoint=src_ep,
+                    ClusterId=cluster,
+                    TSN=sequence,
+                    Options=c.af.TransmitOptions.NONE,
+                    Radius=radius,
+                    Data=data,
+                ),
+                RspStatus=t.Status.Success,
+                callback=c.AFCommands.DataConfirm.Callback(
+                    partial=True, Endpoint=dst_ep, TSN=sequence
+                ),
+            )
 
-    async def force_remove(self, device):
+        LOGGER.debug("Received a data request confirmation: %s", response)
+
+        if response.Status != t.Status.Success:
+            return response.Status, "Invalid response status"
+
+        return response.Status, "Request sent successfully"
+
+    async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
         await self._api.request(
             c.ZDOCommands.MgmtLeaveReq(
@@ -418,15 +445,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.Success,
         )
 
-        # TODO: do we wait for a c.ZDOCommands.LeaveInd?
-
-    async def permit_ncp(self, time_s):
+    async def permit_ncp(self, time_s: int) -> None:
         response = await self._api.request_callback_rsp(
             request=c.ZDOCommands.MgmtPermitJoinReq.Req(
                 AddrMode=t.AddrMode.Broadcast,
                 Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
                 Duration=time_s,
-                TCSignificance=0,
+                TCSignificance=0,  # not used in Z-Stack
             ),
             RspStatus=t.Status.Success,
             callback=c.ZDOCommands.MgmtPermitJoinRsp.Callback(partial=True),

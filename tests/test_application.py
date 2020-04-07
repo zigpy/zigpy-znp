@@ -1,8 +1,10 @@
 import asyncio
 import logging
 
-import zigpy_znp.commands as c
+import pytest
+
 import zigpy_znp.types as t
+import zigpy_znp.commands as c
 
 from zigpy_znp.uart import ZnpMtProtocol
 
@@ -40,6 +42,20 @@ class ServerZNP(ZNP):
         # We just respond to pings, nothing more
         self.callback_for_response(c.SysCommands.Ping.Req(), self.ping_replier)
 
+    def reply_once_to(self, request, responses):
+        async def callback():
+            if callback.called:
+                return
+
+            callback.called = True
+
+            for response in responses:
+                await asyncio.sleep(0.1)
+                self.send(response)
+
+        callback.called = False
+        self.callback_for_response(request, lambda _: asyncio.create_task(callback()))
+
     def reply_to(self, request, responses):
         async def callback():
             for response in responses:
@@ -57,8 +73,8 @@ class ServerZNP(ZNP):
         self._uart.send(response.to_frame())
 
 
-@pytest_mark_asyncio_timeout(seconds=5)
-async def test_application_startup(mocker, event_loop):
+@pytest.fixture
+async def znp_client_server(mocker, event_loop):
     server_znp = ServerZNP()
     server_znp._uart = ZnpMtProtocol(server_znp)
     device = "/dev/ttyFAKE0"
@@ -87,6 +103,13 @@ async def test_application_startup(mocker, event_loop):
 
     znp = ZNP()
     await znp.connect(device, baudrate=1234_5678)
+
+    return znp, server_znp
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_application_startup(znp_client_server, event_loop):
+    znp, server_znp = znp_client_server
 
     # Now that we're connected, handle a few requests
     server_znp.reply_to(
@@ -159,3 +182,34 @@ async def test_application_startup(mocker, event_loop):
 
     application = ControllerApplication(znp)
     await application.startup(auto_form=False)
+
+
+@pytest_mark_asyncio_timeout(seconds=1)
+async def test_permit_join(znp_client_server, event_loop):
+    znp, server_znp = znp_client_server
+
+    # Handle the broadcast sent by Zigpy
+    server_znp.reply_once_to(
+        request=c.AFCommands.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AFCommands.DataConfirm.Callback(
+                Status=t.Status.Success, Endpoint=0, TSN=1
+            ),
+        ],
+    )
+
+    # Handle the permit join request sent by us
+    server_znp.reply_once_to(
+        request=c.ZDOCommands.MgmtPermitJoinReq.Req(partial=True),
+        responses=[
+            c.ZDOCommands.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
+            c.ZDOCommands.MgmtPermitJoinRsp.Callback(
+                Src=0x0000, Status=t.Status.Success
+            ),
+        ],
+    )
+
+    application = ControllerApplication(znp)
+
+    await application.permit(time_s=10)
