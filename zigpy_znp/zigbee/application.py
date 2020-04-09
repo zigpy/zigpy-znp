@@ -42,6 +42,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDOCommands.LeaveInd.Callback(partial=True), self.on_device_leave
         )
 
+        self._api.callback_for_response(
+            c.ZDOCommands.SrcRtgInd.Callback(partial=True), self.on_relays_message
+        )
+
+    def on_relays_message(self, msg: c.ZDOCommands.SrcRtgInd.Callback) -> None:
+        LOGGER.info("ZDO device relays: %s", msg)
+        device = self.get_device(nwk=msg.Dst)
+        device.relays = msg.Relays
+
     def on_device_announce(self, msg: c.ZDOCommands.EndDeviceAnnceInd.Callback) -> None:
         LOGGER.info("ZDO device announce: %s", msg)
         self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=0x0000)
