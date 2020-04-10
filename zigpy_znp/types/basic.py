@@ -132,12 +132,7 @@ class TypedListMeta(list):
 
     @classmethod
     def deserialize(cls, data: bytes):
-        assert cls._item_type is not None
-        r = cls()
-        while data:
-            item, data = cls._item_type.deserialize(data)
-            r.append(item)
-        return r, data
+        raise NotImplementedError()  # pragma: no cover
 
 
 class LVList(TypedListMeta):
@@ -146,7 +141,7 @@ class LVList(TypedListMeta):
         cls._item_type = item_type
         cls._header = length_type
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         assert self._item_type is not None
         return self._header(len(self)).serialize() + super().serialize()
 
@@ -167,6 +162,10 @@ class FixedList(TypedListMeta):
         cls._item_type = item_type
         cls._length = length
 
+    def serialize(self) -> bytes:
+        assert len(self) == self._length
+        return super().serialize()
+
     @classmethod
     def deserialize(cls, data):
         assert cls._item_type is not None
@@ -175,10 +174,6 @@ class FixedList(TypedListMeta):
             item, data = cls._item_type.deserialize(data)
             r.append(item)
         return r, data
-
-    def serialize(self):
-        assert len(self) == self._length
-        return super().serialize()
 
 
 class HexRepr:
