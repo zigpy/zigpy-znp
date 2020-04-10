@@ -1,5 +1,6 @@
 import pytest
 import logging
+import keyword
 
 import zigpy_znp.commands as c
 import zigpy_znp.frames as frames
@@ -71,6 +72,8 @@ def test_error_code():
 def _validate_schema(schema):
     for param in schema.parameters:
         assert isinstance(param.name, str)
+        assert param.name.isidentifier()
+        assert not keyword.iskeyword(param.name)
         assert isinstance(param.type, type)
         assert isinstance(param.description, str)
 

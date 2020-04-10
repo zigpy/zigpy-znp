@@ -670,7 +670,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     "LogicalChannel", t.uint8_t, "Channel where the PAN is located"
                 ),
                 t.Param("PanId", t.PanId, "The PAN Id to join."),
-                t.Param("Extended PanId", t.ExtendedPanId, "64-bit extended PAN ID"),
+                t.Param("ExtendedPanId", t.ExtendedPanId, "64-bit extended PAN ID"),
                 t.Param(
                     "ChosenParent",
                     t.NWK,
