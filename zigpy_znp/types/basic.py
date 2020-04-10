@@ -199,8 +199,9 @@ class HexRepr:
 
 
 class EnumIntFlagMixin:
-    # Rebind _missing_ to our own class.
+    # Rebind classmethods to our own class
     _missing_ = classmethod(enum.IntFlag._missing_.__func__)
+    _create_pseudo_member_ = classmethod(enum.IntFlag._create_pseudo_member_.__func__)
 
     __or__ = enum.IntFlag.__or__
     __and__ = enum.IntFlag.__and__
@@ -209,18 +210,6 @@ class EnumIntFlagMixin:
     __rand__ = enum.IntFlag.__rand__
     __rxor__ = enum.IntFlag.__rxor__
     __invert__ = enum.IntFlag.__invert__
-
-    @classmethod
-    def _create_pseudo_member_(cls, value):
-        # Again, _create_pseudo_member_ is bound to enum.IntFlag. Unbind it.
-        pseudo_member = enum.IntFlag._create_pseudo_member_.__func__(cls, value)
-
-        # _create_pseudo_member_'s return type is int, but we want a specific subclass
-        if not isinstance(pseudo_member, cls):
-            pseudo_member = cls(pseudo_member)
-            cls._value2member_map_[value] = pseudo_member
-
-        return pseudo_member
 
 
 class enum_uint8(uint8_t, enum.Enum):
