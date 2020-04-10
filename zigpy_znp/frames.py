@@ -1,4 +1,5 @@
 import attr
+import typing
 import functools
 
 import zigpy_znp.types as t
@@ -50,7 +51,7 @@ class TransportFrame:
     payload: GeneralFrame = attr.ib()
 
     @classmethod
-    def deserialize(cls, data: bytes) -> "TransportFrame":
+    def deserialize(cls, data: bytes) -> typing.Tuple["TransportFrame", bytes]:
         """Deserialize frame."""
         sof, data = t.uint8_t.deserialize(data)
 

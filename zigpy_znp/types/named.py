@@ -140,10 +140,19 @@ class ScanType(basic.enum_uint8):
 
 
 @attr.s(frozen=True)
+class Param:
+    """Parameter."""
+
+    name = attr.ib(converter=str)
+    type = attr.ib()
+    description = attr.ib(default="")
+
+
+@attr.s(frozen=True)
 class Schema:
     """List of Parameters."""
 
-    parameters = attr.ib(factory=tuple, converter=tuple)
+    parameters: typing.Tuple[Param, ...] = attr.ib(factory=tuple, converter=tuple)
 
 
 class MissingEnumMixin:
@@ -185,15 +194,6 @@ class Status(MissingEnumMixin, basic.enum_uint8):
     ZMACNoBeacon = 0xEA
     ZMACTransactionExpired = 0xF0
     MACScanInProgress = 0xFC
-
-
-@attr.s(frozen=True)
-class Param:
-    """Parameter."""
-
-    name = attr.ib(converter=str)
-    type = attr.ib()
-    description = attr.ib(default="")
 
 
 class ResetReason(basic.enum_uint8):

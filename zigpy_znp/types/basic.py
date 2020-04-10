@@ -28,7 +28,7 @@ class int_t(int):
         return self.to_bytes(self._size, "little", signed=self._signed)
 
     @classmethod
-    def deserialize(cls, data: bytes) -> "int_t":
+    def deserialize(cls, data: bytes) -> typing.Tuple["int_t", bytes]:
         if len(data) < cls._size:
             raise ValueError(f"Data is too short to contain {cls._size} bytes")
 
@@ -108,7 +108,7 @@ class uint64_t(uint_t):
 class ShortBytes(Bytes):
     _header = uint8_t
 
-    def serialize(self) -> bytes:
+    def serialize(self) -> "Bytes":
         return self._header(len(self)).serialize() + self
 
     @classmethod
