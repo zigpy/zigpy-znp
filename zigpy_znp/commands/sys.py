@@ -2,22 +2,15 @@
 as reset, read/write memory, read/write extended address…etc.
 """
 
-from zigpy_znp.commands.types import (
-    STATUS_SCHEMA,
-    CommandDef,
-    CommandType,
-    MTCapabilities,
-    CommandsBase,
-    Subsystem,
-)
 import zigpy_znp.types as t
+
 from zigpy_znp.types import nvids
 
 
-class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
+class SysCommands(t.CommandsBase, subsystem=t.Subsystem.SYS):
     # reset the target device
-    ResetReq = CommandDef(
-        CommandType.AREQ,
+    ResetReq = t.CommandDef(
+        t.CommandType.AREQ,
         0x00,
         req_schema=t.Schema(
             (
@@ -40,15 +33,15 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
 
     # issue PING requests to verify if a device is active and check the capability of
     # the device
-    Ping = CommandDef(
-        CommandType.SREQ,
+    Ping = t.CommandDef(
+        t.CommandType.SREQ,
         0x01,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
             (
                 t.Param(
                     "Capabilities",
-                    MTCapabilities,
+                    t.MTCapabilities,
                     "Represents the intefaces this device can handle",
                 ),
             )
@@ -56,8 +49,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # request for the device’s version string
-    Version = CommandDef(
-        CommandType.SREQ,
+    Version = t.CommandDef(
+        t.CommandType.SREQ,
         0x02,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -72,20 +65,20 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # set the extended address of the device
-    SetExtAddr = CommandDef(
-        CommandType.SREQ,
+    SetExtAddr = t.CommandDef(
+        t.CommandType.SREQ,
         0x03,
         req_schema=t.Schema(
             (t.Param("ExtAddr", t.EUI64, "The device's extended address"),)
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # get the extended address of the device
-    GetExtAddr = CommandDef(
-        CommandType.SREQ,
+    GetExtAddr = t.CommandDef(
+        t.CommandType.SREQ,
         0x04,
-        req_schema=STATUS_SCHEMA,
+        req_schema=t.STATUS_SCHEMA,
         rsp_schema=t.Schema(
             (t.Param("ExtAddr", t.EUI64, "The device's extended address"),)
         ),
@@ -93,8 +86,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
 
     # read a single memory location in the target RAM. The command accepts an address
     # value and returns the memory value present in the target RAM at that address
-    RamRead = CommandDef(
-        CommandType.SREQ,
+    RamRead = t.CommandDef(
+        t.CommandType.SREQ,
         0x05,
         req_schema=t.Schema(
             (
@@ -115,8 +108,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     # write to a particular location in the target RAM. The command accepts an
     # address location and a memory value. The memory value is written to the address
     # location in the target RAM
-    RamWrite = CommandDef(
-        CommandType.SREQ,
+    RamWrite = t.CommandDef(
+        t.CommandType.SREQ,
         0x06,
         req_schema=t.Schema(
             (
@@ -124,7 +117,7 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Value", t.ShortBytes, "The value read from memory address"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # create and initialize an item in non-volatile memory. The NV item will be created
@@ -135,8 +128,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     # item (InitLen < ItemLen). It is also possible to create an NV item that is larger
     # than the maximum length InitData – use the SYS_OSAL_NV_WRITE command to finish
     # the initialization
-    OSALNVItemInit = CommandDef(
-        CommandType.SREQ,
+    OSALNVItemInit = t.CommandDef(
+        t.CommandType.SREQ,
         0x07,
         req_schema=t.Schema(
             (
@@ -145,14 +138,14 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Value", t.ShortBytes, "The value of the NV item"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # read a single memory item in the target non-volatile memory. The command accepts
     # an attribute Id value and returns the memory value present in the target for the
     # specified attribute Id
-    OSALNVRead = CommandDef(
-        CommandType.SREQ,
+    OSALNVRead = t.CommandDef(
+        t.CommandType.SREQ,
         0x08,
         req_schema=t.Schema(
             (
@@ -177,8 +170,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     # write to a particular item in non-volatile memory. The command accepts an
     # attribute Id and an attribute value. The attribute value is written to the
     # location specified for the attribute Id in the target
-    OSALNVWrite = CommandDef(
-        CommandType.SREQ,
+    OSALNVWrite = t.CommandDef(
+        t.CommandType.SREQ,
         0x09,
         req_schema=t.Schema(
             (
@@ -191,13 +184,13 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Value", t.ShortBytes, "The value of the NV item"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # delete an item from the non-volatile memory. The ItemLen parameter must match
     # the length of the NV item or the command will fail
-    OSALNVDelete = CommandDef(
-        CommandType.SREQ,
+    OSALNVDelete = t.CommandDef(
+        t.CommandType.SREQ,
         0x12,
         req_schema=t.Schema(
             (
@@ -205,13 +198,13 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # get the length of an item in non-volatile memory. A returned length of zero
     # indicates that the NV item does not exist
-    OSALNVLength = CommandDef(
-        CommandType.SREQ,
+    OSALNVLength = t.CommandDef(
+        t.CommandType.SREQ,
         0x13,
         req_schema=t.Schema((t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),)),
         rsp_schema=t.Schema(
@@ -221,8 +214,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
 
     # start a timer event. The event will expired after the indicated amount of time
     # and a notification will be sent back to the tester
-    OSALStartTimer = CommandDef(
-        CommandType.SREQ,
+    OSALStartTimer = t.CommandDef(
+        t.CommandType.SREQ,
         0x0A,
         req_schema=t.Schema(
             (
@@ -230,30 +223,30 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Timeout", t.uint16_t, "Timer timeout in millliseconds"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # stop a timer event
-    OSALStopTimer = CommandDef(
-        CommandType.SREQ,
+    OSALStopTimer = t.CommandDef(
+        t.CommandType.SREQ,
         0x0B,
         req_schema=t.Schema(
             (t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),)
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     #  get a random 16-bit number
-    Random = CommandDef(
-        CommandType.SREQ,
+    Random = t.CommandDef(
+        t.CommandType.SREQ,
         0x0C,
         req_schema=t.Schema(),
         rsp_schema=t.Schema((t.Param("Value", t.uint16_t, "The random value"),)),
     )
 
     # read a value from the ADC based on specified channel and resolution
-    ADCRead = CommandDef(
-        CommandType.SREQ,
+    ADCRead = t.CommandDef(
+        t.CommandType.SREQ,
         0x0D,
         req_schema=t.Schema(
             (
@@ -269,8 +262,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # control the 4 GPIO pins on the CC2530-ZNP build
-    GPIO = CommandDef(
-        CommandType.SREQ,
+    GPIO = t.CommandDef(
+        t.CommandType.SREQ,
         0x0E,
         req_schema=t.Schema(
             (
@@ -286,8 +279,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # tune intricate or arcane settings at runtime
-    StackTune = CommandDef(
-        CommandType.SREQ,
+    StackTune = t.CommandDef(
+        t.CommandType.SREQ,
         0x0F,
         req_schema=t.Schema(
             (
@@ -307,8 +300,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     # set the target system date and time. The time can be specified in
     # “seconds since 00:00:00 on January 1, 2000”
     # or in parsed date/time components
-    SetTime = CommandDef(
-        CommandType.SREQ,
+    SetTime = t.CommandDef(
+        t.CommandType.SREQ,
         0x10,
         req_schema=t.Schema(
             (
@@ -325,13 +318,13 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Year", t.uint16_t, "Year (2000 -- )"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # get the target system date and time. The time is returned in
     # “seconds since 00:00:00 on January 1, 2000” and parsed date/time components
-    GetTime = CommandDef(
-        CommandType.SREQ,
+    GetTime = t.CommandDef(
+        t.CommandType.SREQ,
         0x11,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -354,8 +347,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     # set the target system radio transmit power. The returned TX power is the actual
     # setting applied to the radio – nearest characterized value for the specific
     # radio
-    SetTxPower = CommandDef(
-        CommandType.SREQ,
+    SetTxPower = t.CommandDef(
+        t.CommandType.SREQ,
         0x14,
         req_schema=t.Schema(
             (t.Param("TXPower", t.uint8_t, "Requested TX power setting, in dBm"),)
@@ -363,18 +356,18 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
         # While the docs say "the returned TX power is the actual setting applied to
         # the radio – nearest characterized value for the specific radio.", the code
         # matches the documentation.
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # initialize the statistics table in NV memory
-    ZDiagsInitStats = CommandDef(
-        CommandType.SREQ, 0x17, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    ZDiagsInitStats = t.CommandDef(
+        t.CommandType.SREQ, 0x17, req_schema=t.Schema(), rsp_schema=t.STATUS_SCHEMA
     )
 
     # clear the statistics table. To clear data in NV (including the Boot
     # Counter) the clearNV flag shall be set to TRUE
-    ZDiagsClearStats = CommandDef(
-        CommandType.SREQ,
+    ZDiagsClearStats = t.CommandDef(
+        t.CommandType.SREQ,
         0x018,
         req_schema=t.Schema(
             (t.Param("ClearNV", t.Bool, "True -- clear statistics in NV memory"),)
@@ -385,8 +378,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # read a specific system (attribute) ID statistics and/or metrics value
-    ZDiagsGetStats = CommandDef(
-        CommandType.SREQ,
+    ZDiagsGetStats = t.CommandDef(
+        t.CommandType.SREQ,
         0x19,
         req_schema=t.Schema(
             # as defined in ZDiags.h
@@ -398,13 +391,13 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # restore the statistics table from NV into the RAM table
-    ZDiagsRestoreStatsNV = CommandDef(
-        CommandType.SREQ, 0x1A, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    ZDiagsRestoreStatsNV = t.CommandDef(
+        t.CommandType.SREQ, 0x1A, req_schema=t.Schema(), rsp_schema=t.STATUS_SCHEMA
     )
 
     # save the statistics table from RAM to NV
-    ZDiagsSaveStatsToNV = CommandDef(
-        CommandType.SREQ,
+    ZDiagsSaveStatsToNV = t.CommandDef(
+        t.CommandType.SREQ,
         0x1B,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -413,8 +406,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # attempt to create an item in non-volatile memory
-    NVCreate = CommandDef(
-        CommandType.SREQ,
+    NVCreate = t.CommandDef(
+        t.CommandType.SREQ,
         0x30,
         req_schema=t.Schema(
             (
@@ -424,12 +417,12 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Length", t.uint32_t, "Number of bytes in the NV item"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # attempt to delete an item in non-volatile memory
-    NVDelete = CommandDef(
-        CommandType.SREQ,
+    NVDelete = t.CommandDef(
+        t.CommandType.SREQ,
         0x31,
         req_schema=t.Schema(
             (
@@ -438,12 +431,12 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # get the length of an item in non-volatile memory
-    NVLength = CommandDef(
-        CommandType.SREQ,
+    NVLength = t.CommandDef(
+        t.CommandType.SREQ,
         0x32,
         req_schema=t.Schema(
             (
@@ -456,8 +449,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # read an item in non-volatile memory
-    NVRead = CommandDef(
-        CommandType.SREQ,
+    NVRead = t.CommandDef(
+        t.CommandType.SREQ,
         0x33,
         req_schema=t.Schema(
             (
@@ -483,8 +476,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # write an item in non-volatile memory
-    NVWrite = CommandDef(
-        CommandType.SREQ,
+    NVWrite = t.CommandDef(
+        t.CommandType.SREQ,
         0x34,
         req_schema=t.Schema(
             (
@@ -501,12 +494,12 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Value", t.ShortBytes, "Value of the NV item to write"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # update an item in non-volatile memory
-    NVUpdate = CommandDef(
-        CommandType.SREQ,
+    NVUpdate = t.CommandDef(
+        t.CommandType.SREQ,
         0x35,
         req_schema=t.Schema(
             (
@@ -516,12 +509,12 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 t.Param("Value", t.ShortBytes, "Value of the NV item to update"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # compact the active page in non-volatile memory
-    NVCompact = CommandDef(
-        CommandType.SREQ,
+    NVCompact = t.CommandDef(
+        t.CommandType.SREQ,
         0x36,
         req_schema=t.Schema(
             (
@@ -532,13 +525,13 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # MT SYS Callbacks
     # This command is sent by the device to indicate the reset
-    ResetInd = CommandDef(
-        CommandType.AREQ,
+    ResetInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x80,
         rsp_schema=t.Schema(
             (
@@ -553,8 +546,8 @@ class SysCommands(CommandsBase, subsystem=Subsystem.SYS):
     )
 
     # This command is sent by the device to indicate a specific time has been expired
-    OSALTimerExpired = CommandDef(
-        CommandType.AREQ,
+    OSALTimerExpired = t.CommandDef(
+        t.CommandType.AREQ,
         0x81,
         rsp_schema=t.Schema(
             (t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),)

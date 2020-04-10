@@ -67,7 +67,7 @@ class ServerZNP(ZNP):
     def ping_replier(self, request):
         # XXX: what in the world is this received MTCapabilities value?
         # It does not match up at all to the TI codebase
-        self.send(c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities(1625)))
+        self.send(c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
 
     def send(self, response):
         self._uart.send(response.to_frame())
@@ -133,7 +133,7 @@ async def test_application_startup(znp_client_server, event_loop):
                 State=c.zdo.StartupState.RestoredNetworkState
             ),
             c.ZDOCommands.StateChangeInd.Callback(
-                State=c.util.DeviceState.StartedAsCoordinator
+                State=t.DeviceState.StartedAsCoordinator
             ),
         ],
     )

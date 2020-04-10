@@ -7,8 +7,10 @@ from zigpy.types import (  # noqa: F401
     ExtendedPanId,
     PanId,
     Channels,
+    KeyData,
 )
 
 from .basic import *  # noqa: F401, F403
 from .named import *  # noqa: F401, F403
 from .struct import *  # noqa: F401, F403
+from .commands import *  # noqa: F401, F403

@@ -13,12 +13,12 @@ def test_command_header():
     """Test CommandHeader class."""
     data = b"\x61\x02"
     extra = b"the rest of data\xaa\x55"
-    r, rest = c.CommandHeader.deserialize(data + extra)
+    r, rest = t.CommandHeader.deserialize(data + extra)
     assert rest == extra
     assert r.cmd0 == 0x61
     assert r.id == 0x02
 
-    r = c.CommandHeader(0x0261)
+    r = t.CommandHeader(0x0261)
     assert r.cmd0 == 0x61
     assert r.id == 0x02
 
@@ -34,9 +34,9 @@ def test_command_header():
 def test_command_setters():
     """Test setters"""
     # the setter order should not matter
-    command = c.CommandHeader(0xFFFF)
-    for cmd_type in c.CommandType:
-        for subsys in c.Subsystem:
+    command = t.CommandHeader(0xFFFF)
+    for cmd_type in t.CommandType:
+        for subsys in t.Subsystem:
             # There's probably no need to iterate over all 256 possible values
             for cmd_id in (0x00, 0xFF, 0x10, 0x01, 0xF0, 0x0F, 0x22, 0xEE):
                 perms = [
@@ -46,7 +46,7 @@ def test_command_setters():
                     command.with_subsystem(subsys).with_type(cmd_type).with_id(cmd_id),
                     command.with_subsystem(subsys).with_id(cmd_id).with_type(cmd_type),
                     command.with_id(cmd_id).with_subsystem(subsys).with_type(cmd_type),
-                    c.CommandHeader(0xFFFF, id=cmd_id, subsystem=subsys, type=cmd_type),
+                    t.CommandHeader(0xFFFF, id=cmd_id, subsystem=subsys, type=cmd_type),
                 ]
 
                 assert len(set(perms)) == 1
@@ -59,12 +59,12 @@ def test_error_code():
     data = b"\x03"
     extra = b"the rest of the owl\x00\xff"
 
-    r, rest = c.ErrorCode.deserialize(data + extra)
+    r, rest = t.ErrorCode.deserialize(data + extra)
     assert rest == extra
     assert r == 0x03
     assert r.name == "INVALID_PARAMETER"
 
-    r, rest = c.ErrorCode.deserialize(b"\xaa" + extra)
+    r, rest = t.ErrorCode.deserialize(b"\xaa" + extra)
     assert rest == extra
     assert r.name == "unknown_0xAA"
 
@@ -83,16 +83,16 @@ def test_commands_schema():
 
     for commands in c.ALL_COMMANDS:
         for cmd in commands:
-            if cmd.type == c.CommandType.SREQ:
+            if cmd.type == t.CommandType.SREQ:
                 assert cmd.type == cmd.Req.header.type
-                assert cmd.Rsp.header.type == c.CommandType.SRSP
+                assert cmd.Rsp.header.type == t.CommandType.SRSP
                 assert (
                     cmd.subsystem
                     == cmd.Req.header.subsystem
                     == cmd.Rsp.header.subsystem
                 )
-                assert isinstance(cmd.Req.header, c.CommandHeader)
-                assert isinstance(cmd.Rsp.header, c.CommandHeader)
+                assert isinstance(cmd.Req.header, t.CommandHeader)
+                assert isinstance(cmd.Rsp.header, t.CommandHeader)
 
                 assert cmd.Req.Rsp is cmd.Rsp
                 assert cmd.Rsp.Req is cmd.Req
@@ -103,7 +103,7 @@ def test_commands_schema():
 
                 commands_by_id[cmd.Req.header].append(cmd.Req)
                 commands_by_id[cmd.Rsp.header].append(cmd.Rsp)
-            elif cmd.type == c.CommandType.AREQ:
+            elif cmd.type == t.CommandType.AREQ:
                 # we call the AREQ Rsp a Callback
                 assert cmd.Rsp is None
 
@@ -113,7 +113,7 @@ def test_commands_schema():
                 if cmd.Callback is not None:
                     assert cmd.type == cmd.Callback.header.type
                     assert cmd.subsystem == cmd.Callback.header.subsystem
-                    assert isinstance(cmd.Callback.header, c.CommandHeader)
+                    assert isinstance(cmd.Callback.header, t.CommandHeader)
 
                     _validate_schema(cmd.Callback.schema)
 
@@ -121,23 +121,23 @@ def test_commands_schema():
                 elif cmd.Req is not None:
                     assert cmd.type == cmd.Req.header.type
                     assert cmd.subsystem == cmd.Req.header.subsystem
-                    assert isinstance(cmd.Req.header, c.CommandHeader)
+                    assert isinstance(cmd.Req.header, t.CommandHeader)
 
                     _validate_schema(cmd.Req.schema)
 
                     commands_by_id[cmd.Req.header].append(cmd.Req)
                 else:
                     assert False, "Command is empty"
-            elif cmd.type == c.CommandType.SRSP:
+            elif cmd.type == t.CommandType.SRSP:
                 # The one command like this is RPCError
                 assert cmd is c.RPCErrorCommands.CommandNotRecognized
 
                 assert cmd.type == cmd.Rsp.header.type
                 assert cmd.Req is None
                 assert cmd.Callback is None
-                assert cmd.Rsp.header.type == c.CommandType.SRSP
+                assert cmd.Rsp.header.type == t.CommandType.SRSP
                 assert cmd.subsystem == cmd.Rsp.header.subsystem
-                assert isinstance(cmd.Rsp.header, c.CommandHeader)
+                assert isinstance(cmd.Rsp.header, t.CommandHeader)
 
                 _validate_schema(cmd.Rsp.schema)
 
@@ -162,11 +162,11 @@ def test_command_param_binding():
         c.SysCommands.Ping.Rsp(asd=123)
 
     # Valid param name
-    c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
+    c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
 
     # Too many params, one valid
     with pytest.raises(KeyError):
-        c.SysCommands.Ping.Rsp(foo="asd", Capabilities=c.types.MTCapabilities.CAP_SYS)
+        c.SysCommands.Ping.Rsp(foo="asd", Capabilities=t.MTCapabilities.CAP_SYS)
 
     # Not enough params
     with pytest.raises(KeyError):
@@ -189,14 +189,14 @@ def test_command_param_binding():
         c.UtilCommands.TimeAlive.Rsp(Seconds=10 ** 20)
 
     # Integers will not be coerced to enums
-    assert c.types.MTCapabilities.CAP_SYS == 0x0001
+    assert t.MTCapabilities.CAP_SYS == 0x0001
 
     with pytest.raises(ValueError):
         c.SysCommands.Ping.Rsp(Capabilities=0x0001)
 
     # Parameters can be looked up by name
-    ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=c.types.MTCapabilities.CAP_SYS)
-    assert ping_rsp.Capabilities == c.types.MTCapabilities.CAP_SYS
+    ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    assert ping_rsp.Capabilities == t.MTCapabilities.CAP_SYS
 
     # Invalid ones cannot
     with pytest.raises(AttributeError):
@@ -358,7 +358,7 @@ def test_command_deserialization(caplog):
 def test_command_not_recognized():
     command = c.RPCErrorCommands.CommandNotRecognized.Rsp(
         ErrorCode=c.rpc_error.ErrorCode.InvalidSubsystem,
-        RequestHeader=c.types.CommandHeader(0xABCD),
+        RequestHeader=t.CommandHeader(0xABCD),
     )
 
     transport_frame = frames.TransportFrame(command.to_frame())

@@ -1,10 +1,3 @@
-from zigpy_znp.commands.types import (
-    CommandDef,
-    CommandType,
-    CommandsBase,
-    Subsystem,
-    CommandHeader,
-)
 import zigpy_znp.types as t
 
 
@@ -15,11 +8,11 @@ class ErrorCode(t.enum_uint8):
     InvalidLength = 0x04
 
 
-class RPCErrorCommands(CommandsBase, subsystem=Subsystem.RPCError):
+class RPCErrorCommands(t.CommandsBase, subsystem=t.Subsystem.RPCError):
     # When the ZNP cannot recognize an SREQ command from the host processor,
     # the following SRSP is returned
-    CommandNotRecognized = CommandDef(
-        CommandType.SRSP,
+    CommandNotRecognized = t.CommandDef(
+        t.CommandType.SRSP,
         0x00,
         req_schema=None,  # XXX: There is no REQ, only a RSP
         rsp_schema=t.Schema(
@@ -30,7 +23,7 @@ class RPCErrorCommands(CommandsBase, subsystem=Subsystem.RPCError):
                     "The error code maps to one of the following enumerated values.",
                 ),
                 t.Param(
-                    "RequestHeader", CommandHeader, "Header of the invalid request"
+                    "RequestHeader", t.CommandHeader, "Header of the invalid request"
                 ),
             )
         ),

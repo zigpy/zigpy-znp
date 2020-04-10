@@ -1,15 +1,16 @@
 import enum
+import typing
 
 
 class Bytes(bytes):
-    def serialize(self):
+    def serialize(self) -> "Bytes":
         return self
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: bytes) -> typing.Tuple["Bytes", bytes]:
         return cls(data), b""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         # Reading byte sequences like \x200\x21 is extremely annoying
         # compared to \x20\x30\x21
         escaped = "".join(f"\\x{b:02X}" for b in self)
@@ -23,11 +24,11 @@ class int_t(int):
     _signed = True
     _size = None
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         return self.to_bytes(self._size, "little", signed=self._signed)
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: bytes) -> "int_t":
         if len(data) < cls._size:
             raise ValueError(f"Data is too short to contain {cls._size} bytes")
 
@@ -107,11 +108,11 @@ class uint64_t(uint_t):
 class ShortBytes(Bytes):
     _header = uint8_t
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         return self._header(len(self)).serialize() + self
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: bytes) -> typing.Tuple[Bytes, bytes]:
         length, data = cls._header.deserialize(data)
         if length > len(data):
             raise ValueError(f"Data is too short to contain {length} bytes of data")
@@ -136,7 +137,7 @@ class TypedListMeta(list):
 
 
 class LVList(TypedListMeta):
-    def __init_subclass__(cls, *, item_type, length_type):
+    def __init_subclass__(cls, *, item_type, length_type) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
         cls._header = length_type
@@ -146,7 +147,7 @@ class LVList(TypedListMeta):
         return self._header(len(self)).serialize() + super().serialize()
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: bytes):
         assert cls._item_type is not None
         length, data = cls._header.deserialize(data)
         r = cls()
@@ -157,7 +158,7 @@ class LVList(TypedListMeta):
 
 
 class FixedList(TypedListMeta):
-    def __init_subclass__(cls, *, item_type, length):
+    def __init_subclass__(cls, *, item_type, length) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
         cls._length = length

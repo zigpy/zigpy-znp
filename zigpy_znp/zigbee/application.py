@@ -16,7 +16,6 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
 from zigpy_znp.types.nvids import NwkNvIds
-from zigpy_znp.commands.types import DeviceState
 
 
 DATA_CONFIRM_TIMEOUT = 5  # seconds
@@ -96,7 +95,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._api.wait_for_response(
             c.ZDOCommands.StateChangeInd.Callback(
-                State=DeviceState.StartedAsCoordinator
+                State=t.DeviceState.StartedAsCoordinator
             )
         )
 
@@ -187,8 +186,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         channel: Optional[t.uint8_t] = None,
         channels: Optional[t.Channels] = None,
         pan_id: Optional[t.PanId] = None,
-        extended_pan_id: Optional[zigpy.types.ExtendedPanId] = None,
-        network_key: Optional[zigpy.types.KeyData] = None,
+        extended_pan_id: Optional[t.ExtendedPanId] = None,
+        network_key: Optional[t.KeyData] = None,
         reset: bool = True,
     ):
         if channel is None:
@@ -272,7 +271,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             extended_pan_id=ExtendedPanId(
                 os.urandom(8) if extended_pan_id is None else extended_pan_id
             ),
-            network_key=zigpy.types.KeyData(os.urandom(16)),
+            network_key=t.KeyData(os.urandom(16)),
             reset=False,
         )
 
@@ -289,7 +288,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # This may take a while because of some sort of background scanning.
         # This can probably be disabled.
         await self._api.wait_for_response(
-            c.ZDOCommands.StateChangeInd.Rsp(State=DeviceState.StartedAsCoordinator)
+            c.ZDOCommands.StateChangeInd.Rsp(State=t.DeviceState.StartedAsCoordinator)
         )
 
         await self._api.request(

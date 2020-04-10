@@ -1,10 +1,3 @@
-from zigpy_znp.commands.types import (
-    STATUS_SCHEMA,
-    CommandDef,
-    CommandType,
-    CommandsBase,
-    Subsystem,
-)
 import zigpy_znp.types as t
 
 
@@ -12,10 +5,10 @@ class AttributeValue(t.FixedList, item_type=t.uint8_t, length=16):
     pass
 
 
-class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
+class MacCommands(t.CommandsBase, subsystem=t.Subsystem.MAC):
     # MAC Reset command to reset MAC state machine
-    ResetReq = CommandDef(
-        CommandType.SREQ,
+    ResetReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x01,
         req_schema=t.Schema(
             (
@@ -26,17 +19,17 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # initialize the MAC
-    Init = CommandDef(
-        CommandType.SREQ, 0x02, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    Init = t.CommandDef(
+        t.CommandType.SREQ, 0x02, req_schema=t.Schema(), rsp_schema=t.STATUS_SCHEMA
     )
 
     # start the MAC as a coordinator or end device
-    StartReq = CommandDef(
-        CommandType.SREQ,
+    StartReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x03,
         req_schema=t.Schema(
             (
@@ -104,12 +97,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("BeaconKeyIndex", t.uint8_t, "Key index of this data frame"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # request synchronization to the current network beacon
-    SyncReq = CommandDef(
-        CommandType.SREQ,
+    SyncReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x04,
         req_schema=t.Schema(
             (
@@ -126,12 +119,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # send (on behalf of the next higher layer) MAC Data Frame packet
-    DataReq = CommandDef(
-        CommandType.SREQ,
+    DataReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x05,
         req_schema=t.Schema(
             (
@@ -162,12 +155,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("MSDU", t.ShortBytes, "Actual data that will be sent"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # request (on behalf of the next higher layer) an association with a coordinator
-    AssociateReq = CommandDef(
-        CommandType.SREQ,
+    AssociateReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x06,
         req_schema=t.Schema(
             (
@@ -191,12 +184,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # This command is sent by the host to response to the MAC_ASSOCIATE_IND
-    AssociateRsp = CommandDef(
-        CommandType.SREQ,
+    AssociateRsp = t.CommandDef(
+        t.CommandType.SREQ,
         0x50,
         req_schema=t.Schema(
             (
@@ -210,13 +203,13 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("AssocStatus", t.uint8_t, "Status of the associaiton"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     #  request (on behalf of the next higher layer) a disassociation of the device
     #  from the coordinator
-    DisAssociateReq = CommandDef(
-        CommandType.SREQ,
+    DisAssociateReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x07,
         req_schema=t.Schema(
             (
@@ -239,12 +232,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # read (on behalf of the next higher layer) a MAC PIB attribute
-    GetReq = CommandDef(
-        CommandType.SREQ,
+    GetReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x08,
         req_schema=t.Schema(
             (
@@ -263,8 +256,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # request the device to write a MAC PIB value
-    SetReq = CommandDef(
-        CommandType.SREQ,
+    SetReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x09,
         req_schema=t.Schema(
             (
@@ -273,12 +266,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("Value", AttributeValue, "Value of the attribute"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # send a request to the device to perform a network scan
-    ScanReq = CommandDef(
-        CommandType.SREQ,
+    ScanReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x0C,
         req_schema=t.Schema(
             (
@@ -303,12 +296,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # This command is sent by the host to response to the ORPHAN_IND
-    OrphanRsp = CommandDef(
-        CommandType.SREQ,
+    OrphanRsp = t.CommandDef(
+        t.CommandType.SREQ,
         0x51,
         req_schema=t.Schema(
             (
@@ -325,12 +318,12 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # send a MAC data request poll
-    PollReq = CommandDef(
-        CommandType.SREQ,
+    PollReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x0D,
         req_schema=t.Schema(
             (
@@ -350,31 +343,31 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # send a request to the device to purge a data frame
-    PurgeReq = CommandDef(
-        CommandType.SREQ,
+    PurgeReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x0E,
         req_schema=t.Schema((t.Param("MsduHandle", t.uint8_t, "MSDU handle"),)),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # send a request to the device to set Rx gain
-    SetRxGainReq = CommandDef(
-        CommandType.SREQ,
+    SetRxGainReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x0F,
         req_schema=t.Schema((t.Param("Mode", t.Bool, "PA/PNA mode – True/False"),)),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # MAC Callbacks
 
     # send (on behalf of the next higher layer) an indication of the synchronization
     # loss
-    SyncLossInd = CommandDef(
-        CommandType.AREQ,
+    SyncLossInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x80,
         rsp_schema=t.Schema(
             (
@@ -401,8 +394,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) an association indication message
-    AssociateInd = CommandDef(
-        CommandType.AREQ,
+    AssociateInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x81,
         rsp_schema=t.Schema(
             (
@@ -423,8 +416,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) an association confirmation message
-    AssociateCnf = CommandDef(
-        CommandType.AREQ,
+    AssociateCnf = t.CommandDef(
+        t.CommandType.AREQ,
         0x82,
         rsp_schema=t.Schema(
             (
@@ -445,8 +438,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC beacon notify indication
-    BeaconNotifyInd = CommandDef(
-        CommandType.AREQ,
+    BeaconNotifyInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x83,
         rsp_schema=t.Schema(
             (
@@ -487,8 +480,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC data confirmation
-    DataCnf = CommandDef(
-        CommandType.AREQ,
+    DataCnf = t.CommandDef(
+        t.CommandType.AREQ,
         0x84,
         rsp_schema=t.Schema(
             (
@@ -503,8 +496,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC data indication
-    DataInd = CommandDef(
-        CommandType.AREQ,
+    DataInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x85,
         rsp_schema=t.Schema(
             (
@@ -532,8 +525,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC disassociation indication
-    DisassociateReq = CommandDef(
-        CommandType.AREQ,
+    DisassociateReq = t.CommandDef(
+        t.CommandType.AREQ,
         0x86,
         rsp_schema=t.Schema(
             (
@@ -555,8 +548,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC disassociate confirm
-    DisassociateCnf = CommandDef(
-        CommandType.AREQ,
+    DisassociateCnf = t.CommandDef(
+        t.CommandType.AREQ,
         0x87,
         rsp_schema=t.Schema(
             (
@@ -574,8 +567,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC orphan indication
-    OrphanInd = CommandDef(
-        CommandType.AREQ,
+    OrphanInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x8A,
         rsp_schema=t.Schema(
             (
@@ -593,15 +586,15 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC poll confirmation
-    PollCnf = CommandDef(CommandType.AREQ, 0x8B, rsp_schema=STATUS_SCHEMA)
+    PollCnf = t.CommandDef(t.CommandType.AREQ, 0x8B, rsp_schema=t.STATUS_SCHEMA)
 
     # TODO: investigate the actual structure of this command. The source code indicates
     #       that the response type differs heavily based on the ScanType.
     #       Also, ResultListMaxLength does not appear to be present.
     """
     # send (on behalf of the next higher layer) a MAC scan confirmation
-    ScanCnf = CommandDef(
-        CommandType.AREQ,
+    ScanCnf = t.CommandDef(
+        t.CommandType.AREQ,
         0x8C,
         rsp_schema=t.Schema(
             (
@@ -631,8 +624,8 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     """
 
     # send (on behalf of the next higher layer) a MAC communication indicator
-    CommStatusInd = CommandDef(
-        CommandType.AREQ,
+    CommStatusInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x8D,
         rsp_schema=t.Schema(
             (
@@ -658,14 +651,14 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     )
 
     # send (on behalf of the next higher layer) a MAC start confirmation
-    StartCnf = CommandDef(CommandType.AREQ, 0x8E, rsp_schema=STATUS_SCHEMA)
+    StartCnf = t.CommandDef(t.CommandType.AREQ, 0x8E, rsp_schema=t.STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC Rx enable confirmation
-    RxEnableCnf = CommandDef(CommandType.AREQ, 0x8F, rsp_schema=STATUS_SCHEMA)
+    RxEnableCnf = t.CommandDef(t.CommandType.AREQ, 0x8F, rsp_schema=t.STATUS_SCHEMA)
 
     # send (on behalf of the next higher layer) a MAC purge confirmation
-    PurgeCnf = CommandDef(
-        CommandType.AREQ,
+    PurgeCnf = t.CommandDef(
+        t.CommandType.AREQ,
         0x9A,
         rsp_schema=t.Schema(
             (

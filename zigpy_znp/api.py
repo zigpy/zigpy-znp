@@ -14,7 +14,6 @@ from zigpy_znp.types import nvids
 
 from zigpy_znp import uart
 from zigpy_znp.commands import SysCommands, RPCErrorCommands
-from zigpy_znp.commands.types import CommandBase
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
@@ -52,7 +51,7 @@ def _deduplicate_commands(commands):
 
 @attr.s(frozen=True)
 class BaseResponseListener:
-    matching_commands: typing.Tuple[CommandBase] = attr.ib(
+    matching_commands: typing.Tuple[t.CommandBase] = attr.ib(
         converter=_deduplicate_commands
     )
 
@@ -64,7 +63,7 @@ class BaseResponseListener:
     def matching_headers(self):
         return {response.header for response in self.matching_commands}
 
-    def resolve(self, response: CommandBase) -> bool:
+    def resolve(self, response: t.CommandBase) -> bool:
         if not any(c.matches(response) for c in self.matching_commands):
             return False
 
@@ -73,7 +72,7 @@ class BaseResponseListener:
 
         return True
 
-    def _resolve(self, response: CommandBase) -> bool:
+    def _resolve(self, response: t.CommandBase) -> bool:
         """
         Implemented by subclasses to handle matched commands.
 
@@ -97,7 +96,7 @@ class OneShotResponseListener(BaseResponseListener):
         default=attr.Factory(lambda: asyncio.get_running_loop().create_future())
     )
 
-    def _resolve(self, response: CommandBase) -> bool:
+    def _resolve(self, response: t.CommandBase) -> bool:
         if self.future.done():
             # This happens if the UART receives multiple packets during the same
             # event loop step and all of them match this listener. Our Future's
@@ -118,9 +117,9 @@ class OneShotResponseListener(BaseResponseListener):
 
 @attr.s(frozen=True)
 class CallbackResponseListener(BaseResponseListener):
-    callback: typing.Callable[[CommandBase], typing.Any] = attr.ib()
+    callback: typing.Callable[[t.CommandBase], typing.Any] = attr.ib()
 
-    def _resolve(self, response: CommandBase) -> bool:
+    def _resolve(self, response: t.CommandBase) -> bool:
         try:
             result = self.callback(response)
 
@@ -305,9 +304,7 @@ class ZNP:
 
         return listener.future
 
-    def wait_for_response(
-        self, response: zigpy_znp.commands.types.CommandBase
-    ) -> asyncio.Future:
+    def wait_for_response(self, response: t.CommandBase) -> asyncio.Future:
         return self.wait_for_responses([response])
 
     async def request(self, request, **response_params):

@@ -1,11 +1,3 @@
-from zigpy_znp.commands.types import (
-    STATUS_SCHEMA,
-    CommandDef,
-    CommandType,
-    InterPanCommand,
-    CommandsBase,
-    Subsystem,
-)
 import zigpy_znp.types as t
 
 
@@ -29,10 +21,10 @@ class LatencyReq(t.enum_uint8):
     SlowBeacons = 0x02
 
 
-class AFCommands(CommandsBase, subsystem=Subsystem.AF):
+class AFCommands(t.CommandsBase, subsystem=t.Subsystem.AF):
     # This command enables the tester to register an application’s endpoint description
-    Register = CommandDef(
-        CommandType.SREQ,
+    Register = t.CommandDef(
+        t.CommandType.SREQ,
         0x00,
         req_schema=t.Schema(
             (
@@ -53,12 +45,12 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("OutputClusters", t.ClusterIdList, "Output cluster list"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # This command is used by the tester to build and send a message through AF layer
-    DataRequest = CommandDef(
-        CommandType.SREQ,
+    DataRequest = t.CommandDef(
+        t.CommandType.SREQ,
         0x01,
         req_schema=t.Schema(
             (
@@ -85,13 +77,13 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("Data", t.ShortBytes, "Data request"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # This extended form of the AF_DATA_REQUEST must be used to send an
     # inter-pan message
-    DataRequestExt = CommandDef(
-        CommandType.SREQ,
+    DataRequestExt = t.CommandDef(
+        t.CommandType.SREQ,
         0x02,
         req_schema=t.Schema(
             (
@@ -130,13 +122,13 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("Data", t.LongBytes, "Data request"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # This command is used by the tester to build and send a message through AF layer
     # using source routing
-    DataRequestSrcRtg = CommandDef(
-        CommandType.SREQ,
+    DataRequestSrcRtg = t.CommandDef(
+        t.CommandType.SREQ,
         0x03,
         req_schema=t.Schema(
             (
@@ -164,28 +156,28 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("Data", t.ShortBytes, "Data request"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # XXX: UNDOCUMENTED
-    Delete = CommandDef(
-        CommandType.SREQ,
+    Delete = t.CommandDef(
+        t.CommandType.SREQ,
         0x04,
         req_schema=t.Schema(
             (t.Param("Endpoint", t.uint8_t, "Application Endpoint to delete"),)
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # Inter-Pan control command and data
-    InterPanCtl = CommandDef(
-        CommandType.SREQ,
+    InterPanCtl = t.CommandDef(
+        t.CommandType.SREQ,
         0x10,
         req_schema=t.Schema(
             (
                 t.Param(
                     "Command",
-                    InterPanCommand,
+                    t.InterPanCommand,
                     (
                         "0x00 InterPanClr Proxy call to StubAPS_SetIntraPanChannel() to"
                         " switch channel back to the NIB-specified channel. "
@@ -201,12 +193,12 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("Data", t.Bytes, "Data"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # Huge AF data request data buffer store command and data
-    DataStore = CommandDef(
-        CommandType.SREQ,
+    DataStore = t.CommandDef(
+        t.CommandType.SREQ,
         0x11,
         req_schema=t.Schema(
             (
@@ -221,12 +213,12 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("Data", t.ShortBytes, "Data"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # Huge AF incoming message data buffer retrieve command
-    DataRetrieve = CommandDef(
-        CommandType.SREQ,
+    DataRetrieve = t.CommandDef(
+        t.CommandType.SREQ,
         0x12,
         req_schema=t.Schema(
             (
@@ -260,8 +252,8 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     )
 
     # proxy for afAPSF_ConfigSet()
-    APSFConfigSet = CommandDef(
-        CommandType.SREQ,
+    APSFConfigSet = t.CommandDef(
+        t.CommandType.SREQ,
         0x13,
         req_schema=t.Schema(
             (
@@ -276,13 +268,13 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                 t.Param("WindowSize", t.uint8_t, "APS Fragmentation window size"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # AF Callbacks
     # This command is sent by the device to the user after it receives a data request
-    DataConfirm = CommandDef(
-        CommandType.AREQ,
+    DataConfirm = t.CommandDef(
+        t.CommandType.AREQ,
         0x80,
         rsp_schema=t.Schema(
             (
@@ -297,8 +289,8 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
 
     # This callback message is in response to incoming data to any of the registered
     # endpoints on this device
-    IncomingMsg = CommandDef(
-        CommandType.AREQ,
+    IncomingMsg = t.CommandDef(
+        t.CommandType.AREQ,
         0x81,
         rsp_schema=t.Schema(
             (
@@ -329,8 +321,8 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
     # This callback message is in response to incoming data to any of the registered
     # endpoints on this device when the code is compiled with the INTER_PAN
     # flag defined
-    IncomingMsgExt = CommandDef(
-        CommandType.AREQ,
+    IncomingMsgExt = t.CommandDef(
+        t.CommandType.AREQ,
         0x82,
         rsp_schema=t.Schema(
             (
@@ -358,8 +350,8 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
 
     # sent by the device to the user when it determines that an error occurred during
     # a reflected message
-    ReflectError = CommandDef(
-        CommandType.AREQ,
+    ReflectError = t.CommandDef(
+        t.CommandType.AREQ,
         0x83,
         rsp_schema=t.Schema(
             (

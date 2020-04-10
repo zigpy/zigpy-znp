@@ -103,7 +103,9 @@ class CallbackSubsystem(t.enum_uint16):
 class CommandHeader(t.uint16_t):
     """CommandHeader class."""
 
-    def __new__(cls, value=0x0000, *, id=None, subsystem=None, type=None):
+    def __new__(
+        cls, value: int = 0x0000, *, id=None, subsystem=None, type=None
+    ) -> "CommandHeader":
         instance = super().__new__(cls, value)
 
         if id is not None:
@@ -146,7 +148,7 @@ class CommandHeader(t.uint16_t):
     def with_type(self, value) -> "CommandHeader":
         return type(self)(self & 0xFF1F | (value & 0x07) << 5)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"{type(self).__name__}("
             f"id=0x{self.id:02X}, "
@@ -175,7 +177,7 @@ class CommandsMeta(type):
     Metaclass that creates `Command` subclasses out of the `CommandDef` definitions
     """
 
-    def __new__(cls, name, bases, classdict, *, subsystem):
+    def __new__(cls, name: str, bases, classdict, *, subsystem):
         # Ignore CommandsBase
         if not bases:
             return type.__new__(cls, name, bases, classdict)

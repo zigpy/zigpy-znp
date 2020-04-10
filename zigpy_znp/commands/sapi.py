@@ -1,29 +1,22 @@
 """This interface allows tester to interact with the simple API interface."""
 
-from zigpy_znp.commands.types import (
-    STATUS_SCHEMA,
-    CommandDef,
-    CommandType,
-    CommandsBase,
-    Subsystem,
-)
 import zigpy_znp.types as t
 
 
-class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
+class SAPICommands(t.CommandsBase, subsystem=t.Subsystem.SAPI):
     # reset the device by using a soft reset (i.e. a jump to the reset vector) vice a
     # hardware reset (i.e. watchdog reset.)
-    ZBSystemReset = CommandDef(CommandType.AREQ, 0x09, req_schema=t.Schema())
+    ZBSystemReset = t.CommandDef(t.CommandType.AREQ, 0x09, req_schema=t.Schema())
 
     # start the ZigBee stack
-    ZBStartReq = CommandDef(
-        CommandType.SREQ, 0x00, req_schema=t.Schema(), rsp_schema=t.Schema()
+    ZBStartReq = t.CommandDef(
+        t.CommandType.SREQ, 0x00, req_schema=t.Schema(), rsp_schema=t.Schema()
     )
 
     # control the joining permissions and thus allows or disallows new devices
     # from joining the network
-    ZBPermitJoiningReq = CommandDef(
-        CommandType.SREQ,
+    ZBPermitJoiningReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x08,
         req_schema=t.Schema(
             (
@@ -42,14 +35,14 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # establishes or removes a ‘binding’ between two devices. Once bound, an
     # application can send messages to a device by referencing the commandId
     # for the binding
-    ZBBindDevice = CommandDef(
-        CommandType.SREQ,
+    ZBBindDevice = t.CommandDef(
+        t.CommandType.SREQ,
         0x01,
         req_schema=t.Schema(
             (
@@ -64,8 +57,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     # puts the device into the Allow Binding Mode for a given period of time. A peer
     # device can establish a binding to a device in the Allow Binding Mode by calling
     # zb_BindDevice with a destination address of NULL
-    ZBAllowBind = CommandDef(
-        CommandType.SREQ,
+    ZBAllowBind = t.CommandDef(
+        t.CommandType.SREQ,
         0x02,
         req_schema=t.Schema(
             (
@@ -80,8 +73,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     )
 
     # initiates transmission of data to a peer device
-    ZBSendDataRequest = CommandDef(
-        CommandType.SREQ,
+    ZBSendDataRequest = t.CommandDef(
+        t.CommandType.SREQ,
         0x03,
         req_schema=t.Schema(
             (
@@ -105,8 +98,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     )
 
     # get a configuration property from nonvolatile memory
-    ZBReadConfiguration = CommandDef(
-        CommandType.SREQ,
+    ZBReadConfiguration = t.CommandDef(
+        t.CommandType.SREQ,
         0x04,
         req_schema=t.Schema(
             (
@@ -129,8 +122,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     )
 
     # write a configuration property from nonvolatile memory
-    ZBWriteConfiguration = CommandDef(
-        CommandType.SREQ,
+    ZBWriteConfiguration = t.CommandDef(
+        t.CommandType.SREQ,
         0x05,
         req_schema=t.Schema(
             (
@@ -143,12 +136,12 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
                 t.Param("Value", t.ShortBytes, "Value"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # retrieves a Device Information Property
-    ZBGetDeviceInfo = CommandDef(
-        CommandType.SREQ,
+    ZBGetDeviceInfo = t.CommandDef(
+        t.CommandType.SREQ,
         0x06,
         req_schema=t.Schema(
             (t.Param("Param", t.uint8_t, "The identifier for deice information"),)
@@ -165,8 +158,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     # initiating a call to zb_FindDeviceRequest and the device being discovered must
     # both be a member of the same network. When the search is complete,
     # the zv_FindDeviceConfirm callback function is called
-    ZBFindDeviceReq = CommandDef(
-        CommandType.SREQ,
+    ZBFindDeviceReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x07,
         req_schema=t.Schema(
             (t.Param("SearchKey", t.EUI64, "IEEE address of the device"),)
@@ -177,11 +170,11 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     # SAPI CallBacks
     # this callback is called by the ZigBee stack after a start request
     # operation completes
-    ZBStartConfirm = CommandDef(CommandType.AREQ, 0x80, req_schema=STATUS_SCHEMA)
+    ZBStartConfirm = t.CommandDef(t.CommandType.AREQ, 0x80, req_schema=t.STATUS_SCHEMA)
 
     # This callback is called by the ZigBee stack after a bind operation completes
-    ZBBindConfirm = CommandDef(
-        CommandType.AREQ,
+    ZBBindConfirm = t.CommandDef(
+        t.CommandType.AREQ,
         0x81,
         rsp_schema=t.Schema(
             (
@@ -196,8 +189,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     )
 
     # This callback indicates another device attempted to bind to this device
-    ZBAllowBindConfirm = CommandDef(
-        CommandType.AREQ,
+    ZBAllowBindConfirm = t.CommandDef(
+        t.CommandType.AREQ,
         0x82,
         rsp_schema=t.Schema(
             (t.Param("Source", t.NWK, "Source Nwk of the device attempted to bind"),)
@@ -205,8 +198,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
     )
 
     # This callback indicates the data has been sent
-    ZBSendConfirm = CommandDef(
-        CommandType.AREQ,
+    ZBSendConfirm = t.CommandDef(
+        t.CommandType.AREQ,
         0x83,
         rsp_schema=t.Schema(
             (
@@ -224,8 +217,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
 
     # This callback is called asynchronously by the ZigBee stack to notify the
     # application when data is received from a peer device
-    ZBRecieveDataInd = CommandDef(
-        CommandType.AREQ,
+    ZBRecieveDataInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x87,
         rsp_schema=t.Schema(
             (
@@ -240,8 +233,8 @@ class SAPICommands(CommandsBase, subsystem=Subsystem.SAPI):
 
     # This callback is called by the ZigBee stack when a find device operation
     # completes
-    ZBFindDeviceConfirm = CommandDef(
-        CommandType.AREQ,
+    ZBFindDeviceConfirm = t.CommandDef(
+        t.CommandType.AREQ,
         0x85,
         rsp_schema=t.Schema(
             (

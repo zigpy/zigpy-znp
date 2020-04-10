@@ -1,4 +1,5 @@
 import attr
+import typing
 
 
 class Struct:
@@ -32,7 +33,7 @@ class Struct:
         return (getattr(self, n) for n in names)
 
     @staticmethod
-    def converter(_type):
+    def converter(_type) -> typing.Callable:
         """Pass through converter."""
 
         def converter(input):

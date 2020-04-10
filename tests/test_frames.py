@@ -1,15 +1,15 @@
 import pytest
 
-import zigpy_znp.commands as commands
-import zigpy_znp.exceptions as zexc
 import zigpy_znp.frames as frames
 import zigpy_znp.types as t
+
+from zigpy_znp.exceptions import InvalidFrame
 
 
 def test_general_frame():
     data = b"\xaa\55\xccdata goes in here\x00\x00"
     length = t.uint8_t(len(data)).serialize()
-    cmd = commands.CommandHeader(0x0161)
+    cmd = t.CommandHeader(0x0161)
 
     frame = frames.GeneralFrame(cmd, data)
     assert frame.serialize() == length + b"\x61\x01" + data
@@ -30,7 +30,7 @@ def test_general_frame_wrong_data():
 
     # data too short
     data = b"\x04\x00\x00"
-    with pytest.raises(zexc.InvalidFrame):
+    with pytest.raises(InvalidFrame):
         frames.GeneralFrame.deserialize(data)
 
 
@@ -47,11 +47,11 @@ def test_transport_frame():
     assert r.serialize() == sof + payload + fcs
 
     # wrong SOF
-    with pytest.raises(zexc.InvalidFrame):
+    with pytest.raises(InvalidFrame):
         frames.TransportFrame.deserialize(bad_sof + payload + fcs + extra)
 
     # bad FCS
-    with pytest.raises(zexc.InvalidFrame):
+    with pytest.raises(InvalidFrame):
         frames.TransportFrame.deserialize(sof + payload + bad_fcs + extra)
 
     # extra

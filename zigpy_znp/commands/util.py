@@ -1,18 +1,6 @@
 """This interface provides tester supporting functionalities such as setting PanId,
 getting device info, getting NV info, subscribing callbacks…etc."""
 
-import zigpy.types
-import zigpy.zdo.types
-
-from zigpy_znp.commands.types import (
-    STATUS_SCHEMA,
-    CallbackSubsystem,
-    CommandDef,
-    CommandType,
-    DeviceState,
-    CommandsBase,
-    Subsystem,
-)
 import zigpy_znp.types as t
 
 
@@ -37,10 +25,10 @@ class RandomNumbers(t.FixedList, item_type=t.uint8_t, length=0x64):
     pass
 
 
-class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
+class UtilCommands(t.CommandsBase, subsystem=t.Subsystem.UTIL):
     # MAC Reset command to reset MAC state machine
-    GetDeviceInfo = CommandDef(
-        CommandType.SREQ,
+    GetDeviceInfo = t.CommandDef(
+        t.CommandType.SREQ,
         0x00,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -52,7 +40,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 t.Param("NWK", t.NWK, "Short address of the device"),
                 t.Param("DeviceType", t.DeviceLogicalType, "Device type"),
                 t.Param(
-                    "DeviceState", DeviceState, "Indicated the state of the device"
+                    "DeviceState", t.DeviceState, "Indicated the state of the device"
                 ),
                 t.Param(
                     "AssociatedDevices",
@@ -67,8 +55,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # read a block of parameters from Non-Volatile storage of the target device
-    GetNVInfo = CommandDef(
-        CommandType.SREQ,
+    GetNVInfo = t.CommandDef(
+        t.CommandType.SREQ,
         0x01,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -91,25 +79,23 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 t.Param(
                     "SecurityLevel", t.uint8_t, "Security level of this data frame"
                 ),
-                t.Param(
-                    "PreConfigKey", zigpy.types.KeyData, "Preconfigured network key"
-                ),
+                t.Param("PreConfigKey", t.KeyData, "Preconfigured network key"),
             )
         ),
     )
 
     # Set PAN ID
-    SetPanId = CommandDef(
-        CommandType.SREQ,
+    SetPanId = t.CommandDef(
+        t.CommandType.SREQ,
         0x02,
         req_schema=t.Schema((t.Param("PanId", t.PanId, "The PAN Id to set"),)),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # store a channel select bit-mask into Non-Volatile memory to be used the next
     # time the target device resets
-    SetChannels = CommandDef(
-        CommandType.SREQ,
+    SetChannels = t.CommandDef(
+        t.CommandType.SREQ,
         0x03,
         req_schema=t.Schema(
             (
@@ -118,13 +104,13 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # store a security level value into Non-Volatile memory to be used the next time
     # the target device reset
-    SetSecurityLevel = CommandDef(
-        CommandType.SREQ,
+    SetSecurityLevel = t.CommandDef(
+        t.CommandType.SREQ,
         0x04,
         req_schema=t.Schema(
             (
@@ -136,43 +122,43 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # store a pre-configured key array into Non-Volatile memory to be used the next
     # time the target device resets
-    SetPreConfigKey = CommandDef(
-        CommandType.SREQ,
+    SetPreConfigKey = t.CommandDef(
+        t.CommandType.SREQ,
         0x05,
         req_schema=t.Schema(
-            (t.Param("PreConfigKey", zigpy.types.KeyData, "Preconfigured network key"),)
+            (t.Param("PreConfigKey", t.KeyData, "Preconfigured network key"),)
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # subscribes/unsubscribes to layer callbacks. For particular subsystem callbacks
     # to work, the software must be compiled with a special flag that is unique to that
     # subsystem to enable the callback mechanism. For example to enable ZDO callbacks,
     # MT_ZDO_CB_FUNC flag must be compiled when the software is built
-    CallbackSubCmd = CommandDef(
-        CommandType.SREQ,
+    CallbackSubCmd = t.CommandDef(
+        t.CommandType.SREQ,
         0x06,
         req_schema=t.Schema(
             (
                 t.Param(
                     "SubsystemId",
-                    CallbackSubsystem,
+                    t.CallbackSubsystem,
                     "Subsystem id to subscribe/unsubscribe",
                 ),
                 t.Param("Action", t.Bool, "True -- enable, False -- Disable"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # Send a key event to the device registered application
-    KeyEvent = CommandDef(
-        CommandType.SREQ,
+    KeyEvent = t.CommandDef(
+        t.CommandType.SREQ,
         0x07,
         req_schema=t.Schema(
             (
@@ -180,12 +166,12 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 t.Param("Shift", t.Bool, "True -- shift, False -- no shift"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # get the board’s time alive
-    TimeAlive = CommandDef(
-        CommandType.SREQ,
+    TimeAlive = t.CommandDef(
+        t.CommandType.SREQ,
         0x09,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -198,8 +184,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # control the LEDs on the board
-    LEDControl = CommandDef(
-        CommandType.SREQ,
+    LEDControl = t.CommandDef(
+        t.CommandType.SREQ,
         0x0A,
         req_schema=t.Schema(
             (
@@ -207,20 +193,20 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 t.Param("On", t.Bool, "True -- On, False -- Off"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # test data buffer loopback
-    Loopback = CommandDef(
-        CommandType.SREQ,
+    Loopback = t.CommandDef(
+        t.CommandType.SREQ,
         0x10,
         req_schema=t.Schema((t.Param("Data", t.Bytes, "The data bytes to loop back"),)),
         rsp_schema=t.Schema((t.Param("Data", t.Bytes, "The looped back data"),)),
     )
 
     # effect a MAC MLME Poll Request
-    DataReq = CommandDef(
-        CommandType.SREQ,
+    DataReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x11,
         req_schema=t.Schema(
             (
@@ -231,17 +217,17 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # enable AUTOPEND and source address matching
-    SrcMatchEnable = CommandDef(
-        CommandType.SREQ, 0x20, req_schema=t.Schema(), rsp_schema=STATUS_SCHEMA
+    SrcMatchEnable = t.CommandDef(
+        t.CommandType.SREQ, 0x20, req_schema=t.Schema(), rsp_schema=t.STATUS_SCHEMA
     )
 
     # add a short or extended address to source address table
-    SrcMatchAddEntry = CommandDef(
-        CommandType.SREQ,
+    SrcMatchAddEntry = t.CommandDef(
+        t.CommandType.SREQ,
         0x21,
         req_schema=t.Schema(
             (
@@ -255,12 +241,12 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # delete a short or extended address to source address table
-    SrcMatchDelEntry = CommandDef(
-        CommandType.SREQ,
+    SrcMatchDelEntry = t.CommandDef(
+        t.CommandType.SREQ,
         0x22,
         req_schema=t.Schema(
             (
@@ -274,12 +260,12 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # check if a short or extended address is in the source address table
-    SrcMatchCheckSrcAddr = CommandDef(
-        CommandType.SREQ,
+    SrcMatchCheckSrcAddr = t.CommandDef(
+        t.CommandType.SREQ,
         0x23,
         req_schema=t.Schema(
             (
@@ -293,12 +279,12 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # enable/disable acknowledging all packets with pending bit set
-    SrcMatchAckAllPending = CommandDef(
-        CommandType.SREQ,
+    SrcMatchAckAllPending = t.CommandDef(
+        t.CommandType.SREQ,
         0x24,
         req_schema=t.Schema(
             (
@@ -312,12 +298,12 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # check if acknowledging all packets with pending bit set is enabled
-    SrcMatchCheckAllPending = CommandDef(
-        CommandType.SREQ,
+    SrcMatchCheckAllPending = t.CommandDef(
+        t.CommandType.SREQ,
         0x25,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -338,8 +324,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # proxy call to the AddrMgrEntryLookupExt() function
-    AddrMgrExtAddrLookup = CommandDef(
-        CommandType.SREQ,
+    AddrMgrExtAddrLookup = t.CommandDef(
+        t.CommandType.SREQ,
         0x40,
         req_schema=t.Schema(
             (
@@ -352,8 +338,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # a proxy call to the AddrMgrEntryLookupNwk() function
-    AddrMgwNwkAddrLookUp = CommandDef(
-        CommandType.SREQ,
+    AddrMgwNwkAddrLookUp = t.CommandDef(
+        t.CommandType.SREQ,
         0x41,
         req_schema=t.Schema(
             (t.Param("NWK", t.NWK, "Short address of the device to lookup IEEE"),)
@@ -364,8 +350,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # retrieve APS link key data, Tx and Rx frame counters
-    APSMELinkKeyDataGet = CommandDef(
-        CommandType.SREQ,
+    APSMELinkKeyDataGet = t.CommandDef(
+        t.CommandType.SREQ,
         0x44,
         req_schema=t.Schema(
             (
@@ -379,7 +365,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 t.Param(
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
-                t.Param("SecKey", zigpy.types.KeyData, "Security Key"),
+                t.Param("SecKey", t.KeyData, "Security Key"),
                 t.Param("TxFrmCntr", t.uint32_t, "On success, the TX frame counter"),
                 t.Param("RxFrmCntr", t.uint32_t, "On success, the RX frame counter"),
             )
@@ -387,8 +373,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # a proxy call to the APSME_LinkKeyNvIdGet() function
-    APSMELinkKeyNvIdGet = CommandDef(
-        CommandType.SREQ,
+    APSMELinkKeyNvIdGet = t.CommandDef(
+        t.CommandType.SREQ,
         0x45,
         req_schema=t.Schema(
             (
@@ -412,8 +398,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # a proxy call to the AssocCount() function
-    AssocCount = CommandDef(
-        CommandType.SREQ,
+    AssocCount = t.CommandDef(
+        t.CommandType.SREQ,
         0x48,
         req_schema=t.Schema(
             (
@@ -433,8 +419,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # a proxy call to the AssocFindDevice() function
-    AssocFindDevice = CommandDef(
-        CommandType.SREQ,
+    AssocFindDevice = t.CommandDef(
+        t.CommandType.SREQ,
         0x49,
         req_schema=t.Schema(
             (t.Param("Index", t.uint8_t, "Nth active entry in the device list"),)
@@ -445,8 +431,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # a proxy call to the AssocGetWithAddress() function
-    AssocGetWithAddress = CommandDef(
-        CommandType.SREQ,
+    AssocGetWithAddress = t.CommandDef(
+        t.CommandType.SREQ,
         0x4A,
         req_schema=t.Schema(
             (
@@ -470,8 +456,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
 
     # send a request key to the Trust Center from an originator device who wants to
     # exchange messages with a partner device
-    APSMEREquestKeyCmd = CommandDef(
-        CommandType.SREQ,
+    APSMEREquestKeyCmd = t.CommandDef(
+        t.CommandType.SREQ,
         0x4B,
         req_schema=t.Schema(
             (
@@ -485,12 +471,12 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # a proxy call to the bindAddEntry() function
-    BindAddEntry = CommandDef(
-        CommandType.SREQ,
+    BindAddEntry = t.CommandDef(
+        t.CommandType.SREQ,
         0x4D,
         req_schema=t.Schema(
             (
@@ -518,8 +504,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     )
 
     # a proxy call to zclGeneral_KeyEstablish_InitiateKeyEstablishment()
-    ZCLKeyEstInitEst = CommandDef(
-        CommandType.SREQ,
+    ZCLKeyEstInitEst = t.CommandDef(
+        t.CommandType.SREQ,
         0x80,
         req_schema=t.Schema(
             (
@@ -533,12 +519,12 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # a proxy call to zclGeneral_KeyEstablishment_ECDSASign()
-    ZCLKeyEstSign = CommandDef(
-        CommandType.SREQ,
+    ZCLKeyEstSign = t.CommandDef(
+        t.CommandType.SREQ,
         0x81,
         req_schema=t.Schema((t.Param("Input", t.ShortBytes, "The input data"),)),
         rsp_schema=t.Schema(
@@ -555,8 +541,8 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     #  As in 100 bytes of secure random numbers are generated until 1,000,000 bits are
     #  generated. 100 bytes are generated 1250 times. So 1250 SRSPs are generated.
     #  MT_SRNG has to be defined to include this API
-    SRngGen = CommandDef(
-        CommandType.SREQ,
+    SRngGen = t.CommandDef(
+        t.CommandType.SREQ,
         0x4C,
         req_schema=t.Schema(),
         rsp_schema=t.Schema(
@@ -568,11 +554,11 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
     # asynchronous request/response handshake
     # XXX: This command is ambiguously defined.
     #      We see an example of how it behaves.
-    # SyncReq = CommandDef(CommandType.AREQ, 0xE0)
+    # SyncReq = t.CommandDef(t.CommandType.AREQ, 0xE0)
 
     # RPC proxy indication for a ZCL_KEY_ESTABLISH_IND
-    ZCLKeyEstInd = CommandDef(
-        CommandType.AREQ,
+    ZCLKeyEstInd = t.CommandDef(
+        t.CommandType.AREQ,
         0xE1,
         rsp_schema=t.Schema(
             (

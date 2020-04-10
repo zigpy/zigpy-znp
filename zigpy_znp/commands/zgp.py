@@ -1,20 +1,11 @@
 """Green Power devices and Green Power infrastructure interface."""
 
-import zigpy.types
-
-from zigpy_znp.commands.types import (
-    STATUS_SCHEMA,
-    CommandDef,
-    CommandType,
-    CommandsBase,
-    Subsystem,
-)
 import zigpy_znp.types as t
 
 
-class ZGPCommands(CommandsBase, subsystem=Subsystem.ZGP):
-    DataReq = CommandDef(
-        CommandType.SREQ,
+class ZGPCommands(t.CommandsBase, subsystem=t.Subsystem.ZGP):
+    DataReq = t.CommandDef(
+        t.CommandType.SREQ,
         0x01,
         req_schema=t.Schema(
             (
@@ -50,12 +41,12 @@ class ZGPCommands(CommandsBase, subsystem=Subsystem.ZGP):
                 t.Param("LifeTime", t.uint24_t, "The lifetime of the packet"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # send security data into # the dGP stub
-    SecRsp = CommandDef(
-        CommandType.SREQ,
+    SecRsp = t.CommandDef(
+        t.CommandType.SREQ,
         0x02,
         req_schema=t.Schema(
             (
@@ -91,19 +82,19 @@ class ZGPCommands(CommandsBase, subsystem=Subsystem.ZGP):
                     "SecurityLevel", t.uint8_t, "Security level for GPDF processing"
                 ),
                 t.Param("KeyType", t.uint8_t, "The security key type"),
-                t.Param("KeyData", zigpy.types.KeyData, "Security key"),
+                t.Param("KeyData", t.KeyData, "Security key"),
                 t.Param("FrameCounter", t.uint32_t, "The security frame counter value"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # ZGP Callbacks
     # Green power confirm is a message that provides a mechanism for the Green Power
     # EndPoint in the host processor to understand the status of a previous request
     # to send a GPDF
-    DataCnf = CommandDef(
-        CommandType.AREQ,
+    DataCnf = t.CommandDef(
+        t.CommandType.AREQ,
         0x05,
         req_schema=t.Schema(
             (
@@ -119,8 +110,8 @@ class ZGPCommands(CommandsBase, subsystem=Subsystem.ZGP):
 
     # This message provides a mechanism for dGP stub to request security data from the
     # Green Power EndPoint in the host processor
-    SecReq = CommandDef(
-        CommandType.AREQ,
+    SecReq = t.CommandDef(
+        t.CommandType.AREQ,
         0x03,
         req_schema=t.Schema(
             (
@@ -158,8 +149,8 @@ class ZGPCommands(CommandsBase, subsystem=Subsystem.ZGP):
 
     # This message provides a mechanism for identifying and conveying a received
     # GPDF to the Green Power EndPoint in the host processor
-    DataInd = CommandDef(
-        CommandType.AREQ,
+    DataInd = t.CommandDef(
+        t.CommandType.AREQ,
         0x04,
         req_schema=t.Schema(
             (

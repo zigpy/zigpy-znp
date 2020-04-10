@@ -1,15 +1,13 @@
+import attr
 import functools
 
-import attr
-
-from zigpy_znp.commands import CommandHeader
+import zigpy_znp.types as t
 from zigpy_znp.exceptions import InvalidFrame
-from zigpy_znp.types import basic as t
 
 
 @attr.s
 class GeneralFrame:
-    header: CommandHeader = attr.ib(converter=CommandHeader)
+    header: t.CommandHeader = attr.ib(converter=t.CommandHeader)
     data: t.Bytes = attr.ib(factory=t.Bytes, converter=t.Bytes)
 
     @property
@@ -28,7 +26,7 @@ class GeneralFrame:
         if len(data) < length + 2:
             raise InvalidFrame(f"Data is too short for {cls.__name__}")
 
-        header, data = CommandHeader.deserialize(data)
+        header, data = t.CommandHeader.deserialize(data)
         payload, data = data[:length], data[length:]
         return cls(header, payload), data
 

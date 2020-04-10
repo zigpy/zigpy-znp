@@ -1,19 +1,12 @@
-from zigpy_znp.commands.types import (
-    STATUS_SCHEMA,
-    CommandDef,
-    CommandType,
-    CommandsBase,
-    Subsystem,
-)
 import zigpy_znp.types as t
 
 
-class APPCommands(CommandsBase, subsystem=Subsystem.APP):
+class APPCommands(t.CommandsBase, subsystem=t.Subsystem.APP):
     # This command is sent to the target in order to test the functions defined
     # for individual applications.
     # This command sends a raw data to an application
-    Msg = CommandDef(
-        CommandType.SREQ,
+    Msg = t.CommandDef(
+        t.CommandType.SREQ,
         0x00,
         req_schema=t.Schema(
             (
@@ -34,13 +27,13 @@ class APPCommands(CommandsBase, subsystem=Subsystem.APP):
                 t.Param("Data", t.ShortBytes, "Data request"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # This command is used by tester to issue user’s defined commands to the
     # application
-    UserTest = CommandDef(
-        CommandType.SREQ,
+    UserTest = t.CommandDef(
+        t.CommandType.SREQ,
         0x01,
         req_schema=t.Schema(
             (
@@ -56,5 +49,5 @@ class APPCommands(CommandsBase, subsystem=Subsystem.APP):
                 t.Param("Parameter2", t.uint16_t, "Parameter #2 of the command"),
             )
         ),
-        rsp_schema=STATUS_SCHEMA,
+        rsp_schema=t.STATUS_SCHEMA,
     )
