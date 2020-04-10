@@ -195,15 +195,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if channels is not None:
             await self._api.request(
-                c.UtilCommands.SetChannels(Channels=channels),
+                c.UtilCommands.SetChannels.Req(Channels=channels),
                 RspStatus=t.Status.Success,
             )
             await self._api.request(
-                c.APPConfigCommands.BDBSetChannel(IsPrimary=True, Channel=channels),
+                c.APPConfigCommands.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
                 RspStatus=t.Status.Success,
             )
             await self._api.request(
-                c.APPConfigCommands.BDBSetChannel(
+                c.APPConfigCommands.BDBSetChannel.Req(
                     IsPrimary=False, Channel=t.Channels.NO_CHANNELS
                 ),
                 RspStatus=t.Status.Success,
@@ -213,7 +213,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if pan_id is not None:
             await self._api.request(
-                c.UtilCommands.SetPanId(PanId=pan_id), RspStatus=t.Status.Success
+                c.UtilCommands.SetPanId.Req(PanId=pan_id), RspStatus=t.Status.Success
             )
 
             self._pan_id = pan_id
@@ -226,7 +226,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if network_key is not None:
             await self._api.request(
-                c.UtilCommands.SetPreConfigKey(PreConfigKey=network_key),
+                c.UtilCommands.SetPreConfigKey.Req(PreConfigKey=network_key),
                 RspStatus=t.Status.Success,
             )
 
@@ -444,7 +444,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
         await self._api.request(
-            c.ZDOCommands.MgmtLeaveReq(
+            c.ZDOCommands.MgmtLeaveReq.Req(
                 Dst=device.nwk, IEEE=device.ieee, LeaveOptions=c.zdo.LeaveOptions.NONE
             ),
             RspStatus=t.Status.Success,
