@@ -111,7 +111,7 @@ class ShortBytes(Bytes):
         return self._header(len(self)).serialize() + self
 
     @classmethod
-    def deserialize(cls, data, byteorder="little"):
+    def deserialize(cls, data):
         length, data = cls._header.deserialize(data)
         if length > len(data):
             raise ValueError(f"Data is too short to contain {length} bytes of data")
@@ -122,73 +122,63 @@ class LongBytes(ShortBytes):
     _header = uint16_t
 
 
-class List(list):
+class TypedListMeta(list):
+    _item_type = None
     _length = None
-    _itemtype = None
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         assert self._length is None or len(self) == self._length
-        return b"".join([self._itemtype(i).serialize() for i in self])
+        return b"".join([self._item_type(i).serialize() for i in self])
 
     @classmethod
-    def deserialize(cls, data):
-        assert cls._itemtype is not None
+    def deserialize(cls, data: bytes):
+        assert cls._item_type is not None
         r = cls()
         while data:
-            item, data = cls._itemtype.deserialize(data)
+            item, data = cls._item_type.deserialize(data)
             r.append(item)
         return r, data
 
 
-class _LVList(List):
-    _header = uint8_t
+class LVList(TypedListMeta):
+    def __init_subclass__(cls, *, item_type, length_type):
+        super().__init_subclass__()
+        cls._item_type = item_type
+        cls._header = length_type
 
     def serialize(self):
-        assert self._itemtype is not None
+        assert self._item_type is not None
         return self._header(len(self)).serialize() + super().serialize()
 
     @classmethod
     def deserialize(cls, data):
-        assert cls._itemtype is not None
+        assert cls._item_type is not None
         length, data = cls._header.deserialize(data)
         r = cls()
         for i in range(length):
-            item, data = cls._itemtype.deserialize(data)
+            item, data = cls._item_type.deserialize(data)
             r.append(item)
         return r, data
 
 
-# So that isinstance(LVList(uint8_t)([]), LVList(uint8_t)) is True
-# XXX: This is not a "real" solution, it just passes unit tests.
-#      Namely, it is not pickleable.
-LVLIST_SINGLETON_CACHE = {}
-
-
-def LVList(itemtype, headertype=uint8_t):
-    if (itemtype, headertype) in LVLIST_SINGLETON_CACHE:
-        return LVLIST_SINGLETON_CACHE[(itemtype, headertype)]
-
-    class LVList(_LVList):
-        _header = headertype
-        _itemtype = itemtype
-
-    LVLIST_SINGLETON_CACHE[(itemtype, headertype)] = LVList
-
-    return LVList
-
-
-class FixedList(List):
-    _length = None
-    _itemtype = None
+class FixedList(TypedListMeta):
+    def __init_subclass__(cls, *, item_type, length):
+        super().__init_subclass__()
+        cls._item_type = item_type
+        cls._length = length
 
     @classmethod
     def deserialize(cls, data):
-        assert cls._itemtype is not None
+        assert cls._item_type is not None
         r = cls()
         for i in range(cls._length):
-            item, data = cls._itemtype.deserialize(data)
+            item, data = cls._item_type.deserialize(data)
             r.append(item)
         return r, data
+
+    def serialize(self):
+        assert len(self) == self._length
+        return super().serialize()
 
 
 class HexRepr:
@@ -199,6 +189,11 @@ class HexRepr:
 
 
 class EnumIntFlagMixin:
+    """
+    Enum does not allow multiple base classes. We turn enum.IntFlag into a mixin, since
+    it really doesn't depend on the base class specifically being `int`.
+    """
+
     # Rebind classmethods to our own class
     _missing_ = classmethod(enum.IntFlag._missing_.__func__)
     _create_pseudo_member_ = classmethod(enum.IntFlag._create_pseudo_member_.__func__)

@@ -22,9 +22,8 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
-class SecurityEntry(t.FixedList):
-    _itemtype = t.uint8_t
-    _length = 5
+class SecurityEntry(t.FixedList, item_type=t.uint8_t, length=5):
+    pass
 
 
 class StartupState(t.enum_uint8):
@@ -54,6 +53,26 @@ class LeaveOptions(t.enum_flag_uint8):
     NONE = 0
     Rejoin = 1 << 0
     RemoveChildren = 1 << 1
+
+
+class NetworkList(t.LVList, item_type=Network, length_type=t.uint8_t):
+    pass
+
+
+class EndpointList(t.LVList, item_type=t.uint8_t, length_type=t.uint8_t):
+    pass
+
+
+class GroupIdList(t.LVList, item_type=t.GroupId, length_type=t.uint8_t):
+    pass
+
+
+class BindEntryList(t.LVList, item_type=BindEntry, length_type=t.uint8_t):
+    pass
+
+
+class BeaconList(t.LVList, item_type=t.Beacon, length_type=t.uint8_t):
+    pass
 
 
 class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
@@ -197,12 +216,8 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     "Short address of the device being queried",
                 ),
                 t.Param("ProfileId", t.uint16_t, "profile id of the device"),
-                t.Param(
-                    "InputClusters", t.LVList(t.ClusterId), "Input cluster id list"
-                ),
-                t.Param(
-                    "OutputClusters", t.LVList(t.ClusterId), "Output cluster id list"
-                ),
+                t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
+                t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -322,12 +337,8 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                 t.Param("IEEE", t.EUI64, "Local coordinator's IEEE address"),
                 t.Param("Endpoint", t.uint8_t, "device's endpoint"),
                 t.Param("ProfileId", t.uint16_t, "profile id of the device"),
-                t.Param(
-                    "InputClusters", t.LVList(t.ClusterId), "Input cluster id list"
-                ),
-                t.Param(
-                    "OutputClusters", t.LVList(t.ClusterId), "Output cluster id list"
-                ),
+                t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
+                t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -797,9 +808,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                 t.Param("Groups", t.uint16_t, "List to hold group IDs"),
             )
         ),
-        rsp_schema=t.Schema(
-            (t.Param("Groups", t.LVList(t.GroupId), "List of Group IDs"),)
-        ),
+        rsp_schema=t.Schema((t.Param("Groups", GroupIdList, "List of Group IDs"),)),
     )
 
     # handle the ZDO extension find group message
@@ -966,7 +975,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     t.uint8_t,
                     "Starting index into the list of associated devices",
                 ),
-                t.Param("Devices", t.LVList(t.NWK), "List of the associated devices"),
+                t.Param("Devices", t.NWKList, "List of the associated devices"),
             )
         ),
     )
@@ -987,7 +996,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     t.uint8_t,
                     "Starting index into the list of associated devices",
                 ),
-                t.Param("Devices", t.LVList(t.NWK), "List of the associated devices"),
+                t.Param("Devices", t.NWKList, "List of the associated devices"),
             )
         ),
     )
@@ -1062,9 +1071,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param(
-                    "ActiveEndpoints", t.LVList(t.uint8_t), "Active endpoints list"
-                ),
+                t.Param("ActiveEndpoints", EndpointList, "Active endpoints list"),
             )
         ),
     )
@@ -1080,7 +1087,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("MatchList", t.LVList(t.uint8_t), "Endpoints list"),
+                t.Param("MatchList", EndpointList, "Endpoints list"),
             )
         ),
     )
@@ -1201,7 +1208,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                 ),
                 t.Param("NetworkCount", t.uint8_t, "Total number of entries available"),
                 t.Param("Index", t.uint8_t, "Where the response starts"),
-                t.Param("Networks", t.LVList(Network), "Discovered networks list"),
+                t.Param("Networks", NetworkList, "Discovered networks list"),
             )
         ),
     )
@@ -1252,7 +1259,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     "Total number of entries available on the device",
                 ),
                 t.Param("Index", t.uint8_t, "Index where the response starts"),
-                t.Param("BindTable", t.LVList(BindEntry), "list of BindEntries"),
+                t.Param("BindTable", BindEntryList, "list of BindEntries"),
             )
         ),
     )
@@ -1331,12 +1338,8 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param("NWK", t.NWK, "Device's network address"),
-                t.Param(
-                    "InputClusters", t.LVList(t.ClusterId), "Input cluster id list"
-                ),
-                t.Param(
-                    "OutputClusters", t.LVList(t.ClusterId), "Output cluster id list"
-                ),
+                t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
+                t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
             )
         ),
     )
@@ -1366,7 +1369,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
                     t.NWK,
                     "Network address of the destination of the source route",
                 ),
-                t.Param("Relays", t.LVList(t.NWK), "List of relay devices"),
+                t.Param("Relays", t.NWKList, "List of relay devices"),
             )
         ),
     )
@@ -1375,7 +1378,7 @@ class ZDOCommands(CommandsBase, subsystem=Subsystem.ZDO):
     BeaconNotifyInd = CommandDef(
         CommandType.AREQ,
         0xC5,
-        rsp_schema=t.Schema((t.Param("Beacons", t.LVList(t.Beacon), "Beacons list"),)),
+        rsp_schema=t.Schema((t.Param("Beacons", BeaconList, "Beacons list"),)),
     )
 
     # inform the host device of a ZDO join request result

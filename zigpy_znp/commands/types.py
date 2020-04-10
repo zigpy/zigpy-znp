@@ -333,7 +333,10 @@ class CommandBase:
             value = params[param.name]
 
             if not isinstance(value, param.type):
-                # Coerce only actual numerical types, not enums
+                # Coerce the following types:
+                #  - int to int_t
+                #  - bytes to Bytes
+                #  - list to typed List
                 if (
                     isinstance(value, int)
                     and issubclass(param.type, int)

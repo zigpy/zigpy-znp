@@ -8,9 +8,8 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
-class AttributeValue(t.FixedList):
-    _itemtype = t.uint8_t
-    _length = 16
+class AttributeValue(t.FixedList, item_type=t.uint8_t, length=16):
+    pass
 
 
 class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
@@ -596,6 +595,10 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
     # send (on behalf of the next higher layer) a MAC poll confirmation
     PollCnf = CommandDef(CommandType.AREQ, 0x8B, rsp_schema=STATUS_SCHEMA)
 
+    # TODO: investigate the actual structure of this command. The source code indicates
+    #       that the response type differs heavily based on the ScanType.
+    #       Also, ResultListMaxLength does not appear to be present.
+    """
     # send (on behalf of the next higher layer) a MAC scan confirmation
     ScanCnf = CommandDef(
         CommandType.AREQ,
@@ -616,10 +619,16 @@ class MacCommands(CommandsBase, subsystem=Subsystem.MAC):
                 t.Param(
                     "ResultListCount", t.uint8_t, "Number of items in the result list"
                 ),
+                t.Param(
+                    "ResultListMaxLength",
+                    t.uint8_t,
+                    "Max length of the result list in bytes"
+                ),
                 t.Param("ResultList", t.LVList(t.uint8_t), "Result list"),
             )
         ),
     )
+    """
 
     # send (on behalf of the next higher layer) a MAC communication indicator
     CommStatusInd = CommandDef(

@@ -49,8 +49,8 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                         "0x02 -- slow beacons"
                     ),
                 ),
-                t.Param("InputClusters", t.LVList(t.ClusterId), "Input cluster list"),
-                t.Param("OutputClusters", t.LVList(t.ClusterId), "Output cluster list"),
+                t.Param("InputClusters", t.ClusterIdList, "Input cluster list"),
+                t.Param("OutputClusters", t.ClusterIdList, "Output cluster list"),
             )
         ),
         rsp_schema=STATUS_SCHEMA,
@@ -160,7 +160,7 @@ class AFCommands(CommandsBase, subsystem=Subsystem.AF):
                     t.uint8_t,
                     "Specifies the number of hops allowed delivering the message",
                 ),
-                t.Param("SourceRoute", t.LVList(t.NWK), "Relay list"),
+                t.Param("SourceRoute", t.NWKList, "Relay list"),
                 t.Param("Data", t.ShortBytes, "Data request"),
             )
         ),

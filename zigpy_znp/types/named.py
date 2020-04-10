@@ -2,7 +2,7 @@ import typing
 import logging
 
 import attr
-from zigpy.types import EUI64, NWK, ExtendedPanId, PanId
+from zigpy.types import EUI64, NWK, ExtendedPanId, PanId, ClusterId
 
 from . import basic, struct
 
@@ -207,9 +207,8 @@ class ResetType(basic.enum_uint8):
     Soft = 0x01
 
 
-class KeySource(basic.FixedList):
-    _length = 8
-    _itemtype = basic.uint8_t
+class KeySource(basic.FixedList, item_type=basic.uint8_t, length=8):
+    pass
 
 
 class StartupOptions(basic.enum_flag_uint8):
@@ -222,3 +221,11 @@ class DeviceLogicalType(basic.enum_flag_uint8):
     Coordinator = 1 << 0
     Router = 1 << 1
     EndDevice = 1 << 2
+
+
+class ClusterIdList(basic.LVList, item_type=ClusterId, length_type=basic.uint8_t):
+    pass
+
+
+class NWKList(basic.LVList, item_type=NWK, length_type=basic.uint8_t):
+    pass

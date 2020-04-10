@@ -123,8 +123,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
                 DeviceVersion=0x00,
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=t.LVList(t.ClusterId)([]),
-                OutputClusters=t.LVList(t.ClusterId)([]),
+                InputClusters=[],
+                OutputClusters=[],
             ),
             RspStatus=t.Status.Success,
         )
@@ -135,8 +135,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
                 DeviceVersion=0x00,
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=t.LVList(t.ClusterId)([]),
-                OutputClusters=t.LVList(t.ClusterId)([IasZone.cluster_id]),
+                InputClusters=[],
+                OutputClusters=[IasZone.cluster_id],
             ),
             RspStatus=t.Status.Success,
         )
@@ -147,8 +147,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
                 DeviceVersion=0x00,
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=t.LVList(t.ClusterId)([]),
-                OutputClusters=t.LVList(t.ClusterId)([]),
+                InputClusters=[],
+                OutputClusters=[],
             ),
             RspStatus=t.Status.Success,
         )
@@ -159,8 +159,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
                 DeviceVersion=0x00,
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=t.LVList(t.ClusterId)([]),
-                OutputClusters=t.LVList(t.ClusterId)([]),
+                InputClusters=[],
+                OutputClusters=[],
             ),
             RspStatus=t.Status.Success,
         )

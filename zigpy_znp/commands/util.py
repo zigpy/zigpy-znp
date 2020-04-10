@@ -16,29 +16,25 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
-class BindEntry(t.FixedList):
+class BindEntry(t.FixedList, item_type=t.uint8_t, length=14):
     """"The packed BindingEntry_t structure returned by the proxy call."""
 
-    _itemtype = t.uint8_t
-    _length = 14
+    pass
 
 
-class Device(t.FixedList):
+class Device(t.FixedList, item_type=t.uint8_t, length=18):
     """associated_devices_t structure returned by the proxy call to
         AssocFindDevice()"""
 
-    _itemtype = t.uint8_t
-    _length = 18
+    pass
 
 
-class Key(t.FixedList):
-    _itemtype = t.uint8_t
-    _length = 42
+class Key(t.FixedList, item_type=t.uint8_t, length=42):
+    pass
 
 
-class RandomNumbers(t.FixedList):
-    _itemtype = (t.uint8_t,)
-    _length = 0x64
+class RandomNumbers(t.FixedList, item_type=t.uint8_t, length=0x64):
+    pass
 
 
 class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
@@ -60,7 +56,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                 ),
                 t.Param(
                     "AssociatedDevices",
-                    t.LVList(t.NWK),
+                    t.NWKList,
                     (
                         "Network addresses of Reduce Function Devices associated "
                         "to the local device."
@@ -504,9 +500,7 @@ class UtilCommands(CommandsBase, subsystem=Subsystem.UTIL):
                     "Address mode address of the partner",
                 ),
                 t.Param("DstEndpoint", t.uint8_t, "Binding entry destination endpoint"),
-                t.Param(
-                    "ClusterIdList", t.LVList(t.ClusterId), "List of the cluster IDs"
-                ),
+                t.Param("ClusterIdList", t.ClusterIdList, "List of the cluster IDs"),
             )
         ),
         rsp_schema=t.Schema(

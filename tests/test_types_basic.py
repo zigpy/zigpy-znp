@@ -72,47 +72,30 @@ def test_longbytes():
         t.LongBytes.deserialize(len(data).to_bytes(2, "little") + data[:-1])
 
 
-def test_list():
-    class TestList(t.List):
-        _itemtype = t.uint16_t
-
-    r = TestList([1, 2, 3, 0x55AA])
-    assert r.serialize() == b"\x01\x00\x02\x00\x03\x00\xaa\x55"
-
-
-def test_list_deserialize():
-    class TestList(t.List):
-        _itemtype = t.uint16_t
-
-    data = b"\x34\x12\x55\xaa\x89\xab"
-    extra = b"\x00\xff"
-
-    r, rest = TestList.deserialize(data + extra)
-    assert rest == b""
-    assert r[0] == 0x1234
-    assert r[1] == 0xAA55
-    assert r[2] == 0xAB89
-    assert r[3] == 0xFF00
-
-
 def test_lvlist():
-    d, r = t.LVList(t.uint8_t).deserialize(b"\x0412345")
+    class TestList(t.LVList, item_type=t.uint8_t, length_type=t.uint8_t):
+        pass
+
+    d, r = TestList.deserialize(b"\x0412345")
     assert r == b"5"
     assert d == list(map(ord, "1234"))
-    assert t.LVList(t.uint8_t).serialize(d) == b"\x041234"
+    assert TestList.serialize(d) == b"\x041234"
 
-    assert isinstance(d, t.LVList(t.uint8_t))
+    assert isinstance(d, TestList)
 
     with pytest.raises(OverflowError):
-        t.LVList(t.uint8_t)([1, 2, 0xFFFF, 4]).serialize()
+        TestList([1, 2, 0xFFFF, 4]).serialize()
 
 
 def test_lvlist_too_short():
-    with pytest.raises(ValueError):
-        t.LVList(t.uint8_t).deserialize(b"")
+    class TestList(t.LVList, item_type=t.uint8_t, length_type=t.uint8_t):
+        pass
 
     with pytest.raises(ValueError):
-        t.LVList(t.uint8_t).deserialize(b"\x04123")
+        TestList.deserialize(b"")
+
+    with pytest.raises(ValueError):
+        TestList.deserialize(b"\x04123")
 
 
 def test_hex_repr():
@@ -128,9 +111,8 @@ def test_hex_repr():
 
 
 def test_fixed_list():
-    class TestList(t.FixedList):
-        _length = 3
-        _itemtype = t.uint16_t
+    class TestList(t.FixedList, item_type=t.uint16_t, length=3):
+        pass
 
     with pytest.raises(AssertionError):
         r = TestList([1, 2, 3, 0x55AA])
@@ -146,9 +128,8 @@ def test_fixed_list():
 
 
 def test_fixed_list_deserialize():
-    class TestList(t.FixedList):
-        _length = 3
-        _itemtype = t.uint16_t
+    class TestList(t.FixedList, length=3, item_type=t.uint16_t):
+        pass
 
     data = b"\x34\x12\x55\xaa\x89\xab"
     extra = b"\x00\xff"
