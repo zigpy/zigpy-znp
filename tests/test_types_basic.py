@@ -1,13 +1,11 @@
 import ast
-import enum
-
 import pytest
 
 import zigpy_znp.types as t
 
 
 def test_enum_uint():
-    class TE(t.enum_uint16, enum.IntFlag):
+    class TE(t.enum_flag_uint16):
         ALL = 0xFFFF
         CH_1 = 0x0001
         CH_2 = 0x0002
@@ -26,12 +24,6 @@ def test_enum_uint():
 
     assert r.serialize() == data
     assert TE(0x8012).serialize() == data
-
-
-def test_serialize():
-    data = [1, 3, 4]
-    schema = (t.Status, t.uint16_t, t.uint32_t)
-    assert t.serialize(data, schema) == b"\x01\x03\x00\x04\x00\x00\x00"
 
 
 def test_int_too_short():

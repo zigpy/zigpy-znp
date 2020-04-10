@@ -1,6 +1,5 @@
 """commands to configure parameters of the device, trust center and BDB subsystem."""
 
-import enum
 from zigpy_znp.commands.types import (
     STATUS_SCHEMA,
     CommandDef,
@@ -11,7 +10,7 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
-class TimeoutIndex(t.uint8_t, enum.Enum):
+class TimeoutIndex(t.enum_uint8):
     Seconds_10 = 0x00
 
     Minutes_2 = 0x01
@@ -30,7 +29,7 @@ class TimeoutIndex(t.uint8_t, enum.Enum):
     Minutes_16384 = 0x0E
 
 
-class CentralizedLinkKeyMode(t.uint8_t, enum.Enum):
+class CentralizedLinkKeyMode(t.enum_uint8):
     UseDefault = 0x00
     UseProvidedInstallCode = 0x01
     UseProvidedInstallCodeAndFallbackToDefault = 0x02
@@ -38,7 +37,7 @@ class CentralizedLinkKeyMode(t.uint8_t, enum.Enum):
     UseProvidedAPSLinkKeyAndFallbackToDefault = 0x04
 
 
-class BDBCommissioningStatus(t.uint8_t, enum.Enum):
+class BDBCommissioningStatus(t.enum_uint8):
     Success = 0x00
     InProgress = 0x01
     NoNetwork = 0x02
@@ -57,7 +56,7 @@ class BDBCommissioningStatus(t.uint8_t, enum.Enum):
     Failure = 0x0E
 
 
-class BDBCommissioningMode(t.uint8_t, enum.Enum):
+class BDBCommissioningMode(t.enum_uint8):
     Initialization = 0x00
     NwkSteering = 0x01
     Formation = 0x02
@@ -66,7 +65,7 @@ class BDBCommissioningMode(t.uint8_t, enum.Enum):
     ParentLost = 0x05
 
 
-class BDBRemainingCommissioningModes(t.uint8_t, enum.Flag):
+class BDBRemainingCommissioningModes(t.enum_flag_uint8):
     NONE = 0
 
     InitiatorTl = 1 << 0

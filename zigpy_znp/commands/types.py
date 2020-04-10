@@ -23,7 +23,7 @@ class BindEntry(t.Struct):
     )
 
 
-class CommandType(enum.IntEnum):
+class CommandType(t.enum_uint8):
     """Command Type."""
 
     POLL = 0
@@ -37,7 +37,7 @@ class CommandType(enum.IntEnum):
     RESERVED_7 = 7
 
 
-class ErrorCode(t.uint8_t, t.MissingEnumMixin, enum.Enum):
+class ErrorCode(t.MissingEnumMixin, t.enum_uint8):
     """Error code."""
 
     INVALID_SUBSYSTEM = 0x01
@@ -46,7 +46,7 @@ class ErrorCode(t.uint8_t, t.MissingEnumMixin, enum.Enum):
     INVALID_LENGTH = 0x04
 
 
-class Subsystem(t.enum_uint8, enum.IntEnum):
+class Subsystem(t.enum_uint8):
     """Command subsystem."""
 
     RPCError = 0x00
@@ -83,7 +83,7 @@ class Subsystem(t.enum_uint8, enum.IntEnum):
     RESERVED_31 = 0x1F
 
 
-class CallbackSubsystem(t.enum_uint16, enum.IntEnum):
+class CallbackSubsystem(t.enum_uint16):
     """Subscribe/unsubscribe subsystem callbacks."""
 
     MT_SYS = Subsystem.SYS << 8
@@ -337,7 +337,7 @@ class CommandBase:
                 if (
                     isinstance(value, int)
                     and issubclass(param.type, int)
-                    and not issubclass(param.type, t.enum_uint8)
+                    and not issubclass(param.type, enum.Enum)
                 ):
                     value = param.type(value)
                 elif isinstance(value, bytes) and issubclass(
@@ -454,7 +454,7 @@ class CommandBase:
     __str__ = __repr__
 
 
-class DeviceState(t.enum_uint8, enum.IntEnum):
+class DeviceState(t.enum_uint8):
     """Indicated device state."""
 
     InitializedNotStarted = 0x00
@@ -470,14 +470,14 @@ class DeviceState(t.enum_uint8, enum.IntEnum):
     LostParent = 0x0A
 
 
-class InterPanCommand(t.uint8_t, enum.Enum):
+class InterPanCommand(t.enum_uint8):
     InterPanClr = 0x00
     InterPanSet = 0x01
     InterPanReg = 0x02
     InterPanChk = 0x03
 
 
-class MTCapabilities(t.enum_uint16, enum.IntFlag):
+class MTCapabilities(t.enum_flag_uint16):
     CAP_SYS = 1 << 0
     CAP_MAC = 1 << 1
     CAP_NWK = 1 << 2

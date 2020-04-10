@@ -1,13 +1,4 @@
-def deserialize(data, schema):
-    result = []
-    for type_ in schema:
-        value, data = type_.deserialize(data)
-        result.append(value)
-    return result, data
-
-
-def serialize(data, schema):
-    return b"".join(t(v).serialize() for t, v in zip(schema, data))
+import enum
 
 
 class Bytes(bytes):
@@ -30,16 +21,17 @@ class Bytes(bytes):
 
 class int_t(int):
     _signed = True
-    _size = 0
+    _size = None
 
-    def serialize(self, byteorder="little"):
-        return self.to_bytes(self._size, byteorder, signed=self._signed)
+    def serialize(self):
+        return self.to_bytes(self._size, "little", signed=self._signed)
 
     @classmethod
-    def deserialize(cls, data, byteorder="little"):
+    def deserialize(cls, data):
         if len(data) < cls._size:
             raise ValueError(f"Data is too short to contain {cls._size} bytes")
-        r = cls.from_bytes(data[: cls._size], byteorder, signed=cls._signed)
+
+        r = cls.from_bytes(data[: cls._size], "little", signed=cls._signed)
         data = data[cls._size :]
         return r, data
 
@@ -206,43 +198,90 @@ class HexRepr:
     __repr__ = __str__
 
 
-class enum_uint8:
-    _type = uint8_t
+class EnumIntFlagMixin:
+    # Rebind _missing_ to our own class.
+    _missing_ = classmethod(enum.IntFlag._missing_.__func__)
 
-    def serialize(self):
-        """Serialize enum."""
-        return self._type(self.value).serialize()
+    __or__ = enum.IntFlag.__or__
+    __and__ = enum.IntFlag.__and__
+    __xor__ = enum.IntFlag.__xor__
+    __ror__ = enum.IntFlag.__ror__
+    __rand__ = enum.IntFlag.__rand__
+    __rxor__ = enum.IntFlag.__rxor__
+    __invert__ = enum.IntFlag.__invert__
 
     @classmethod
-    def deserialize(cls, data: bytes, byteorder: str = "little") -> (bytes, bytes):
-        """Deserialize data."""
-        val, data = cls._type.deserialize(data, byteorder)
-        return cls(val), data
+    def _create_pseudo_member_(cls, value):
+        # Again, _create_pseudo_member_ is bound to enum.IntFlag. Unbind it.
+        pseudo_member = enum.IntFlag._create_pseudo_member_.__func__(cls, value)
+
+        # _create_pseudo_member_'s return type is int, but we want a specific subclass
+        if not isinstance(pseudo_member, cls):
+            pseudo_member = cls(pseudo_member)
+            cls._value2member_map_[value] = pseudo_member
+
+        return pseudo_member
 
 
-class enum_uint16(enum_uint8):
-    _type = uint16_t
+class enum_uint8(uint8_t, enum.Enum):
+    pass
 
 
-class enum_uint24(enum_uint8):
-    _type = uint24_t
+class enum_uint16(uint16_t, enum.Enum):
+    pass
 
 
-class enum_uint32(enum_uint8):
-    _type = uint32_t
+class enum_uint24(uint24_t, enum.Enum):
+    pass
 
 
-class enum_uint40(enum_uint8):
-    _type = uint40_t
+class enum_uint32(uint32_t, enum.Enum):
+    pass
 
 
-class enum_uint48(enum_uint8):
-    _type = uint48_t
+class enum_uint40(uint40_t, enum.Enum):
+    pass
 
 
-class enum_uint56(enum_uint8):
-    _type = uint56_t
+class enum_uint48(uint48_t, enum.Enum):
+    pass
 
 
-class enum_uint64(enum_uint8):
-    _type = uint64_t
+class enum_uint56(uint56_t, enum.Enum):
+    pass
+
+
+class enum_uint64(uint64_t, enum.Enum):
+    pass
+
+
+class enum_flag_uint8(EnumIntFlagMixin, uint8_t, enum.Flag):
+    pass
+
+
+class enum_flag_uint16(EnumIntFlagMixin, uint16_t, enum.Flag):
+    pass
+
+
+class enum_flag_uint24(EnumIntFlagMixin, uint24_t, enum.Flag):
+    pass
+
+
+class enum_flag_uint32(EnumIntFlagMixin, uint32_t, enum.Flag):
+    pass
+
+
+class enum_flag_uint40(EnumIntFlagMixin, uint40_t, enum.Flag):
+    pass
+
+
+class enum_flag_uint48(EnumIntFlagMixin, uint48_t, enum.Flag):
+    pass
+
+
+class enum_flag_uint56(EnumIntFlagMixin, uint56_t, enum.Flag):
+    pass
+
+
+class enum_flag_uint64(EnumIntFlagMixin, uint64_t, enum.Flag):
+    pass

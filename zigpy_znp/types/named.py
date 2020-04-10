@@ -1,4 +1,3 @@
-import enum
 import typing
 import logging
 
@@ -11,7 +10,7 @@ from . import basic, struct
 LOGGER = logging.getLogger(__name__)
 
 
-class ADCChannel(basic.enum_uint8, enum.IntEnum):
+class ADCChannel(basic.enum_uint8):
     """The ADC channel."""
 
     AIN0 = 0x00
@@ -26,7 +25,7 @@ class ADCChannel(basic.enum_uint8, enum.IntEnum):
     Voltage = 0x0F
 
 
-class ADCResolution(basic.enum_uint8, enum.IntEnum):
+class ADCResolution(basic.enum_uint8):
     """Resolution of the ADC channel."""
 
     bits_8 = 0x00
@@ -35,7 +34,7 @@ class ADCResolution(basic.enum_uint8, enum.IntEnum):
     bits_14 = 0x03
 
 
-class GpioOperation(basic.enum_uint8, enum.IntEnum):
+class GpioOperation(basic.enum_uint8):
     """Specifies the type of operation to perform on the GPIO pins."""
 
     SetDirection = 0x00
@@ -46,7 +45,7 @@ class GpioOperation(basic.enum_uint8, enum.IntEnum):
     Read = 0x05
 
 
-class StackTuneOperation(basic.enum_uint8, enum.IntEnum):
+class StackTuneOperation(basic.enum_uint8):
     """The tuning operation to be executed."""
 
     PowerLevel = 0x00  # XXX: [Value] should correspond to the valid values
@@ -57,7 +56,7 @@ class StackTuneOperation(basic.enum_uint8, enum.IntEnum):
     # otherwise return the 0x01 current setting of RxOnWhenIdle.
 
 
-class AddrMode(basic.uint8_t, enum.Enum):
+class AddrMode(basic.enum_uint8):
     """Address mode."""
 
     NOT_PRESENT = 0x00
@@ -99,7 +98,7 @@ class AddrModeAddress(struct.Struct):
             raise ValueError(f"Unknown address mode: {self.mode}")  # pragma: no cover
 
 
-class BDBCommissioningMode(basic.enum_uint8, enum.IntEnum):
+class BDBCommissioningMode(basic.enum_uint8):
     """Commissioning mode."""
 
     Initialization = 0x00
@@ -133,7 +132,7 @@ class GroupId(basic.HexRepr, basic.uint16_t):
     pass
 
 
-class ScanType(basic.enum_uint8, enum.IntEnum):
+class ScanType(basic.enum_uint8):
     EnergyDetect = 0x00
     Active = 0x01
     Passive = 0x02
@@ -164,7 +163,7 @@ class MissingEnumMixin:
         return new_member
 
 
-class Status(basic.uint8_t, MissingEnumMixin, enum.Enum):
+class Status(MissingEnumMixin, basic.enum_uint8):
     Success = 0x00
     Failure = 0x01
     InvalidParameter = 0x02
@@ -197,13 +196,13 @@ class Param:
     description = attr.ib(default="")
 
 
-class ResetReason(basic.enum_uint8, enum.IntEnum):
+class ResetReason(basic.enum_uint8):
     PowerUp = 0x00
     External = 0x01
     Watchdog = 0x02
 
 
-class ResetType(basic.enum_uint8, enum.IntEnum):
+class ResetType(basic.enum_uint8):
     Hard = 0x00
     Soft = 0x01
 
@@ -213,13 +212,13 @@ class KeySource(basic.FixedList):
     _itemtype = basic.uint8_t
 
 
-class StartupOptions(basic.enum_uint8, enum.IntFlag):
+class StartupOptions(basic.enum_flag_uint8):
     ClearConfig = 1 << 1
     ClearState = 1 << 2
     AutoStart = 1 << 3
 
 
-class DeviceLogicalType(basic.enum_uint8, enum.IntFlag):
+class DeviceLogicalType(basic.enum_flag_uint8):
     Coordinator = 1 << 0
     Router = 1 << 1
     EndDevice = 1 << 2

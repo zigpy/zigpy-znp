@@ -1,4 +1,3 @@
-import enum
 from zigpy_znp.commands.types import (
     CommandDef,
     CommandType,
@@ -9,7 +8,7 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
-class ErrorCode(t.uint8_t, enum.Enum):
+class ErrorCode(t.enum_uint8):
     InvalidSubsystem = 0x01
     InvalidCommandId = 0x02
     InvalidParameter = 0x03

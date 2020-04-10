@@ -1,5 +1,3 @@
-import enum
-
 from zigpy_znp.commands.types import (
     STATUS_SCHEMA,
     CommandDef,
@@ -11,7 +9,7 @@ from zigpy_znp.commands.types import (
 import zigpy_znp.types as t
 
 
-class TransmitOptions(t.enum_uint8, enum.IntFlag):
+class TransmitOptions(t.enum_flag_uint8):
     NONE = 0
 
     Reserved1 = 1 << 0
@@ -25,7 +23,7 @@ class TransmitOptions(t.enum_uint8, enum.IntFlag):
     SkipRouting = 1 << 7
 
 
-class LatencyReq(t.uint8_t, enum.Enum):
+class LatencyReq(t.enum_uint8):
     NoLatencyReqs = 0x00
     FastBeacons = 0x01
     SlowBeacons = 0x02

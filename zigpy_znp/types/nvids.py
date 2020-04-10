@@ -1,9 +1,7 @@
-import enum
-
 from zigpy_znp.types import basic
 
 
-class BaseNvIds(basic.enum_uint16, enum.IntEnum):
+class BaseNvIds(basic.enum_uint16):
     pass
 
 

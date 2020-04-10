@@ -281,16 +281,22 @@ def test_command_deduplication():
             c.UtilCommands.TimeAlive.Rsp(Seconds=12),
             c.UtilCommands.TimeAlive.Rsp(Seconds=10),
             c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                partial=True, Status=0x01
+                partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
             ),
             c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                partial=True, Status=0x01, Mode=0x02
+                partial=True,
+                Status=c.app_config.BDBCommissioningStatus.InProgress,
+                Mode=c.app_config.BDBCommissioningMode.Formation,
             ),
             c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                partial=True, Status=0x01, Mode=0x02, RemainingModes=0x1
+                partial=True,
+                Status=c.app_config.BDBCommissioningStatus.InProgress,
+                Mode=c.app_config.BDBCommissioningMode.Formation,
+                RemainingModes=c.app_config.BDBRemainingCommissioningModes.InitiatorTl,
             ),
             c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                partial=True, RemainingModes=0x1
+                partial=True,
+                RemainingModes=c.app_config.BDBRemainingCommissioningModes.InitiatorTl,
             ),
         ]
     )
@@ -300,10 +306,11 @@ def test_command_deduplication():
         c.UtilCommands.TimeAlive.Rsp(Seconds=12),
         c.UtilCommands.TimeAlive.Rsp(Seconds=10),
         c.APPConfigCommands.BDBCommissioningNotification.Callback(
-            partial=True, Status=0x01
+            partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
         ),
         c.APPConfigCommands.BDBCommissioningNotification.Callback(
-            partial=True, RemainingModes=0x1
+            partial=True,
+            RemainingModes=c.app_config.BDBRemainingCommissioningModes.InitiatorTl,
         ),
     }
 

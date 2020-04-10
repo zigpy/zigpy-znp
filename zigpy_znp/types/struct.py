@@ -1,7 +1,5 @@
 import attr
 
-from . import basic as t
-
 
 class Struct:
     """Structure based on attr."""
@@ -9,7 +7,13 @@ class Struct:
     @classmethod
     def deserialize(cls, data: bytes):
         """Deserialize structure."""
-        args, data = t.deserialize(data, cls.schema())
+
+        args = []
+
+        for field_type in cls.schema():
+            arg, data = field_type.deserialize(data)
+            args.append(arg)
+
         return cls(*args), data
 
     @classmethod

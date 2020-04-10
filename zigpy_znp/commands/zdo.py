@@ -6,8 +6,6 @@ returned by the target. The response message only indicates that the command mes
 was received and executed. The result of the command execution will be conveyed to
 the tester via a callback message interface"""
 
-import enum
-
 import zigpy.types
 import zigpy.zdo.types
 
@@ -29,19 +27,19 @@ class SecurityEntry(t.FixedList):
     _length = 5
 
 
-class StartupState(t.enum_uint8, enum.IntEnum):
+class StartupState(t.enum_uint8):
     RestoredNetworkState = 0x00
     NewNetworkState = 0x01
     NotStarted = 0x02
 
 
-class RouteDiscoveryOptions(t.enum_uint8, enum.IntEnum):
+class RouteDiscoveryOptions(t.enum_uint8):
     Suppress = 0x00
     Enable = 0x01
     Force = 0x02
 
 
-class MACCapabilities(t.enum_uint8, enum.IntFlag):
+class MACCapabilities(t.enum_flag_uint8):
     PANCoordinator = 1 << 0
     Router = 1 << 1
     MainsPowered = 1 << 2
@@ -52,7 +50,7 @@ class MACCapabilities(t.enum_uint8, enum.IntFlag):
     AllocateShortAddrDuringAssocNeeded = 1 << 7
 
 
-class LeaveOptions(t.enum_uint8, enum.IntFlag):
+class LeaveOptions(t.enum_flag_uint8):
     NONE = 0
     Rejoin = 1 << 0
     RemoveChildren = 1 << 1
