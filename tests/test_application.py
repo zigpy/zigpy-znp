@@ -127,18 +127,6 @@ async def test_application_startup(znp_client_server, event_loop):
     )
 
     server_znp.reply_to(
-        request=c.ZDOCommands.StartupFromApp.Req(partial=True),
-        responses=[
-            c.ZDOCommands.StartupFromApp.Rsp(
-                State=c.zdo.StartupState.RestoredNetworkState
-            ),
-            c.ZDOCommands.StateChangeInd.Callback(
-                State=t.DeviceState.StartedAsCoordinator
-            ),
-        ],
-    )
-
-    server_znp.reply_to(
         request=c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
             c.ZDOCommands.ActiveEpReq.Rsp(Status=t.Status.Success),
@@ -153,6 +141,25 @@ async def test_application_startup(znp_client_server, event_loop):
         responses=[c.AFCommands.Register.Rsp(Status=t.Status.Success)],
     )
 
+    server_znp.reply_to(
+        request=c.APPConfigCommands.BDBStartCommissioning.Req(
+            Mode=c.app_config.BDBCommissioningMode.NetworkFormation
+        ),
+        responses=[
+            c.APPConfigCommands.BDBStartCommissioning.Rsp(Status=t.Status.Success),
+            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+                Status=c.app_config.BDBCommissioningStatus.Success,
+                Mode=c.app_config.BDBCommissioningMode.NwkSteering,
+                RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
+            ),
+            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+                Status=c.app_config.BDBCommissioningStatus.NoNetwork,
+                Mode=c.app_config.BDBCommissioningMode.NwkSteering,
+                RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
+            ),
+        ],
+    )
+
     num_endpoints = 5
     endpoints = []
 
@@ -162,18 +169,7 @@ async def test_application_startup(znp_client_server, event_loop):
 
         endpoints.append(request)
 
-        # Once our endpoints have been registered, trigger BDBCommissioningNotification
-        if num_endpoints == 0:
-            event_loop.call_later(
-                0.2,
-                server_znp.send,
-                c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                    Status=c.app_config.BDBCommissioningStatus.FormationFailure,
-                    Mode=c.app_config.BDBCommissioningMode.Formation,
-                    RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
-                ),
-            )
-        elif num_endpoints < 0:
+        if num_endpoints < 0:
             raise RuntimeError("Too many endpoints registered")
 
     server_znp.callback_for_response(
@@ -182,6 +178,8 @@ async def test_application_startup(znp_client_server, event_loop):
 
     application = ControllerApplication(znp)
     await application.startup(auto_form=False)
+
+    assert len(endpoints) == 5
 
 
 @pytest_mark_asyncio_timeout(seconds=1)

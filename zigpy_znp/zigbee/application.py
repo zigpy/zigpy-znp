@@ -1,13 +1,14 @@
 import os
+import typing
 import logging
 import async_timeout
-
-from typing import Optional
 
 import zigpy.util
 import zigpy.types
 import zigpy.application
 import zigpy.profiles
+import zigpy.zcl.foundation
+from zigpy.zdo.types import ZDOCmd
 
 from zigpy.types import ExtendedPanId
 from zigpy.zcl.clusters.security import IasZone
@@ -18,8 +19,56 @@ import zigpy_znp.commands as c
 from zigpy_znp.types.nvids import NwkNvIds
 
 
+ZDO_ENDPOINT = 0
+ZDO_REQUEST_TIMEOUT = 15  # seconds
 DATA_CONFIRM_TIMEOUT = 5  # seconds
 LOGGER = logging.getLogger(__name__)
+
+
+ZDO_CONVERTERS = {
+    ZDOCmd.Node_Desc_req: (
+        ZDOCmd.Node_Desc_rsp,
+        (
+            lambda addr, ep: c.ZDOCommands.NodeDescReq.Req(
+                DstAddr=addr, NWKAddrOfInterest=addr
+            )
+        ),
+        (
+            lambda addr: c.ZDOCommands.NodeDescRsp.Callback(
+                partial=True, Src=addr, Status=t.ZDOStatus.SUCCESS
+            )
+        ),
+        (lambda rsp, dev: [rsp.NodeDescriptor]),
+    ),
+    ZDOCmd.Active_EP_req: (
+        ZDOCmd.Active_EP_rsp,
+        (
+            lambda addr, ep: c.ZDOCommands.ActiveEpReq.Req(
+                DstAddr=addr, NWKAddrOfInterest=addr
+            )
+        ),
+        (
+            lambda addr: c.ZDOCommands.ActiveEpRsp.Callback(
+                partial=True, Src=addr, Status=t.ZDOStatus.SUCCESS
+            )
+        ),
+        (lambda rsp, dev: [rsp.ActiveEndpoints]),
+    ),
+    ZDOCmd.Simple_Desc_req: (
+        ZDOCmd.Simple_Desc_rsp,
+        (
+            lambda addr, ep: c.ZDOCommands.SimpleDescReq.Req(
+                DstAddr=addr, NWKAddrOfInterest=addr, Endpoint=ep
+            )
+        ),
+        (
+            lambda addr: c.ZDOCommands.SimpleDescRsp.Callback(
+                partial=True, Src=addr, Status=t.ZDOStatus.SUCCESS
+            )
+        ),
+        (lambda rsp, dev: [rsp.SimpleDescriptor]),
+    ),
+}
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
@@ -32,29 +81,41 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.AFCommands.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
+        # ZDO requests need to be handled explicitly
         self._api.callback_for_response(
             c.ZDOCommands.EndDeviceAnnceInd.Callback(partial=True),
-            self.on_device_announce,
+            self.on_zdo_device_announce,
         )
 
         self._api.callback_for_response(
-            c.ZDOCommands.LeaveInd.Callback(partial=True), self.on_device_leave
+            c.ZDOCommands.TCDevInd.Callback.Callback(partial=True),
+            self.on_zdo_device_join,
         )
 
         self._api.callback_for_response(
-            c.ZDOCommands.SrcRtgInd.Callback(partial=True), self.on_relays_message
+            c.ZDOCommands.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
         )
 
-    def on_relays_message(self, msg: c.ZDOCommands.SrcRtgInd.Callback) -> None:
+        self._api.callback_for_response(
+            c.ZDOCommands.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
+        )
+
+    def on_zdo_relays_message(self, msg: c.ZDOCommands.SrcRtgInd.Callback) -> None:
         LOGGER.info("ZDO device relays: %s", msg)
-        device = self.get_device(nwk=msg.Dst)
+        device = self.get_device(nwk=msg.DstAddr)
         device.relays = msg.Relays
 
-    def on_device_announce(self, msg: c.ZDOCommands.EndDeviceAnnceInd.Callback) -> None:
+    def on_zdo_device_announce(
+        self, msg: c.ZDOCommands.EndDeviceAnnceInd.Callback
+    ) -> None:
         LOGGER.info("ZDO device announce: %s", msg)
         self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=0x0000)
 
-    def on_device_leave(self, msg: c.ZDOCommands.LeaveInd.Callback) -> None:
+    def on_zdo_device_join(self, msg: c.ZDOCommands.TCDevInd.Callback) -> None:
+        LOGGER.info("ZDO device join: %s", msg)
+        self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
+
+    def on_zdo_device_leave(self, msg: c.ZDOCommands.LeaveInd.Callback) -> None:
         LOGGER.info("ZDO device left: %s", msg)
         self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
 
@@ -84,21 +145,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def startup(self, auto_form=False):
         """Perform a complete application startup"""
-        await self._reset()
+
+        await self._reset(t.ResetType.Soft)
 
         should_form = [False]
 
         if auto_form and any(should_form):
             await self.form_network()
 
-        await self._api.request(c.ZDOCommands.StartupFromApp.Req(StartDelay=0))
-
-        await self._api.wait_for_response(
-            c.ZDOCommands.StateChangeInd.Callback(
-                State=t.DeviceState.StartedAsCoordinator
-            )
-        )
-
+        """
         # Get our active endpoints
         endpoints = await self._api.request_callback_rsp(
             request=c.ZDOCommands.ActiveEpReq.Req(
@@ -113,8 +168,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._api.request(
                 c.AFCommands.Delete(Endpoint=endpoint), RspStatus=t.Status.Success
             )
+        """
 
-        # Register our own
+        # Register our endpoints
         await self._api.request(
             c.AFCommands.Register.Req(
                 Endpoint=1,
@@ -176,21 +232,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.Success,
         )
 
-        await self._api.wait_for_response(
-            c.APPConfigCommands.BDBCommissioningNotification.Callback(partial=True)
+        # Start commissioning and wait until it's done
+        comm_notification = await self._api.request_callback_rsp(
+            request=c.APPConfigCommands.BDBStartCommissioning.Req(
+                Mode=c.app_config.BDBCommissioningMode.NetworkFormation
+            ),
+            RspStatus=t.Status.Success,
+            callback=c.APPConfigCommands.BDBCommissioningNotification.Callback(
+                partial=True,
+                RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
+            ),
         )
+
+        # XXX: Commissioning fails for me yet I experience no issues
+        if comm_notification.Status != c.app_config.BDBCommissioningStatus.Success:
+            LOGGER.warning(
+                "BDB commissioning did not succeed: %s", comm_notification.Status
+            )
 
     async def update_network(
         self,
         *,
-        channel: Optional[t.uint8_t] = None,
-        channels: Optional[t.Channels] = None,
-        pan_id: Optional[t.PanId] = None,
-        extended_pan_id: Optional[t.ExtendedPanId] = None,
-        network_key: Optional[t.KeyData] = None,
+        channel: typing.Optional[t.uint8_t] = None,
+        channels: typing.Optional[t.Channels] = None,
+        pan_id: typing.Optional[t.PanId] = None,
+        extended_pan_id: typing.Optional[t.ExtendedPanId] = None,
+        network_key: typing.Optional[t.KeyData] = None,
         reset: bool = True,
     ):
-        if channel is None:
+        if channel is not None:
             raise NotImplementedError("Cannot set a specific channel")
 
         if channels is not None:
@@ -239,9 +309,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # We have to reset afterwards
             await self._reset()
 
-    async def _reset(self):
+    async def _reset(self, reset_type: t.ResetType = t.ResetType.Soft):
         await self._api.request_callback_rsp(
-            request=c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft),
+            request=c.SysCommands.ResetReq.Req(Type=reset_type),
             callback=c.SysCommands.ResetInd.Callback(partial=True),
         )
 
@@ -275,12 +345,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             reset=False,
         )
 
-        # Receive verbose callbacks
+        # We do not want to receive verbose ZDO callbacks
+        # Just pass ZDO callbacks back to Zigpy
         await self._api.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
 
         await self._api.request(
             c.APPConfigCommands.BDBStartCommissioning.Req(
-                Mode=t.BDBCommissioningMode.NetworkFormation
+                Mode=c.app_config.BDBCommissioningMode.NetworkFormation
             ),
             RspStatus=t.Status.Success,
         )
@@ -288,19 +359,91 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # This may take a while because of some sort of background scanning.
         # This can probably be disabled.
         await self._api.wait_for_response(
-            c.ZDOCommands.StateChangeInd.Rsp(State=t.DeviceState.StartedAsCoordinator)
+            c.ZDOCommands.StateChangeInd.Callback(
+                State=t.DeviceState.StartedAsCoordinator
+            )
         )
 
         await self._api.request(
             c.APPConfigCommands.BDBStartCommissioning.Req(
-                Mode=t.BDBCommissioningMode.NetworkSteering
+                Mode=c.app_config.BDBCommissioningMode.NetworkSteering
             ),
             RspStatus=t.Status.Success,
         )
 
+    async def _send_zdo_request(
+        self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
+    ):
+        """
+        Zigpy doesn't send ZDO requests via TI's ZDO_* MT commands,
+        so it will never receive a reply because ZNP intercepts ZDO replies, never
+        sends a DataConfirm, and instead replies with one of its ZDO_* MT responses.
+
+        This method translates the ZDO_* MT response into one zigpy can handle.
+        """
+
+        LOGGER.trace(
+            "Intercepted a ZDO request: dst_addr=%s, dst_ep=%s, src_ep=%s, "
+            "cluster=%s, sequence=%s, options=%s, radius=%s, data=%s",
+            dst_addr,
+            dst_ep,
+            src_ep,
+            cluster,
+            sequence,
+            options,
+            radius,
+            data,
+        )
+
+        assert dst_ep == ZDO_ENDPOINT
+
+        response_cluster, request_factory, callback_factory, converter = ZDO_CONVERTERS[
+            cluster
+        ]
+        request = request_factory(dst_addr.address, ep=src_ep)
+        callback = callback_factory(dst_addr.address)
+
+        LOGGER.debug(
+            "Intercepted AP ZDO request and replaced with %s - %s", request, callback
+        )
+
+        async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
+            response = await self._api.request_callback_rsp(
+                request=request, RspStatus=t.Status.Success, callback=callback
+            )
+
+        device = self.get_device(nwk=dst_addr.address)
+
+        # Build up a ZDO response
+        message = t.serialize_list(
+            [t.uint8_t(sequence), response.Status, response.NWK]
+            + converter(response, device)
+        )
+        LOGGER.trace("Pretending we received a ZDO message: %s", message)
+
+        # We do not get any LQI info here
+        self.handle_message(
+            sender=device,
+            profile=zigpy.profiles.zha.PROFILE_ID,
+            cluster=response_cluster,
+            src_ep=dst_ep,
+            dst_ep=src_ep,
+            message=message,
+        )
+
+        return response.Status, "Request sent successfully"
+
     async def _send_request(
         self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
     ):
+        if dst_ep == ZDO_ENDPOINT and not (
+            cluster == ZDOCmd.Mgmt_Permit_Joining_req
+            and dst_addr.mode == t.AddrMode.Broadcast
+        ):
+            return await self._send_zdo_request(
+                dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
+            )
+
         async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
             response = await self._api.request_callback_rsp(
                 request=c.AFCommands.DataRequestExt.Req(
@@ -340,20 +483,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         expect_reply=True,
         use_ieee=False,
     ):
-        """Submit and send data out as an unicast transmission.
-        :param device: destination device
-        :param profile: Zigbee Profile ID to use for outgoing message
-        :param cluster: cluster id where the message is being sent
-        :param src_ep: source endpoint id
-        :param dst_ep: destination endpoint id
-        :param sequence: transaction sequence number of the message
-        :param data: Zigbee message payload
-        :param expect_reply: True if this is essentially a request
-        :param use_ieee: use EUI64 for destination addressing
-        :returns: return a tuple of a status and an error_message. Original requestor
-                  has more context to provide a more meaningful error message
-        """
-
         tx_options = c.af.TransmitOptions.RouteDiscovery
 
         # if expect_reply:
@@ -387,22 +516,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         data,
         broadcast_address=zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
     ):
-        """Submit and send data out as an broadcast transmission.
-        :param profile: Zigbee Profile ID to use for outgoing message
-        :param cluster: cluster id where the message is being sent
-        :param src_ep: source endpoint id
-        :param dst_ep: destination endpoint id
-        :param grpid: group id to address the broadcast to
-        :param radius: max radius of the broadcast
-        :param sequence: transaction sequence number of the message
-        :param data: zigbee message payload
-        :param broadcast_address: broadcast address.
-        :returns: return a tuple of a status and an error_message. Original requestor
-                  has more context to provide a more meaningful error message
-        """
+        assert grpid == 0
 
         return await self._send_request(
-            dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=grpid),
+            dst_addr=t.AddrModeAddress(
+                mode=t.AddrMode.Broadcast, address=broadcast_address
+            ),
             dst_ep=dst_ep,
             src_ep=src_ep,
             cluster=cluster,
@@ -424,28 +543,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         hops=0,
         non_member_radius=3,
     ):
-        """Submit and send data out as a multicast transmission.
-        :param group_id: destination multicast address
-        :param profile: Zigbee Profile ID to use for outgoing message
-        :param cluster: cluster id where the message is being sent
-        :param src_ep: source endpoint id
-        :param sequence: transaction sequence number of the message
-        :param data: Zigbee message payload
-        :param hops: the message will be delivered to all nodes within this number of
-                     hops of the sender. A value of zero is converted to MAX_HOPS
-        :param non_member_radius: the number of hops that the message will be forwarded
-                                  by devices that are not members of the group. A value
-                                  of 7 or greater is treated as infinite
-        :returns: return a tuple of a status and an error_message. Original requestor
-                  has more context to provide a more meaningful error message
-        """
         raise NotImplementedError()
 
     async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
         await self._api.request(
             c.ZDOCommands.MgmtLeaveReq.Req(
-                Dst=device.nwk, IEEE=device.ieee, LeaveOptions=c.zdo.LeaveOptions.NONE
+                DstAddr=device.nwk,
+                IEEE=device.ieee,
+                LeaveOptions=c.zdo.LeaveOptions.NONE,
             ),
             RspStatus=t.Status.Success,
         )
