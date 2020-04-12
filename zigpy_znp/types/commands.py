@@ -314,6 +314,8 @@ class CommandBase:
         cls.schema = schema
 
     def __init__(self, *, partial=False, **params):
+        from zigpy_znp.commands.zdo import PatchedSizePrefixedSimpleDescriptor
+
         all_params = {param.name for param in self.schema.parameters}
         given_params = set(params.keys())
 
@@ -335,22 +337,29 @@ class CommandBase:
             value = params[param.name]
 
             if not isinstance(value, param.type):
-                # Coerce the following types:
-                #  - int to int_t
-                #  - bytes to Bytes
-                #  - list to typed List
-                if (
+                # fmt: off
+                is_coercible_type = [
                     isinstance(value, int)
                     and issubclass(param.type, int)
-                    and not issubclass(param.type, enum.Enum)
+                    and not issubclass(param.type, enum.Enum),
+
+                    isinstance(value, bytes)
+                    and issubclass(param.type, (t.ShortBytes, t.LongBytes)),
+
+                    isinstance(value, list) and issubclass(param.type, list),
+                    isinstance(value, bool) and issubclass(param.type, t.Bool),
+                ]
+                # fmt: on
+
+                if any(is_coercible_type):
+                    value = param.type(value)
+                elif (
+                    type(value) is zigpy.zdo.types.SimpleDescriptor
+                    and param.type is PatchedSizePrefixedSimpleDescriptor
                 ):
-                    value = param.type(value)
-                elif isinstance(value, bytes) and issubclass(
-                    param.type, (t.ShortBytes, t.LongBytes)
-                ):
-                    value = param.type(value)
-                elif isinstance(value, list) and issubclass(param.type, list):
-                    value = param.type(value)
+                    # TODO: fix SizePrefixedSimpleDescriptor.deserialize upstream
+                    data = value.serialize()
+                    value, _ = param.type.deserialize(bytes([len(data)]) + data)
                 else:
                     raise ValueError(
                         f"In {type(self)}, param {param.name} is "
@@ -368,9 +377,6 @@ class CommandBase:
             bound_params[param.name] = (param, value)
 
         super().__setattr__("_bound_params", bound_params)
-
-        if partial and all_params == given_params:
-            LOGGER.warning("Partial command has no unbound parameters: %s", self)
 
     def to_frame(self):
         from zigpy_znp.frames import GeneralFrame
@@ -459,7 +465,7 @@ class CommandBase:
     __str__ = __repr__
 
 
-class DeviceState(t.enum_uint8):
+class DeviceState(t.MissingEnumMixin, t.enum_uint8):
     """Indicated device state."""
 
     InitializedNotStarted = 0x00

@@ -52,7 +52,7 @@ class BDBCommissioningStatus(t.enum_uint8):
 class BDBCommissioningMode(t.enum_uint8):
     Initialization = 0x00
     NwkSteering = 0x01
-    Formation = 0x02
+    NetworkFormation = 0x02
     FindingBinding = 0x03
     Touchlink = 0x04
     ParentLost = 0x05
@@ -134,7 +134,7 @@ class APPConfigCommands(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
         t.CommandType.SREQ,
         0x05,
         req_schema=t.Schema(
-            (t.Param("Mode", t.BDBCommissioningMode, "Commissioning mode"),)
+            (t.Param("Mode", BDBCommissioningMode, "Commissioning mode"),)
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )

@@ -98,16 +98,6 @@ class AddrModeAddress(struct.Struct):
             raise ValueError(f"Unknown address mode: {self.mode}")  # pragma: no cover
 
 
-class BDBCommissioningMode(basic.enum_uint8):
-    """Commissioning mode."""
-
-    Initialization = 0x00
-    TouchLink = 0x01
-    NetworkSteering = 0x02
-    NetworkFormation = 0x04
-    FindingAndBinding = 0x08
-
-
 @attr.s
 class Beacon(struct.Struct):
     """Beacon message."""
@@ -182,6 +172,9 @@ class Status(MissingEnumMixin, basic.enum_uint8):
     MemoryFailure = 0x10
     TableFull = 0x11
     MACNoResource = 0x1A
+
+    InvalidReqType = 0x80
+
     InvalidRequest = 0xC2
 
     NwkTableFull = 0xC7

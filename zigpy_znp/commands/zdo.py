@@ -63,6 +63,29 @@ class BeaconList(t.LVList, item_type=t.Beacon, length_type=t.uint8_t):
     pass
 
 
+class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
+    @classmethod
+    def deserialize(cls, data):
+        if data == b"\x00":
+            return cls(), b""
+
+        return super().deserialize(data)
+
+
+class PatchedSizePrefixedSimpleDescriptor(zigpy.zdo.types.SimpleDescriptor):
+    def serialize(self):
+        data = super().serialize()
+        return len(data).to_bytes(1, "little") + data
+
+    @classmethod
+    def deserialize(cls, data):
+        if not data or data[0] == 0:
+            return None, data[1:]
+
+        assert data[0] <= len(data[1:])
+        return super().deserialize(data[1:])
+
+
 class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     # send a “Network Address Request”. This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
@@ -117,7 +140,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the inquiry"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the inquiry",
                 ),
                 t.Param(
                     "NWKAddrOfInterest",
@@ -136,7 +161,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the inquiry"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the inquiry",
                 ),
                 t.Param(
                     "NWKAddrOfInterest",
@@ -155,7 +182,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the inquiry"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the inquiry",
                 ),
                 t.Param(
                     "NWKAddrOfInterest",
@@ -196,7 +225,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the inquiry"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the inquiry",
                 ),
                 t.Param(
                     "NWKAddrOfInterest",
@@ -218,7 +249,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the inquiry"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the inquiry",
                 ),
                 t.Param(
                     "NWKAddrOfInterest",
@@ -237,7 +270,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the inquiry"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the inquiry",
                 ),
                 t.Param(
                     "NWKAddrOfInterest",
@@ -276,7 +311,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst",
+                    "DstAddr",
                     t.NWK,
                     "network address of the device generating the set request",
                 ),
@@ -312,7 +347,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst", t.NWK, "Short address of the device generating the request"
+                    "DstAddr",
+                    t.NWK,
+                    "Short address of the device generating the request",
                 ),
                 t.Param(
                     "LocalCoordinator",
@@ -449,7 +486,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (
                 t.Param(
-                    "Dst",
+                    "DstAddr",
                     t.NWK,
                     "Short address of the device that will process the "
                     "mgmt leave (remote or self)",
@@ -995,14 +1032,14 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x82,
         rsp_schema=t.Schema(
             (
+                t.Param("Src", t.NWK, "The message’s source network address."),
                 t.Param(
+                    "Status",
+                    t.ZDOStatus,
+                    "This field indicates either SUCCESS or FAILURE.",
                 ),
-                t.Param("IEEE", t.EUI64, "Extended address of the source device"),
-                t.Param("NWK", t.NWK, "Short address of the source device"),
-                t.Param("Status", t.ZDOStatus, "This field indicates either SUCCESS or FAILURE."),
-                t.Param(
-                    "NodeDescriptor", zigpy.zdo.types.NodeDescriptor, "Node descriptor"
-                ),
+                t.Param("NWK", t.NWK, "Device’s short address of this Node descriptor"),
+                t.Param("NodeDescriptor", NullableNodeDescriptor, "Node descriptor"),
             )
         ),
     )
@@ -1038,10 +1075,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                     "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("Len", t.uint8_t, "Length of the simple descriptor"),
                 t.Param(
                     "SimpleDescriptor",
-                    zigpy.zdo.types.SimpleDescriptor,
+                    PatchedSizePrefixedSimpleDescriptor,
                     "Simple descriptor",
                 ),
             )
@@ -1353,7 +1389,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param(
-                    "Dst",
+                    "DstAddr",
                     t.NWK,
                     "Network address of the destination of the source route",
                 ),
