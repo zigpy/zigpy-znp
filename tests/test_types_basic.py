@@ -4,6 +4,18 @@ import pytest
 import zigpy_znp.types as t
 
 
+def test_serialize_list():
+    class TestList(t.LVList, item_type=t.uint8_t, length_type=t.uint8_t):
+        pass
+
+    assert (
+        t.serialize_list([t.uint8_t(0xF0), t.Bytes(b"asd"), TestList([0xAB, 0xCD])])
+        == b"\xF0asd\x02\xAB\xCD"
+    )
+
+    assert t.serialize_list([]) == b""
+
+
 def test_enum_uint():
     class TE(t.enum_flag_uint16):
         ALL = 0xFFFF

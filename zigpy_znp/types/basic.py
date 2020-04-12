@@ -20,6 +20,10 @@ class Bytes(bytes):
     __str__ = __repr__
 
 
+def serialize_list(objects) -> Bytes:
+    return Bytes(b"".join([o.serialize() for o in objects]))
+
+
 class int_t(int):
     _signed = True
     _size = None
