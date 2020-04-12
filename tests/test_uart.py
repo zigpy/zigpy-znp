@@ -180,6 +180,36 @@ def test_uart_rx_sof_stress():
     api.frame_received.assert_called_once_with(test_frame)
 
 
+def test_uart_frame_received_error():
+    transport = mock.Mock()
+
+    api = mock.Mock()
+    api.frame_received = mock.Mock(side_effect=RuntimeError("An error"))
+
+    with pytest.raises(RuntimeError):
+        api.frame_received(None)
+
+    uart = znp_uart.ZnpMtProtocol(api)
+    uart.connection_made(transport)
+
+    test_command = c.SysCommands.ResetInd.Callback(
+        Reason=t.ResetReason.PowerUp,
+        TransportRev=0x00,
+        ProductId=0x45,
+        MajorRel=0x01,
+        MinorRel=0x02,
+        MaintRel=0x03,
+    )
+    test_frame = test_command.to_frame()
+    test_frame_bytes = TransportFrame(test_frame).serialize()
+
+    # Errors thrown by api.frame_received should not impact how many frames are handled
+    uart.data_received(test_frame_bytes * 3)
+
+    # We should have received all three frames
+    api.frame_received.call_count == 3
+
+
 PORT_INFO = [
     {
         "device": "/dev/ttyUSB1",
