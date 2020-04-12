@@ -141,9 +141,9 @@ async def test_application_startup(znp_client_server, event_loop):
     server_znp.reply_to(
         request=c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
-            c.ZDOCommands.ActiveEpReq.Rsp(Status=t.Status.Success),
+            c.ZDOCommands.ActiveEpReq.Rsp(Status=t.ZDOStatus.SUCCESS),
             c.ZDOCommands.ActiveEpRsp.Callback(
-                Src=0x0000, Status=t.Status.Success, NWK=0x0000, ActiveEndpoints=[]
+                Src=0x0000, Status=t.ZDOStatus.SUCCESS, NWK=0x0000, ActiveEndpoints=[]
             ),
         ],
     )
@@ -205,7 +205,7 @@ async def test_permit_join(znp_client_server, event_loop):
         responses=[
             c.ZDOCommands.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
             c.ZDOCommands.MgmtPermitJoinRsp.Callback(
-                Src=0x0000, Status=t.Status.Success
+                Src=0x0000, Status=t.ZDOStatus.SUCCESS
             ),
         ],
     )

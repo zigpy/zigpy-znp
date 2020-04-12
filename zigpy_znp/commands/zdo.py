@@ -627,7 +627,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("IEEE", t.EUI64, "Extended address of the device"),
                 t.Param("LinkKeyData", t.KeyData, "128bit link key"),
@@ -954,7 +954,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("IEEE", t.EUI64, "Extended address of the source device"),
                 t.Param("NWK", t.NWK, "Short address of the source device"),
@@ -975,7 +975,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("IEEE", t.EUI64, "Extended address of the source device"),
                 t.Param("NWK", t.NWK, "Short address of the source device"),
@@ -996,10 +996,10 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("IEEE", t.EUI64, "Extended address of the source device"),
                 t.Param("NWK", t.NWK, "Short address of the source device"),
+                t.Param("Status", t.ZDOStatus, "This field indicates either SUCCESS or FAILURE."),
                 t.Param(
                     "NodeDescriptor", zigpy.zdo.types.NodeDescriptor, "Node descriptor"
                 ),
@@ -1015,7 +1015,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
                 t.Param(
@@ -1035,7 +1035,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
                 t.Param("Len", t.uint8_t, "Length of the simple descriptor"),
@@ -1056,7 +1056,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
                 t.Param("ActiveEndpoints", EndpointList, "Active endpoints list"),
@@ -1072,7 +1072,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
                 t.Param("MatchList", EndpointList, "Endpoints list"),
@@ -1088,7 +1088,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
                 t.Param("ComplexDesc", t.ShortBytes, "Complex descriptor"),
@@ -1104,7 +1104,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
                 t.Param("UserDesc", t.ShortBytes, "User descriptor"),
@@ -1120,7 +1120,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
             )
@@ -1135,9 +1135,9 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
-                t.Param("ServerMask", t.Status, "Server mask response"),
+                t.Param("ServerMask", t.ZDOStatus, "Server mask response"),
             )
         ),
     )
@@ -1150,7 +1150,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
             )
         ),
@@ -1164,7 +1164,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
             )
         ),
@@ -1178,7 +1178,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
             )
         ),
@@ -1192,7 +1192,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("NetworkCount", t.uint8_t, "Total number of entries available"),
                 t.Param("Index", t.uint8_t, "Where the response starts"),
@@ -1209,7 +1209,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("Neighbours", zigpy.zdo.types.Neighbors, "Neighbours"),
             )
@@ -1224,7 +1224,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("Routes", zigpy.zdo.types.Routes, "Routes"),
             )
@@ -1239,7 +1239,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param(
                     "BindTableEntries",
@@ -1260,7 +1260,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
             )
         ),
@@ -1274,7 +1274,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
             )
         ),
@@ -1288,7 +1288,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
             )
         ),
@@ -1340,7 +1340,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             (
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
             )
         ),
@@ -1376,7 +1376,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
+                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
                 ),
                 t.Param("Nwk", t.NWK, "device's network address"),
                 t.Param("ParentNwk", t.NWK, "Parent's network address"),
