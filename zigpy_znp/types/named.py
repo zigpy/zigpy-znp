@@ -76,7 +76,7 @@ class AddrModeAddress(struct.Struct):
     def deserialize(cls, data: bytes):
         """Deserialize data."""
         mode, data = AddrMode.deserialize(data)
-        if mode in (AddrMode.NWK, AddrMode.Group):
+        if mode in (AddrMode.NWK, AddrMode.Group, AddrMode.Broadcast):
             # a value of 2 indicates 2-byte (16-bit) address mode,
             # using only the 2 LSB’s of the DstAddr field to form
             # a 2-byte short address.
@@ -90,7 +90,7 @@ class AddrModeAddress(struct.Struct):
         return cls(mode=mode, address=addr), data
 
     def serialize(self):
-        if self.mode in (AddrMode.NWK, AddrMode.Group):
+        if self.mode in (AddrMode.NWK, AddrMode.Group, AddrMode.Broadcast):
             return self.mode.serialize() + basic.uint64_t(self.address).serialize()
         elif self.mode == AddrMode.IEEE:
             return self.mode.serialize() + self.address.serialize()
