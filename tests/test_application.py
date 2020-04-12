@@ -141,7 +141,7 @@ async def test_application_startup(znp_client_server, event_loop):
     server_znp.reply_to(
         request=c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
-            c.ZDOCommands.ActiveEpReq.Rsp(Status=t.ZDOStatus.SUCCESS),
+            c.ZDOCommands.ActiveEpReq.Rsp(Status=t.Status.Success),
             c.ZDOCommands.ActiveEpRsp.Callback(
                 Src=0x0000, Status=t.ZDOStatus.SUCCESS, NWK=0x0000, ActiveEndpoints=[]
             ),
