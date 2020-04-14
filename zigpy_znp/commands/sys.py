@@ -351,7 +351,7 @@ class SysCommands(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x14,
         req_schema=t.Schema(
-            (t.Param("TXPower", t.uint8_t, "Requested TX power setting, in dBm"),)
+            (t.Param("TXPower", t.int8s, "Requested TX power setting, in dBm"),)
         ),
         # While the docs say "the returned TX power is the actual setting applied to
         # the radio – nearest characterized value for the specific radio.", the code

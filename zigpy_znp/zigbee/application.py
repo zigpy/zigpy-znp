@@ -570,3 +570,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if response.Status != t.Status.Success:
             raise RuntimeError(f"Permit join response failure: {response}")
+
+    async def set_tx_power(self, dbm: int) -> None:
+        assert -22 <= dbm <= 19
+
+        await self._api.request(
+            c.SysCommands.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.Success
+        )
