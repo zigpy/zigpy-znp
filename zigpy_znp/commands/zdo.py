@@ -6,6 +6,8 @@ returned by the target. The response message only indicates that the command mes
 was received and executed. The result of the command execution will be conveyed to
 the tester via a callback message interface"""
 
+import typing
+
 import zigpy.zdo.types
 import zigpy_znp.types as t
 
@@ -65,11 +67,18 @@ class BeaconList(t.LVList, item_type=t.Beacon, length_type=t.uint8_t):
 
 class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: bytes) -> typing.Tuple["NullableNodeDescriptor", bytes]:
         if data == b"\x00":
             return cls(), b""
 
         return super().deserialize(data)
+
+    def serialize(self) -> bytes:
+        # Special case when the node descriptor is completely empty
+        if all(getattr(self, field) is None for field, _ in self._fields):
+            return b"\x00"
+
+        return super().serialize()
 
 
 class PatchedSizePrefixedSimpleDescriptor(zigpy.zdo.types.SimpleDescriptor):
@@ -82,7 +91,6 @@ class PatchedSizePrefixedSimpleDescriptor(zigpy.zdo.types.SimpleDescriptor):
         if not data or data[0] == 0:
             return None, data[1:]
 
-        assert data[0] <= len(data[1:])
         return super().deserialize(data[1:])
 
 

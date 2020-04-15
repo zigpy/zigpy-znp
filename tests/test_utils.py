@@ -1,8 +1,13 @@
 def test_no_trace_logger():
-    from zigpy_znp.utils import TraceLogger
+    from zigpy_znp.utils import TraceLogger, TRACE
     import logging
 
     assert logging.getLoggerClass() is TraceLogger
+
+    LOGGER = logging.getLogger("test")
+    LOGGER.setLevel(TRACE)
+    LOGGER.debug("test")
+    LOGGER.trace("test")
 
 
 def test_existing_trace_logger():

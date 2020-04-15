@@ -1,6 +1,8 @@
 import pytest
 
-from zigpy_znp import types as t
+import zigpy.types as zigpy_t
+import zigpy_znp.commands as c
+import zigpy_znp.types as t
 
 
 def test_status():
@@ -69,6 +71,11 @@ def test_addr_mode_address():
         data = b"\xAB\xaa\x55\x02\x03\x04\x05\x06\x07"
         t.AddrModeAddress.deserialize(data)
 
+    with pytest.raises(ValueError):
+        # NOT_PRESENT is a valid AddrMode member but it is not a valid AddrModeAddress
+        data = b"\x00\xaa\x55\x02\x03\x04\x05\x06\x07"
+        t.AddrModeAddress.deserialize(data)
+
     # Bytes at the end for NWK address mode are ignored
     data1 = b"\x02\x0E\xAD" + b"\xC0\x8C\x97\x83\xB0\x20\x33"
     data2 = b"\x02\x0E\xAD" + b"\x3F\xB9\x5B\x64\x20\x86\xD6"
@@ -96,3 +103,47 @@ def test_missing_status_enum():
     # Status values that don't fit can't be created
     with pytest.raises(ValueError):
         t.Status(0xFF + 1)
+
+
+def test_zdo_nullable_node_descriptor():
+    desc1, data = c.zdo.NullableNodeDescriptor.deserialize(b"\x00")
+
+    assert all(getattr(desc1, field) is None for field, _ in desc1._fields)
+    assert not data
+    assert desc1.serialize() == b"\x00"
+
+    desc2 = c.zdo.NullableNodeDescriptor(1, 2, 3, 4, 5, 6, 7, 8, 9)
+    desc3, data = c.zdo.NullableNodeDescriptor.deserialize(desc2.serialize())
+
+    assert not data
+    assert desc2.serialize() == desc3.serialize()
+
+
+# Copied from zigpy, until fix is released
+def test_patched_size_prefixed_simple_descriptor():
+    sd = c.zdo.PatchedSizePrefixedSimpleDescriptor()
+    sd.endpoint = t.uint8_t(1)
+    sd.profile = t.uint16_t(2)
+    sd.device_type = t.uint16_t(3)
+    sd.device_version = t.uint8_t(4)
+    sd.input_clusters = zigpy_t.LVList(t.uint16_t)([t.uint16_t(5), t.uint16_t(6)])
+    sd.output_clusters = zigpy_t.LVList(t.uint16_t)([t.uint16_t(7), t.uint16_t(8)])
+
+    ser = sd.serialize()
+    assert ser[0] == len(ser) - 1
+
+    sd2, data = c.zdo.PatchedSizePrefixedSimpleDescriptor.deserialize(ser + b"extra")
+    assert sd.input_clusters == sd2.input_clusters
+    assert sd.output_clusters == sd2.output_clusters
+    assert isinstance(sd2, c.zdo.PatchedSizePrefixedSimpleDescriptor)
+    assert data == b"extra"
+
+
+def test_empty_patched_size_prefixed_simple_descriptor():
+    r = c.zdo.PatchedSizePrefixedSimpleDescriptor.deserialize(b"\x00")
+    assert r == (None, b"")
+
+
+def test_invalid_patched_size_prefixed_simple_descriptor():
+    with pytest.raises(ValueError):
+        c.zdo.PatchedSizePrefixedSimpleDescriptor.deserialize(b"\x01")

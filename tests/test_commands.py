@@ -2,6 +2,8 @@ import pytest
 import logging
 import keyword
 
+import zigpy.types as zigpy_t
+import zigpy.zdo.types
 import zigpy_znp.commands as c
 import zigpy_znp.frames as frames
 from zigpy_znp import types as t
@@ -222,6 +224,45 @@ def test_command_param_binding():
             DstEndpoint=0x56,
             ClusterIdList=[0x12, 0x457890],  # 0x457890 doesn't fit into a uint8_t
         )
+
+
+def test_simple_descriptor():
+    simple_descriptor = zigpy.zdo.types.SimpleDescriptor()
+    simple_descriptor.endpoint = zigpy_t.uint8_t(1)
+    simple_descriptor.profile = zigpy_t.uint16_t(260)
+    simple_descriptor.device_type = zigpy_t.uint16_t(257)
+    simple_descriptor.device_version = zigpy_t.uint8_t(0)
+    simple_descriptor.input_clusters = zigpy_t.LVList(t.uint16_t)(
+        [0, 3, 4, 5, 6, 8, 2821, 1794]
+    )
+    simple_descriptor.output_clusters = zigpy_t.LVList(t.uint16_t)([10, 25])
+
+    c1 = c.ZDOCommands.SimpleDescRsp.Callback(
+        Src=t.NWK(0x1234),
+        Status=t.ZDOStatus.SUCCESS,
+        NWK=t.NWK(0x1234),
+        SimpleDescriptor=simple_descriptor,
+    )
+
+    sp_simple_descriptor = c.zdo.PatchedSizePrefixedSimpleDescriptor()
+    sp_simple_descriptor.endpoint = zigpy_t.uint8_t(1)
+    sp_simple_descriptor.profile = zigpy_t.uint16_t(260)
+    sp_simple_descriptor.device_type = zigpy_t.uint16_t(257)
+    sp_simple_descriptor.device_version = zigpy_t.uint8_t(0)
+    sp_simple_descriptor.input_clusters = zigpy_t.LVList(t.uint16_t)(
+        [0, 3, 4, 5, 6, 8, 2821, 1794]
+    )
+    sp_simple_descriptor.output_clusters = zigpy_t.LVList(t.uint16_t)([10, 25])
+
+    c2 = c.ZDOCommands.SimpleDescRsp.Callback(
+        Src=t.NWK(0x1234),
+        Status=t.ZDOStatus.SUCCESS,
+        NWK=t.NWK(0x1234),
+        SimpleDescriptor=sp_simple_descriptor,
+    )
+
+    assert c1.to_frame() == c2.to_frame()
+    # assert c1 == c2
 
 
 def test_command_str_repr():

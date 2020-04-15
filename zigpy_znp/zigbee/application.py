@@ -397,10 +397,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         assert dst_ep == ZDO_ENDPOINT
 
-        response_cluster, request_factory, callback_factory, converter = ZDO_CONVERTERS[
-            cluster
-        ]
-        request = request_factory(dst_addr.address, ep=src_ep)
+        rsp_cluster, req_factory, callback_factory, converter = ZDO_CONVERTERS[cluster]
+        request = req_factory(dst_addr.address, ep=src_ep)
         callback = callback_factory(dst_addr.address)
 
         LOGGER.debug(
@@ -425,7 +423,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.handle_message(
             sender=device,
             profile=zigpy.profiles.zha.PROFILE_ID,
-            cluster=response_cluster,
+            cluster=rsp_cluster,
             src_ep=dst_ep,
             dst_ep=src_ep,
             message=message,

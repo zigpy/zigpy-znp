@@ -37,6 +37,12 @@ def test_uart_rx_basic():
     api.frame_received.assert_called_once_with(test_frame)
 
 
+def test_uart_str_repr():
+    uart = znp_uart.ZnpMtProtocol(mock.Mock())
+    str(uart)
+    repr(uart)
+
+
 def test_uart_rx_byte_by_byte():
     api = mock.Mock()
     transport = mock.Mock()
