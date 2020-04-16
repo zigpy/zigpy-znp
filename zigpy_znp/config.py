@@ -2,7 +2,13 @@ import typing
 import numbers
 
 import voluptuous as vol
-from zigpy.config import CONF_DEVICE, CONFIG_SCHEMA, SCHEMA_DEVICE, cv_boolean
+from zigpy.config import (  # noqa: F401
+    CONF_DEVICE,
+    CONF_DEVICE_PATH,
+    CONFIG_SCHEMA,
+    SCHEMA_DEVICE,
+    cv_boolean,
+)
 
 ConfigType = typing.Dict[str, typing.Any]
 
