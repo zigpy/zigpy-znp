@@ -230,3 +230,115 @@ async def test_permit_join(application):
 
     # Make sure both commands were received
     await asyncio.gather(data_req_sent, permit_join_sent)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_on_zdo_relays_message_callback(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    device = mocker.Mock()
+    mocker.patch.object(app, "get_device", return_value=device)
+
+    znp_server.send(
+        c.ZDOCommands.SrcRtgInd.Callback(DstAddr=0x1234, Relays=[0x5678, 0xABCD])
+    )
+    assert device.relays == [0x5678, 0xABCD]
+
+
+@pytest_mark_asyncio_timeout()
+async def test_on_zdo_device_announce(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "handle_join")
+
+    nwk = 0x1234
+    ieee = t.EUI64(range(8))
+
+    znp_server.send(
+        c.ZDOCommands.EndDeviceAnnceInd.Callback(
+            Src=0x0001, NWK=nwk, IEEE=ieee, Capabilities=c.zdo.MACCapabilities.Router
+        )
+    )
+    app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_on_zdo_device_join(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "handle_join")
+
+    nwk = 0x1234
+    ieee = t.EUI64(range(8))
+
+    znp_server.send(
+        c.ZDOCommands.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0001)
+    )
+    app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_on_zdo_device_leave_callback(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "handle_leave")
+
+    nwk = 0x1234
+    ieee = t.EUI64(range(8))
+
+    znp_server.send(
+        c.ZDOCommands.LeaveInd.Callback(
+            NWK=nwk, IEEE=ieee, Request=False, Remove=False, Rejoin=False
+        )
+    )
+    app.handle_leave.assert_called_once_with(nwk=nwk, ieee=ieee)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_on_af_message_callback(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    device = mocker.Mock()
+    mocker.patch.object(
+        app, "get_device", side_effect=[device, KeyError("No such device")]
+    )
+    mocker.patch.object(app, "handle_message")
+
+    af_message = c.AFCommands.IncomingMsg.Callback(
+        GroupId=1,
+        ClusterId=2,
+        SrcAddr=0xABCD,
+        SrcEndpoint=4,
+        DstEndpoint=5,
+        WasBroadcast=False,
+        LQI=19,
+        SecurityUse=False,
+        TimeStamp=0,
+        TSN=0,
+        Data=b"test",
+        MacSrcAddr=0x0000,
+        MsgResultRadius=1,
+    )
+
+    # Normal message
+    znp_server.send(af_message)
+    app.get_device.assert_called_once_with(nwk=0xABCD)
+    device.radio_details.assert_called_once_with(lqi=19, rssi=None)
+    app.handle_message.assert_called_once_with(
+        sender=device, profile=260, cluster=2, src_ep=4, dst_ep=5, message=b"test"
+    )
+
+    device.reset_mock()
+    app.handle_message.reset_mock()
+    app.get_device.reset_mock()
+
+    # Message from an unknown device
+    znp_server.send(af_message)
+    app.get_device.assert_called_once_with(nwk=0xABCD)
+    assert device.radio_details.call_count == 0
+    assert app.handle_message.call_count == 0
