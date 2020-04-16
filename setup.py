@@ -1,13 +1,18 @@
 """Setup module for zigpy-znp"""
 
+import pathlib
 from setuptools import find_packages, setup
 
 import zigpy_znp
+
+root = pathlib.Path(__file__).parent
 
 setup(
     name="zigpy-znp",
     version=zigpy_znp.__version__,
     description="A library which communicates with ZNP radios for zigpy",
+    long_description=(root / "README.md").read_text(),
+    long_description_content_type="text/markdown",
     url="http://github.com/zha-ng/zigpy-znp",
     author="Alexei Chetroi",
     author_email="alexei.chetroi@outlook.com",
