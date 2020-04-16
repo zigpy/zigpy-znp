@@ -253,6 +253,7 @@ class ZNP:
     def close(self) -> None:
         if self._uart is not None:
             self._uart.close()
+            self._uart = None
 
         self._cancel_all_listeners()
 

@@ -134,7 +134,7 @@ class ZnpMtProtocol(asyncio.Protocol):
         return f"<{type(self).__name__} for {self._api}>"
 
 
-def guess_port() -> serial.tools.list_ports_common.ListPortInfo:
+def guess_port() -> str:
     """Picks the first USB port with a Texas Instruments vendor ID."""
     candidates = []
 

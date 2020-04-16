@@ -12,7 +12,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 
 from zigpy_znp.types import nvids
-from zigpy_znp.uart import ZnpMtProtocol
+from zigpy_znp.uart import ZnpMtProtocol, connect
 
 from zigpy_znp.api import (
     ZNP,
@@ -101,6 +101,37 @@ def pingable_serial_port(mocker):
 async def test_znp_connect(mocker, event_loop, pingable_serial_port):
     api = ZNP(TEST_APP_CONFIG)
     await api.connect()
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_auto_connect(mocker, event_loop, pingable_serial_port):
+    AUTO_DETECTED_PORT = "/dev/ttyWorkingUSB1"
+
+    uart_guess_port = mocker.patch(
+        "zigpy_znp.uart.guess_port", return_value=AUTO_DETECTED_PORT
+    )
+
+    async def fixed_uart_connect(config, api, loop=None):
+        protocol = await connect(config, api, loop=loop)
+        protocol.transport.serial.name = AUTO_DETECTED_PORT
+
+        return protocol
+
+    mock = mocker.patch("zigpy_znp.uart.connect", side_effect=fixed_uart_connect)
+
+    api = ZNP(config_for_port_path("auto"))
+
+    await api.connect()
+    assert uart_guess_port.call_count == 1
+    assert mock.call_count == 1
+
+    api.close()
+    await api.connect()
+
+    # We should not detect the port again
+    # The user might have multiple matching devices
+    assert uart_guess_port.call_count == 1
+    assert mock.call_count == 2
 
 
 @pytest_mark_asyncio_timeout()
