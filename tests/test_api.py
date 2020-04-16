@@ -104,6 +104,16 @@ async def test_znp_connect(mocker, event_loop, pingable_serial_port):
 
 
 @pytest_mark_asyncio_timeout()
+async def test_znp_new(mocker, event_loop, pingable_serial_port):
+    application = mocker.Mock()
+
+    znp = await ZNP.new(application, TEST_APP_CONFIG)
+
+    assert isinstance(znp, ZNP)
+    assert znp._app is application
+
+
+@pytest_mark_asyncio_timeout()
 async def test_znp_auto_connect(mocker, event_loop, pingable_serial_port):
     AUTO_DETECTED_PORT = "/dev/ttyWorkingUSB1"
 
