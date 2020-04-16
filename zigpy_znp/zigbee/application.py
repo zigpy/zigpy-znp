@@ -5,17 +5,21 @@ import async_timeout
 
 import zigpy.util
 import zigpy.types
+import zigpy.config
 import zigpy.application
 import zigpy.profiles
 import zigpy.zcl.foundation
+
 from zigpy.zdo.types import ZDOCmd
 
 from zigpy.types import ExtendedPanId
 from zigpy.zcl.clusters.security import IasZone
 
+import zigpy_znp.config as conf
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
+from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import NwkNvIds
 
 
@@ -72,33 +76,12 @@ ZDO_CONVERTERS = {
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
-    def __init__(self, api, database_file=None):
-        super().__init__(database_file=database_file)
-        self._api = api
-        api.set_application(self)
+    SCHEMA = conf.CONFIG_SCHEMA
 
-        self._api.callback_for_response(
-            c.AFCommands.IncomingMsg.Callback(partial=True), self.on_af_message
-        )
+    def __init__(self, config: typing.Dict[str, typing.Any]):
+        super().__init__(config=zigpy.config.ZIGPY_SCHEMA(config))
 
-        # ZDO requests need to be handled explicitly
-        self._api.callback_for_response(
-            c.ZDOCommands.EndDeviceAnnceInd.Callback(partial=True),
-            self.on_zdo_device_announce,
-        )
-
-        self._api.callback_for_response(
-            c.ZDOCommands.TCDevInd.Callback.Callback(partial=True),
-            self.on_zdo_device_join,
-        )
-
-        self._api.callback_for_response(
-            c.ZDOCommands.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
-        )
-
-        self._api.callback_for_response(
-            c.ZDOCommands.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
-        )
+        self._api = None
 
     def on_zdo_relays_message(self, msg: c.ZDOCommands.SrcRtgInd.Callback) -> None:
         LOGGER.info("ZDO device relays: %s", msg)
@@ -143,8 +126,36 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """Shutdown application."""
         self._api.close()
 
+    def _bind_callbacks(self, api):
+        api.callback_for_response(
+            c.AFCommands.IncomingMsg.Callback(partial=True), self.on_af_message
+        )
+
+        # ZDO requests need to be handled explicitly
+        api.callback_for_response(
+            c.ZDOCommands.EndDeviceAnnceInd.Callback(partial=True),
+            self.on_zdo_device_announce,
+        )
+
+        api.callback_for_response(
+            c.ZDOCommands.TCDevInd.Callback.Callback(partial=True),
+            self.on_zdo_device_join,
+        )
+
+        api.callback_for_response(
+            c.ZDOCommands.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
+        )
+
+        api.callback_for_response(
+            c.ZDOCommands.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
+        )
+
     async def startup(self, auto_form=False):
         """Perform a complete application startup"""
+
+        self._api = ZNP(self.config[conf.CONF_DEVICE])
+        self._bind_callbacks(self._api)
+        await self._api.connect()
 
         await self._reset(t.ResetType.Soft)
 

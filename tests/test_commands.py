@@ -244,7 +244,7 @@ def test_simple_descriptor():
         SimpleDescriptor=simple_descriptor,
     )
 
-    sp_simple_descriptor = c.zdo.PatchedSizePrefixedSimpleDescriptor()
+    sp_simple_descriptor = zigpy.zdo.types.SizePrefixedSimpleDescriptor()
     sp_simple_descriptor.endpoint = zigpy_t.uint8_t(1)
     sp_simple_descriptor.profile = zigpy_t.uint16_t(260)
     sp_simple_descriptor.device_type = zigpy_t.uint16_t(257)

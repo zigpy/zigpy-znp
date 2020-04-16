@@ -7,8 +7,9 @@ import serial_asyncio
 from unittest.mock import Mock, call
 
 import zigpy_znp
-import zigpy_znp.commands as c
 import zigpy_znp.types as t
+import zigpy_znp.config as conf
+import zigpy_znp.commands as c
 
 from zigpy_znp.types import nvids
 from zigpy_znp.uart import ZnpMtProtocol
@@ -21,6 +22,13 @@ from zigpy_znp.api import (
 )
 from zigpy_znp.frames import TransportFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+
+
+def config_for_port_path(path):
+    return conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: path})
+
+
+TEST_APP_CONFIG = config_for_port_path("/dev/ttyWorkingUSB1")
 
 
 def pytest_mark_asyncio_timeout(*, seconds=1):
@@ -38,7 +46,7 @@ def pytest_mark_asyncio_timeout(*, seconds=1):
 
 @pytest.fixture
 def znp(mocker):
-    api = ZNP()
+    api = ZNP(TEST_APP_CONFIG)
     transport = mocker.Mock()
     transport.close = lambda: api._uart.connection_lost(exc=None)
 
@@ -55,7 +63,7 @@ def pingable_serial_port(mocker):
     transport = mocker.Mock()
     protocol = None
 
-    api = ZNP()
+    api = ZNP(config_for_port_path(port_name))
     api.set_application(mocker.Mock())
     api._app.startup = Mock(return_value=lambda: asyncio.sleep(0))
 
@@ -91,11 +99,8 @@ def pingable_serial_port(mocker):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_connect(mocker, event_loop, pingable_serial_port):
-    api = ZNP()
-    await api.connect(pingable_serial_port, baudrate=1234_5678)
-
-    assert api._port_path == pingable_serial_port
-    assert api._baudrate == 1234_5678
+    api = ZNP(TEST_APP_CONFIG)
+    await api.connect()
 
 
 @pytest_mark_asyncio_timeout()
@@ -754,8 +759,11 @@ async def test_api_close(znp, event_loop):
     assert znp._uart is None
     assert znp._reconnect_task is None or znp._reconnect_task.cancel.call_count == 1
 
+    config_without_reconnect = TEST_APP_CONFIG.copy()
+    config_without_reconnect[conf.CONF_AUTO_RECONNECT] = False
+
     # ZNP.close should not throw any errors
-    znp2 = ZNP(auto_reconnect=False)
+    znp2 = ZNP(TEST_APP_CONFIG)
     znp2.close()
     znp2.close()
 
@@ -766,10 +774,18 @@ async def test_api_close(znp, event_loop):
 @pytest_mark_asyncio_timeout()
 async def test_api_reconnect(event_loop, mocker):
     SREQ_TIMEOUT = 0.2
-    mocker.patch("zigpy_znp.api.SREQ_TIMEOUT", new=SREQ_TIMEOUT)
-    mocker.patch("zigpy_znp.api.RECONNECT_RETRY_TIME", new=0.01)
-
     port_path = "/dev/ttyUSB1"
+
+    config = conf.SCHEMA_DEVICE(
+        {
+            conf.CONF_DEVICE_PATH: port_path,
+            conf.CONF_ZNP_CONFIG: {
+                conf.CONF_SREQ_TIMEOUT: SREQ_TIMEOUT,
+                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.01,
+            },
+        }
+    )
+
     transport = mocker.Mock()
 
     def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
@@ -786,15 +802,17 @@ async def test_api_reconnect(event_loop, mocker):
     mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
     mocker.patch("zigpy_znp.uart.connect", wraps=zigpy_znp.uart.connect)
 
-    api = ZNP()
-    api.set_application(mocker.Mock())
-    api._app.startup = Mock(return_value=asyncio.sleep(0))
+    app = mocker.Mock()
+    app.startup = Mock(return_value=asyncio.sleep(0))
+
+    api = ZNP(config)
+    api.set_application(app)
 
     connect_fut = event_loop.create_future()
-    connect_task = asyncio.create_task(api.connect(port_path, baudrate=1234_5678))
+    connect_task = asyncio.create_task(api.connect())
     connect_task.add_done_callback(lambda _: connect_fut.set_result(None))
 
-    while transport.write.call_count != 1:
+    while transport.write.call_count < 1:
         await asyncio.sleep(0.01)  # XXX: not ideal
 
     # We should have receiving a ping
@@ -807,7 +825,6 @@ async def test_api_reconnect(event_loop, mocker):
     await connect_fut
 
     assert api._port_path == port_path
-    assert api._baudrate == 1234_5678
 
     transport.reset_mock()
 
@@ -826,7 +843,6 @@ async def test_api_reconnect(event_loop, mocker):
 
     # We should still have the old connection info
     assert api._port_path == port_path
-    assert api._baudrate == 1234_5678
 
     # Wait for the SREQ_TIMEOUT to pass, we should fail to reconnect
     await asyncio.sleep(SREQ_TIMEOUT + 0.1)
@@ -854,14 +870,19 @@ async def test_api_reconnect(event_loop, mocker):
 
 @pytest_mark_asyncio_timeout()
 async def test_probe(pingable_serial_port):
-    assert not (await ZNP.probe("/dev/null", 12345))
-    assert await ZNP.probe(pingable_serial_port, 12345)
+    assert not (
+        await ZNP.probe(conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "/dev/null"}))
+    )
+
+    assert await ZNP.probe(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port})
+    )
 
 
 @pytest_mark_asyncio_timeout()
 async def test_request_callback_rsp(pingable_serial_port, event_loop):
-    api = ZNP()
-    await api.connect(pingable_serial_port, baudrate=1234_5678)
+    api = ZNP(conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port}))
+    await api.connect()
 
     def send_responses():
         api._uart.data_received(

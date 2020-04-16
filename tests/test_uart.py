@@ -2,8 +2,9 @@ import pytest
 
 from unittest import mock
 
-import zigpy_znp.commands as c
 import zigpy_znp.types as t
+import zigpy_znp.commands as c
+import zigpy_znp.config as conf
 
 from zigpy_znp import uart as znp_uart
 from zigpy_znp.frames import TransportFrame
@@ -376,7 +377,7 @@ async def test_connect_auto(mocker):
     mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
 
     api = mock.Mock()
-    await znp_uart.connect(port="auto", baudrate=115_200, api=api)
+    await znp_uart.connect(conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "auto"}), api=api)
 
 
 @pytest_mark_asyncio_timeout()
@@ -410,7 +411,9 @@ async def test_connection_lost(mocker, event_loop):
     conn_lost_fut = event_loop.create_future()
     api.connection_lost = conn_lost_fut.set_result
 
-    protocol, _ = await znp_uart.connect(port=device, baudrate=115_200, api=api)
+    protocol = await znp_uart.connect(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=api
+    )
 
     exception = RuntimeError("Uh oh, something broke")
     protocol.connection_lost(exception)
@@ -422,7 +425,9 @@ async def test_connection_lost(mocker, event_loop):
     conn_closed_fut = event_loop.create_future()
     api.connection_lost = conn_closed_fut.set_result
 
-    protocol, _ = await znp_uart.connect(port=device, baudrate=115_200, api=api)
+    protocol = await znp_uart.connect(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=api
+    )
     protocol.close()
 
     # Closing a connection does as well

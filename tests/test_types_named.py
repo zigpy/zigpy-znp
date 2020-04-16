@@ -1,6 +1,5 @@
 import pytest
 
-import zigpy.types as zigpy_t
 import zigpy_znp.commands as c
 import zigpy_znp.types as t
 
@@ -117,33 +116,3 @@ def test_zdo_nullable_node_descriptor():
 
     assert not data
     assert desc2.serialize() == desc3.serialize()
-
-
-# Copied from zigpy, until fix is released
-def test_patched_size_prefixed_simple_descriptor():
-    sd = c.zdo.PatchedSizePrefixedSimpleDescriptor()
-    sd.endpoint = t.uint8_t(1)
-    sd.profile = t.uint16_t(2)
-    sd.device_type = t.uint16_t(3)
-    sd.device_version = t.uint8_t(4)
-    sd.input_clusters = zigpy_t.LVList(t.uint16_t)([t.uint16_t(5), t.uint16_t(6)])
-    sd.output_clusters = zigpy_t.LVList(t.uint16_t)([t.uint16_t(7), t.uint16_t(8)])
-
-    ser = sd.serialize()
-    assert ser[0] == len(ser) - 1
-
-    sd2, data = c.zdo.PatchedSizePrefixedSimpleDescriptor.deserialize(ser + b"extra")
-    assert sd.input_clusters == sd2.input_clusters
-    assert sd.output_clusters == sd2.output_clusters
-    assert isinstance(sd2, c.zdo.PatchedSizePrefixedSimpleDescriptor)
-    assert data == b"extra"
-
-
-def test_empty_patched_size_prefixed_simple_descriptor():
-    r = c.zdo.PatchedSizePrefixedSimpleDescriptor.deserialize(b"\x00")
-    assert r == (None, b"")
-
-
-def test_invalid_patched_size_prefixed_simple_descriptor():
-    with pytest.raises(ValueError):
-        c.zdo.PatchedSizePrefixedSimpleDescriptor.deserialize(b"\x01")

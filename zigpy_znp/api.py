@@ -9,6 +9,7 @@ from collections import defaultdict
 
 import zigpy_znp.commands
 import zigpy_znp.types as t
+import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.types import nvids
 
@@ -19,8 +20,6 @@ from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 
 LOGGER = logging.getLogger(__name__)
-RECONNECT_RETRY_TIME = 5  # seconds
-SREQ_TIMEOUT = 5  # seconds
 
 
 def _deduplicate_commands(commands):
@@ -140,57 +139,71 @@ class CallbackResponseListener(BaseResponseListener):
 
 
 class ZNP:
-    def __init__(self, *, auto_reconnect=True):
+    def __init__(self, device_config: conf.ConfigType):
         self._uart = None
         self._app = None
+        self._config = conf.SCHEMA_DEVICE(device_config)
+
         self._response_listeners = defaultdict(list)
-
-        self._auto_reconnect = auto_reconnect
-        self._port_path = None
-        self._baudrate = None
-
         self._reconnect_task = None
         self._sync_request_lock = asyncio.Lock()
 
+    @classmethod
+    async def new(cls, application, config: conf.ConfigType) -> "ZNP":
+        znp = cls(config)
+        await znp.connect()
+        znp.set_application(application)
+
+        return znp
+
     def set_application(self, app):
+        assert self._app is None
         self._app = app
 
-    @classmethod
-    async def probe(cls, serial_port_path, baudrate) -> bool:
-        LOGGER.debug("Probing %s at %d baud", serial_port_path, baudrate)
+    @property
+    def _port_path(self) -> str:
+        return self._config[conf.CONF_DEVICE_PATH]
 
-        znp = cls(auto_reconnect=False)
+    @classmethod
+    async def probe(cls, device_config: conf.ConfigType) -> bool:
+        new_config = conf.SCHEMA_DEVICE(device_config)
+        new_config[conf.CONF_ZNP_CONFIG][conf.CONF_AUTO_RECONNECT] = False
+
+        znp = cls(new_config)
+
+        LOGGER.debug("Probing %s", znp._port_path)
 
         try:
-            await znp.connect(serial_port_path, baudrate)
+            await znp.connect()
             return True
         except Exception:
             return False
         finally:
             znp.close()
 
-    async def connect(self, serial_port_path, baudrate=115_200) -> None:
+    async def connect(self) -> None:
         assert self._uart is None
 
-        self._uart, serial_port_path = await uart.connect(
-            serial_port_path, baudrate, self
-        )
-
-        LOGGER.debug("Testing connection to %s", serial_port_path)
+        self._uart = await uart.connect(self._config, self)
+        LOGGER.debug("Testing connection to %s", self._uart.transport.serial.name)
 
         try:
             # Make sure that our port works
-            async with async_timeout.timeout(2):
-                await self.request(c.SysCommands.Ping.Req())
+            await self.request(c.SysCommands.Ping.Req())
         except Exception:
             self._uart = None
             raise
 
-        # We want to reuse the same serial_port_path when reconnecting
-        self._port_path = serial_port_path
-        self._baudrate = baudrate
+        # XXX: To make sure we don't switch to the wrong device upon reconnect,
+        #      update our config to point to the last-detected port.
+        if self._config[conf.CONF_DEVICE_PATH] == "auto":
+            self._config[conf.CONF_DEVICE_PATH] = self._uart.transport.serial.name
 
-        LOGGER.debug("Connected to %s at %s baud", self._port_path, self._baudrate)
+        LOGGER.debug(
+            "Connected to %s at %s baud",
+            self._uart.transport.serial.name,
+            self._uart.transport.serial.baudrate,
+        )
 
     def _cancel_all_listeners(self) -> None:
         for header, listeners in self._response_listeners.items():
@@ -203,20 +216,20 @@ class ZNP:
                 "Trying to reconnect to %s, attempt %d", self._port_path, attempt
             )
 
-            assert self._uart is None
-            assert self._port_path is not None
-            assert self._baudrate is not None
-
             try:
                 self._cancel_all_listeners()
 
-                await self.connect(self._port_path, self._baudrate)
+                await self.connect()
                 await self._app.startup()
 
                 return
             except Exception as e:
                 LOGGER.error("Failed to reconnect", exc_info=e)
-                await asyncio.sleep(RECONNECT_RETRY_TIME)
+                await asyncio.sleep(
+                    self._config[conf.CONF_ZNP_CONFIG][
+                        conf.CONF_AUTO_RECONNECT_RETRY_DELAY
+                    ]
+                )
 
     def connection_lost(self, exc) -> None:
         LOGGER.debug("We were disconnected from %s: %s", self._port_path, exc)
@@ -224,12 +237,11 @@ class ZNP:
         self._uart = None
         self._cancel_all_listeners()
 
-        # Cancel the existing reconnect task, if any
-        if self._reconnect_task is not None and not self._reconnect_task.done():
-            self._reconnect_task.cancel()
-
         # exc=None means that the connection was closed
-        if not self._auto_reconnect or exc is None:
+        if (
+            not self._config[conf.CONF_ZNP_CONFIG][conf.CONF_AUTO_RECONNECT]
+            or exc is None
+        ):
             LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
             return
 
@@ -241,7 +253,12 @@ class ZNP:
     def close(self) -> None:
         if self._uart is not None:
             self._uart.close()
-            self._uart = None
+
+        self._cancel_all_listeners()
+
+        # Cancel any existing reconnect tasks, if any
+        if self._reconnect_task is not None and not self._reconnect_task.done():
+            self._reconnect_task.cancel()
 
     def _remove_listener(self, listener: BaseResponseListener) -> None:
         LOGGER.trace("Removing listener %s", listener)
@@ -352,7 +369,9 @@ class ZNP:
             self._uart.send(request.to_frame())
 
             # We should get a SRSP in a reasonable amount of time
-            async with async_timeout.timeout(SREQ_TIMEOUT):
+            async with async_timeout.timeout(
+                self._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT]
+            ):
                 # We lock until either a sync response is seen or an error occurs
                 response = await response_future
 

@@ -8,6 +8,7 @@ import serial_asyncio
 
 from serial.tools.list_ports import comports as list_com_ports
 
+import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 
 from zigpy_znp.types import Bytes
@@ -159,9 +160,12 @@ def guess_port() -> serial.tools.list_ports_common.ListPortInfo:
     return device
 
 
-async def connect(port, baudrate, api, loop=None) -> typing.Tuple[ZnpMtProtocol, str]:
+async def connect(config: conf.ConfigType, api, loop=None) -> ZnpMtProtocol:
     if loop is None:
         loop = asyncio.get_event_loop()
+
+    port = config[conf.CONF_DEVICE_PATH]
+    baudrate = config[conf.CONF_DEVICE_BAUDRATE]
 
     if port == "auto":
         port = guess_port()
@@ -182,4 +186,4 @@ async def connect(port, baudrate, api, loop=None) -> typing.Tuple[ZnpMtProtocol,
 
     LOGGER.debug("Connected to %s at %s baud", port, baudrate)
 
-    return protocol, port
+    return protocol

@@ -314,8 +314,6 @@ class CommandBase:
         cls.schema = schema
 
     def __init__(self, *, partial=False, **params):
-        from zigpy_znp.commands.zdo import PatchedSizePrefixedSimpleDescriptor
-
         all_params = {param.name for param in self.schema.parameters}
         given_params = set(params.keys())
 
@@ -355,9 +353,8 @@ class CommandBase:
                     value = param.type(value)
                 elif (
                     type(value) is zigpy.zdo.types.SimpleDescriptor
-                    and param.type is PatchedSizePrefixedSimpleDescriptor
+                    and param.type is zigpy.zdo.types.SizePrefixedSimpleDescriptor
                 ):
-                    # TODO: fix SizePrefixedSimpleDescriptor.deserialize upstream
                     data = value.serialize()
                     value, _ = param.type.deserialize(bytes([len(data)]) + data)
                 else:
@@ -367,7 +364,7 @@ class CommandBase:
                     )
 
                 try:
-                    # XXX: Break early if a numerical type overflows
+                    # XXX: Break early if a type cannot be serialized
                     value.serialize()
                 except Exception as e:
                     raise ValueError(

@@ -81,19 +81,6 @@ class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
         return super().serialize()
 
 
-class PatchedSizePrefixedSimpleDescriptor(zigpy.zdo.types.SimpleDescriptor):
-    def serialize(self):
-        data = super().serialize()
-        return len(data).to_bytes(1, "little") + data
-
-    @classmethod
-    def deserialize(cls, data):
-        if not data or data[0] == 0:
-            return None, data[1:]
-
-        return super().deserialize(data[1:])
-
-
 class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     # send a “Network Address Request”. This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
@@ -1085,7 +1072,7 @@ class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("NWK", t.NWK, "Short address of the device response describes"),
                 t.Param(
                     "SimpleDescriptor",
-                    PatchedSizePrefixedSimpleDescriptor,
+                    zigpy.zdo.types.SizePrefixedSimpleDescriptor,
                     "Simple descriptor",
                 ),
             )
