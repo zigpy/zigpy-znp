@@ -120,9 +120,7 @@ async def znp_server(mocker):
 
 @pytest.fixture
 def application(znp_server):
-    app = ControllerApplication(
-        {conf.CONF_DEVICE: config_for_port_path("/dev/ttyFAKE0")}
-    )
+    app = ControllerApplication(config_for_port_path("/dev/ttyFAKE0"))
 
     # Handle the entire startup sequence
     znp_server.reply_to(

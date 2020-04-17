@@ -78,8 +78,8 @@ ZDO_CONVERTERS = {
 class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
 
-    def __init__(self, config: typing.Dict[str, typing.Any]):
-        super().__init__(config=zigpy.config.ZIGPY_SCHEMA(config))
+    def __init__(self, config: conf.ConfigType):
+        super().__init__(config=conf.CONFIG_SCHEMA(config))
 
         self._znp = None
 
@@ -173,16 +173,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def startup(self, auto_form=False):
         """Perform a complete application startup"""
 
-        self._znp = ZNP(self.config[conf.CONF_DEVICE])
+        self._znp = ZNP(self.config)
         self._bind_callbacks(self._znp)
         await self._znp.connect()
 
         await self._reset(t.ResetType.Soft)
 
-        should_form = [False]
-
-        if auto_form and any(should_form):
+        if auto_form and False:
+            # XXX: actually form a network
             await self.form_network()
+
+        if self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER] is not None:
+            dbm = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER]
+
+            await self._znp.request(
+                c.SysCommands.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.Success
+            )
 
         """
         # Get our active endpoints
@@ -572,7 +578,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         hops=0,
         non_member_radius=3,
     ):
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
@@ -599,10 +605,3 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if response.Status != t.Status.Success:
             raise RuntimeError(f"Permit join response failure: {response}")
-
-    async def set_tx_power(self, dbm: int) -> None:
-        assert -22 <= dbm <= 19
-
-        await self._znp.request(
-            c.SysCommands.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.Success
-        )
