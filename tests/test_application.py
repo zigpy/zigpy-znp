@@ -13,7 +13,11 @@ from zigpy_znp.api import ZNP
 from zigpy_znp.zigbee.application import ControllerApplication
 
 
-from test_api import pytest_mark_asyncio_timeout, config_for_port_path
+from test_api import (  # noqa: F401
+    pytest_mark_asyncio_timeout,
+    config_for_port_path,
+    pingable_serial_port,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -342,3 +346,16 @@ async def test_on_af_message_callback(application, mocker):
     app.get_device.assert_called_once_with(nwk=0xABCD)
     assert device.radio_details.call_count == 0
     assert app.handle_message.call_count == 0
+
+
+@pytest_mark_asyncio_timeout()
+async def test_probe(pingable_serial_port):  # noqa: F811
+    assert not (
+        await ControllerApplication.probe(
+            conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "/dev/null"})
+        )
+    )
+
+    assert await ControllerApplication.probe(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port})
+    )

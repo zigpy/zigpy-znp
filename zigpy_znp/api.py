@@ -139,22 +139,14 @@ class CallbackResponseListener(BaseResponseListener):
 
 
 class ZNP:
-    def __init__(self, device_config: conf.ConfigType):
+    def __init__(self, config: conf.ConfigType):
         self._uart = None
         self._app = None
-        self._config = conf.SCHEMA_DEVICE(device_config)
+        self._config = config
 
         self._response_listeners = defaultdict(list)
         self._reconnect_task = None
         self._sync_request_lock = asyncio.Lock()
-
-    @classmethod
-    async def new(cls, application, config: conf.ConfigType) -> "ZNP":
-        znp = cls(config)
-        await znp.connect()
-        znp.set_application(application)
-
-        return znp
 
     def set_application(self, app):
         assert self._app is None
@@ -162,29 +154,12 @@ class ZNP:
 
     @property
     def _port_path(self) -> str:
-        return self._config[conf.CONF_DEVICE_PATH]
-
-    @classmethod
-    async def probe(cls, device_config: conf.ConfigType) -> bool:
-        new_config = conf.SCHEMA_DEVICE(device_config)
-        new_config[conf.CONF_ZNP_CONFIG][conf.CONF_AUTO_RECONNECT] = False
-
-        znp = cls(new_config)
-
-        LOGGER.debug("Probing %s", znp._port_path)
-
-        try:
-            await znp.connect()
-            return True
-        except Exception:
-            return False
-        finally:
-            znp.close()
+        return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
     async def connect(self) -> None:
         assert self._uart is None
 
-        self._uart = await uart.connect(self._config, self)
+        self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
         LOGGER.debug("Testing connection to %s", self._uart.transport.serial.name)
 
         try:
@@ -196,8 +171,10 @@ class ZNP:
 
         # XXX: To make sure we don't switch to the wrong device upon reconnect,
         #      update our config to point to the last-detected port.
-        if self._config[conf.CONF_DEVICE_PATH] == "auto":
-            self._config[conf.CONF_DEVICE_PATH] = self._uart.transport.serial.name
+        if self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == "auto":
+            self._config[conf.CONF_DEVICE][
+                conf.CONF_DEVICE_PATH
+            ] = self._uart.transport.serial.name
 
         LOGGER.debug(
             "Connected to %s at %s baud",

@@ -160,15 +160,21 @@ def guess_port() -> str:
     return device
 
 
-async def connect(config: conf.ConfigType, api, loop=None) -> ZnpMtProtocol:
-    if loop is None:
-        loop = asyncio.get_event_loop()
+async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
+    loop = asyncio.get_running_loop()
 
     port = config[conf.CONF_DEVICE_PATH]
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]
+    flow_control = config[conf.CONF_DEVICE_FLOW_CONTROL]
 
     if port == "auto":
         port = guess_port()
+
+    xonxoff, rtscts = {
+        None: (False, False),
+        "hardware": (False, True),
+        "software": (True, False),
+    }[flow_control]
 
     LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
 
@@ -179,7 +185,8 @@ async def connect(config: conf.ConfigType, api, loop=None) -> ZnpMtProtocol:
         baudrate=baudrate,
         parity=serial.PARITY_NONE,
         stopbits=serial.STOPBITS_ONE,
-        xonxoff=False,
+        xonxoff=xonxoff,
+        rtscts=rtscts,
     )
 
     await protocol._connected_event.wait()
