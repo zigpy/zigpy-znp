@@ -59,6 +59,28 @@ Developers should note that that Texas Instruments recommends different baud rat
   - CC2538 also supports flexible UART baud rate generation but only up to a maximum of 460800 baud.
   - CC2530 and CC2531 default recommended UART baud rate is 115200 baud.
 
+## Testing new releases
+
+Testing a new release of the zigpy-znp library before it is released in Home Assistant.
+
+If you are using Supervised Home Assistant (formerly known as the Hassio/Hass.io distro):
+- Add https://github.com/home-assistant/hassio-addons-development as "add-on" repository
+- Install "Custom deps deployment" addon
+- Update config like: 
+  ```
+  pypi:
+    - zigpy-znp==0.0.1rc2
+  apk: []
+  ```
+  where 0.0.1rc2 is the new version
+- Start the addon
+
+If you are instead using some custom python installation of Home Assistant then do this:
+- Activate your python virtual env
+- Update package with ``pip``
+  ```
+  pip install zigpy-znp==0.0.1rc2
+
 # Releases via PyPI
 
 Tagged versions will also be released via PyPI
