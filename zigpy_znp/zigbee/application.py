@@ -77,6 +77,7 @@ ZDO_CONVERTERS = {
 
 class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
+    SCHEMA_DEVICE = conf.SCHEMA_DEVICE
 
     def __init__(self, config: conf.ConfigType):
         super().__init__(config=conf.CONFIG_SCHEMA(config))
