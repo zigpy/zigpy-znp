@@ -85,7 +85,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         super().__init__(config=conf.CONFIG_SCHEMA(config))
 
         self._znp = None
-        self._reconnect_task = None
+
+        # It's easier to deal with this if it's never None
+        self._reconnect_task = asyncio.Future()
+        self._reconnect_task.cancel()
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
@@ -95,7 +98,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         try:
             await znp.connect()
             return True
-        except Exception:
+        except Exception as e:
+            LOGGER.warning(
+                "Failed to probe ZNP radio with config %s", device_config, exc_info=e
+            )
             return False
         finally:
             znp.close()
@@ -142,10 +148,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def shutdown(self):
         """Shutdown application."""
 
-        # Cancel any existing reconnect tasks, if any
-        if self._reconnect_task is not None:
-            self._reconnect_task.cancel()
-
+        self._reconnect_task.cancel()
         self._znp.close()
 
     def _bind_callbacks(self, api):
@@ -203,10 +206,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Reconnect in the background using our previously-detected port.
         LOGGER.debug("Starting background reconnection task")
 
-        if self._reconnect_task is not None:
-            self._reconnect_task.cancel()
-            self._reconnect_task = None
-
+        self._reconnect_task.cancel()
         self._reconnect_task = asyncio.create_task(self._reconnect())
 
     async def _register_endpoint(
