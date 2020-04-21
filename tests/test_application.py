@@ -237,6 +237,43 @@ async def test_permit_join(application):
     await asyncio.gather(data_req_sent, permit_join_sent)
 
 
+@pytest_mark_asyncio_timeout(seconds=2)
+async def test_permit_join_failure(application):
+    app, znp_server = application
+
+    # Handle the ZDO broadcast sent by Zigpy
+    data_req_sent = znp_server.reply_once_to(
+        request=c.AFCommands.DataRequestExt.Req(
+            partial=True, SrcEndpoint=0, DstEndpoint=0
+        ),
+        responses=[
+            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AFCommands.DataConfirm.Callback(
+                Status=t.Status.Success, Endpoint=0, TSN=1
+            ),
+        ],
+    )
+
+    # Handle the permit join request sent by us
+    permit_join_sent = znp_server.reply_once_to(
+        request=c.ZDOCommands.MgmtPermitJoinReq.Req(partial=True),
+        responses=[
+            c.ZDOCommands.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
+            c.ZDOCommands.MgmtPermitJoinRsp.Callback(
+                Src=0xFFFF, Status=t.ZDOStatus.TIMEOUT
+            ),
+        ],
+    )
+
+    await app.startup(auto_form=False)
+
+    with pytest.raises(RuntimeError):
+        await app.permit(time_s=10)
+
+    # Make sure both commands were received
+    await asyncio.gather(data_req_sent, permit_join_sent)
+
+
 @pytest_mark_asyncio_timeout()
 async def test_on_zdo_relays_message_callback(application, mocker):
     app, znp_server = application
