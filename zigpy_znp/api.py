@@ -2,7 +2,6 @@ import attr
 import typing
 import asyncio
 import logging
-import itertools
 import async_timeout
 
 from collections import defaultdict
@@ -145,7 +144,6 @@ class ZNP:
         self._config = config
 
         self._response_listeners = defaultdict(list)
-        self._reconnect_task = None
         self._sync_request_lock = asyncio.Lock()
 
     def set_application(self, app):
@@ -169,13 +167,6 @@ class ZNP:
             self._uart = None
             raise
 
-        # XXX: To make sure we don't switch to the wrong device upon reconnect,
-        #      update our config to point to the last-detected port.
-        if self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == "auto":
-            self._config[conf.CONF_DEVICE][
-                conf.CONF_DEVICE_PATH
-            ] = self._uart.transport.serial.name
-
         LOGGER.debug(
             "Connected to %s at %s baud",
             self._uart.transport.serial.name,
@@ -187,45 +178,14 @@ class ZNP:
             for listener in listeners:
                 listener.cancel()
 
-    async def _reconnect(self) -> None:
-        for attempt in itertools.count(start=1):
-            LOGGER.debug(
-                "Trying to reconnect to %s, attempt %d", self._port_path, attempt
-            )
-
-            try:
-                self._cancel_all_listeners()
-
-                await self.connect()
-                await self._app.startup()
-
-                return
-            except Exception as e:
-                LOGGER.error("Failed to reconnect", exc_info=e)
-                await asyncio.sleep(
-                    self._config[conf.CONF_ZNP_CONFIG][
-                        conf.CONF_AUTO_RECONNECT_RETRY_DELAY
-                    ]
-                )
-
     def connection_lost(self, exc) -> None:
         LOGGER.debug("We were disconnected from %s: %s", self._port_path, exc)
 
         self._uart = None
-        self._cancel_all_listeners()
+        self.close()
 
-        # exc=None means that the connection was closed
-        if (
-            not self._config[conf.CONF_ZNP_CONFIG][conf.CONF_AUTO_RECONNECT]
-            or exc is None
-        ):
-            LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
-            return
-
-        # Reconnect in the background using our previous port path
-        # Note that this will reuse the same port as before
-        LOGGER.debug("Starting background reconnection task")
-        self._reconnect_task = asyncio.create_task(self._reconnect())
+        if self._app is not None:
+            self._app.connection_lost(exc)
 
     def close(self) -> None:
         if self._uart is not None:
@@ -233,10 +193,6 @@ class ZNP:
             self._uart = None
 
         self._cancel_all_listeners()
-
-        # Cancel any existing reconnect tasks, if any
-        if self._reconnect_task is not None and not self._reconnect_task.done():
-            self._reconnect_task.cancel()
 
     def _remove_listener(self, listener: BaseResponseListener) -> None:
         LOGGER.trace("Removing listener %s", listener)

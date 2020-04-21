@@ -1,6 +1,8 @@
 import os
 import typing
+import asyncio
 import logging
+import itertools
 import async_timeout
 
 import zigpy.util
@@ -83,17 +85,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         super().__init__(config=conf.CONFIG_SCHEMA(config))
 
         self._znp = None
+        self._reconnect_task = None
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
-        new_schema = conf.CONFIG_SCHEMA(
-            {
-                conf.CONF_DEVICE: device_config,
-                conf.CONF_ZNP_CONFIG: {conf.CONF_AUTO_RECONNECT: False},
-            }
-        )
-
-        znp = ZNP(new_schema)
+        znp = ZNP(conf.CONFIG_SCHEMA({conf.CONF_DEVICE: device_config}))
         LOGGER.debug("Probing %s", znp._port_path)
 
         try:
@@ -145,6 +141,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def shutdown(self):
         """Shutdown application."""
+
+        # Cancel any existing reconnect tasks, if any
+        if self._reconnect_task is not None:
+            self._reconnect_task.cancel()
+
         self._znp.close()
 
     def _bind_callbacks(self, api):
@@ -171,12 +172,82 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDOCommands.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
         )
 
+    async def _reconnect(self) -> None:
+        for attempt in itertools.count(start=1):
+            LOGGER.debug(
+                "Trying to reconnect to %s, attempt %d",
+                self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH],
+                attempt,
+            )
+
+            try:
+                await self.startup()
+
+                return
+            except Exception as e:
+                LOGGER.error("Failed to reconnect", exc_info=e)
+                await asyncio.sleep(
+                    self._config[conf.CONF_ZNP_CONFIG][
+                        conf.CONF_AUTO_RECONNECT_RETRY_DELAY
+                    ]
+                )
+
+    def connection_lost(self, exc):
+        self._znp = None
+
+        # exc=None means that the connection was closed
+        if exc is None:
+            LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
+            return
+
+        # Reconnect in the background using our previously-detected port.
+        LOGGER.debug("Starting background reconnection task")
+
+        if self._reconnect_task is not None:
+            self._reconnect_task.cancel()
+            self._reconnect_task = None
+
+        self._reconnect_task = asyncio.create_task(self._reconnect())
+
+    async def _register_endpoint(
+        self,
+        endpoint,
+        profile_id=zigpy.profiles.zha.PROFILE_ID,
+        device_id=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
+        device_version=0x00,
+        latency_req=c.af.LatencyReq.NoLatencyReqs,
+        input_clusters=[],
+        output_clusters=[],
+    ):
+        return await self._znp.request(
+            c.AFCommands.Register.Req(
+                Endpoint=endpoint,
+                ProfileId=profile_id,
+                DeviceId=device_id,
+                DeviceVersion=device_version,
+                LatencyReq=latency_req,
+                InputClusters=input_clusters,
+                OutputClusters=output_clusters,
+            ),
+            RspStatus=t.Status.Success,
+        )
+
     async def startup(self, auto_form=False):
         """Perform a complete application startup"""
 
-        self._znp = ZNP(self.config)
-        self._bind_callbacks(self._znp)
-        await self._znp.connect()
+        znp = ZNP(self.config)
+        znp.set_application(self)
+        self._bind_callbacks(znp)
+        await znp.connect()
+
+        self._znp = znp
+
+        # XXX: To make sure we don't switch to the wrong device upon reconnect,
+        #      update our config to point to the last-detected port.
+        if self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == "auto":
+            self._config[conf.CONF_DEVICE][
+                conf.CONF_DEVICE_PATH
+            ] = self._znp._uart.transport.serial.name
 
         await self._reset(t.ResetType.Soft)
 
@@ -209,65 +280,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         # Register our endpoints
-        await self._znp.request(
-            c.AFCommands.Register.Req(
-                Endpoint=1,
-                ProfileId=zigpy.profiles.zha.PROFILE_ID,
-                DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
-                DeviceVersion=0x00,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[],
-                OutputClusters=[],
-            ),
-            RspStatus=t.Status.Success,
+        await self._register_endpoint(endpoint=1)
+        await self._register_endpoint(
+            endpoint=8,
+            device_id=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
+            output_clusters=[IasZone.cluster_id],
         )
-        await self._znp.request(
-            c.AFCommands.Register.Req(
-                Endpoint=8,
-                ProfileId=zigpy.profiles.zha.PROFILE_ID,
-                DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
-                DeviceVersion=0x00,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[],
-                OutputClusters=[IasZone.cluster_id],
-            ),
-            RspStatus=t.Status.Success,
-        )
-        await self._znp.request(
-            c.AFCommands.Register.Req(
-                Endpoint=11,
-                ProfileId=zigpy.profiles.zha.PROFILE_ID,
-                DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
-                DeviceVersion=0x00,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[],
-                OutputClusters=[],
-            ),
-            RspStatus=t.Status.Success,
-        )
-        await self._znp.request(
-            c.AFCommands.Register.Req(
-                Endpoint=12,
-                ProfileId=zigpy.profiles.zha.PROFILE_ID,
-                DeviceId=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
-                DeviceVersion=0x00,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[],
-                OutputClusters=[],
-            ),
-            RspStatus=t.Status.Success,
-        )
-        await self._znp.request(
-            c.AFCommands.Register.Req(
-                Endpoint=100,
-                ProfileId=zigpy.profiles.zll.PROFILE_ID,
-                DeviceId=0x0005,
-                DeviceVersion=0x00,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[],
-                OutputClusters=[],
-            ),
-            RspStatus=t.Status.Success,
+        await self._register_endpoint(endpoint=11)
+        await self._register_endpoint(endpoint=12)
+        await self._register_endpoint(
+            endpoint=100, profile_id=zigpy.profiles.zll.PROFILE_ID, device_id=0x0005
         )
 
         # Start commissioning and wait until it's done

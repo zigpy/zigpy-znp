@@ -6,13 +6,12 @@ import serial_asyncio
 
 from unittest.mock import Mock, call
 
-import zigpy_znp
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 
 from zigpy_znp.types import nvids
-from zigpy_znp.uart import ZnpMtProtocol, connect
+from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import (
     ZNP,
@@ -101,37 +100,6 @@ def pingable_serial_port(mocker):
 async def test_znp_connect(mocker, event_loop, pingable_serial_port):
     api = ZNP(TEST_APP_CONFIG)
     await api.connect()
-
-
-@pytest_mark_asyncio_timeout()
-async def test_znp_auto_connect(mocker, event_loop, pingable_serial_port):
-    AUTO_DETECTED_PORT = "/dev/ttyWorkingUSB1"
-
-    uart_guess_port = mocker.patch(
-        "zigpy_znp.uart.guess_port", return_value=AUTO_DETECTED_PORT
-    )
-
-    async def fixed_uart_connect(config, api):
-        protocol = await connect(config, api)
-        protocol.transport.serial.name = AUTO_DETECTED_PORT
-
-        return protocol
-
-    mock = mocker.patch("zigpy_znp.uart.connect", side_effect=fixed_uart_connect)
-
-    api = ZNP(config_for_port_path("auto"))
-
-    await api.connect()
-    assert uart_guess_port.call_count == 1
-    assert mock.call_count == 1
-
-    api.close()
-    await api.connect()
-
-    # We should not detect the port again
-    # The user might have multiple matching devices
-    assert uart_guess_port.call_count == 1
-    assert mock.call_count == 2
 
 
 @pytest_mark_asyncio_timeout()
@@ -786,9 +754,8 @@ async def test_api_close(znp, event_loop):
     # connection_lost with no exc indicates the port was closed
     assert (await closed_future) is None
 
-    # Make sure our UART was actually closed and we aren't going to try reconnecting
+    # Make sure our UART was actually closed
     assert znp._uart is None
-    assert znp._reconnect_task is None or znp._reconnect_task.cancel.call_count == 1
 
     # ZNP.close should not throw any errors
     znp2 = ZNP(TEST_APP_CONFIG)
@@ -797,103 +764,6 @@ async def test_api_close(znp, event_loop):
 
     znp.close()
     znp.close()
-
-
-@pytest_mark_asyncio_timeout()
-async def test_api_reconnect(event_loop, mocker):
-    SREQ_TIMEOUT = 0.2
-    port_path = "/dev/ttyUSB1"
-
-    config = conf.CONFIG_SCHEMA(
-        {
-            conf.CONF_DEVICE: {conf.CONF_DEVICE_PATH: port_path},
-            conf.CONF_ZNP_CONFIG: {
-                conf.CONF_SREQ_TIMEOUT: SREQ_TIMEOUT,
-                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.01,
-            },
-        }
-    )
-
-    transport = mocker.Mock()
-
-    def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
-        fut = loop.create_future()
-        assert url == port_path
-
-        protocol = protocol_factory()
-        protocol.connection_made(transport)
-
-        fut.set_result((transport, protocol))
-
-        return fut
-
-    mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
-    mocker.patch("zigpy_znp.uart.connect", wraps=zigpy_znp.uart.connect)
-
-    app = mocker.Mock()
-    app.startup = Mock(return_value=asyncio.sleep(0))
-
-    api = ZNP(config)
-    api.set_application(app)
-
-    connect_fut = event_loop.create_future()
-    connect_task = asyncio.create_task(api.connect())
-    connect_task.add_done_callback(lambda _: connect_fut.set_result(None))
-
-    while transport.write.call_count < 1:
-        await asyncio.sleep(0.01)  # XXX: not ideal
-
-    # We should have receiving a ping
-    transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
-
-    # Send a ping response
-    api._uart.data_received(bytes.fromhex("FE  02  61 01  00 01  63"))
-
-    # Wait to connect
-    await connect_fut
-
-    assert api._port_path == port_path
-
-    transport.reset_mock()
-
-    # Now that we're connected, close the connection due to an error
-    assert transport.write.call_count == 0
-    api.connection_lost(RuntimeError("Uh oh"))
-
-    # We should get another ping request soon
-    while transport.write.call_count != 1:
-        await asyncio.sleep(0.01)  # XXX: not ideal
-
-    transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
-
-    # Reply incorrectly to the ping request
-    api._uart.data_received(b"bad response")
-
-    # We should still have the old connection info
-    assert api._port_path == port_path
-
-    # Wait for the SREQ_TIMEOUT to pass, we should fail to reconnect
-    await asyncio.sleep(SREQ_TIMEOUT + 0.1)
-
-    transport.reset_mock()
-
-    # We wait a bit again for another ping
-    while transport.write.call_count != 1:
-        await asyncio.sleep(0.01)  # XXX: not ideal
-
-    transport.write.assert_called_once_with(bytes.fromhex("FE  00  21 01  20"))
-
-    # Our reconnect task should complete after we send the ping reply
-    reconnect_fut = event_loop.create_future()
-    api._reconnect_task.add_done_callback(lambda _: reconnect_fut.set_result(None))
-
-    # App re-startup should not have happened, we've never reconnected before
-    assert api._app.startup.call_count == 0
-    api._uart.data_received(bytes.fromhex("FE  02  61 01  00 01  63"))
-
-    # We should be reconnected soon and the app should have been restarted
-    await reconnect_fut
-    assert api._app.startup.call_count == 1
 
 
 @pytest_mark_asyncio_timeout()

@@ -10,6 +10,7 @@ import zigpy_znp.config as conf
 from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import ZNP
+from zigpy_znp.uart import connect as uart_connect
 from zigpy_znp.zigbee.application import ControllerApplication
 
 
@@ -46,7 +47,9 @@ class ServerZNP(ZNP):
         super().__init__(*args, **kwargs)
 
         # We just respond to pings, nothing more
-        self.callback_for_response(c.SysCommands.Ping.Req(), self.ping_replier)
+        self.callback_for_response(
+            c.SysCommands.Ping.Req(), lambda r: self.ping_replier(r)
+        )
 
     def reply_once_to(self, request, responses):
         called_future = asyncio.get_running_loop().create_future()
@@ -357,3 +360,78 @@ async def test_probe(pingable_serial_port):  # noqa: F811
     assert await ControllerApplication.probe(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port})
     )
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_reconnect(event_loop, application):
+    app, znp_server = application
+    app._config[conf.CONF_ZNP_CONFIG][conf.CONF_AUTO_RECONNECT_RETRY_DELAY] = 0.01
+
+    await app.startup(auto_form=False)
+
+    # Don't reply to the ping request this time
+    old_ping_replier = znp_server.ping_replier
+    znp_server.ping_replier = lambda request: None
+
+    # Now that we're connected, close the connection due to an error
+    SREQ_TIMEOUT = 0.2
+    app._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = SREQ_TIMEOUT
+    app._znp._uart.connection_lost(RuntimeError("Uh oh"))
+    app.connection_lost(RuntimeError("Uh oh"))
+
+    assert app._znp is None
+
+    # Wait for the SREQ_TIMEOUT to pass, we should fail to reconnect
+    await asyncio.sleep(SREQ_TIMEOUT + 0.1)
+    assert app._znp is None
+
+    # Respond to the ping appropriately
+    znp_server.ping_replier = old_ping_replier
+
+    # Our reconnect task should complete after we send the ping reply
+    reconnect_fut = event_loop.create_future()
+    app._reconnect_task.add_done_callback(lambda _: reconnect_fut.set_result(None))
+
+    # We should be reconnected soon and the app should have been restarted
+    await reconnect_fut
+    assert app._znp is not None
+    assert app._znp._uart is not None
+
+
+@pytest_mark_asyncio_timeout()
+async def test_auto_connect(mocker, application):
+    AUTO_DETECTED_PORT = "/dev/ttyFAKE0"
+
+    app, znp_server = application
+
+    uart_guess_port = mocker.patch(
+        "zigpy_znp.uart.guess_port", return_value=AUTO_DETECTED_PORT
+    )
+
+    async def fixed_uart_connect(config, api):
+        protocol = await uart_connect(config, api)
+        protocol.transport.serial.name = AUTO_DETECTED_PORT
+
+        return protocol
+
+    uart_connect_mock = mocker.patch(
+        "zigpy_znp.uart.connect", side_effect=fixed_uart_connect
+    )
+
+    app._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] = "auto"
+    await app.startup(auto_form=False)
+
+    assert uart_guess_port.call_count == 1
+    assert uart_connect_mock.call_count == 1
+    assert app._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == AUTO_DETECTED_PORT
+
+
+@pytest_mark_asyncio_timeout()
+async def test_close(mocker, application):
+    app, znp_server = application
+    app.connection_lost = mocker.MagicMock(wraps=app.connection_lost)
+
+    await app.startup(auto_form=False)
+    app._znp._uart.connection_lost(None)
+
+    app.connection_lost.assert_called_once_with(None)
