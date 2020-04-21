@@ -320,7 +320,7 @@ class CommandBase:
         if given_params - all_params:
             raise KeyError(
                 f"Unexpected parameters: {given_params - all_params}. "
-                f"Expected one of {all_params}"
+                f"Expected one of {all_params - given_params}"
             )
         elif not partial and all_params - given_params:
             raise KeyError(f"Missing parameters: {all_params - given_params}")

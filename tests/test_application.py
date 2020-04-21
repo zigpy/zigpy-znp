@@ -7,6 +7,8 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
 
+from zigpy.zdo.types import ZDOCmd
+
 from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import ZNP
@@ -472,3 +474,56 @@ async def test_close(mocker, application):
     app._znp._uart.connection_lost(None)
 
     app.connection_lost.assert_called_once_with(None)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_shutdown(mocker, application):
+    app, znp_server = application
+
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "_reconnect_task")
+    mocker.patch.object(app, "_znp")
+
+    await app.shutdown()
+
+    app._reconnect_task.cancel.assert_called_once_with()
+    app._znp.close.assert_called_once_with()
+
+
+@pytest_mark_asyncio_timeout(seconds=2)
+async def test_zdo_request_interception(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0x0011)
+
+    # Send back a request response
+    active_ep_req = znp_server.reply_once_to(
+        request=c.ZDOCommands.ActiveEpReq.Req(
+            DstAddr=device.nwk, NWKAddrOfInterest=device.nwk
+        ),
+        responses=[
+            c.ZDOCommands.ActiveEpReq.Rsp(Status=t.Status.Success),
+            c.ZDOCommands.ActiveEpRsp.Callback(
+                Src=device.nwk,
+                Status=t.ZDOStatus.SUCCESS,
+                ActiveEndpoints=[0, 1, 2],
+                NWK=device.nwk,
+            ),
+        ],
+    )
+
+    status, message = await app.request(
+        device=device,
+        profile=260,
+        cluster=ZDOCmd.Active_EP_req,
+        src_ep=0,
+        dst_ep=0,
+        sequence=0,
+        data=b"test",
+    )
+
+    await active_ep_req
+
+    assert status == t.Status.Success
