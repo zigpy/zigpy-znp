@@ -3,6 +3,8 @@ import logging
 
 import pytest
 
+from asynctest import CoroutineMock
+
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
@@ -13,6 +15,7 @@ from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import connect as uart_connect
+from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.zigbee.application import ControllerApplication
 
 
@@ -435,7 +438,7 @@ async def test_reconnect(event_loop, application):
     assert app._znp._uart is not None
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_auto_connect(mocker, application):
     AUTO_DETECTED_PORT = "/dev/ttyFAKE0"
 
@@ -525,3 +528,122 @@ async def test_zdo_request_interception(application, mocker):
     await active_ep_req
 
     assert status == t.Status.Success
+
+
+@pytest_mark_asyncio_timeout()
+async def test_update_network_noop(mocker, application):
+    app, znp_server = application
+
+    await app.startup(auto_form=False)
+
+    app._znp = mocker.NonCallableMock()
+
+    # Nothing should be called
+    await app.update_network(reset=False)
+
+    # This will call _znp.request and fail
+    with pytest.raises(TypeError):
+        await app.update_network(reset=True)
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_update_network(mocker, caplog, application):
+    app, znp_server = application
+
+    await app.startup(auto_form=False)
+    mocker.patch.object(app, "_reset", new=CoroutineMock())
+
+    channel = t.uint8_t(15)
+    pan_id = t.PanId(0x1234)
+    extended_pan_id = t.ExtendedPanId(range(8))
+    channels = t.Channels.from_channel_list([11, 15, 20])
+    network_key = t.KeyData(range(16))
+
+    channels_updated = znp_server.reply_once_to(
+        request=c.UtilCommands.SetChannels.Req(Channels=channels),
+        responses=[c.UtilCommands.SetChannels.Rsp(Status=t.Status.Success)],
+    )
+
+    bdb_set_primary_channel = znp_server.reply_once_to(
+        request=c.APPConfigCommands.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
+        responses=[c.APPConfigCommands.BDBSetChannel.Rsp(Status=t.Status.Success)],
+    )
+
+    bdb_set_secondary_channel = znp_server.reply_once_to(
+        request=c.APPConfigCommands.BDBSetChannel.Req(
+            IsPrimary=False, Channel=t.Channels.NO_CHANNELS
+        ),
+        responses=[c.APPConfigCommands.BDBSetChannel.Rsp(Status=t.Status.Success)],
+    )
+
+    set_pan_id = znp_server.reply_once_to(
+        request=c.UtilCommands.SetPanId.Req(PanId=pan_id),
+        responses=[c.UtilCommands.SetPanId.Rsp(Status=t.Status.Success)],
+    )
+
+    set_extended_pan_id = znp_server.reply_once_to(
+        request=c.SysCommands.OSALNVWrite.Req(
+            Id=NwkNvIds.EXTENDED_PAN_ID, Offset=0, Value=extended_pan_id.serialize()
+        ),
+        responses=[c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)],
+    )
+
+    set_network_key_util = znp_server.reply_once_to(
+        request=c.UtilCommands.SetPreConfigKey.Req(PreConfigKey=network_key),
+        responses=[c.UtilCommands.SetPreConfigKey.Rsp(Status=t.Status.Success)],
+    )
+
+    set_network_key_nvram = znp_server.reply_once_to(
+        request=c.SysCommands.OSALNVWrite.Req(
+            Id=NwkNvIds.PRECFGKEYS_ENABLE, Offset=0, Value=t.Bool(True).serialize()
+        ),
+        responses=[c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)],
+    )
+
+    # But it does succeed with a warning if you explicitly allow it
+    with caplog.at_level(logging.WARNING):
+        await app.update_network(
+            channel=channel,
+            channels=channels,
+            extended_pan_id=extended_pan_id,
+            network_key=network_key,
+            pan_id=pan_id,
+            tc_address=t.EUI64(range(8)),
+            tc_link_key=t.KeyData(range(8)),
+            update_id=0,
+            reset=True,
+        )
+
+    # We should receive a warning about setting a specific channel
+    assert len(caplog.records) >= 1
+    assert any(
+        "Cannot set a specific channel in config" in r.message for r in caplog.records
+    )
+
+    await channels_updated
+    await bdb_set_primary_channel
+    await bdb_set_secondary_channel
+    await set_pan_id
+    await set_extended_pan_id
+    await set_network_key_util
+    await set_network_key_nvram
+
+    app._reset.assert_called_once_with()
+
+    # Ensure we set everything we could
+    assert app.channel is None  # We can't set it
+    assert app.nwk_update_id is None  # We can't use it
+    assert app.channels == channels
+    assert app.pan_id == pan_id
+    assert app.extended_pan_id == extended_pan_id
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_update_network_bad_channel(mocker, caplog, application):
+    app, znp_server = application
+
+    with pytest.raises(ValueError):
+        # 12 is not in the mask
+        await app.update_network(
+            channel=t.uint8_t(12), channels=t.Channels.from_channel_list([11, 15, 20]),
+        )

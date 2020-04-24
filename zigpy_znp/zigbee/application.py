@@ -318,16 +318,26 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         extended_pan_id: typing.Optional[t.ExtendedPanId] = None,
         network_key: typing.Optional[t.KeyData] = None,
         pan_id: typing.Optional[t.PanId] = None,
-        tc_address: typing.Optional[t.KeyData] = None,
+        tc_address: typing.Optional[t.EUI64] = None,
         tc_link_key: typing.Optional[t.KeyData] = None,
         update_id: int = 0,
         reset: bool = True,
     ):
+        if (
+            channel is not None
+            and channels is not None
+            and not t.Channels.from_channel_list([channel]) & channels
+        ):
+            raise ValueError("Channel does not overlap with channel mask")
+
         if channel is not None:
             LOGGER.warning("Cannot set a specific channel in config: %d", channel)
 
         if tc_link_key is not None:
             LOGGER.warning("Trust center link key in config is not yet supported")
+
+        if tc_address is not None:
+            LOGGER.warning("Trust center address in config is not yet supported")
 
         if channels is not None:
             await self._znp.request(
@@ -358,7 +368,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # There is no Util request to do this
             await self._znp.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
 
-            self._extended_pan_id = extended_pan_id
+            self._ext_pan_id = extended_pan_id
 
         if network_key is not None:
             await self._znp.request(
@@ -367,9 +377,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
             # XXX: The Util request does not actually write to this NV address
-            await self._znp.nvram_write(
-                NwkNvIds.PRECFGKEYS_ENABLE, zigpy.types.bool(True)
-            )
+            await self._znp.nvram_write(NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True))
 
         if reset:
             # We have to reset afterwards
