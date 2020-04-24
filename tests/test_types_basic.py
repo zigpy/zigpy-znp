@@ -126,11 +126,11 @@ def test_fixed_list():
     class TestList(t.FixedList, item_type=t.uint16_t, length=3):
         pass
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         r = TestList([1, 2, 3, 0x55AA])
         r.serialize()
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         r = TestList([1, 2])
         r.serialize()
 

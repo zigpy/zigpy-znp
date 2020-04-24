@@ -171,10 +171,6 @@ class FixedList(TypedListMeta):
         cls._item_type = item_type
         cls._length = length
 
-    def serialize(self) -> bytes:
-        assert len(self) == self._length
-        return super().serialize()
-
     @classmethod
     def deserialize(cls, data):
         assert cls._item_type is not None
