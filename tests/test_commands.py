@@ -178,6 +178,10 @@ def test_command_param_binding():
     with pytest.raises(ValueError):
         c.UtilCommands.TimeAlive.Rsp(Seconds=b"asd")
 
+    # Valid type but invalid value
+    with pytest.raises(ValueError):
+        c.UtilCommands.SetPreConfigKey.Req(PreConfigKey=t.KeyData([1, 2, 3]))
+
     # Coerced numerical type
     a = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
     b = c.UtilCommands.TimeAlive.Rsp(Seconds=t.uint32_t(12))

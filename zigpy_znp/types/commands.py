@@ -363,13 +363,13 @@ class CommandBase:
                         f"type {param.type}, got {type(value)}"
                     )
 
-                try:
-                    # XXX: Break early if a type cannot be serialized
-                    value.serialize()
-                except Exception as e:
-                    raise ValueError(
-                        f"Invalid parameter value: {param.name}={value!r}"
-                    ) from e
+            try:
+                # XXX: Break early if a type cannot be serialized
+                value.serialize()
+            except Exception as e:
+                raise ValueError(
+                    f"Invalid parameter value: {param.name}={value!r}"
+                ) from e
 
             bound_params[param.name] = (param, value)
 
