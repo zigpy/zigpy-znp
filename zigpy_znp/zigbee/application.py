@@ -249,7 +249,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 conf.CONF_DEVICE_PATH
             ] = self._znp._uart.transport.serial.name
 
-        await self._reset(t.ResetType.Soft)
+        await self._reset()
 
         if auto_form and False:
             # XXX: actually form a network
@@ -369,9 +369,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # We have to reset afterwards
             await self._reset()
 
-    async def _reset(self, reset_type: t.ResetType = t.ResetType.Soft):
+    async def _reset(self):
         await self._znp.request_callback_rsp(
-            request=c.SysCommands.ResetReq.Req(Type=reset_type),
+            request=c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft),
             callback=c.SysCommands.ResetInd.Callback(partial=True),
         )
 
