@@ -82,8 +82,6 @@ class ServerZNP(ZNP):
         self.callback_for_response(request, lambda _: asyncio.create_task(callback()))
 
     def ping_replier(self, request):
-        # XXX: what in the world is this received MTCapabilities value?
-        # It does not match up at all to the TI codebase
         self.send(c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
 
     def send(self, response):

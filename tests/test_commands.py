@@ -383,9 +383,6 @@ def test_command_deserialization(caplog):
         type(command).from_frame(bad_frame)
 
     # But it does succeed with a warning if you explicitly allow it
-    with pytest.warns(None):
-        True
-
     with caplog.at_level(logging.WARNING):
         type(command).from_frame(bad_frame, ignore_unparsed=True)
 

@@ -496,12 +496,9 @@ class MTCapabilities(t.enum_flag_uint16):
     CAP_DEBUG = 1 << 7
     CAP_APP = 1 << 8
     CAP_GP = 1 << 9
-
-    CAP_UNK11 = 1 << 10
+    CAP_APP_CNF = 1 << 10
     CAP_UNK12 = 1 << 11
-
     CAP_ZOAD = 1 << 12
-
     CAP_UNK14 = 1 << 13
     CAP_UNK15 = 1 << 14
     CAP_UNK16 = 1 << 15
