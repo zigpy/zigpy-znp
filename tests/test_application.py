@@ -9,6 +9,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
 
+import zigpy.device
 from zigpy.zdo.types import ZDOCmd
 
 from zigpy_znp.uart import ZnpMtProtocol
@@ -523,11 +524,96 @@ async def test_zdo_request_interception(application, mocker):
         dst_ep=0,
         sequence=0,
         data=b"test",
+        use_ieee=False,
     )
 
     await active_ep_req
 
     assert status == t.Status.Success
+
+
+@pytest_mark_asyncio_timeout(seconds=10)
+async def test_zigpy_request(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    TSN = 1
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+    device.status = zigpy.device.Status.ENDPOINTS_INIT
+    device.initializing = False
+
+    device.add_endpoint(1).add_input_cluster(6)
+
+    # Respond to a light turn on request
+    data_req = znp_server.reply_once_to(
+        request=c.AFCommands.DataRequestExt.Req(
+            DstAddrModeAddress=t.AddrModeAddress(
+                mode=t.AddrMode.NWK, address=device.nwk
+            ),
+            DstEndpoint=1,
+            SrcEndpoint=1,
+            ClusterId=6,
+            TSN=TSN,
+            Data=bytes([0x01, TSN, 0x01]),
+            partial=True,
+        ),
+        responses=[
+            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AFCommands.DataConfirm.Callback(
+                Status=t.Status.Success, Endpoint=1, TSN=TSN,
+            ),
+            c.ZDOCommands.SrcRtgInd.Callback(DstAddr=device.nwk, Relays=[]),
+            c.AFCommands.IncomingMsg.Callback(
+                GroupId=0x0000,
+                ClusterId=6,
+                SrcAddr=device.nwk,
+                SrcEndpoint=1,
+                DstEndpoint=1,
+                WasBroadcast=False,
+                LQI=63,
+                SecurityUse=False,
+                TimeStamp=1198515,
+                TSN=0,
+                Data=bytes([0x08, TSN, 0x0B, 0x00, 0x00]),
+                MacSrcAddr=device.nwk,
+                MsgResultRadius=29,
+            ),
+        ],
+    )
+
+    # Turn on the light
+    await device.endpoints[1].on_off.on()
+    await data_req
+
+
+@pytest_mark_asyncio_timeout(seconds=2)
+@pytest.mark.parametrize(
+    "use_ieee,dev_addr",
+    [
+        (True, t.AddrModeAddress(mode=t.AddrMode.IEEE, address=t.EUI64(range(8)))),
+        (False, t.AddrModeAddress(mode=t.AddrMode.NWK, address=t.NWK(0xAABB))),
+    ],
+)
+async def test_request_use_ieee(application, mocker, use_ieee, dev_addr):
+    app, znp_server = application
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+
+    send_req = mocker.patch.object(app, "_send_request", new=CoroutineMock())
+
+    await app.request(
+        device,
+        use_ieee=use_ieee,
+        profile=None,
+        cluster=None,
+        src_ep=None,
+        dst_ep=None,
+        sequence=None,
+        data=None,
+    )
+
+    assert send_req.call_count == 1
+    assert send_req.mock_calls[0][2]["dst_addr"] == dev_addr
 
 
 @pytest_mark_asyncio_timeout()
