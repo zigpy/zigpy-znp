@@ -618,10 +618,6 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     znp._uart.send.reset_mock()
 
-    # Writing too big of a value should fail
-    with pytest.raises(ValueError):
-        await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint16_t(0xAABB))
-
     # The SYS_OSAL_NV_WRITE response status should be checked
     event_loop.call_soon(
         znp.frame_received,

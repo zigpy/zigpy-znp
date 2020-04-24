@@ -347,23 +347,6 @@ class ZNP:
         if not isinstance(value, bytes):
             value = value.serialize()
 
-        # Find the next NVID in the table to check that our write doesn't overflow
-        # It's not foolproof, but it will catch simple mistakes
-        all_enum_values = list(type(nv_id))
-        all_enum_values.sort(key=lambda i: i.value)
-        index = all_enum_values.index(nv_id)
-
-        if index == len(all_enum_values) - 1:
-            LOGGER.warning(
-                "NVID is at end of table, cannot check for overflow"
-            )  # pragma: no cover
-        else:
-            next_nvid = all_enum_values[index + 1]
-            end_address = nv_id + offset + len(value)
-
-            if end_address > next_nvid:
-                raise ValueError("OSALNVWrite request overflows into %s", next_nvid)
-
         return await self.request(
             SysCommands.OSALNVWrite.Req(
                 Id=nv_id, Offset=offset, Value=t.ShortBytes(value)
