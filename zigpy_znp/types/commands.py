@@ -385,7 +385,7 @@ class CommandBase:
                 f"Cannot serialize a partial frame: missing {missing_params}"
             )
 
-        data = b"".join(v.serialize() for p, v in self._bound_params.values())
+        data = b"".join([v.serialize() for p, v in self._bound_params.values()])
 
         return GeneralFrame(self.header, data)
 

@@ -132,7 +132,11 @@ class TypedListMeta(list):
     _length = None
 
     def serialize(self) -> bytes:
-        assert self._length is None or len(self) == self._length
+        if self._length is not None and len(self) != self._length:
+            raise ValueError(
+                f"Invalid length for {self!r}: expected {self._length}, got {len(self)}"
+            )
+
         return b"".join([self._item_type(i).serialize() for i in self])
 
     @classmethod
