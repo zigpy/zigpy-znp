@@ -3,10 +3,19 @@ import numbers
 
 import voluptuous as vol
 from zigpy.config import (  # noqa: F401
-    CONF_DEVICE,
-    CONF_DEVICE_PATH,
     CONFIG_SCHEMA,
     SCHEMA_DEVICE,
+    CONF_DEVICE,
+    CONF_DEVICE_PATH,
+    CONF_NWK,
+    CONF_NWK_CHANNEL,
+    CONF_NWK_CHANNELS,
+    CONF_NWK_EXTENDED_PAN_ID,
+    CONF_NWK_PAN_ID,
+    CONF_NWK_KEY,
+    CONF_NWK_TC_ADDRESS,
+    CONF_NWK_TC_LINK_KEY,
+    CONF_NWK_UPDATE_ID,
     cv_boolean,
 )
 

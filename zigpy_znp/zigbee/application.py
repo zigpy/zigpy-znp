@@ -315,13 +315,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         *,
         channel: typing.Optional[t.uint8_t] = None,
         channels: typing.Optional[t.Channels] = None,
-        pan_id: typing.Optional[t.PanId] = None,
         extended_pan_id: typing.Optional[t.ExtendedPanId] = None,
         network_key: typing.Optional[t.KeyData] = None,
+        pan_id: typing.Optional[t.PanId] = None,
+        tc_address: typing.Optional[t.KeyData] = None,
+        tc_link_key: typing.Optional[t.KeyData] = None,
+        update_id: int = 0,
         reset: bool = True,
     ):
         if channel is not None:
-            raise NotImplementedError("Cannot set a specific channel")
+            LOGGER.warning("Cannot set a specific channel in config: %d", channel)
+
+        if tc_link_key is not None:
+            LOGGER.warning("Trust center link key in config is not yet supported")
 
         if channels is not None:
             await self._znp.request(
@@ -375,7 +381,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             callback=c.SysCommands.ResetInd.Callback(partial=True),
         )
 
-    async def form_network(self, channels=[15], pan_id=None, extended_pan_id=None):
+    async def form_network(self):
         # These options are read only on startup so we perform a soft reset right after
         await self._znp.nvram_write(
             NwkNvIds.STARTUP_OPTION, t.StartupOptions.ClearState
@@ -394,19 +400,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # the device will retrieve the pre-configured key from NV memory if the NV_INIT
         # compile option is defined (the NV item is called ZCD_NV_PRECFGKEY).
 
+        pan_id = self.config[conf.SCHEMA_NETWORK][conf.CONF_NWK_PAN_ID]
+        extended_pan_id = self.config[conf.SCHEMA_NETWORK][
+            conf.CONF_NWK_EXTENDED_PAN_ID
+        ]
+
         await self.update_network(
-            channel=None,
-            channels=t.Channels.from_channel_list(channels),
+            channels=self.config[conf.SCHEMA_NETWORK][conf.CONF_NWK_CHANNELS],
             pan_id=0xFFFF if pan_id is None else pan_id,
-            extended_pan_id=ExtendedPanId(
-                os.urandom(8) if extended_pan_id is None else extended_pan_id
-            ),
-            network_key=t.KeyData(os.urandom(16)),
+            extended_pan_id=ExtendedPanId(os.urandom(8))
+            if extended_pan_id is None
+            else extended_pan_id,
+            network_key=t.KeyData([os.urandom(16)]),
             reset=False,
         )
 
-        # We do not want to receive verbose ZDO callbacks
-        # Just pass ZDO callbacks back to Zigpy
+        # We want to receive all ZDO callbacks to proxy them back go zipgy
         await self._znp.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
 
         await self._znp.request(
