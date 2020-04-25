@@ -249,6 +249,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 conf.CONF_DEVICE_PATH
             ] = self._znp._uart.transport.serial.name
 
+        # It's better to configure these explicitly than rely on the NVRAM defaults
+        await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_ENABLE, t.Bool(True))
+        await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_DISCOVERY, t.uint8_t(120))
+        await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_RC, t.Bool(True))
+        await self._znp.nvram_write(NwkNvIds.SRC_RTG_EXPIRY_TIME, t.uint8_t(255))
+        await self._znp.nvram_write(NwkNvIds.NWK_CHILD_AGE_ENABLE, t.Bool(False))
+
         await self._reset()
 
         if auto_form and False:

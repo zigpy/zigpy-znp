@@ -178,6 +178,19 @@ def application(znp_server):
         ],
     )
 
+    # Reply to the initialization NVID writes
+    for nvid in [
+        NwkNvIds.CONCENTRATOR_ENABLE,
+        NwkNvIds.CONCENTRATOR_DISCOVERY,
+        NwkNvIds.CONCENTRATOR_RC,
+        NwkNvIds.SRC_RTG_EXPIRY_TIME,
+        NwkNvIds.NWK_CHILD_AGE_ENABLE,
+    ]:
+        znp_server.reply_to(
+            request=c.SysCommands.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),
+            responses=[c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)],
+        )
+
     return app, znp_server
 
 
@@ -206,7 +219,7 @@ async def test_application_startup(application):
     assert len(endpoints) == 5
 
 
-@pytest_mark_asyncio_timeout(seconds=2)
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_permit_join(application):
     app, znp_server = application
 
@@ -241,7 +254,7 @@ async def test_permit_join(application):
     await asyncio.gather(data_req_sent, permit_join_sent)
 
 
-@pytest_mark_asyncio_timeout(seconds=2)
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_permit_join_failure(application):
     app, znp_server = application
 
@@ -278,7 +291,7 @@ async def test_permit_join_failure(application):
     await asyncio.gather(data_req_sent, permit_join_sent)
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_relays_message_callback(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
@@ -292,7 +305,7 @@ async def test_on_zdo_relays_message_callback(application, mocker):
     assert device.relays == [0x5678, 0xABCD]
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_device_announce(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
@@ -310,7 +323,7 @@ async def test_on_zdo_device_announce(application, mocker):
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0)
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_device_join(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
@@ -326,7 +339,7 @@ async def test_on_zdo_device_join(application, mocker):
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_device_leave_callback(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
@@ -344,7 +357,7 @@ async def test_on_zdo_device_leave_callback(application, mocker):
     app.handle_leave.assert_called_once_with(nwk=nwk, ieee=ieee)
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_af_message_callback(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
@@ -390,7 +403,7 @@ async def test_on_af_message_callback(application, mocker):
     assert app.handle_message.call_count == 0
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_probe(pingable_serial_port):  # noqa: F811
     assert not (
         await ControllerApplication.probe(
@@ -467,7 +480,7 @@ async def test_auto_connect(mocker, application):
     assert app._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == AUTO_DETECTED_PORT
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_close(mocker, application):
     app, znp_server = application
     app.connection_lost = mocker.MagicMock(wraps=app.connection_lost)
@@ -478,7 +491,7 @@ async def test_close(mocker, application):
     app.connection_lost.assert_called_once_with(None)
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_shutdown(mocker, application):
     app, znp_server = application
 
@@ -493,7 +506,7 @@ async def test_shutdown(mocker, application):
     app._znp.close.assert_called_once_with()
 
 
-@pytest_mark_asyncio_timeout(seconds=2)
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_zdo_request_interception(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
@@ -587,7 +600,7 @@ async def test_zigpy_request(application, mocker):
     await data_req
 
 
-@pytest_mark_asyncio_timeout(seconds=2)
+@pytest_mark_asyncio_timeout(seconds=3)
 @pytest.mark.parametrize(
     "use_ieee,dev_addr",
     [
@@ -616,7 +629,7 @@ async def test_request_use_ieee(application, mocker, use_ieee, dev_addr):
     assert send_req.mock_calls[0][2]["dst_addr"] == dev_addr
 
 
-@pytest_mark_asyncio_timeout()
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_update_network_noop(mocker, application):
     app, znp_server = application
 
