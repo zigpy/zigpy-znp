@@ -300,22 +300,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # Start commissioning and wait until it's done
-        comm_notification = await self._znp.request_callback_rsp(
+        await self._znp.request_callback_rsp(
             request=c.APPConfigCommands.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NetworkFormation
             ),
             RspStatus=t.Status.Success,
             callback=c.APPConfigCommands.BDBCommissioningNotification.Callback(
-                partial=True,
-                RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
+                partial=True, Status=c.app_config.BDBCommissioningStatus.Success,
             ),
         )
-
-        # XXX: Commissioning fails for me yet I experience no issues
-        if comm_notification.Status != c.app_config.BDBCommissioningStatus.Success:
-            LOGGER.warning(
-                "BDB commissioning did not succeed: %s", comm_notification.Status
-            )
 
     async def update_network(
         self,
