@@ -12,9 +12,9 @@ import zigpy.application
 import zigpy.profiles
 import zigpy.zcl.foundation
 
-from zigpy.zdo.types import ZDOCmd
+from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
 
-from zigpy.types import ExtendedPanId
+from zigpy.types import ExtendedPanId, deserialize as list_deserialize
 from zigpy.zcl.clusters.security import IasZone
 
 import zigpy_znp.config as conf
@@ -35,8 +35,8 @@ ZDO_CONVERTERS = {
     ZDOCmd.Node_Desc_req: (
         ZDOCmd.Node_Desc_rsp,
         (
-            lambda addr, ep: c.ZDOCommands.NodeDescReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=addr
+            lambda addr, NWKAddrOfInterest: c.ZDOCommands.NodeDescReq.Req(
+                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
         (
@@ -49,8 +49,8 @@ ZDO_CONVERTERS = {
     ZDOCmd.Active_EP_req: (
         ZDOCmd.Active_EP_rsp,
         (
-            lambda addr, ep: c.ZDOCommands.ActiveEpReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=addr
+            lambda addr, NWKAddrOfInterest: c.ZDOCommands.ActiveEpReq.Req(
+                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
         (
@@ -63,8 +63,8 @@ ZDO_CONVERTERS = {
     ZDOCmd.Simple_Desc_req: (
         ZDOCmd.Simple_Desc_rsp,
         (
-            lambda addr, ep: c.ZDOCommands.SimpleDescReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=addr, Endpoint=ep
+            lambda addr, NWKAddrOfInterest, EndPoint: c.ZDOCommands.SimpleDescReq.Req(
+                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest, Endpoint=EndPoint
             )
         ),
         (
@@ -474,8 +474,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         assert dst_ep == ZDO_ENDPOINT
 
+        # Deserialize the ZDO request
+        zdo_hdr, data = ZDOHeader.deserialize(cluster, data)
+        field_names, field_types = ZDO_CLUSTERS[cluster]
+        zdo_args, _ = list_deserialize(data, field_types)
+        zdo_kwargs = dict(zip(field_names, zdo_args))
+
+        # Call the converter with the ZDO request's kwargs
         rsp_cluster, req_factory, callback_factory, converter = ZDO_CONVERTERS[cluster]
-        request = req_factory(dst_addr.address, ep=src_ep)
+        request = req_factory(dst_addr.address, **zdo_kwargs)
         callback = callback_factory(dst_addr.address)
 
         LOGGER.debug(

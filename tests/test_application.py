@@ -10,7 +10,7 @@ import zigpy_znp.commands as c
 import zigpy_znp.config as conf
 
 import zigpy.device
-from zigpy.zdo.types import ZDOCmd
+from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
 
 from zigpy_znp.uart import ZnpMtProtocol
 
@@ -511,20 +511,29 @@ async def test_zdo_request_interception(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0x0011)
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
 
     # Send back a request response
     active_ep_req = znp_server.reply_once_to(
-        request=c.ZDOCommands.ActiveEpReq.Req(
-            DstAddr=device.nwk, NWKAddrOfInterest=device.nwk
+        request=c.ZDOCommands.SimpleDescReq.Req(
+            DstAddr=device.nwk, NWKAddrOfInterest=device.nwk, Endpoint=1
         ),
         responses=[
-            c.ZDOCommands.ActiveEpReq.Rsp(Status=t.Status.Success),
-            c.ZDOCommands.ActiveEpRsp.Callback(
+            c.ZDOCommands.SimpleDescReq.Rsp(Status=t.Status.Success),
+            c.ZDOCommands.SimpleDescRsp.Callback(
                 Src=device.nwk,
                 Status=t.ZDOStatus.SUCCESS,
-                ActiveEndpoints=[0, 1, 2],
                 NWK=device.nwk,
+                SimpleDescriptor=SizePrefixedSimpleDescriptor(
+                    *dict(
+                        endpoint=1,
+                        profile=49246,
+                        device_type=256,
+                        device_version=2,
+                        input_clusters=[0, 3, 4, 5, 6, 8, 2821, 4096],
+                        output_clusters=[5, 25, 32, 4096],
+                    ).values()
+                ),
             ),
         ],
     )
@@ -532,11 +541,11 @@ async def test_zdo_request_interception(application, mocker):
     status, message = await app.request(
         device=device,
         profile=260,
-        cluster=ZDOCmd.Active_EP_req,
+        cluster=ZDOCmd.Simple_Desc_req,
         src_ep=0,
         dst_ep=0,
-        sequence=0,
-        data=b"test",
+        sequence=1,
+        data=b"\x01\x9e\xfa\x01",
         use_ieee=False,
     )
 
