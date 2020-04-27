@@ -11,4 +11,6 @@ class CommandNotRecognized(CommandError):
 
 
 class InvalidCommandResponse(CommandError):
-    pass
+    def __init__(self, message, response):
+        super().__init__(message)
+        self.response = response

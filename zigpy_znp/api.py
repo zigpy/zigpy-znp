@@ -315,7 +315,7 @@ class ZNP:
         # If the sync response we got is not what we wanted, this is an error
         if not partial_response.matches(response):
             raise InvalidCommandResponse(
-                f"SRSP was not what we expected: {response} !~ {partial_response}"
+                f"Expected SRSP response {partial_response}, got {response}", response
             )
 
         return response

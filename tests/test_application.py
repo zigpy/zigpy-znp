@@ -69,6 +69,7 @@ class ServerZNP(ZNP):
 
             for response in responses:
                 await asyncio.sleep(0.1)
+                LOGGER.debug("Replying to %s with %s", request, response)
                 self.send(response)
 
             called_future.set_result(True)
@@ -84,6 +85,7 @@ class ServerZNP(ZNP):
 
             for response in responses:
                 await asyncio.sleep(0.1)
+                LOGGER.debug("Replying to %s with %s", request, response)
                 self.send(response)
 
         callback.call_count = 0
@@ -822,3 +824,47 @@ async def test_update_network_bad_channel(mocker, caplog, application):
         await app.update_network(
             channel=t.uint8_t(12), channels=t.Channels.from_channel_list([11, 15, 20]),
         )
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_force_remove(application, mocker):
+    app, znp_server = application
+
+    await app.startup(auto_form=False)
+
+    mocker.patch("zigpy_znp.zigbee.application.ZDO_REQUEST_TIMEOUT", new=0.3)
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+    device.status = zigpy.device.Status.ENDPOINTS_INIT
+    device.initializing = False
+
+    # Reply to zigpy's leave request
+    bad_mgmt_leave_req = znp_server.reply_once_to(
+        request=c.ZDOCommands.MgmtLeaveReq.Req(DstAddr=device.nwk, partial=True),
+        responses=[c.ZDOCommands.MgmtLeaveReq.Rsp(Status=t.Status.Failure)],
+    )
+
+    # Reply to our own leave request
+    good_mgmt_leave_req = znp_server.reply_once_to(
+        request=c.ZDOCommands.MgmtLeaveReq.Req(DstAddr=0x0000, partial=True),
+        responses=[
+            c.ZDOCommands.MgmtLeaveReq.Rsp(Status=t.Status.Success),
+            c.ZDOCommands.LeaveInd.Callback(
+                NWK=device.nwk,
+                IEEE=device.ieee,
+                Remove=False,
+                Request=False,
+                Rejoin=False,
+            ),
+        ],
+    )
+
+    # Make sure the device exists
+    assert app.get_device(nwk=device.nwk) is device
+
+    await app.remove(device.ieee)
+    await asyncio.gather(bad_mgmt_leave_req, good_mgmt_leave_req)
+
+    # Make sure the device is gone once we remove it
+    with pytest.raises(KeyError):
+        app.get_device(nwk=device.nwk)

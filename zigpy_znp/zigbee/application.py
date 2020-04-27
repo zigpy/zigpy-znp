@@ -16,10 +16,12 @@ from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
 
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
 from zigpy.zcl.clusters.security import IasZone
+from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.config as conf
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
+from zigpy_znp.exceptions import InvalidCommandResponse
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import NwkNvIds
@@ -33,46 +35,45 @@ LOGGER = logging.getLogger(__name__)
 
 ZDO_CONVERTERS = {
     ZDOCmd.Node_Desc_req: (
-        ZDOCmd.Node_Desc_rsp,
         (
-            lambda addr, NWKAddrOfInterest: c.ZDOCommands.NodeDescReq.Req(
+            lambda addr, device, NWKAddrOfInterest: c.ZDOCommands.NodeDescReq.Req(
                 DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (
-            lambda addr: c.ZDOCommands.NodeDescRsp.Callback(
-                partial=True, Src=addr, Status=t.ZDOStatus.SUCCESS
-            )
-        ),
-        (lambda rsp, dev: [rsp.NodeDescriptor]),
+        (lambda addr: c.ZDOCommands.NodeDescRsp.Callback(partial=True, Src=addr)),
+        (lambda rsp: (ZDOCmd.Node_Desc_rsp, [rsp.NodeDescriptor])),
     ),
     ZDOCmd.Active_EP_req: (
-        ZDOCmd.Active_EP_rsp,
         (
-            lambda addr, NWKAddrOfInterest: c.ZDOCommands.ActiveEpReq.Req(
+            lambda addr, device, NWKAddrOfInterest: c.ZDOCommands.ActiveEpReq.Req(
                 DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (
-            lambda addr: c.ZDOCommands.ActiveEpRsp.Callback(
-                partial=True, Src=addr, Status=t.ZDOStatus.SUCCESS
-            )
-        ),
-        (lambda rsp, dev: [rsp.ActiveEndpoints]),
+        (lambda addr: c.ZDOCommands.ActiveEpRsp.Callback(partial=True, Src=addr)),
+        (lambda rsp: (ZDOCmd.Active_EP_rsp, [rsp.ActiveEndpoints])),
     ),
     ZDOCmd.Simple_Desc_req: (
-        ZDOCmd.Simple_Desc_rsp,
         (
-            lambda addr, NWKAddrOfInterest, EndPoint: c.ZDOCommands.SimpleDescReq.Req(
+            # fmt: off
+            lambda addr, device, NWKAddrOfInterest, EndPoint: \
+            c.ZDOCommands.SimpleDescReq.Req(
                 DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest, Endpoint=EndPoint
             )
+            # fmt: on
         ),
+        (lambda addr: c.ZDOCommands.SimpleDescRsp.Callback(partial=True, Src=addr)),
+        (lambda rsp: (ZDOCmd.Simple_Desc_rsp, [rsp.SimpleDescriptor])),
+    ),
+    ZDOCmd.Mgmt_Leave_req: (
         (
-            lambda addr: c.ZDOCommands.SimpleDescRsp.Callback(
-                partial=True, Src=addr, Status=t.ZDOStatus.SUCCESS
+            lambda addr, device, DeviceAddress, Options: c.ZDOCommands.MgmtLeaveReq.Req(
+                DstAddr=addr,
+                IEEE=device.ieee,
+                RemoveChildren_Rejoin=c.zdo.LeaveOptions(Options),
             )
         ),
-        (lambda rsp, dev: [rsp.SimpleDescriptor]),
+        (lambda addr: c.ZDOCommands.MgmtLeaveRsp.Callback(partial=True, Src=addr)),
+        (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, [rsp.Status])),
     ),
 }
 
@@ -480,26 +481,30 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         zdo_args, _ = list_deserialize(data, field_types)
         zdo_kwargs = dict(zip(field_names, zdo_args))
 
+        device = self.get_device(nwk=dst_addr.address)
+
         # Call the converter with the ZDO request's kwargs
-        rsp_cluster, req_factory, callback_factory, converter = ZDO_CONVERTERS[cluster]
-        request = req_factory(dst_addr.address, **zdo_kwargs)
-        callback = callback_factory(dst_addr.address)
+        req_factory, rsp_factory, zdo_rsp_factory = ZDO_CONVERTERS[cluster]
+        request = req_factory(dst_addr.address, device, **zdo_kwargs)
+        callback = rsp_factory(dst_addr.address)
 
         LOGGER.debug(
-            "Intercepted AP ZDO request and replaced with %s - %s", request, callback
+            "Intercepted AP ZDO request and replaced with %s/%s", request, callback
         )
 
-        async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
-            response = await self._znp.request_callback_rsp(
-                request=request, RspStatus=t.Status.Success, callback=callback
-            )
+        try:
+            async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
+                response = await self._znp.request_callback_rsp(
+                    request=request, RspStatus=t.Status.Success, callback=callback
+                )
+        except InvalidCommandResponse as e:
+            raise DeliveryError(f"Could not send command: {e.response.Status}") from e
 
-        device = self.get_device(nwk=dst_addr.address)
+        zdo_rsp_cluster, zdo_response_args = zdo_rsp_factory(response)
 
         # Build up a ZDO response
         message = t.serialize_list(
-            [t.uint8_t(sequence), response.Status, response.NWK]
-            + converter(response, device)
+            [t.uint8_t(sequence), response.Status, response.NWK] + zdo_response_args
         )
         LOGGER.trace("Pretending we received a ZDO message: %s", message)
 
@@ -507,7 +512,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.handle_message(
             sender=device,
             profile=zigpy.profiles.zha.PROFILE_ID,
-            cluster=rsp_cluster,
+            cluster=zdo_rsp_cluster,
             src_ep=dst_ep,
             dst_ep=src_ep,
             message=message,
@@ -631,11 +636,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """Forcibly remove device from NCP."""
         await self._znp.request(
             c.ZDOCommands.MgmtLeaveReq.Req(
-                DstAddr=device.nwk,
+                DstAddr=0x0000,  # We handle it
                 IEEE=device.ieee,
-                LeaveOptions=c.zdo.LeaveOptions.NONE,
+                RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
             ),
             RspStatus=t.Status.Success,
+        )
+
+        # TODO: see what happens when we forcibly remove a device that isn't our child
+
+        # Just wait for the response, removing the device will be handled upstream
+        await self._znp.wait_for_response(
+            c.ZDOCommands.LeaveInd.Callback(
+                NWK=device.nwk, IEEE=device.ieee, partial=True
+            )
         )
 
     async def permit_ncp(self, time_s: int) -> None:
