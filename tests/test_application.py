@@ -5,6 +5,7 @@ import pytest
 
 from asynctest import CoroutineMock
 
+import zigpy
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
@@ -79,11 +80,17 @@ class ServerZNP(ZNP):
 
     def reply_to(self, request, responses):
         async def callback():
+            callback.call_count += 1
+
             for response in responses:
                 await asyncio.sleep(0.1)
                 self.send(response)
 
+        callback.call_count = 0
+
         self.callback_for_response(request, lambda _: asyncio.create_task(callback()))
+
+        return callback
 
     def ping_replier(self, request):
         self.send(c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
@@ -217,6 +224,21 @@ async def test_application_startup(application):
     await app.startup(auto_form=False)
 
     assert len(endpoints) == 5
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_application_startup_tx_power(application):
+    app, znp_server = application
+
+    set_tx_power = znp_server.reply_once_to(
+        request=c.SysCommands.SetTxPower.Req(TXPower=19),
+        responses=[c.SysCommands.SetTxPower.Rsp(Status=t.Status.Success)],
+    )
+
+    app.update_config({conf.CONF_ZNP_CONFIG: {conf.CONF_TX_POWER: 19}})
+
+    await app.startup(auto_form=False)
+    await set_tx_power
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
