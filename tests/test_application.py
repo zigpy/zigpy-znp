@@ -631,6 +631,51 @@ async def test_zigpy_request(application, mocker):
     await data_req
 
 
+@pytest_mark_asyncio_timeout(seconds=10)
+async def test_zigpy_request_failure(application, mocker):
+    app, znp_server = application
+    await app.startup(auto_form=False)
+
+    TSN = 1
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+    device.status = zigpy.device.Status.ENDPOINTS_INIT
+    device.initializing = False
+
+    device.add_endpoint(1).add_input_cluster(6)
+
+    # Fail to respond to a light turn on request
+    znp_server.reply_to(
+        request=c.AFCommands.DataRequestExt.Req(
+            DstAddrModeAddress=t.AddrModeAddress(
+                mode=t.AddrMode.NWK, address=device.nwk
+            ),
+            DstEndpoint=1,
+            SrcEndpoint=1,
+            ClusterId=6,
+            TSN=TSN,
+            Data=bytes([0x01, TSN, 0x01]),
+            partial=True,
+        ),
+        responses=[
+            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AFCommands.DataConfirm.Callback(
+                Status=t.Status.Failure, Endpoint=1, TSN=TSN,
+            ),
+        ],
+    )
+
+    mocker.patch.object(
+        app, "_send_request", new=CoroutineMock(wraps=app._send_request)
+    )
+
+    # Fail to turn on the light
+    with pytest.raises(zigpy.exceptions.DeliveryError):
+        await device.endpoints[1].on_off.on()
+
+    assert app._send_request.call_count == 1
+
+
 @pytest_mark_asyncio_timeout(seconds=3)
 @pytest.mark.parametrize(
     "use_ieee,dev_addr",
