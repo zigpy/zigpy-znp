@@ -25,6 +25,11 @@ class OsalExNvIds(BaseNvIds):
 
 
 class NwkNvIds(BaseNvIds):
+    # XXX: These are not documented or found in the code but seem to work?
+    #      No others exist. Every one of the 2^16 possible NVIDs is in this enum.
+    # HAS_CONFIGURED_ZSTACK1 = 0x0F00
+    HAS_CONFIGURED_ZSTACK3 = 0x0060
+
     # OSAL NV item IDs
     EXTADDR = 0x0001
     BOOTCOUNTER = 0x0002
@@ -93,10 +98,6 @@ class NwkNvIds(BaseNvIds):
 
     BDBNODEISONANETWORK = 0x0055  # bdbNodeIsOnANetwork attribute
     BDBREPORTINGCONFIG = 0x0056
-
-    # XXX: these are not documented or found anywhere but in the Z2M codebase
-    ZNP_HAS_CONFIGURED_ZSTACK1 = 0x0F00
-    ZNP_HAS_CONFIGURED_ZSTACK3 = 0x0060
 
     # Security NV Item IDs
     SECURITY_LEVEL = 0x0061
