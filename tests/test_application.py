@@ -59,7 +59,7 @@ class ServerZNP(ZNP):
     def reply_once_to(self, request, responses):
         called_future = asyncio.get_running_loop().create_future()
 
-        async def callback():
+        async def callback(request):
             if callback.called:
                 return
 
@@ -68,27 +68,35 @@ class ServerZNP(ZNP):
             for response in responses:
                 await asyncio.sleep(0.1)
                 LOGGER.debug("Replying to %s with %s", request, response)
-                self.send(response)
+
+                try:
+                    self.send(response(request))
+                except TypeError:
+                    self.send(response)
 
             called_future.set_result(True)
 
         callback.called = False
-        self.callback_for_response(request, lambda _: asyncio.create_task(callback()))
+        self.callback_for_response(request, lambda r: asyncio.create_task(callback(r)))
 
         return called_future
 
     def reply_to(self, request, responses):
-        async def callback():
+        async def callback(request):
             callback.call_count += 1
 
             for response in responses:
                 await asyncio.sleep(0.1)
                 LOGGER.debug("Replying to %s with %s", request, response)
-                self.send(response)
+
+                try:
+                    self.send(response(request))
+                except TypeError:
+                    self.send(response)
 
         callback.call_count = 0
 
-        self.callback_for_response(request, lambda _: asyncio.create_task(callback()))
+        self.callback_for_response(request, lambda r: asyncio.create_task(callback(r)))
 
         return callback
 
@@ -844,3 +852,75 @@ async def test_force_remove(application, mocker):
     # Make sure the device is gone once we remove it
     with pytest.raises(KeyError):
         app.get_device(nwk=device.nwk)
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_auto_form_unnecessary(application, mocker):
+    app, znp_server = application
+
+    # b"\x55" means that Z-Stack is already configured?
+    read_zstack_configured = znp_server.reply_once_to(
+        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x55")],
+    )
+
+    mocker.patch.object(app, "form_network")
+
+    await app.startup(auto_form=True)
+
+    await read_zstack_configured
+    assert app.form_network.call_count == 0
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_auto_form_necessary(application, mocker):
+    app, znp_server = application
+    nvram = {}
+
+    mocker.patch.object(app, "update_network", new=CoroutineMock())
+    mocker.patch.object(app, "_reset", new=CoroutineMock())
+
+    def nvram_writer(req):
+        if req.Id in nvram:
+            raise ValueError("Unexpected overwrite")
+
+        nvram[req.Id] = req.Value
+
+        return c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)
+
+    read_zstack_configured = znp_server.reply_once_to(
+        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x00")],
+    )
+
+    znp_server.reply_to(
+        request=c.Sys.OSALNVWrite.Req(Offset=0, partial=True), responses=[nvram_writer]
+    )
+
+    znp_server.reply_to(
+        request=c.AppConfig.BDBStartCommissioning.Req(
+            Mode=c.app_config.BDBCommissioningMode.NwkFormation
+        ),
+        responses=[
+            c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.Success),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+        ],
+    )
+
+    znp_server.reply_to(
+        request=c.AppConfig.BDBStartCommissioning.Req(
+            Mode=c.app_config.BDBCommissioningMode.NwkSteering
+        ),
+        responses=[c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.Success)],
+    )
+
+    await app.startup(auto_form=True)
+
+    await read_zstack_configured
+
+    assert app.update_network.call_count == 1
+    assert app._reset.call_count == 2
+
+    assert nvram[NwkNvIds.STARTUP_OPTION] == t.StartupOptions.ClearState.serialize()
+    assert nvram[NwkNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
+    assert nvram[NwkNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()

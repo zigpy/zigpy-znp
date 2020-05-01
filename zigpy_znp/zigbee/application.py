@@ -403,13 +403,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
         await self._reset()
 
-        pan_id = self.config[conf.SCHEMA_NETWORK][conf.CONF_NWK_PAN_ID]
-        extended_pan_id = self.config[conf.SCHEMA_NETWORK][
-            conf.CONF_NWK_EXTENDED_PAN_ID
-        ]
+        pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID]
+        extended_pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID]
 
         await self.update_network(
-            channels=self.config[conf.SCHEMA_NETWORK][conf.CONF_NWK_CHANNELS],
+            channels=self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNELS],
             pan_id=0xFFFF if pan_id is None else pan_id,
             extended_pan_id=ExtendedPanId(os.urandom(8))
             if extended_pan_id is None
