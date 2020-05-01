@@ -255,9 +255,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._reset()
 
-        if auto_form and False:
-            # XXX: actually form a network
-            await self.form_network()
+        if auto_form:
+            is_configured = await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
+
+            # This is some NVID that stores 0x55 (0b01010101) if the stack is configured
+            # It is not documented or present in the TI codebase, as far as I can tell.
+            if is_configured != b"\x55":
+                await self.form_network()
+            else:
+                LOGGER.info("ZNP is already configured, no need to form network.")
 
         if self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER] is not None:
             dbm = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER]

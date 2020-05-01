@@ -619,6 +619,28 @@ async def test_znp_nvram_writes(znp, event_loop):
 
 
 @pytest_mark_asyncio_timeout()
+async def test_znp_nvram_read_success(znp, event_loop):
+    event_loop.call_soon(
+        znp.frame_received,
+        c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"test",).to_frame(),
+    )
+    result = await znp.nvram_read(nvids.NwkNvIds.STARTUP_OPTION)
+
+    assert result == b"test"
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_nvram_read_failure(znp, event_loop):
+    event_loop.call_soon(
+        znp.frame_received,
+        c.Sys.OSALNVRead.Rsp(Status=t.Status.Failure, Value=b"test",).to_frame(),
+    )
+
+    with pytest.raises(InvalidCommandResponse):
+        await znp.nvram_read(nvids.NwkNvIds.STARTUP_OPTION)
+
+
+@pytest_mark_asyncio_timeout()
 async def test_listeners_resolve(event_loop):
     callback = Mock()
     callback_listener = CallbackResponseListener(
