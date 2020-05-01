@@ -5,7 +5,7 @@ class AttributeValue(t.FixedList, item_type=t.uint8_t, length=16):
     pass
 
 
-class MacCommands(t.CommandsBase, subsystem=t.Subsystem.MAC):
+class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
     # MAC Reset command to reset MAC state machine
     ResetReq = t.CommandDef(
         t.CommandType.SREQ,

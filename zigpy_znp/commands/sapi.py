@@ -3,7 +3,7 @@
 import zigpy_znp.types as t
 
 
-class SAPICommands(t.CommandsBase, subsystem=t.Subsystem.SAPI):
+class SAPI(t.CommandsBase, subsystem=t.Subsystem.SAPI):
     # reset the device by using a soft reset (i.e. a jump to the reset vector) vice a
     # hardware reset (i.e. watchdog reset.)
     ZBSystemReset = t.CommandDef(t.CommandType.AREQ, 0x09, req_schema=t.Schema())

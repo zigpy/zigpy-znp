@@ -13,7 +13,6 @@ import zigpy_znp.commands as c
 from zigpy_znp.types import nvids
 
 from zigpy_znp import uart
-from zigpy_znp.commands import SysCommands, RPCErrorCommands
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
@@ -162,7 +161,7 @@ class ZNP:
 
         try:
             # Make sure that our port works
-            await self.request(c.SysCommands.Ping.Req())
+            await self.request(c.Sys.Ping.Req())
         except Exception:
             self._uart = None
             raise
@@ -295,7 +294,7 @@ class ZNP:
             response_future = self.wait_for_responses(
                 [
                     request.Rsp(partial=True),
-                    RPCErrorCommands.CommandNotRecognized.Rsp(
+                    c.RPCError.CommandNotRecognized.Rsp(
                         partial=True, RequestHeader=request.header
                     ),
                 ]
@@ -309,7 +308,7 @@ class ZNP:
                 # We lock until either a sync response is seen or an error occurs
                 response = await response_future
 
-        if isinstance(response, RPCErrorCommands.CommandNotRecognized.Rsp):
+        if isinstance(response, c.RPCError.CommandNotRecognized.Rsp):
             raise CommandNotRecognized(f"Fatal request error: {response}")
 
         # If the sync response we got is not what we wanted, this is an error
@@ -348,8 +347,6 @@ class ZNP:
             value = value.serialize()
 
         return await self.request(
-            SysCommands.OSALNVWrite.Req(
-                Id=nv_id, Offset=offset, Value=t.ShortBytes(value)
-            ),
+            c.Sys.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)),
             RspStatus=t.Status.Success,
         )

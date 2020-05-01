@@ -132,7 +132,7 @@ def test_commands_schema():
                     assert False, "Command is empty"
             elif cmd.type == t.CommandType.SRSP:
                 # The one command like this is RPCError
-                assert cmd is c.RPCErrorCommands.CommandNotRecognized
+                assert cmd is c.RPCError.CommandNotRecognized
 
                 assert cmd.type == cmd.Rsp.header.type
                 assert cmd.Req is None
@@ -157,34 +157,34 @@ def test_commands_schema():
 
 def test_command_param_binding():
     # No params
-    c.SysCommands.Ping.Req()
+    c.Sys.Ping.Req()
 
     # Invalid param name
     with pytest.raises(KeyError):
-        c.SysCommands.Ping.Rsp(asd=123)
+        c.Sys.Ping.Rsp(asd=123)
 
     # Valid param name
-    c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
 
     # Too many params, one valid
     with pytest.raises(KeyError):
-        c.SysCommands.Ping.Rsp(foo="asd", Capabilities=t.MTCapabilities.CAP_SYS)
+        c.Sys.Ping.Rsp(foo="asd", Capabilities=t.MTCapabilities.CAP_SYS)
 
     # Not enough params
     with pytest.raises(KeyError):
-        c.SysCommands.Ping.Rsp()
+        c.Sys.Ping.Rsp()
 
     # Invalid type
     with pytest.raises(ValueError):
-        c.UtilCommands.TimeAlive.Rsp(Seconds=b"asd")
+        c.Util.TimeAlive.Rsp(Seconds=b"asd")
 
     # Valid type but invalid value
     with pytest.raises(ValueError):
-        c.UtilCommands.SetPreConfigKey.Req(PreConfigKey=t.KeyData([1, 2, 3]))
+        c.Util.SetPreConfigKey.Req(PreConfigKey=t.KeyData([1, 2, 3]))
 
     # Coerced numerical type
-    a = c.UtilCommands.TimeAlive.Rsp(Seconds=12)
-    b = c.UtilCommands.TimeAlive.Rsp(Seconds=t.uint32_t(12))
+    a = c.Util.TimeAlive.Rsp(Seconds=12)
+    b = c.Util.TimeAlive.Rsp(Seconds=t.uint32_t(12))
 
     assert a == b
     assert a.Seconds == b.Seconds
@@ -192,16 +192,16 @@ def test_command_param_binding():
 
     # Overflowing integer types
     with pytest.raises(ValueError):
-        c.UtilCommands.TimeAlive.Rsp(Seconds=10 ** 20)
+        c.Util.TimeAlive.Rsp(Seconds=10 ** 20)
 
     # Integers will not be coerced to enums
     assert t.MTCapabilities.CAP_SYS == 0x0001
 
     with pytest.raises(ValueError):
-        c.SysCommands.Ping.Rsp(Capabilities=0x0001)
+        c.Sys.Ping.Rsp(Capabilities=0x0001)
 
     # Parameters can be looked up by name
-    ping_rsp = c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    ping_rsp = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     assert ping_rsp.Capabilities == t.MTCapabilities.CAP_SYS
 
     # Invalid ones cannot
@@ -209,13 +209,13 @@ def test_command_param_binding():
         ping_rsp.Oops
 
     # bytes are converted into t.ShortBytes
-    cmd = c.SysCommands.NVWrite.Req(
+    cmd = c.Sys.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x0000, Value=b"asdfoo"
     )
     assert isinstance(cmd.Value, t.ShortBytes)
 
     # Lists are converted to typed LVLists
-    c.UtilCommands.BindAddEntry.Req(
+    c.Util.BindAddEntry.Req(
         DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
         DstEndpoint=0x56,
         ClusterIdList=[0x12, 0x45],
@@ -223,7 +223,7 @@ def test_command_param_binding():
 
     # Type errors within containers are also caught
     with pytest.raises(ValueError):
-        c.UtilCommands.BindAddEntry.Req(
+        c.Util.BindAddEntry.Req(
             DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
             DstEndpoint=0x56,
             ClusterIdList=[0x12, 0x457890],  # 0x457890 doesn't fit into a uint8_t
@@ -241,7 +241,7 @@ def test_simple_descriptor():
     )
     simple_descriptor.output_clusters = zigpy_t.LVList(t.uint16_t)([10, 25])
 
-    c1 = c.ZDOCommands.SimpleDescRsp.Callback(
+    c1 = c.ZDO.SimpleDescRsp.Callback(
         Src=t.NWK(0x1234),
         Status=t.ZDOStatus.SUCCESS,
         NWK=t.NWK(0x1234),
@@ -258,7 +258,7 @@ def test_simple_descriptor():
     )
     sp_simple_descriptor.output_clusters = zigpy_t.LVList(t.uint16_t)([10, 25])
 
-    c2 = c.ZDOCommands.SimpleDescRsp.Callback(
+    c2 = c.ZDO.SimpleDescRsp.Callback(
         Src=t.NWK(0x1234),
         Status=t.ZDOStatus.SUCCESS,
         NWK=t.NWK(0x1234),
@@ -270,7 +270,7 @@ def test_simple_descriptor():
 
 
 def test_command_str_repr():
-    command = c.UtilCommands.BindAddEntry.Req(
+    command = c.Util.BindAddEntry.Req(
         DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
         DstEndpoint=0x56,
         ClusterIdList=[0x12, 0x34],
@@ -281,11 +281,11 @@ def test_command_str_repr():
 
 
 def test_command_immutability():
-    command1 = c.SysCommands.NVWrite.Req(
+    command1 = c.Sys.NVWrite.Req(
         partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
     )
 
-    command2 = c.SysCommands.NVWrite.Req(
+    command2 = c.Sys.NVWrite.Req(
         partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
     )
 
@@ -311,7 +311,7 @@ def test_command_immutability():
 
 
 def test_command_serialization():
-    command = c.SysCommands.NVWrite.Req(
+    command = c.Sys.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x0000, Value=b"asdfoo"
     )
     frame = command.to_frame()
@@ -320,27 +320,27 @@ def test_command_serialization():
 
     # Partial frames cannot be serialized
     with pytest.raises(ValueError):
-        partial1 = c.SysCommands.NVWrite.Req(partial=True, SysId=0x12)
+        partial1 = c.Sys.NVWrite.Req(partial=True, SysId=0x12)
         partial1.to_frame()
 
     # Partial frames cannot be serialized, even if all params are filled out
     with pytest.raises(ValueError):
-        partial2 = c.SysCommands.NVWrite.Req(
+        partial2 = c.Sys.NVWrite.Req(
             partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
         )
         partial2.to_frame()
 
 
 def test_command_equality():
-    command1 = c.SysCommands.NVWrite.Req(
+    command1 = c.Sys.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
-    command2 = c.SysCommands.NVWrite.Req(
+    command2 = c.Sys.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
-    command3 = c.SysCommands.NVWrite.Req(
+    command3 = c.Sys.NVWrite.Req(
         SysId=0xFF, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
@@ -357,22 +357,22 @@ def test_command_equality():
     assert not command1.matches(command3)
     assert not command3.matches(command1)
 
-    assert not command1.matches(c.SysCommands.NVWrite.Req(partial=True))
-    assert c.SysCommands.NVWrite.Req(partial=True).matches(command1)
+    assert not command1.matches(c.Sys.NVWrite.Req(partial=True))
+    assert c.Sys.NVWrite.Req(partial=True).matches(command1)
 
     # parameters can be specified explicitly as None
-    assert c.SysCommands.NVWrite.Req(partial=True, SubId=None).matches(command1)
-    assert c.SysCommands.NVWrite.Req(partial=True, SubId=0x7890).matches(command1)
-    assert not c.SysCommands.NVWrite.Req(partial=True, SubId=123).matches(command1)
+    assert c.Sys.NVWrite.Req(partial=True, SubId=None).matches(command1)
+    assert c.Sys.NVWrite.Req(partial=True, SubId=0x7890).matches(command1)
+    assert not c.Sys.NVWrite.Req(partial=True, SubId=123).matches(command1)
 
     # Different frame types do not match, even if they have the same structure
-    assert not c.SysCommands.NVWrite.Rsp(Status=t.Status.Success).matches(
-        c.SysCommands.NVDelete.Rsp(partial=True)
+    assert not c.Sys.NVWrite.Rsp(Status=t.Status.Success).matches(
+        c.Sys.NVDelete.Rsp(partial=True)
     )
 
 
 def test_command_deserialization(caplog):
-    command = c.SysCommands.NVWrite.Req(
+    command = c.Sys.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
@@ -394,11 +394,11 @@ def test_command_deserialization(caplog):
 
     # Deserialization fails if you attempt to deserialize the wrong frame
     with pytest.raises(ValueError):
-        c.SysCommands.NVWrite.Req.from_frame(c.SysCommands.Ping.Req().to_frame())
+        c.Sys.NVWrite.Req.from_frame(c.Sys.Ping.Req().to_frame())
 
 
 def test_command_not_recognized():
-    command = c.RPCErrorCommands.CommandNotRecognized.Rsp(
+    command = c.RPCError.CommandNotRecognized.Rsp(
         ErrorCode=c.rpc_error.ErrorCode.InvalidSubsystem,
         RequestHeader=t.CommandHeader(0xABCD),
     )

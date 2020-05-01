@@ -25,7 +25,7 @@ class RandomNumbers(t.FixedList, item_type=t.uint8_t, length=0x64):
     pass
 
 
-class UtilCommands(t.CommandsBase, subsystem=t.Subsystem.UTIL):
+class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
     # MAC Reset command to reset MAC state machine
     GetDeviceInfo = t.CommandDef(
         t.CommandType.SREQ,

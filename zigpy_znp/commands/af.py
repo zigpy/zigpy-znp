@@ -21,7 +21,7 @@ class LatencyReq(t.enum_uint8):
     SlowBeacons = 0x02
 
 
-class AFCommands(t.CommandsBase, subsystem=t.Subsystem.AF):
+class AF(t.CommandsBase, subsystem=t.Subsystem.AF):
     # This command enables the tester to register an application’s endpoint description
     Register = t.CommandDef(
         t.CommandType.SREQ,

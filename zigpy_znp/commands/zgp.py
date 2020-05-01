@@ -3,7 +3,7 @@
 import zigpy_znp.types as t
 
 
-class ZGPCommands(t.CommandsBase, subsystem=t.Subsystem.ZGP):
+class ZGP(t.CommandsBase, subsystem=t.Subsystem.ZGP):
     DataReq = t.CommandDef(
         t.CommandType.SREQ,
         0x01,

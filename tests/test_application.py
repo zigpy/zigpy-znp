@@ -54,9 +54,7 @@ class ServerZNP(ZNP):
         super().__init__(*args, **kwargs)
 
         # We just respond to pings, nothing more
-        self.callback_for_response(
-            c.SysCommands.Ping.Req(), lambda r: self.ping_replier(r)
-        )
+        self.callback_for_response(c.Sys.Ping.Req(), lambda r: self.ping_replier(r))
 
     def reply_once_to(self, request, responses):
         called_future = asyncio.get_running_loop().create_future()
@@ -95,7 +93,7 @@ class ServerZNP(ZNP):
         return callback
 
     def ping_replier(self, request):
-        self.send(c.SysCommands.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
+        self.send(c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
 
     def send(self, response):
         self._uart.send(response.to_frame())
@@ -140,9 +138,9 @@ def application(znp_server):
 
     # Handle the entire startup sequence
     znp_server.reply_to(
-        request=c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft),
+        request=c.Sys.ResetReq.Req(Type=t.ResetType.Soft),
         responses=[
-            c.SysCommands.ResetInd.Callback(
+            c.Sys.ResetInd.Callback(
                 Reason=t.ResetReason.PowerUp,
                 TransportRev=2,
                 ProductId=1,
@@ -154,32 +152,32 @@ def application(znp_server):
     )
 
     znp_server.reply_to(
-        request=c.ZDOCommands.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
+        request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
-            c.ZDOCommands.ActiveEpReq.Rsp(Status=t.Status.Success),
-            c.ZDOCommands.ActiveEpRsp.Callback(
+            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.Success),
+            c.ZDO.ActiveEpRsp.Callback(
                 Src=0x0000, Status=t.ZDOStatus.SUCCESS, NWK=0x0000, ActiveEndpoints=[]
             ),
         ],
     )
 
     znp_server.reply_to(
-        request=c.AFCommands.Register.Req(partial=True),
-        responses=[c.AFCommands.Register.Rsp(Status=t.Status.Success)],
+        request=c.AF.Register.Req(partial=True),
+        responses=[c.AF.Register.Rsp(Status=t.Status.Success)],
     )
 
     znp_server.reply_to(
-        request=c.APPConfigCommands.BDBStartCommissioning.Req(
+        request=c.AppConfig.BDBStartCommissioning.Req(
             Mode=c.app_config.BDBCommissioningMode.NetworkFormation
         ),
         responses=[
-            c.APPConfigCommands.BDBStartCommissioning.Rsp(Status=t.Status.Success),
-            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+            c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.Success),
+            c.AppConfig.BDBCommissioningNotification.Callback(
                 Status=c.app_config.BDBCommissioningStatus.Success,
                 Mode=c.app_config.BDBCommissioningMode.NwkSteering,
                 RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
             ),
-            c.APPConfigCommands.BDBCommissioningNotification.Callback(
+            c.AppConfig.BDBCommissioningNotification.Callback(
                 Status=c.app_config.BDBCommissioningStatus.NoNetwork,
                 Mode=c.app_config.BDBCommissioningMode.NwkSteering,
                 RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
@@ -196,8 +194,8 @@ def application(znp_server):
         NwkNvIds.NWK_CHILD_AGE_ENABLE,
     ]:
         znp_server.reply_to(
-            request=c.SysCommands.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),
-            responses=[c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)],
+            request=c.Sys.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),
+            responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)],
         )
 
     return app, znp_server
@@ -219,9 +217,7 @@ async def test_application_startup(application):
         if num_endpoints < 0:
             raise RuntimeError("Too many endpoints registered")
 
-    znp_server.callback_for_response(
-        c.AFCommands.Register.Req(partial=True), register_endpoint
-    )
+    znp_server.callback_for_response(c.AF.Register.Req(partial=True), register_endpoint)
 
     await app.startup(auto_form=False)
 
@@ -233,8 +229,8 @@ async def test_application_startup_tx_power(application):
     app, znp_server = application
 
     set_tx_power = znp_server.reply_once_to(
-        request=c.SysCommands.SetTxPower.Req(TXPower=19),
-        responses=[c.SysCommands.SetTxPower.Rsp(Status=t.Status.Success)],
+        request=c.Sys.SetTxPower.Req(TXPower=19),
+        responses=[c.Sys.SetTxPower.Rsp(Status=t.Status.Success)],
     )
 
     app.update_config({conf.CONF_ZNP_CONFIG: {conf.CONF_TX_POWER: 19}})
@@ -249,25 +245,19 @@ async def test_permit_join(application):
 
     # Handle the ZDO broadcast sent by Zigpy
     data_req_sent = znp_server.reply_once_to(
-        request=c.AFCommands.DataRequestExt.Req(
-            partial=True, SrcEndpoint=0, DstEndpoint=0
-        ),
+        request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
         responses=[
-            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AFCommands.DataConfirm.Callback(
-                Status=t.Status.Success, Endpoint=0, TSN=1
-            ),
+            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AF.DataConfirm.Callback(Status=t.Status.Success, Endpoint=0, TSN=1),
         ],
     )
 
     # Handle the permit join request sent by us
     permit_join_sent = znp_server.reply_once_to(
-        request=c.ZDOCommands.MgmtPermitJoinReq.Req(partial=True),
+        request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
         responses=[
-            c.ZDOCommands.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
-            c.ZDOCommands.MgmtPermitJoinRsp.Callback(
-                Src=0x0000, Status=t.ZDOStatus.SUCCESS
-            ),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
@@ -284,25 +274,19 @@ async def test_permit_join_failure(application):
 
     # Handle the ZDO broadcast sent by Zigpy
     data_req_sent = znp_server.reply_once_to(
-        request=c.AFCommands.DataRequestExt.Req(
-            partial=True, SrcEndpoint=0, DstEndpoint=0
-        ),
+        request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
         responses=[
-            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AFCommands.DataConfirm.Callback(
-                Status=t.Status.Success, Endpoint=0, TSN=1
-            ),
+            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AF.DataConfirm.Callback(Status=t.Status.Success, Endpoint=0, TSN=1),
         ],
     )
 
     # Handle the permit join request sent by us
     permit_join_sent = znp_server.reply_once_to(
-        request=c.ZDOCommands.MgmtPermitJoinReq.Req(partial=True),
+        request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
         responses=[
-            c.ZDOCommands.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
-            c.ZDOCommands.MgmtPermitJoinRsp.Callback(
-                Src=0xFFFF, Status=t.ZDOStatus.TIMEOUT
-            ),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFF, Status=t.ZDOStatus.TIMEOUT),
         ],
     )
 
@@ -323,9 +307,7 @@ async def test_on_zdo_relays_message_callback(application, mocker):
     device = mocker.Mock()
     mocker.patch.object(app, "get_device", return_value=device)
 
-    znp_server.send(
-        c.ZDOCommands.SrcRtgInd.Callback(DstAddr=0x1234, Relays=[0x5678, 0xABCD])
-    )
+    znp_server.send(c.ZDO.SrcRtgInd.Callback(DstAddr=0x1234, Relays=[0x5678, 0xABCD]))
     assert device.relays == [0x5678, 0xABCD]
 
 
@@ -340,7 +322,7 @@ async def test_on_zdo_device_announce(application, mocker):
     ieee = t.EUI64(range(8))
 
     znp_server.send(
-        c.ZDOCommands.EndDeviceAnnceInd.Callback(
+        c.ZDO.EndDeviceAnnceInd.Callback(
             Src=0x0001, NWK=nwk, IEEE=ieee, Capabilities=c.zdo.MACCapabilities.Router
         )
     )
@@ -357,9 +339,7 @@ async def test_on_zdo_device_join(application, mocker):
     nwk = 0x1234
     ieee = t.EUI64(range(8))
 
-    znp_server.send(
-        c.ZDOCommands.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0001)
-    )
+    znp_server.send(c.ZDO.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0001))
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
 
 
@@ -374,7 +354,7 @@ async def test_on_zdo_device_leave_callback(application, mocker):
     ieee = t.EUI64(range(8))
 
     znp_server.send(
-        c.ZDOCommands.LeaveInd.Callback(
+        c.ZDO.LeaveInd.Callback(
             NWK=nwk, IEEE=ieee, Request=False, Remove=False, Rejoin=False
         )
     )
@@ -392,7 +372,7 @@ async def test_on_af_message_callback(application, mocker):
     )
     mocker.patch.object(app, "handle_message")
 
-    af_message = c.AFCommands.IncomingMsg.Callback(
+    af_message = c.AF.IncomingMsg.Callback(
         GroupId=1,
         ClusterId=2,
         SrcAddr=0xABCD,
@@ -539,12 +519,12 @@ async def test_zdo_request_interception(application, mocker):
 
     # Send back a request response
     active_ep_req = znp_server.reply_once_to(
-        request=c.ZDOCommands.SimpleDescReq.Req(
+        request=c.ZDO.SimpleDescReq.Req(
             DstAddr=device.nwk, NWKAddrOfInterest=device.nwk, Endpoint=1
         ),
         responses=[
-            c.ZDOCommands.SimpleDescReq.Rsp(Status=t.Status.Success),
-            c.ZDOCommands.SimpleDescRsp.Callback(
+            c.ZDO.SimpleDescReq.Rsp(Status=t.Status.Success),
+            c.ZDO.SimpleDescRsp.Callback(
                 Src=device.nwk,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=device.nwk,
@@ -593,7 +573,7 @@ async def test_zigpy_request(application, mocker):
 
     # Respond to a light turn on request
     data_req = znp_server.reply_once_to(
-        request=c.AFCommands.DataRequestExt.Req(
+        request=c.AF.DataRequestExt.Req(
             DstAddrModeAddress=t.AddrModeAddress(
                 mode=t.AddrMode.NWK, address=device.nwk
             ),
@@ -605,12 +585,10 @@ async def test_zigpy_request(application, mocker):
             partial=True,
         ),
         responses=[
-            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AFCommands.DataConfirm.Callback(
-                Status=t.Status.Success, Endpoint=1, TSN=TSN,
-            ),
-            c.ZDOCommands.SrcRtgInd.Callback(DstAddr=device.nwk, Relays=[]),
-            c.AFCommands.IncomingMsg.Callback(
+            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AF.DataConfirm.Callback(Status=t.Status.Success, Endpoint=1, TSN=TSN,),
+            c.ZDO.SrcRtgInd.Callback(DstAddr=device.nwk, Relays=[]),
+            c.AF.IncomingMsg.Callback(
                 GroupId=0x0000,
                 ClusterId=6,
                 SrcAddr=device.nwk,
@@ -648,7 +626,7 @@ async def test_zigpy_request_failure(application, mocker):
 
     # Fail to respond to a light turn on request
     znp_server.reply_to(
-        request=c.AFCommands.DataRequestExt.Req(
+        request=c.AF.DataRequestExt.Req(
             DstAddrModeAddress=t.AddrModeAddress(
                 mode=t.AddrMode.NWK, address=device.nwk
             ),
@@ -660,10 +638,8 @@ async def test_zigpy_request_failure(application, mocker):
             partial=True,
         ),
         responses=[
-            c.AFCommands.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AFCommands.DataConfirm.Callback(
-                Status=t.Status.Failure, Endpoint=1, TSN=TSN,
-            ),
+            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
+            c.AF.DataConfirm.Callback(Status=t.Status.Failure, Endpoint=1, TSN=TSN,),
         ],
     )
 
@@ -737,44 +713,44 @@ async def test_update_network(mocker, caplog, application):
     network_key = t.KeyData(range(16))
 
     channels_updated = znp_server.reply_once_to(
-        request=c.UtilCommands.SetChannels.Req(Channels=channels),
-        responses=[c.UtilCommands.SetChannels.Rsp(Status=t.Status.Success)],
+        request=c.Util.SetChannels.Req(Channels=channels),
+        responses=[c.Util.SetChannels.Rsp(Status=t.Status.Success)],
     )
 
     bdb_set_primary_channel = znp_server.reply_once_to(
-        request=c.APPConfigCommands.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-        responses=[c.APPConfigCommands.BDBSetChannel.Rsp(Status=t.Status.Success)],
+        request=c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
+        responses=[c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.Success)],
     )
 
     bdb_set_secondary_channel = znp_server.reply_once_to(
-        request=c.APPConfigCommands.BDBSetChannel.Req(
+        request=c.AppConfig.BDBSetChannel.Req(
             IsPrimary=False, Channel=t.Channels.NO_CHANNELS
         ),
-        responses=[c.APPConfigCommands.BDBSetChannel.Rsp(Status=t.Status.Success)],
+        responses=[c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.Success)],
     )
 
     set_pan_id = znp_server.reply_once_to(
-        request=c.UtilCommands.SetPanId.Req(PanId=pan_id),
-        responses=[c.UtilCommands.SetPanId.Rsp(Status=t.Status.Success)],
+        request=c.Util.SetPanId.Req(PanId=pan_id),
+        responses=[c.Util.SetPanId.Rsp(Status=t.Status.Success)],
     )
 
     set_extended_pan_id = znp_server.reply_once_to(
-        request=c.SysCommands.OSALNVWrite.Req(
+        request=c.Sys.OSALNVWrite.Req(
             Id=NwkNvIds.EXTENDED_PAN_ID, Offset=0, Value=extended_pan_id.serialize()
         ),
-        responses=[c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)],
+        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)],
     )
 
     set_network_key_util = znp_server.reply_once_to(
-        request=c.UtilCommands.SetPreConfigKey.Req(PreConfigKey=network_key),
-        responses=[c.UtilCommands.SetPreConfigKey.Rsp(Status=t.Status.Success)],
+        request=c.Util.SetPreConfigKey.Req(PreConfigKey=network_key),
+        responses=[c.Util.SetPreConfigKey.Rsp(Status=t.Status.Success)],
     )
 
     set_network_key_nvram = znp_server.reply_once_to(
-        request=c.SysCommands.OSALNVWrite.Req(
+        request=c.Sys.OSALNVWrite.Req(
             Id=NwkNvIds.PRECFGKEYS_ENABLE, Offset=0, Value=t.Bool(True).serialize()
         ),
-        responses=[c.SysCommands.OSALNVWrite.Rsp(Status=t.Status.Success)],
+        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)],
     )
 
     # But it does succeed with a warning if you explicitly allow it
@@ -840,16 +816,16 @@ async def test_force_remove(application, mocker):
 
     # Reply to zigpy's leave request
     bad_mgmt_leave_req = znp_server.reply_once_to(
-        request=c.ZDOCommands.MgmtLeaveReq.Req(DstAddr=device.nwk, partial=True),
-        responses=[c.ZDOCommands.MgmtLeaveReq.Rsp(Status=t.Status.Failure)],
+        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=device.nwk, partial=True),
+        responses=[c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.Failure)],
     )
 
     # Reply to our own leave request
     good_mgmt_leave_req = znp_server.reply_once_to(
-        request=c.ZDOCommands.MgmtLeaveReq.Req(DstAddr=0x0000, partial=True),
+        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, partial=True),
         responses=[
-            c.ZDOCommands.MgmtLeaveReq.Rsp(Status=t.Status.Success),
-            c.ZDOCommands.LeaveInd.Callback(
+            c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.Success),
+            c.ZDO.LeaveInd.Callback(
                 NWK=device.nwk,
                 IEEE=device.ieee,
                 Remove=False,

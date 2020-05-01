@@ -81,7 +81,7 @@ class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
         return super().serialize()
 
 
-class ZDOCommands(t.CommandsBase, subsystem=t.Subsystem.ZDO):
+class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     # send a “Network Address Request”. This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
     # “ZDO Network Address Response” to receive the response to this message

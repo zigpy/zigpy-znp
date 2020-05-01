@@ -69,7 +69,7 @@ class BDBRemainingCommissioningModes(t.enum_flag_uint8):
     ParentLost = 1 << 5
 
 
-class APPConfigCommands(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
+class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     # sets the network frame counter to the value specified in the Frame Counter Value.
     # For projects with multiple instances of frame counter, the message sets the
     # frame counter of the current network

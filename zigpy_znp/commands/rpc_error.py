@@ -8,7 +8,7 @@ class ErrorCode(t.enum_uint8):
     InvalidLength = 0x04
 
 
-class RPCErrorCommands(t.CommandsBase, subsystem=t.Subsystem.RPCError):
+class RPCError(t.CommandsBase, subsystem=t.Subsystem.RPCError):
     # When the ZNP cannot recognize an SREQ command from the host processor,
     # the following SRSP is returned
     CommandNotRecognized = t.CommandDef(

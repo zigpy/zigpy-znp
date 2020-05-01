@@ -1,25 +1,25 @@
-from .rpc_error import RPCErrorCommands
-from .af import AFCommands
-from .app import APPCommands
-from .app_config import APPConfigCommands
-from .mac import MacCommands
-from .sapi import SAPICommands
-from .sys import SysCommands
-from .util import UtilCommands
-from .zdo import ZDOCommands
-from .zgp import ZGPCommands
+from .rpc_error import RPCError
+from .af import AF
+from .app import App
+from .app_config import AppConfig
+from .mac import MAC
+from .sapi import SAPI
+from .sys import Sys
+from .util import Util
+from .zdo import ZDO
+from .zgp import ZGP
 
 ALL_COMMANDS = [
-    RPCErrorCommands,
-    AFCommands,
-    APPCommands,
-    APPConfigCommands,
-    MacCommands,
-    SAPICommands,
-    SysCommands,
-    UtilCommands,
-    ZDOCommands,
-    ZGPCommands,
+    RPCError,
+    AF,
+    App,
+    AppConfig,
+    MAC,
+    SAPI,
+    Sys,
+    Util,
+    ZDO,
+    ZGP,
 ]
 
 COMMANDS_BY_ID = {}

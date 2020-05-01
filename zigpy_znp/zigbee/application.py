@@ -36,43 +36,43 @@ LOGGER = logging.getLogger(__name__)
 ZDO_CONVERTERS = {
     ZDOCmd.Node_Desc_req: (
         (
-            lambda addr, device, NWKAddrOfInterest: c.ZDOCommands.NodeDescReq.Req(
+            lambda addr, device, NWKAddrOfInterest: c.ZDO.NodeDescReq.Req(
                 DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (lambda addr: c.ZDOCommands.NodeDescRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.NodeDescRsp.Callback(partial=True, Src=addr)),
         (lambda rsp: (ZDOCmd.Node_Desc_rsp, [rsp.NodeDescriptor])),
     ),
     ZDOCmd.Active_EP_req: (
         (
-            lambda addr, device, NWKAddrOfInterest: c.ZDOCommands.ActiveEpReq.Req(
+            lambda addr, device, NWKAddrOfInterest: c.ZDO.ActiveEpReq.Req(
                 DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (lambda addr: c.ZDOCommands.ActiveEpRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.ActiveEpRsp.Callback(partial=True, Src=addr)),
         (lambda rsp: (ZDOCmd.Active_EP_rsp, [rsp.ActiveEndpoints])),
     ),
     ZDOCmd.Simple_Desc_req: (
         (
             # fmt: off
             lambda addr, device, NWKAddrOfInterest, EndPoint: \
-            c.ZDOCommands.SimpleDescReq.Req(
+            c.ZDO.SimpleDescReq.Req(
                 DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest, Endpoint=EndPoint
             )
             # fmt: on
         ),
-        (lambda addr: c.ZDOCommands.SimpleDescRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.SimpleDescRsp.Callback(partial=True, Src=addr)),
         (lambda rsp: (ZDOCmd.Simple_Desc_rsp, [rsp.SimpleDescriptor])),
     ),
     ZDOCmd.Mgmt_Leave_req: (
         (
-            lambda addr, device, DeviceAddress, Options: c.ZDOCommands.MgmtLeaveReq.Req(
+            lambda addr, device, DeviceAddress, Options: c.ZDO.MgmtLeaveReq.Req(
                 DstAddr=addr,
                 IEEE=device.ieee,
                 RemoveChildren_Rejoin=c.zdo.LeaveOptions(Options),
             )
         ),
-        (lambda addr: c.ZDOCommands.MgmtLeaveRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr)),
         (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, [rsp.Status])),
     ),
 }
@@ -107,26 +107,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         finally:
             znp.close()
 
-    def on_zdo_relays_message(self, msg: c.ZDOCommands.SrcRtgInd.Callback) -> None:
+    def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
         LOGGER.info("ZDO device relays: %s", msg)
         device = self.get_device(nwk=msg.DstAddr)
         device.relays = msg.Relays
 
-    def on_zdo_device_announce(
-        self, msg: c.ZDOCommands.EndDeviceAnnceInd.Callback
-    ) -> None:
+    def on_zdo_device_announce(self, msg: c.ZDO.EndDeviceAnnceInd.Callback) -> None:
         LOGGER.info("ZDO device announce: %s", msg)
         self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=0x0000)
 
-    def on_zdo_device_join(self, msg: c.ZDOCommands.TCDevInd.Callback) -> None:
+    def on_zdo_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
         LOGGER.info("ZDO device join: %s", msg)
         self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
 
-    def on_zdo_device_leave(self, msg: c.ZDOCommands.LeaveInd.Callback) -> None:
+    def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
         LOGGER.info("ZDO device left: %s", msg)
         self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
 
-    def on_af_message(self, msg: c.AFCommands.IncomingMsg.Callback) -> None:
+    def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
         try:
             device = self.get_device(nwk=msg.SrcAddr)
         except KeyError:
@@ -154,26 +152,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     def _bind_callbacks(self, api):
         api.callback_for_response(
-            c.AFCommands.IncomingMsg.Callback(partial=True), self.on_af_message
+            c.AF.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
         # ZDO requests need to be handled explicitly
         api.callback_for_response(
-            c.ZDOCommands.EndDeviceAnnceInd.Callback(partial=True),
-            self.on_zdo_device_announce,
+            c.ZDO.EndDeviceAnnceInd.Callback(partial=True), self.on_zdo_device_announce,
         )
 
         api.callback_for_response(
-            c.ZDOCommands.TCDevInd.Callback.Callback(partial=True),
-            self.on_zdo_device_join,
+            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_zdo_device_join,
         )
 
         api.callback_for_response(
-            c.ZDOCommands.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
+            c.ZDO.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
         )
 
         api.callback_for_response(
-            c.ZDOCommands.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
+            c.ZDO.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
         )
 
     async def _reconnect(self) -> None:
@@ -221,7 +217,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         output_clusters=[],
     ):
         return await self._znp.request(
-            c.AFCommands.Register.Req(
+            c.AF.Register.Req(
                 Endpoint=endpoint,
                 ProfileId=profile_id,
                 DeviceId=device_id,
@@ -267,23 +263,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             dbm = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER]
 
             await self._znp.request(
-                c.SysCommands.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.Success
+                c.Sys.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.Success
             )
 
         """
         # Get our active endpoints
         endpoints = await self._znp.request_callback_rsp(
-            request=c.ZDOCommands.ActiveEpReq.Req(
+            request=c.ZDO.ActiveEpReq.Req(
                 DstAddr=0x0000, NWKAddrOfInterest=0x0000
             ),
             RspStatus=t.Status.Success,
-            callback=c.ZDOCommands.ActiveEpRsp.Callback(partial=True),
+            callback=c.ZDO.ActiveEpRsp.Callback(partial=True),
         )
 
         # Clear out the list of active endpoints
         for endpoint in endpoints.ActiveEndpoints:
             await self._znp.request(
-                c.AFCommands.Delete(Endpoint=endpoint), RspStatus=t.Status.Success
+                c.AF.Delete(Endpoint=endpoint), RspStatus=t.Status.Success
             )
         """
 
@@ -302,11 +298,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Start commissioning and wait until it's done
         await self._znp.request_callback_rsp(
-            request=c.APPConfigCommands.BDBStartCommissioning.Req(
+            request=c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NetworkFormation
             ),
             RspStatus=t.Status.Success,
-            callback=c.APPConfigCommands.BDBCommissioningNotification.Callback(
+            callback=c.AppConfig.BDBCommissioningNotification.Callback(
                 partial=True, Status=c.app_config.BDBCommissioningStatus.Success,
             ),
         )
@@ -342,15 +338,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if channels is not None:
             await self._znp.request(
-                c.UtilCommands.SetChannels.Req(Channels=channels),
+                c.Util.SetChannels.Req(Channels=channels), RspStatus=t.Status.Success,
+            )
+            await self._znp.request(
+                c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
                 RspStatus=t.Status.Success,
             )
             await self._znp.request(
-                c.APPConfigCommands.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-                RspStatus=t.Status.Success,
-            )
-            await self._znp.request(
-                c.APPConfigCommands.BDBSetChannel.Req(
+                c.AppConfig.BDBSetChannel.Req(
                     IsPrimary=False, Channel=t.Channels.NO_CHANNELS
                 ),
                 RspStatus=t.Status.Success,
@@ -360,7 +355,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if pan_id is not None:
             await self._znp.request(
-                c.UtilCommands.SetPanId.Req(PanId=pan_id), RspStatus=t.Status.Success
+                c.Util.SetPanId.Req(PanId=pan_id), RspStatus=t.Status.Success
             )
 
             self._pan_id = pan_id
@@ -373,7 +368,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if network_key is not None:
             await self._znp.request(
-                c.UtilCommands.SetPreConfigKey.Req(PreConfigKey=network_key),
+                c.Util.SetPreConfigKey.Req(PreConfigKey=network_key),
                 RspStatus=t.Status.Success,
             )
 
@@ -386,8 +381,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def _reset(self):
         await self._znp.request_callback_rsp(
-            request=c.SysCommands.ResetReq.Req(Type=t.ResetType.Soft),
-            callback=c.SysCommands.ResetInd.Callback(partial=True),
+            request=c.Sys.ResetReq.Req(Type=t.ResetType.Soft),
+            callback=c.Sys.ResetInd.Callback(partial=True),
         )
 
     async def form_network(self):
@@ -401,13 +396,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
         )
         await self._reset()
-
-        # If zgPreConfigKeys is set to TRUE, all devices should use the same
-        # pre-configured security key. If zgPreConfigKeys is set to FALSE, the
-        # pre-configured key is set only on the coordinator device, and is handed to
-        # joining devices. The key is sent in the clear over the last hop. Upon reset,
-        # the device will retrieve the pre-configured key from NV memory if the NV_INIT
-        # compile option is defined (the NV item is called ZCD_NV_PRECFGKEY).
 
         pan_id = self.config[conf.SCHEMA_NETWORK][conf.CONF_NWK_PAN_ID]
         extended_pan_id = self.config[conf.SCHEMA_NETWORK][
@@ -428,7 +416,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
 
         await self._znp.request(
-            c.APPConfigCommands.BDBStartCommissioning.Req(
+            c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NetworkFormation
             ),
             RspStatus=t.Status.Success,
@@ -437,13 +425,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # This may take a while because of some sort of background scanning.
         # This can probably be disabled.
         await self._znp.wait_for_response(
-            c.ZDOCommands.StateChangeInd.Callback(
-                State=t.DeviceState.StartedAsCoordinator
-            )
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
         )
 
         await self._znp.request(
-            c.APPConfigCommands.BDBStartCommissioning.Req(
+            c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NetworkSteering
             ),
             RspStatus=t.Status.Success,
@@ -533,7 +519,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
             response = await self._znp.request_callback_rsp(
-                request=c.AFCommands.DataRequestExt.Req(
+                request=c.AF.DataRequestExt.Req(
                     DstAddrModeAddress=dst_addr,
                     DstEndpoint=dst_ep,
                     DstPanId=0x0000,
@@ -545,7 +531,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     Data=data,
                 ),
                 RspStatus=t.Status.Success,
-                callback=c.AFCommands.DataConfirm.Callback(
+                callback=c.AF.DataConfirm.Callback(
                     partial=True, Endpoint=dst_ep, TSN=sequence
                 ),
             )
@@ -635,7 +621,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
         await self._znp.request(
-            c.ZDOCommands.MgmtLeaveReq.Req(
+            c.ZDO.MgmtLeaveReq.Req(
                 DstAddr=0x0000,  # We handle it
                 IEEE=device.ieee,
                 RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
@@ -647,21 +633,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Just wait for the response, removing the device will be handled upstream
         await self._znp.wait_for_response(
-            c.ZDOCommands.LeaveInd.Callback(
-                NWK=device.nwk, IEEE=device.ieee, partial=True
-            )
+            c.ZDO.LeaveInd.Callback(NWK=device.nwk, IEEE=device.ieee, partial=True)
         )
 
     async def permit_ncp(self, time_s: int) -> None:
         response = await self._znp.request_callback_rsp(
-            request=c.ZDOCommands.MgmtPermitJoinReq.Req(
+            request=c.ZDO.MgmtPermitJoinReq.Req(
                 AddrMode=t.AddrMode.Broadcast,
                 Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
                 Duration=time_s,
                 TCSignificance=0,  # not used in Z-Stack
             ),
             RspStatus=t.Status.Success,
-            callback=c.ZDOCommands.MgmtPermitJoinRsp.Callback(partial=True),
+            callback=c.ZDO.MgmtPermitJoinRsp.Callback(partial=True),
         )
 
         if response.Status != t.Status.Success:
