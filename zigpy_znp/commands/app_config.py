@@ -52,7 +52,7 @@ class BDBCommissioningStatus(t.enum_uint8):
 class BDBCommissioningMode(t.enum_uint8):
     Initialization = 0x00
     NwkSteering = 0x01
-    NetworkFormation = 0x02
+    NwkFormation = 0x02
     FindingBinding = 0x03
     Touchlink = 0x04
     ParentLost = 0x05

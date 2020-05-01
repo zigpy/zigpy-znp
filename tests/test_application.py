@@ -168,7 +168,7 @@ def application(znp_server):
 
     znp_server.reply_to(
         request=c.AppConfig.BDBStartCommissioning.Req(
-            Mode=c.app_config.BDBCommissioningMode.NetworkFormation
+            Mode=c.app_config.BDBCommissioningMode.NwkFormation
         ),
         responses=[
             c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.Success),

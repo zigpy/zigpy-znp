@@ -288,12 +288,12 @@ def test_command_deduplication():
             c.AppConfig.BDBCommissioningNotification.Callback(
                 partial=True,
                 Status=c.app_config.BDBCommissioningStatus.InProgress,
-                Mode=c.app_config.BDBCommissioningMode.NetworkFormation,
+                Mode=c.app_config.BDBCommissioningMode.NwkFormation,
             ),
             c.AppConfig.BDBCommissioningNotification.Callback(
                 partial=True,
                 Status=c.app_config.BDBCommissioningStatus.InProgress,
-                Mode=c.app_config.BDBCommissioningMode.NetworkFormation,
+                Mode=c.app_config.BDBCommissioningMode.NwkFormation,
                 RemainingModes=c.app_config.BDBRemainingCommissioningModes.InitiatorTl,
             ),
             c.AppConfig.BDBCommissioningNotification.Callback(

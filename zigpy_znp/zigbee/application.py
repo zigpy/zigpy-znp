@@ -305,7 +305,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Start commissioning and wait until it's done
         await self._znp.request_callback_rsp(
             request=c.AppConfig.BDBStartCommissioning.Req(
-                Mode=c.app_config.BDBCommissioningMode.NetworkFormation
+                Mode=c.app_config.BDBCommissioningMode.NwkFormation
             ),
             RspStatus=t.Status.Success,
             callback=c.AppConfig.BDBCommissioningNotification.Callback(
@@ -423,7 +423,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.request(
             c.AppConfig.BDBStartCommissioning.Req(
-                Mode=c.app_config.BDBCommissioningMode.NetworkFormation
+                Mode=c.app_config.BDBCommissioningMode.NwkFormation
             ),
             RspStatus=t.Status.Success,
         )
@@ -436,7 +436,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.request(
             c.AppConfig.BDBStartCommissioning.Req(
-                Mode=c.app_config.BDBCommissioningMode.NetworkSteering
+                Mode=c.app_config.BDBCommissioningMode.NwkSteering
             ),
             RspStatus=t.Status.Success,
         )
