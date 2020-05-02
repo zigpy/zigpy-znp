@@ -49,23 +49,14 @@ class BDBCommissioningStatus(t.enum_uint8):
     Failure = 0x0E
 
 
-class BDBCommissioningMode(t.enum_uint8):
-    Initialization = 0x00
-    NwkSteering = 0x01
-    NwkFormation = 0x02
-    FindingBinding = 0x03
-    Touchlink = 0x04
-    ParentLost = 0x05
-
-
-class BDBRemainingCommissioningModes(t.enum_flag_uint8):
+class BDBCommissioningMode(t.enum_flag_uint8):
     NONE = 0
 
-    InitiatorTl = 1 << 0
+    InitiatorTouchLink = 1 << 0
     NwkSteering = 1 << 1
     NwkFormation = 1 << 2
     FindingBinding = 1 << 3
-    Initialization = 1 << 4
+    Touchlink = 1 << 4
     ParentLost = 1 << 5
 
 
@@ -245,7 +236,7 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
                 ),
                 t.Param(
                     "RemainingModes",
-                    BDBRemainingCommissioningModes,
+                    BDBCommissioningMode,
                     (
                         "Bitmask of the remaining commissioning modes after "
                         "this notification"

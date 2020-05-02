@@ -253,17 +253,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram_write(NwkNvIds.SRC_RTG_EXPIRY_TIME, t.uint8_t(255))
         await self._znp.nvram_write(NwkNvIds.NWK_CHILD_AGE_ENABLE, t.Bool(False))
 
-        await self._reset()
+        try:
+            is_configured = (
+                await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
+            ) == b"\x55"
+        except InvalidCommandResponse as e:
+            assert e.response.Status == t.Status.InvalidParameter
+            is_configured = False
 
-        if auto_form:
-            is_configured = await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
-
-            # This is some NVID that stores 0x55 (0b01010101) if the stack is configured
-            # It is not documented or present in the TI codebase, as far as I can tell.
-            if is_configured != b"\x55":
-                await self.form_network()
-            else:
-                LOGGER.info("ZNP is already configured, no need to form network.")
+        if not is_configured and not auto_form:
+            raise RuntimeError("Cannot start application, network is not formed")
+        elif auto_form and is_configured:
+            LOGGER.info("ZNP is already configured, no need to form a network.")
+        elif auto_form and not is_configured:
+            await self.form_network()
 
         if self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER] is not None:
             dbm = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER]
@@ -272,12 +275,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.Sys.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.Success
             )
 
-        """
+        device_info = await self._znp.request(
+            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.Success
+        )
+
+        if device_info.DeviceState != t.DeviceState.StartedAsCoordinator:
+            # Start the application and wait until it's ready
+            await self._znp.request_callback_rsp(
+                request=c.ZDO.StartupFromApp.Req(StartDelay=100),
+                RspState=c.zdo.StartupState.RestoredNetworkState,
+                callback=c.ZDO.StateChangeInd.Callback(
+                    State=t.DeviceState.StartedAsCoordinator
+                ),
+            )
+
         # Get our active endpoints
         endpoints = await self._znp.request_callback_rsp(
-            request=c.ZDO.ActiveEpReq.Req(
-                DstAddr=0x0000, NWKAddrOfInterest=0x0000
-            ),
+            request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
             RspStatus=t.Status.Success,
             callback=c.ZDO.ActiveEpRsp.Callback(partial=True),
         )
@@ -285,9 +299,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Clear out the list of active endpoints
         for endpoint in endpoints.ActiveEndpoints:
             await self._znp.request(
-                c.AF.Delete(Endpoint=endpoint), RspStatus=t.Status.Success
+                c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.Success
             )
-        """
 
         # Register our endpoints
         await self._register_endpoint(endpoint=1)
@@ -300,17 +313,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._register_endpoint(endpoint=12)
         await self._register_endpoint(
             endpoint=100, profile_id=zigpy.profiles.zll.PROFILE_ID, device_id=0x0005
-        )
-
-        # Start commissioning and wait until it's done
-        await self._znp.request_callback_rsp(
-            request=c.AppConfig.BDBStartCommissioning.Req(
-                Mode=c.app_config.BDBCommissioningMode.NwkFormation
-            ),
-            RspStatus=t.Status.Success,
-            callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True, Status=c.app_config.BDBCommissioningStatus.Success,
-            ),
         )
 
     async def update_network(
@@ -401,7 +403,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram_write(
             NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
         )
-        await self._reset()
 
         pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID]
         extended_pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID]
@@ -412,12 +413,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             extended_pan_id=ExtendedPanId(os.urandom(8))
             if extended_pan_id is None
             else extended_pan_id,
-            network_key=t.KeyData([os.urandom(16)]),
+            network_key=t.KeyData(os.urandom(16)),
             reset=False,
         )
 
         # We want to receive all ZDO callbacks to proxy them back go zipgy
         await self._znp.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
+
+        # Reset now so that the changes take effect
+        await self._reset()
 
         await self._znp.request(
             c.AppConfig.BDBStartCommissioning.Req(
@@ -438,6 +442,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
             RspStatus=t.Status.Success,
         )
+
+        # Create the NV item that keeps track of whether or not we're configured
+        osal_create_rsp = await self._znp.request(
+            c.Sys.OSALNVItemInit.Req(
+                Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1, Value=b""
+            )
+        )
+
+        if osal_create_rsp.Status not in (t.Status.Success, t.Status.ItemCreated):
+            raise RuntimeError(
+                "Could not create HAS_CONFIGURED_ZSTACK3 NV item"
+            )  # pragma: no cover
+
+        # Initializing the item won't guarantee that it holds this exact value
+        await self._znp.nvram_write(NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55")
 
     async def _send_zdo_request(
         self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
@@ -521,26 +540,34 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
             )
 
-        async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-            response = await self._znp.request_callback_rsp(
-                request=c.AF.DataRequestExt.Req(
-                    DstAddrModeAddress=dst_addr,
-                    DstEndpoint=dst_ep,
-                    DstPanId=0x0000,
-                    SrcEndpoint=src_ep,
-                    ClusterId=cluster,
-                    TSN=sequence,
-                    Options=options,
-                    Radius=radius,
-                    Data=data,
-                ),
-                RspStatus=t.Status.Success,
-                callback=c.AF.DataConfirm.Callback(
-                    partial=True, Endpoint=dst_ep, TSN=sequence
-                ),
-            )
+        request = c.AF.DataRequestExt.Req(
+            DstAddrModeAddress=dst_addr,
+            DstEndpoint=dst_ep,
+            DstPanId=0x0000,
+            SrcEndpoint=src_ep,
+            ClusterId=cluster,
+            TSN=sequence,
+            Options=options,
+            Radius=radius,
+            Data=data,
+        )
 
-        LOGGER.debug("Received a data request confirmation: %s", response)
+        if dst_addr.mode == t.AddrMode.Broadcast:
+            # We won't always get a data confirmation
+            response = await self._znp.request(
+                request=request, RspStatus=t.Status.Success
+            )
+        else:
+            async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+                response = await self._znp.request_callback_rsp(
+                    request=request,
+                    RspStatus=t.Status.Success,
+                    callback=c.AF.DataConfirm.Callback(
+                        partial=True, Endpoint=dst_ep, TSN=sequence
+                    ),
+                )
+
+            LOGGER.debug("Received a data request confirmation: %s", response)
 
         if response.Status != t.Status.Success:
             return response.Status, "Invalid response status"

@@ -16,7 +16,7 @@ class Sys(t.CommandsBase, subsystem=t.Subsystem.SYS):
             (
                 t.Param(
                     "Type",
-                    t.uint8_t,
+                    t.ResetType,
                     (
                         "This command will reset the device by using a hardware reset "
                         "(i.e. watchdog reset) if ‘Type’ is zero. Otherwise a soft "

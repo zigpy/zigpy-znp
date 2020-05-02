@@ -294,11 +294,11 @@ def test_command_deduplication():
                 partial=True,
                 Status=c.app_config.BDBCommissioningStatus.InProgress,
                 Mode=c.app_config.BDBCommissioningMode.NwkFormation,
-                RemainingModes=c.app_config.BDBRemainingCommissioningModes.InitiatorTl,
+                RemainingModes=c.app_config.BDBCommissioningMode.InitiatorTouchLink,
             ),
             c.AppConfig.BDBCommissioningNotification.Callback(
                 partial=True,
-                RemainingModes=c.app_config.BDBRemainingCommissioningModes.InitiatorTl,
+                RemainingModes=c.app_config.BDBCommissioningMode.InitiatorTouchLink,
             ),
         ]
     )
@@ -312,7 +312,7 @@ def test_command_deduplication():
         ),
         c.AppConfig.BDBCommissioningNotification.Callback(
             partial=True,
-            RemainingModes=c.app_config.BDBRemainingCommissioningModes.InitiatorTl,
+            RemainingModes=c.app_config.BDBCommissioningMode.InitiatorTouchLink,
         ),
     }
 

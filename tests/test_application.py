@@ -66,7 +66,7 @@ class ServerZNP(ZNP):
             callback.called = True
 
             for response in responses:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.01)
                 LOGGER.debug("Replying to %s with %s", request, response)
 
                 try:
@@ -86,7 +86,7 @@ class ServerZNP(ZNP):
             callback.call_count += 1
 
             for response in responses:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.01)
                 LOGGER.debug("Replying to %s with %s", request, response)
 
                 try:
@@ -159,19 +159,55 @@ def application(znp_server):
         ],
     )
 
+    active_eps = [100, 12, 11, 8, 1]
+
     znp_server.reply_to(
         request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
             c.ZDO.ActiveEpReq.Rsp(Status=t.Status.Success),
             c.ZDO.ActiveEpRsp.Callback(
-                Src=0x0000, Status=t.ZDOStatus.SUCCESS, NWK=0x0000, ActiveEndpoints=[]
+                Src=0x0000,
+                Status=t.ZDOStatus.SUCCESS,
+                NWK=0x0000,
+                ActiveEndpoints=active_eps,
             ),
         ],
     )
 
     znp_server.reply_to(
-        request=c.AF.Register.Req(partial=True),
-        responses=[c.AF.Register.Rsp(Status=t.Status.Success)],
+        request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
+        responses=[
+            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.Success),
+            c.ZDO.ActiveEpRsp.Callback(
+                Src=0x0000,
+                Status=t.ZDOStatus.SUCCESS,
+                NWK=0x0000,
+                ActiveEndpoints=active_eps,
+            ),
+        ],
+    )
+
+    def on_endpoint_registration(req):
+        assert req.Endpoint not in active_eps
+
+        active_eps.append(req.Endpoint)
+        active_eps.sort(reverse=True)
+
+        return c.AF.Register.Rsp(Status=t.Status.Success)
+
+    znp_server.reply_to(
+        request=c.AF.Register.Req(partial=True), responses=[on_endpoint_registration],
+    )
+
+    def on_endpoint_deletion(req):
+        assert req.Endpoint in active_eps
+
+        active_eps.remove(req.Endpoint)
+
+        return c.AF.Delete.Rsp(Status=t.Status.Success)
+
+    znp_server.reply_to(
+        request=c.AF.Delete.Req(partial=True), responses=[on_endpoint_deletion],
     )
 
     znp_server.reply_to(
@@ -183,12 +219,7 @@ def application(znp_server):
             c.AppConfig.BDBCommissioningNotification.Callback(
                 Status=c.app_config.BDBCommissioningStatus.Success,
                 Mode=c.app_config.BDBCommissioningMode.NwkSteering,
-                RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
-            ),
-            c.AppConfig.BDBCommissioningNotification.Callback(
-                Status=c.app_config.BDBCommissioningStatus.NoNetwork,
-                Mode=c.app_config.BDBCommissioningMode.NwkSteering,
-                RemainingModes=c.app_config.BDBRemainingCommissioningModes.NONE,
+                RemainingModes=c.app_config.BDBCommissioningMode.NONE,
             ),
         ],
     )
@@ -206,30 +237,71 @@ def application(znp_server):
             responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)],
         )
 
+    znp_server.reply_to(
+        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x55")],
+    )
+
+    znp_server.reply_to(
+        request=c.Util.GetDeviceInfo.Req(),
+        responses=[
+            c.Util.GetDeviceInfo.Rsp(
+                Status=t.Status.Success,
+                IEEE=t.EUI64([0x00, 0x12, 0x4B, 0x00, 0x1C, 0xAA, 0xAC, 0x5C]),
+                NWK=t.NWK(0xFFFE),
+                DeviceType=t.DeviceLogicalType(7),
+                DeviceState=t.DeviceState.InitializedNotStarted,
+                AssociatedDevices=[],
+            )
+        ],
+    )
+
+    znp_server.reply_to(
+        request=c.ZDO.StartupFromApp.Req(partial=True),
+        responses=[
+            c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.RestoredNetworkState),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+        ],
+    )
+
     return app, znp_server
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_application_startup(application):
+async def test_application_startup_endpoints(application):
     app, znp_server = application
 
-    num_endpoints = 5
     endpoints = []
-
-    def register_endpoint(request):
-        nonlocal num_endpoints
-        num_endpoints -= 1
-
-        endpoints.append(request)
-
-        if num_endpoints < 0:
-            raise RuntimeError("Too many endpoints registered")
-
-    znp_server.callback_for_response(c.AF.Register.Req(partial=True), register_endpoint)
+    znp_server.callback_for_response(c.AF.Register.Req(partial=True), endpoints.append)
 
     await app.startup(auto_form=False)
 
     assert len(endpoints) == 5
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_application_startup_failure(application):
+    app, znp_server = application
+
+    # Prevent the fixture's default response
+    znp_server._response_listeners[c.Sys.OSALNVRead.Req.header].clear()
+
+    znp_server.reply_once_to(
+        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.InvalidParameter, Value=b"")],
+    )
+
+    # We cannot start the application if Z-Stack is not configured and without auto_form
+    with pytest.raises(RuntimeError):
+        await app.startup(auto_form=False)
+
+    znp_server.reply_once_to(
+        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x00")],
+    )
+
+    with pytest.raises(RuntimeError):
+        await app.startup(auto_form=False)
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
@@ -858,17 +930,9 @@ async def test_force_remove(application, mocker):
 async def test_auto_form_unnecessary(application, mocker):
     app, znp_server = application
 
-    # b"\x55" means that Z-Stack is already configured?
-    read_zstack_configured = znp_server.reply_once_to(
-        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x55")],
-    )
-
     mocker.patch.object(app, "form_network")
 
     await app.startup(auto_form=True)
-
-    await read_zstack_configured
     assert app.form_network.call_count == 0
 
 
@@ -881,20 +945,29 @@ async def test_auto_form_necessary(application, mocker):
     mocker.patch.object(app, "_reset", new=CoroutineMock())
 
     def nvram_writer(req):
-        if req.Id in nvram:
-            raise ValueError("Unexpected overwrite")
-
         nvram[req.Id] = req.Value
 
         return c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)
 
+    def nvram_init(req):
+        nvram[req.Id] = req.Value
+
+        return c.Sys.OSALNVItemInit.Rsp(Status=t.Status.Success)
+
+    # Prevent the fixture's default response
+    znp_server._response_listeners[c.Sys.OSALNVRead.Req.header].clear()
+
     read_zstack_configured = znp_server.reply_once_to(
         request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x00")],
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.InvalidParameter, Value=b"")],
     )
 
     znp_server.reply_to(
         request=c.Sys.OSALNVWrite.Req(Offset=0, partial=True), responses=[nvram_writer]
+    )
+
+    znp_server.reply_to(
+        request=c.Sys.OSALNVItemInit.Req(partial=True), responses=[nvram_init]
     )
 
     znp_server.reply_to(
@@ -919,8 +992,9 @@ async def test_auto_form_necessary(application, mocker):
     await read_zstack_configured
 
     assert app.update_network.call_count == 1
-    assert app._reset.call_count == 2
+    assert app._reset.call_count == 1
 
+    assert nvram[NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
     assert nvram[NwkNvIds.STARTUP_OPTION] == t.StartupOptions.ClearState.serialize()
     assert nvram[NwkNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
     assert nvram[NwkNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
