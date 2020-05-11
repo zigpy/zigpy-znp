@@ -14,6 +14,27 @@ USB-adapters, GPIO-modules, and development-boards running recent TI Z-Stack rel
 
 Texas Instruments CC13x2 and CC26x2 based adapters/boards already come with a bootloader so can be flashed over USB using the official "Flash Programmer v2" from Texas Instruments.
 
+## Texas Instruments Chip Part Numbers
+Texas Instruments (TI) has quite a few different wireless MCU chips and they are all used/mentioned in open-source Zigbee world which can be daunting if you are just starting out. Here is a quick summary of part numbers and key features.
+
+### Supported newer generation TI chips
+
+#### 2.4GHz frequency only chips
+- CC2652R = 2.4GHz only wireless MCU for IEEE 802.15.4 multi-protocol (Zigbee, Bluetooth, Thread, IEEE 802.15.4g IPv6-enabled smart objects like 6LoWPAN, and proprietary systems). Cortex-M0 core for radio stack and Cortex-M4F core for application use, plenty of RAM. Free compiler option from TI.
+- CC2652RB = Pin compatible "Crystal-less" CC2652R (so you could use it if you were to build your own zzh and omit the crystal) but not firmware compatible.
+- CC2652P = CC2652R with a built-in RF PA. Not pin or firmware compatible with CC2652R/CC2652RB. 
+
+#### Multi frequency chips
+- CC1352R = Sub 1 GHz & 2.4 GHz wireless MCU. Essentially CC2652R with an extra sub-1GHz radio.
+- CC1352P = CC1352R with a built in RF PA.
+
+### Unsupported older generation TI chips
+- CC2530 = 2.4GHz Zigbee and IEEE 802.15.4 wireless MCU. 8051 core, has very little RAM. Needs expensive compiler license for official TI stack.
+- CC2531 = CC2530 with built-in USB. Used in the cheap "Zigbee sticks" sold everywhere.
+
+### Auxiliary TI chips
+- CC2591 and CC2592 = 2.4 GHz range extenders. These are not wireless MCUs, just auxillary PA (Power Amplifier) and LNA (Low Noise Amplifier) in the same package to improve RF (Radio Frequency) range of any 2.4 GHz radio chip.
+
 # Flashing
 
 Use [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH) to write the pre-compiled firmware `.hex` file to your board.
