@@ -39,6 +39,25 @@ Texas Instruments (TI) has quite a few different wireless MCU chips and they are
 
 Use [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH) to write the pre-compiled firmware `.hex` file to your board.
 
+# Configuration
+
+Home Assistant 0.108 ZHA integration component and before you need to configure port path for your ZNP serial device. Just specify the TTY (serial com) port, example : `/dev/ttyACM0` or `/dev/serial/by-id/...` in Home Assistant `configuration.yaml` YAML config file. Example:
+
+ ```yaml
+ zigpy:
+   device:
+     path: '/dev/serial/by-id/...'
+```
+
+Home Assistant 0.109 ZHA integration component and newer do no longer need a port path configured in Home Assistant `configuration.yaml` YAML config file, however if you wish then you can configure the new setting for amplification power strength of "TX Power" for radios with Power Amplifier (PA) for its RF radio to a setting from a minimum of -22 (= "MINUS 22") to a maximum of 19 (= "PLUS 19") in amplification.Default is otherwise set to 0 (None = Zero as in standard amplification). Example:
+
+ ```yaml
+ zha:
+   zigpy_config:
+     znp_config:
+       tx_power: 19
+ ```
+
 # Releases via PyPI
 
 Tagged versions will also be released via PyPI
