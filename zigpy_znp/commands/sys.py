@@ -445,7 +445,7 @@ class Sys(t.CommandsBase, subsystem=t.Subsystem.SYS):
                 t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
             )
         ),
-        rsp_schema=t.Schema((t.Param("Length", t.uint8_t, "Length of NV item"),)),
+        rsp_schema=t.Schema((t.Param("Length", t.uint32_t, "Length of NV item"),)),
     )
 
     # read an item in non-volatile memory
