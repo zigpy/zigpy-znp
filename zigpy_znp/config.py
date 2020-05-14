@@ -38,8 +38,7 @@ SCHEMA_DEVICE = SCHEMA_DEVICE.extend(
 
 CONF_ZNP_CONFIG = "znp_config"
 CONF_TX_POWER = "tx_power"
-CONF_SREQ_TIMEOUT = "sreq_timeout"
-CONF_AUTO_RECONNECT = "auto_reconnect"
+CONF_SREQ_TIMEOUT = "sync_request_timeout"
 CONF_AUTO_RECONNECT_RETRY_DELAY = "auto_reconnect_retry_delay"
 
 CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
@@ -51,7 +50,6 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     None, vol.All(int, vol.Range(min=-22, max=19))
                 ),
                 vol.Optional(CONF_SREQ_TIMEOUT, default=5): VolPositiveNumber,
-                vol.Optional(CONF_AUTO_RECONNECT, default=True): cv_boolean,
                 vol.Optional(
                     CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
                 ): VolPositiveNumber,
