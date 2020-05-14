@@ -1,3 +1,4 @@
+import sys
 import typing
 import logging
 
@@ -150,14 +151,20 @@ class MissingEnumMixin:
     def _missing_(cls, value):
         if not isinstance(value, int) or value < 0 or value > 0xFF:
             # `return None` works with Python 3.7.7, breaks with 3.7.1
-            raise ValueError("%r is not a valid %r", value, cls.__name__)
+            raise ValueError(f"{value} is not a valid {cls.__name__}")
 
         # XXX: infer type from enum
         new_member = basic.uint8_t.__new__(cls, value)
         new_member._name_ = f"unknown_0x{value:02X}"
         new_member._value_ = value
 
-        LOGGER.warning("Unhandled %s value: %s", cls.__name__, new_member)
+        if sys.version_info >= (3, 8):
+            # Show the warning in the calling code, not in this function
+            LOGGER.warning(
+                "Unhandled %s value: %s", cls.__name__, new_member, stacklevel=2
+            )
+        else:
+            LOGGER.warning("Unhandled %s value: %s", cls.__name__, new_member)
 
         return new_member
 
