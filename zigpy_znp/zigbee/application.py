@@ -75,6 +75,21 @@ ZDO_CONVERTERS = {
         (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr)),
         (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, [rsp.Status])),
     ),
+    ZDOCmd.Bind_req: (
+        (
+            lambda addr, device, SrcAddress, SrcEndpoint, ClusterID, DstAddress: (
+                c.ZDO.BindReq.Req(
+                    Dst=addr,
+                    Src=SrcAddress,
+                    SrcEndpoint=SrcEndpoint,
+                    ClusterId=ClusterID,
+                    Address=DstAddress,
+                )
+            )
+        ),
+        (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr)),
+        (lambda rsp: (ZDOCmd.Bind_rsp, [rsp.Status])),
+    ),
 }
 
 
@@ -278,6 +293,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         device_info = await self._znp.request(
             c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.Success
         )
+
+        self._ieee = device_info.IEEE
 
         if device_info.DeviceState != t.DeviceState.StartedAsCoordinator:
             # Start the application and wait until it's ready
@@ -498,7 +515,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         callback = rsp_factory(dst_addr.address)
 
         LOGGER.debug(
-            "Intercepted AP ZDO request and replaced with %s/%s", request, callback
+            "Intercepted AP ZDO request %s(%s) and replaced with %s/%s",
+            cluster,
+            zdo_kwargs,
+            request,
+            callback,
         )
 
         try:
@@ -513,7 +534,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Build up a ZDO response
         message = t.serialize_list(
-            [t.uint8_t(sequence), response.Status, response.NWK] + zdo_response_args
+            [t.uint8_t(sequence), response.Status, device.nwk] + zdo_response_args
         )
         LOGGER.trace("Pretending we received a ZDO message: %s", message)
 
@@ -673,7 +694,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 AddrMode=t.AddrMode.Broadcast,
                 Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
                 Duration=time_s,
-                TCSignificance=0,  # not used in Z-Stack
+                TCSignificance=1,  # "This field shall always have a value of 1,
+                #                     indicating a request to change the
+                #                     Trust Center policy."
             ),
             RspStatus=t.Status.Success,
             callback=c.ZDO.MgmtPermitJoinRsp.Callback(partial=True),
