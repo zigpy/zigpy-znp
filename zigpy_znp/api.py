@@ -203,7 +203,7 @@ class ZNP:
                 LOGGER.trace("Cleaning up empty listener list for header %s", header)
                 del self._response_listeners[header]
 
-        total_listeners = sum(len(l) for l in self._response_listeners.values())
+        total_listeners = sum(map(len, self._response_listeners.values()))
         LOGGER.trace("There are %d listeners remaining", total_listeners)
 
     def frame_received(self, frame: GeneralFrame) -> None:
