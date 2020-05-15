@@ -28,7 +28,7 @@ from zigpy_znp.types.nvids import NwkNvIds
 
 
 ZDO_ENDPOINT = 0
-ZDO_REQUEST_TIMEOUT = 15  # seconds
+ZDO_REQUEST_TIMEOUT = 10  # seconds
 DATA_CONFIRM_TIMEOUT = 5  # seconds
 LOGGER = logging.getLogger(__name__)
 
