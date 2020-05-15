@@ -580,7 +580,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             cluster,
             zdo_kwargs,
             request,
-            callback,
         )
 
         try:
@@ -721,21 +720,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
-        await self._znp.request(
-            c.ZDO.MgmtLeaveReq.Req(
+        leave_rsp = await self._znp.request_callback_rsp(
+            request=c.ZDO.MgmtLeaveReq.Req(
                 DstAddr=0x0000,  # We handle it
                 IEEE=device.ieee,
                 RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
             ),
             RspStatus=t.Status.Success,
+            callback=c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, partial=True),
         )
+
+        assert leave_rsp.Status == t.ZDOStatus.SUCCESS
 
         # TODO: see what happens when we forcibly remove a device that isn't our child
-
-        # Just wait for the response, removing the device will be handled upstream
-        await self._znp.wait_for_response(
-            c.ZDO.LeaveInd.Callback(NWK=device.nwk, IEEE=device.ieee, partial=True)
-        )
 
     async def permit_ncp(self, time_s: int) -> None:
         response = await self._znp.request_callback_rsp(

@@ -908,13 +908,7 @@ async def test_force_remove(application, mocker):
         request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, partial=True),
         responses=[
             c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.Success),
-            c.ZDO.LeaveInd.Callback(
-                NWK=device.nwk,
-                IEEE=device.ieee,
-                Remove=False,
-                Request=False,
-                Rejoin=False,
-            ),
+            c.ZDO.MgmtLeaveRsp.Callback(Src=0x000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
