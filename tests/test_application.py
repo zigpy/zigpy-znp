@@ -396,17 +396,20 @@ async def test_on_zdo_device_announce(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)
 
-    mocker.patch.object(app, "handle_join")
+    mocker.patch.object(app, "handle_message")
 
-    nwk = 0x1234
-    ieee = t.EUI64(range(8))
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
 
     znp_server.send(
         c.ZDO.EndDeviceAnnceInd.Callback(
-            Src=0x0001, NWK=nwk, IEEE=ieee, Capabilities=c.zdo.MACCapabilities.Router
+            Src=0x0001,
+            NWK=device.nwk,
+            IEEE=device.ieee,
+            Capabilities=c.zdo.MACCapabilities.Router,
         )
     )
-    app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0)
+
+    app.handle_message.called_once_with(cluster=ZDOCmd.Device_annce)
 
 
 @pytest_mark_asyncio_timeout(seconds=3)

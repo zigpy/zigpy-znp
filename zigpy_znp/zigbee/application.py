@@ -33,7 +33,7 @@ DATA_CONFIRM_TIMEOUT = 5  # seconds
 LOGGER = logging.getLogger(__name__)
 
 
-ZDO_CONVERTERS = {
+ZDO_COMPLEX_CONVERTERS = {
     ZDOCmd.Node_Desc_req: (
         (
             lambda addr, device, NWKAddrOfInterest: c.ZDO.NodeDescReq.Req(
@@ -41,7 +41,16 @@ ZDO_CONVERTERS = {
             )
         ),
         (lambda addr: c.ZDO.NodeDescRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Node_Desc_rsp, [rsp.NodeDescriptor])),
+        (
+            lambda rsp: (
+                ZDOCmd.Node_Desc_rsp,
+                {
+                    "Status": rsp.Status,
+                    "NWKAddrOfInterest": rsp.NWK,
+                    "NodeDescriptor": rsp.NodeDescriptor,
+                },
+            )
+        ),
     ),
     ZDOCmd.Active_EP_req: (
         (
@@ -50,19 +59,36 @@ ZDO_CONVERTERS = {
             )
         ),
         (lambda addr: c.ZDO.ActiveEpRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Active_EP_rsp, [rsp.ActiveEndpoints])),
+        (
+            lambda rsp: (
+                ZDOCmd.Active_EP_rsp,
+                {
+                    "Status": rsp.Status,
+                    "NWKAddrOfInterest": rsp.NWK,
+                    "ActiveEPList": rsp.ActiveEndpoints,
+                },
+            )
+        ),
     ),
     ZDOCmd.Simple_Desc_req: (
         (
-            # fmt: off
-            lambda addr, device, NWKAddrOfInterest, EndPoint: \
-            c.ZDO.SimpleDescReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest, Endpoint=EndPoint
+            lambda addr, device, NWKAddrOfInterest, EndPoint: (
+                c.ZDO.SimpleDescReq.Req(
+                    DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest, Endpoint=EndPoint
+                )
             )
-            # fmt: on
         ),
         (lambda addr: c.ZDO.SimpleDescRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Simple_Desc_rsp, [rsp.SimpleDescriptor])),
+        (
+            lambda rsp: (
+                ZDOCmd.Simple_Desc_rsp,
+                {
+                    "Status": rsp.Status,
+                    "NWKAddrOfInterest": rsp.NWK,
+                    "SimpleDescriptor": rsp.SimpleDescriptor,
+                },
+            )
+        ),
     ),
     ZDOCmd.Mgmt_Leave_req: (
         (
@@ -73,7 +99,7 @@ ZDO_CONVERTERS = {
             )
         ),
         (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, [rsp.Status])),
+        (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Bind_req: (
         (
@@ -88,7 +114,7 @@ ZDO_CONVERTERS = {
             )
         ),
         (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Bind_rsp, [rsp.Status])),
+        (lambda rsp: (ZDOCmd.Bind_rsp, {"Status": rsp.Status})),
     ),
 }
 
@@ -122,6 +148,33 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         finally:
             znp.close()
 
+    def _receive_zdo_message(
+        self, cluster: ZDOCmd, *, tsn: t.uint8_t, sender, **zdo_kwargs
+    ) -> None:
+        field_names, field_types = ZDO_CLUSTERS[cluster]
+        assert set(zdo_kwargs) == set(field_names)
+
+        zdo_args = []
+
+        for f_name, f_type in zip(field_names, field_types):
+            # XXX: bugfix for zigpy optional struct bug
+            if f_type.__name__ == "Optional":
+                f_type = f_type.__mro__[1]
+
+            zdo_args.append(f_type(zdo_kwargs[f_name]))
+
+        message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
+
+        LOGGER.trace("Pretending we received a ZDO message: %s", message)
+        self.handle_message(
+            sender=sender,
+            profile=zigpy.profiles.zha.PROFILE_ID,
+            cluster=cluster,
+            src_ep=ZDO_ENDPOINT,
+            dst_ep=ZDO_ENDPOINT,
+            message=message,
+        )
+
     def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
         LOGGER.info("ZDO device relays: %s", msg)
         device = self.get_device(nwk=msg.DstAddr)
@@ -129,10 +182,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     def on_zdo_device_announce(self, msg: c.ZDO.EndDeviceAnnceInd.Callback) -> None:
         LOGGER.info("ZDO device announce: %s", msg)
-        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=0x0000)
 
-    def on_zdo_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
-        LOGGER.info("ZDO device join: %s", msg)
+        self._receive_zdo_message(
+            cluster=ZDOCmd.Device_annce,
+            tsn=0xFF,
+            sender=self.get_device(ieee=msg.IEEE),
+            NWKAddr=msg.NWK,
+            IEEEAddr=msg.IEEE,
+            Capability=msg.Capabilities,
+        )
+
+    def on_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
+        LOGGER.info("TC device join: %s", msg)
         self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
 
     def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
@@ -176,7 +237,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         api.callback_for_response(
-            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_zdo_device_join,
+            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_tc_device_join,
         )
 
         api.callback_for_response(
@@ -510,12 +571,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         device = self.get_device(nwk=dst_addr.address)
 
         # Call the converter with the ZDO request's kwargs
-        req_factory, rsp_factory, zdo_rsp_factory = ZDO_CONVERTERS[cluster]
+        req_factory, rsp_factory, zdo_rsp_factory = ZDO_COMPLEX_CONVERTERS[cluster]
         request = req_factory(dst_addr.address, device, **zdo_kwargs)
         callback = rsp_factory(dst_addr.address)
 
         LOGGER.debug(
-            "Intercepted AP ZDO request %s(%s) and replaced with %s/%s",
+            "Intercepted AP ZDO request %s(%s) and replaced with %s",
             cluster,
             zdo_kwargs,
             request,
@@ -530,22 +591,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         except InvalidCommandResponse as e:
             raise DeliveryError(f"Could not send command: {e.response.Status}") from e
 
-        zdo_rsp_cluster, zdo_response_args = zdo_rsp_factory(response)
+        zdo_rsp_cluster, zdo_response_kwargs = zdo_rsp_factory(response)
 
-        # Build up a ZDO response
-        message = t.serialize_list(
-            [t.uint8_t(sequence), response.Status, device.nwk] + zdo_response_args
-        )
-        LOGGER.trace("Pretending we received a ZDO message: %s", message)
-
-        # We do not get any LQI info here
-        self.handle_message(
-            sender=device,
-            profile=zigpy.profiles.zha.PROFILE_ID,
-            cluster=zdo_rsp_cluster,
-            src_ep=dst_ep,
-            dst_ep=src_ep,
-            message=message,
+        self._receive_zdo_message(
+            cluster=zdo_rsp_cluster, tsn=sequence, sender=device, **zdo_response_kwargs
         )
 
         return response.Status, "Request sent successfully"
@@ -694,9 +743,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 AddrMode=t.AddrMode.Broadcast,
                 Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
                 Duration=time_s,
-                TCSignificance=1,  # "This field shall always have a value of 1,
-                #                     indicating a request to change the
-                #                     Trust Center policy."
+                # "This field shall always have a value of 1,
+                #  indicating a request to change the
+                #  Trust Center policy."
+                TCSignificance=1,
             ),
             RspStatus=t.Status.Success,
             callback=c.ZDO.MgmtPermitJoinRsp.Callback(partial=True),
