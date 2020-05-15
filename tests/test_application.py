@@ -989,7 +989,7 @@ async def test_auto_form_necessary(application, mocker):
     await read_zstack_configured
 
     assert app.update_network.call_count == 1
-    assert app._reset.call_count == 1
+    assert app._reset.call_count == 2
 
     assert nvram[NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
     assert nvram[NwkNvIds.STARTUP_OPTION] == t.StartupOptions.ClearState.serialize()

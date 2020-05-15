@@ -329,6 +329,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram_write(NwkNvIds.SRC_RTG_EXPIRY_TIME, t.uint8_t(255))
         await self._znp.nvram_write(NwkNvIds.NWK_CHILD_AGE_ENABLE, t.Bool(False))
 
+        # Reset to make the above NVRAM writes take effect.
+        # This also ensures any previously-started network joins don't continue.
+        await self._reset()
+
         try:
             is_configured = (
                 await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
