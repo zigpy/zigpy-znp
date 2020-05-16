@@ -22,7 +22,7 @@ def test_uart_rx_basic():
     uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
-    test_command = c.Sys.ResetInd.Callback(
+    test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x45,
@@ -51,7 +51,7 @@ def test_uart_rx_byte_by_byte():
     uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
-    test_command = c.Sys.ResetInd.Callback(
+    test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x45,
@@ -75,7 +75,7 @@ def test_uart_rx_byte_by_byte_garbage():
     uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
-    test_command = c.Sys.ResetInd.Callback(
+    test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x45,
@@ -109,7 +109,7 @@ def test_uart_rx_big_garbage():
     uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
-    test_command = c.Sys.ResetInd.Callback(
+    test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x45,
@@ -142,7 +142,7 @@ def test_uart_rx_corrupted_fcs():
     uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
-    test_command = c.Sys.ResetInd.Callback(
+    test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x45,
@@ -167,7 +167,7 @@ def test_uart_rx_sof_stress():
     uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
-    test_command = c.Sys.ResetInd.Callback(
+    test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x45,
@@ -199,7 +199,7 @@ def test_uart_frame_received_error():
     uart = znp_uart.ZnpMtProtocol(api)
     uart.connection_made(transport)
 
-    test_command = c.Sys.ResetInd.Callback(
+    test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x45,

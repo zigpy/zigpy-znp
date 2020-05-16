@@ -54,7 +54,7 @@ class ServerZNP(ZNP):
         super().__init__(*args, **kwargs)
 
         # We just respond to pings, nothing more
-        self.callback_for_response(c.Sys.Ping.Req(), lambda r: self.ping_replier(r))
+        self.callback_for_response(c.SYS.Ping.Req(), lambda r: self.ping_replier(r))
 
     def reply_once_to(self, request, responses):
         called_future = asyncio.get_running_loop().create_future()
@@ -101,7 +101,7 @@ class ServerZNP(ZNP):
         return callback
 
     def ping_replier(self, request):
-        self.send(c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
+        self.send(c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
 
     def send(self, response):
         self._uart.send(response.to_frame())
@@ -146,9 +146,9 @@ def application(znp_server):
 
     # Handle the entire startup sequence
     znp_server.reply_to(
-        request=c.Sys.ResetReq.Req(Type=t.ResetType.Soft),
+        request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
         responses=[
-            c.Sys.ResetInd.Callback(
+            c.SYS.ResetInd.Callback(
                 Reason=t.ResetReason.PowerUp,
                 TransportRev=2,
                 ProductId=1,
@@ -233,13 +233,13 @@ def application(znp_server):
         NwkNvIds.NWK_CHILD_AGE_ENABLE,
     ]:
         znp_server.reply_to(
-            request=c.Sys.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),
-            responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
+            request=c.SYS.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),
+            responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
         )
 
     znp_server.reply_to(
-        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x55")],
+        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x55")],
     )
 
     znp_server.reply_to(
@@ -284,11 +284,11 @@ async def test_application_startup_failure(application):
     app, znp_server = application
 
     # Prevent the fixture's default response
-    znp_server._response_listeners[c.Sys.OSALNVRead.Req.header].clear()
+    znp_server._response_listeners[c.SYS.OSALNVRead.Req.header].clear()
 
     znp_server.reply_once_to(
-        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
+        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
     )
 
     # We cannot start the application if Z-Stack is not configured and without auto_form
@@ -296,8 +296,8 @@ async def test_application_startup_failure(application):
         await app.startup(auto_form=False)
 
     znp_server.reply_once_to(
-        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x00")],
+        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x00")],
     )
 
     with pytest.raises(RuntimeError):
@@ -309,8 +309,8 @@ async def test_application_startup_tx_power(application):
     app, znp_server = application
 
     set_tx_power = znp_server.reply_once_to(
-        request=c.Sys.SetTxPower.Req(TXPower=19),
-        responses=[c.Sys.SetTxPower.Rsp(Status=t.Status.SUCCESS)],
+        request=c.SYS.SetTxPower.Req(TXPower=19),
+        responses=[c.SYS.SetTxPower.Rsp(Status=t.Status.SUCCESS)],
     )
 
     app.update_config({conf.CONF_ZNP_CONFIG: {conf.CONF_TX_POWER: 19}})
@@ -818,10 +818,10 @@ async def test_update_network(mocker, caplog, application):
     )
 
     set_extended_pan_id = znp_server.reply_once_to(
-        request=c.Sys.OSALNVWrite.Req(
+        request=c.SYS.OSALNVWrite.Req(
             Id=NwkNvIds.EXTENDED_PAN_ID, Offset=0, Value=extended_pan_id.serialize()
         ),
-        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
+        responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
     )
 
     set_network_key_util = znp_server.reply_once_to(
@@ -830,10 +830,10 @@ async def test_update_network(mocker, caplog, application):
     )
 
     set_network_key_nvram = znp_server.reply_once_to(
-        request=c.Sys.OSALNVWrite.Req(
+        request=c.SYS.OSALNVWrite.Req(
             Id=NwkNvIds.PRECFGKEYS_ENABLE, Offset=0, Value=t.Bool(True).serialize()
         ),
-        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
+        responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
     )
 
     # But it does succeed with a warning if you explicitly allow it
@@ -944,27 +944,27 @@ async def test_auto_form_necessary(application, mocker):
     def nvram_writer(req):
         nvram[req.Id] = req.Value
 
-        return c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
+        return c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     def nvram_init(req):
         nvram[req.Id] = req.Value
 
-        return c.Sys.OSALNVItemInit.Rsp(Status=t.Status.SUCCESS)
+        return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.SUCCESS)
 
     # Prevent the fixture's default response
-    znp_server._response_listeners[c.Sys.OSALNVRead.Req.header].clear()
+    znp_server._response_listeners[c.SYS.OSALNVRead.Req.header].clear()
 
     read_zstack_configured = znp_server.reply_once_to(
-        request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
+        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
+        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
     )
 
     znp_server.reply_to(
-        request=c.Sys.OSALNVWrite.Req(Offset=0, partial=True), responses=[nvram_writer]
+        request=c.SYS.OSALNVWrite.Req(Offset=0, partial=True), responses=[nvram_writer]
     )
 
     znp_server.reply_to(
-        request=c.Sys.OSALNVItemInit.Req(partial=True), responses=[nvram_init]
+        request=c.SYS.OSALNVItemInit.Req(partial=True), responses=[nvram_init]
     )
 
     znp_server.reply_to(

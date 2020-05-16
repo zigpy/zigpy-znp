@@ -4,7 +4,7 @@ from .app import App
 from .app_config import AppConfig
 from .mac import MAC
 from .sapi import SAPI
-from .sys import Sys
+from .sys import SYS
 from .util import Util
 from .zdo import ZDO
 from .zgp import ZGP
@@ -16,7 +16,7 @@ ALL_COMMANDS = [
     AppConfig,
     MAC,
     SAPI,
-    Sys,
+    SYS,
     Util,
     ZDO,
     ZGP,

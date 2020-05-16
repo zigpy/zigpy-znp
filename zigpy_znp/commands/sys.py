@@ -7,7 +7,7 @@ import zigpy_znp.types as t
 from zigpy_znp.types import nvids
 
 
-class Sys(t.CommandsBase, subsystem=t.Subsystem.SYS):
+class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     # reset the target device
     ResetReq = t.CommandDef(
         t.CommandType.AREQ,

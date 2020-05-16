@@ -352,7 +352,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             dbm = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER]
 
             await self._znp.request(
-                c.Sys.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
+                c.SYS.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
             )
 
         device_info = await self._znp.request(
@@ -471,8 +471,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def _reset(self):
         await self._znp.request_callback_rsp(
-            request=c.Sys.ResetReq.Req(Type=t.ResetType.Soft),
-            callback=c.Sys.ResetInd.Callback(partial=True),
+            request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
+            callback=c.SYS.ResetInd.Callback(partial=True),
         )
 
     async def form_network(self):
@@ -527,7 +527,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Create the NV item that keeps track of whether or not we're configured
         osal_create_rsp = await self._znp.request(
-            c.Sys.OSALNVItemInit.Req(
+            c.SYS.OSALNVItemInit.Req(
                 Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1, Value=b""
             )
         )

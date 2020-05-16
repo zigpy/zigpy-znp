@@ -106,11 +106,11 @@ async def test_znp_connect(mocker, event_loop, pingable_serial_port):
 async def test_znp_responses(znp):
     assert not znp._response_listeners
 
-    future = znp.wait_for_response(c.Sys.Ping.Rsp(partial=True))
+    future = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
 
     assert znp._response_listeners
 
-    response = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     znp.frame_received(response.to_frame())
 
     assert (await future) == response
@@ -122,7 +122,7 @@ async def test_znp_responses(znp):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_response_timeouts(znp):
-    response = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
 
     async def send_soon(delay):
         await asyncio.sleep(delay)
@@ -131,7 +131,7 @@ async def test_znp_response_timeouts(znp):
     asyncio.create_task(send_soon(0.1))
 
     async with async_timeout.timeout(0.5):
-        assert (await znp.wait_for_response(c.Sys.Ping.Rsp(partial=True))) == response
+        assert (await znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))) == response
 
     # The response was successfully received so we should have no outstanding listeners
     await asyncio.sleep(0)
@@ -142,7 +142,7 @@ async def test_znp_response_timeouts(znp):
     with pytest.raises(asyncio.TimeoutError):
         async with async_timeout.timeout(0.5):
             assert (
-                await znp.wait_for_response(c.Sys.Ping.Rsp(partial=True))
+                await znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
             ) == response
 
     # Our future still completed, albeit unsuccesfully.
@@ -154,12 +154,12 @@ async def test_znp_response_timeouts(znp):
 @pytest_mark_asyncio_timeout()
 async def test_znp_response_matching_partial(znp):
     future = znp.wait_for_response(
-        c.Sys.ResetInd.Callback(
+        c.SYS.ResetInd.Callback(
             partial=True, Reason=t.ResetReason.PowerUp, MaintRel=0x04
         )
     )
 
-    response1 = c.Sys.ResetInd.Callback(
+    response1 = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x12,
@@ -167,7 +167,7 @@ async def test_znp_response_matching_partial(znp):
         MinorRel=0x02,
         MaintRel=0x03,
     )
-    response2 = c.Sys.ResetInd.Callback(
+    response2 = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x12,
@@ -175,7 +175,7 @@ async def test_znp_response_matching_partial(znp):
         MinorRel=0x02,
         MaintRel=0x04,
     )
-    response3 = c.Sys.ResetInd.Callback(
+    response3 = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.External,
         TransportRev=0x00,
         ProductId=0x12,
@@ -194,7 +194,7 @@ async def test_znp_response_matching_partial(znp):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_response_matching_exact(znp):
-    response1 = c.Sys.ResetInd.Callback(
+    response1 = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x12,
@@ -202,7 +202,7 @@ async def test_znp_response_matching_exact(znp):
         MinorRel=0x02,
         MaintRel=0x03,
     )
-    response2 = c.Sys.ResetInd.Callback(
+    response2 = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x12,
@@ -210,7 +210,7 @@ async def test_znp_response_matching_exact(znp):
         MinorRel=0x02,
         MaintRel=0x04,
     )
-    response3 = c.Sys.ResetInd.Callback(
+    response3 = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.External,
         TransportRev=0x00,
         ProductId=0x12,
@@ -232,7 +232,7 @@ async def test_znp_response_matching_exact(znp):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_response_not_matching_out_of_order(znp):
-    response = c.Sys.ResetInd.Callback(
+    response = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
         TransportRev=0x00,
         ProductId=0x12,
@@ -260,8 +260,8 @@ async def test_znp_wait_responses_empty(znp):
 async def test_znp_response_callback_simple(znp, event_loop):
     sync_callback = Mock()
 
-    good_response = c.Sys.SetExtAddr.Rsp(Status=t.Status.FAILURE)
-    bad_response = c.Sys.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
+    good_response = c.SYS.SetExtAddr.Rsp(Status=t.Status.FAILURE)
+    bad_response = c.SYS.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
 
     znp.callback_for_response(good_response, sync_callback)
 
@@ -275,10 +275,10 @@ async def test_znp_response_callback_simple(znp, event_loop):
 def test_command_deduplication():
     result = _deduplicate_commands(
         [
-            c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
             # Duplicating matching commands shouldn't do anything
-            c.Sys.Ping.Rsp(partial=True),
-            c.Sys.Ping.Rsp(partial=True),
+            c.SYS.Ping.Rsp(partial=True),
+            c.SYS.Ping.Rsp(partial=True),
             # Matching against different command types should also work
             c.Util.TimeAlive.Rsp(Seconds=12),
             c.Util.TimeAlive.Rsp(Seconds=10),
@@ -304,7 +304,7 @@ def test_command_deduplication():
     )
 
     assert set(result) == {
-        c.Sys.Ping.Rsp(partial=True),
+        c.SYS.Ping.Rsp(partial=True),
         c.Util.TimeAlive.Rsp(Seconds=12),
         c.Util.TimeAlive.Rsp(Seconds=10),
         c.AppConfig.BDBCommissioningNotification.Callback(
@@ -332,27 +332,27 @@ async def test_znp_response_callbacks(znp, event_loop):
         await asyncio.sleep(0)
         async_callback_responses.append(response)
 
-    good_response1 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    good_response2 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
+    good_response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    good_response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
     good_response3 = c.Util.TimeAlive.Rsp(Seconds=12)
-    bad_response1 = c.Sys.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
-    bad_response2 = c.Sys.NVWrite.Req(
+    bad_response1 = c.SYS.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
+    bad_response2 = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
     responses = [
         # Duplicating matching responses shouldn't do anything
-        c.Sys.Ping.Rsp(partial=True),
-        c.Sys.Ping.Rsp(partial=True),
+        c.SYS.Ping.Rsp(partial=True),
+        c.SYS.Ping.Rsp(partial=True),
         # Matching against different response types should also work
         c.Util.TimeAlive.Rsp(Seconds=12),
-        c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
-        c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
         c.Util.TimeAlive.Rsp(Seconds=10),
     ]
 
     assert set(_deduplicate_commands(responses)) == {
-        c.Sys.Ping.Rsp(partial=True),
+        c.SYS.Ping.Rsp(partial=True),
         c.Util.TimeAlive.Rsp(Seconds=12),
         c.Util.TimeAlive.Rsp(Seconds=10),
     }
@@ -381,11 +381,11 @@ async def test_znp_response_callbacks(znp, event_loop):
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_wait_for_responses(znp, event_loop):
-    response1 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    response2 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
+    response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
     response3 = c.Util.TimeAlive.Rsp(Seconds=12)
-    response4 = c.Sys.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
-    response5 = c.Sys.NVWrite.Req(
+    response4 = c.SYS.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
+    response5 = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
@@ -393,13 +393,13 @@ async def test_znp_wait_for_responses(znp, event_loop):
     znp.frame_received(response1.to_frame())
 
     future1 = znp.wait_for_responses(
-        [c.Sys.Ping.Rsp(partial=True), c.Sys.Ping.Rsp(partial=True)]
+        [c.SYS.Ping.Rsp(partial=True), c.SYS.Ping.Rsp(partial=True)]
     )
 
     future2 = znp.wait_for_responses(
         [
             c.Util.TimeAlive.Rsp(Seconds=12),
-            c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_UTIL),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_UTIL),
         ]
     )
 
@@ -408,12 +408,12 @@ async def test_znp_wait_for_responses(znp, event_loop):
     future4 = znp.wait_for_responses(
         [
             # Duplicating matching responses shouldn't do anything
-            c.Sys.Ping.Rsp(partial=True),
-            c.Sys.Ping.Rsp(partial=True),
+            c.SYS.Ping.Rsp(partial=True),
+            c.SYS.Ping.Rsp(partial=True),
             # Matching against different response types should also work
             c.Util.TimeAlive.Rsp(Seconds=12),
-            c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
-            c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
             c.Util.TimeAlive.Rsp(Seconds=10),
         ]
     )
@@ -447,37 +447,37 @@ async def test_znp_wait_for_responses(znp, event_loop):
 async def test_znp_request_kwargs(znp, event_loop):
     # Invalid format
     with pytest.raises(KeyError):
-        await znp.request(c.Sys.Ping.Req(), foo=0x01)
+        await znp.request(c.SYS.Ping.Req(), foo=0x01)
 
     # Valid format, invalid name
     with pytest.raises(KeyError):
-        await znp.request(c.Sys.Ping.Req(), RspFoo=0x01)
+        await znp.request(c.SYS.Ping.Req(), RspFoo=0x01)
 
     # Valid format, valid name
     event_loop.call_soon(
         znp.frame_received,
-        c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS).to_frame(),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS).to_frame(),
     )
-    await znp.request(c.Sys.Ping.Req(), RspCapabilities=t.MTCapabilities.CAP_SYS)
+    await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.CAP_SYS)
     znp._uart.send.reset_mock()
 
     # Commands with no response (not an empty response!) can still be sent
-    response = await znp.request(c.Sys.ResetReq.Req(Type=t.ResetType.Soft))
+    response = await znp.request(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
 
     znp._uart.send.assert_called_once_with(
-        c.Sys.ResetReq.Req(Type=t.ResetType.Soft).to_frame()
+        c.SYS.ResetReq.Req(Type=t.ResetType.Soft).to_frame()
     )
 
     assert response is None
 
     # You cannot send anything but requests
     with pytest.raises(ValueError):
-        await znp.request(c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS))
+        await znp.request(c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS))
 
     # You cannot send callbacks
     with pytest.raises(ValueError):
         await znp.request(
-            c.Sys.ResetInd.Callback(
+            c.SYS.ResetInd.Callback(
                 Reason=t.ResetReason.PowerUp,
                 TransportRev=0x00,
                 ProductId=0x12,
@@ -491,7 +491,7 @@ async def test_znp_request_kwargs(znp, event_loop):
 @pytest_mark_asyncio_timeout()
 async def test_znp_request_not_recognized(znp, event_loop):
     # An error is raise when a bad request is sent
-    request = c.Sys.Ping.Req()
+    request = c.SYS.Ping.Req()
     unknown_rsp = c.RPCError.CommandNotRecognized.Rsp(
         ErrorCode=c.rpc_error.ErrorCode.InvalidCommandId, RequestHeader=request.header
     )
@@ -505,23 +505,23 @@ async def test_znp_request_not_recognized(znp, event_loop):
 async def test_znp_request_wrong_params(znp, event_loop):
     # You cannot specify response kwargs for responses with no response
     with pytest.raises(ValueError):
-        await znp.request(c.Sys.ResetReq.Req(Type=t.ResetType.Soft), foo=0x01)
+        await znp.request(c.SYS.ResetReq.Req(Type=t.ResetType.Soft), foo=0x01)
 
     # An error is raised when a response with bad params is received
     with pytest.raises(InvalidCommandResponse):
         event_loop.call_soon(
             znp.frame_received,
-            c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS).to_frame(),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS).to_frame(),
         )
-        await znp.request(c.Sys.Ping.Req(), RspCapabilities=t.MTCapabilities.CAP_APP)
+        await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.CAP_APP)
 
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_uart(znp, event_loop):
-    ping_rsp = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
 
     event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
-    response = await znp.request(c.Sys.Ping.Req())
+    response = await znp.request(c.SYS.Ping.Req())
 
     assert ping_rsp == response
 
@@ -536,13 +536,13 @@ async def test_znp_sreq_srsp(znp, event_loop):
     # Each SREQ must have a corresponding SRSP, so this will fail
     with pytest.raises(asyncio.TimeoutError):
         with async_timeout.timeout(0.5):
-            await znp.request(c.Sys.Ping.Req())
+            await znp.request(c.SYS.Ping.Req())
 
     # This will work
-    ping_rsp = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
 
-    await znp.request(c.Sys.Ping.Req())
+    await znp.request(c.SYS.Ping.Req())
 
 
 @pytest_mark_asyncio_timeout()
@@ -572,11 +572,11 @@ async def test_znp_nvram_writes(znp, event_loop):
     assert nvids.NwkNvIds.STARTUP_OPTION == 0x0003
 
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
+        znp.frame_received, c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
     )
     await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint8_t(0xAB))
     znp._uart.send.assert_called_once_with(
-        c.Sys.OSALNVWrite.Req(
+        c.SYS.OSALNVWrite.Req(
             Id=nvids.NwkNvIds.STARTUP_OPTION, Offset=0x00, Value=t.ShortBytes(b"\xAB")
         ).to_frame()
     )
@@ -585,11 +585,11 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # As should explicitly serializing the value to bytes
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
+        znp.frame_received, c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
     )
     await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint8_t(0xAB).serialize())
     znp._uart.send.assert_called_once_with(
-        c.Sys.OSALNVWrite.Req(
+        c.SYS.OSALNVWrite.Req(
             Id=nvids.NwkNvIds.STARTUP_OPTION, Offset=0x00, Value=t.ShortBytes(b"\xAB")
         ).to_frame()
     )
@@ -598,11 +598,11 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # And passing in bytes directly
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
+        znp.frame_received, c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
     )
     await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, b"\xAB")
     znp._uart.send.assert_called_once_with(
-        c.Sys.OSALNVWrite.Req(
+        c.SYS.OSALNVWrite.Req(
             Id=nvids.NwkNvIds.STARTUP_OPTION, Offset=0x00, Value=t.ShortBytes(b"\xAB")
         ).to_frame()
     )
@@ -611,7 +611,7 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # The SYS_OSAL_NV_WRITE response status should be checked
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.FAILURE).to_frame(),
+        znp.frame_received, c.SYS.OSALNVWrite.Rsp(Status=t.Status.FAILURE).to_frame(),
     )
 
     with pytest.raises(InvalidCommandResponse):
@@ -622,7 +622,7 @@ async def test_znp_nvram_writes(znp, event_loop):
 async def test_znp_nvram_read_success(znp, event_loop):
     event_loop.call_soon(
         znp.frame_received,
-        c.Sys.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"test",).to_frame(),
+        c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"test",).to_frame(),
     )
     result = await znp.nvram_read(nvids.NwkNvIds.STARTUP_OPTION)
 
@@ -633,7 +633,7 @@ async def test_znp_nvram_read_success(znp, event_loop):
 async def test_znp_nvram_read_failure(znp, event_loop):
     event_loop.call_soon(
         znp.frame_received,
-        c.Sys.OSALNVRead.Rsp(Status=t.Status.FAILURE, Value=b"test",).to_frame(),
+        c.SYS.OSALNVRead.Rsp(Status=t.Status.FAILURE, Value=b"test",).to_frame(),
     )
 
     with pytest.raises(InvalidCommandResponse):
@@ -644,14 +644,14 @@ async def test_znp_nvram_read_failure(znp, event_loop):
 async def test_listeners_resolve(event_loop):
     callback = Mock()
     callback_listener = CallbackResponseListener(
-        [c.Sys.Ping.Rsp(partial=True)], callback
+        [c.SYS.Ping.Rsp(partial=True)], callback
     )
 
     future = event_loop.create_future()
-    one_shot_listener = OneShotResponseListener([c.Sys.Ping.Rsp(partial=True)], future)
+    one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
 
-    match = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    no_match = c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
+    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    no_match = c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     assert callback_listener.resolve(match)
     assert not callback_listener.resolve(no_match)
@@ -679,10 +679,10 @@ async def test_listeners_resolve(event_loop):
 async def test_listener_cancel(event_loop):
     # Cancelling a one-shot listener prevents it from being fired
     future = event_loop.create_future()
-    one_shot_listener = OneShotResponseListener([c.Sys.Ping.Rsp(partial=True)], future)
+    one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
     one_shot_listener.cancel()
 
-    match = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     assert not one_shot_listener.resolve(match)
 
     with pytest.raises(asyncio.CancelledError):
@@ -693,14 +693,14 @@ async def test_listener_cancel(event_loop):
 async def test_listeners_cancel(event_loop):
     callback = Mock()
     callback_listener = CallbackResponseListener(
-        [c.Sys.Ping.Rsp(partial=True)], callback
+        [c.SYS.Ping.Rsp(partial=True)], callback
     )
 
     future = event_loop.create_future()
-    one_shot_listener = OneShotResponseListener([c.Sys.Ping.Rsp(partial=True)], future)
+    one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
 
-    match = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    no_match = c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
+    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    no_match = c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     assert callback_listener.resolve(match)
     assert not callback_listener.resolve(no_match)
@@ -717,12 +717,12 @@ async def test_api_cancel_all_listeners(znp, event_loop):
     callback = Mock()
 
     znp.callback_for_response(
-        c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS), callback
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS), callback
     )
     future = znp.wait_for_responses(
         [
-            c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
-            c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+            c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS),
         ]
     )
 

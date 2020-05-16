@@ -161,7 +161,7 @@ class ZNP:
 
         try:
             # Make sure that our port works
-            await self.request(c.Sys.Ping.Req())
+            await self.request(c.SYS.Ping.Req())
         except Exception:
             self._uart = None
             raise
@@ -347,7 +347,7 @@ class ZNP:
             value = value.serialize()
 
         return await self.request(
-            c.Sys.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)),
+            c.SYS.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)),
             RspStatus=t.Status.SUCCESS,
         )
 
@@ -355,7 +355,7 @@ class ZNP:
         self, nv_id: nvids.BaseNvIds, *, offset: t.uint8_t = 0
     ) -> bytes:
         response = await self.request(
-            c.Sys.OSALNVRead.Req(Id=nv_id, Offset=offset), RspStatus=t.Status.SUCCESS,
+            c.SYS.OSALNVRead.Req(Id=nv_id, Offset=offset), RspStatus=t.Status.SUCCESS,
         )
 
         return response.Value

@@ -157,22 +157,22 @@ def test_commands_schema():
 
 def test_command_param_binding():
     # No params
-    c.Sys.Ping.Req()
+    c.SYS.Ping.Req()
 
     # Invalid param name
     with pytest.raises(KeyError):
-        c.Sys.Ping.Rsp(asd=123)
+        c.SYS.Ping.Rsp(asd=123)
 
     # Valid param name
-    c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
 
     # Too many params, one valid
     with pytest.raises(KeyError):
-        c.Sys.Ping.Rsp(foo="asd", Capabilities=t.MTCapabilities.CAP_SYS)
+        c.SYS.Ping.Rsp(foo="asd", Capabilities=t.MTCapabilities.CAP_SYS)
 
     # Not enough params
     with pytest.raises(KeyError):
-        c.Sys.Ping.Rsp()
+        c.SYS.Ping.Rsp()
 
     # Invalid type
     with pytest.raises(ValueError):
@@ -198,10 +198,10 @@ def test_command_param_binding():
     assert t.MTCapabilities.CAP_SYS == 0x0001
 
     with pytest.raises(ValueError):
-        c.Sys.Ping.Rsp(Capabilities=0x0001)
+        c.SYS.Ping.Rsp(Capabilities=0x0001)
 
     # Parameters can be looked up by name
-    ping_rsp = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     assert ping_rsp.Capabilities == t.MTCapabilities.CAP_SYS
 
     # Invalid ones cannot
@@ -209,7 +209,7 @@ def test_command_param_binding():
         ping_rsp.Oops
 
     # bytes are converted into t.ShortBytes
-    cmd = c.Sys.NVWrite.Req(
+    cmd = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x0000, Value=b"asdfoo"
     )
     assert isinstance(cmd.Value, t.ShortBytes)
@@ -281,11 +281,11 @@ def test_command_str_repr():
 
 
 def test_command_immutability():
-    command1 = c.Sys.NVWrite.Req(
+    command1 = c.SYS.NVWrite.Req(
         partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
     )
 
-    command2 = c.Sys.NVWrite.Req(
+    command2 = c.SYS.NVWrite.Req(
         partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
     )
 
@@ -311,7 +311,7 @@ def test_command_immutability():
 
 
 def test_command_serialization():
-    command = c.Sys.NVWrite.Req(
+    command = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x0000, Value=b"asdfoo"
     )
     frame = command.to_frame()
@@ -320,27 +320,27 @@ def test_command_serialization():
 
     # Partial frames cannot be serialized
     with pytest.raises(ValueError):
-        partial1 = c.Sys.NVWrite.Req(partial=True, SysId=0x12)
+        partial1 = c.SYS.NVWrite.Req(partial=True, SysId=0x12)
         partial1.to_frame()
 
     # Partial frames cannot be serialized, even if all params are filled out
     with pytest.raises(ValueError):
-        partial2 = c.Sys.NVWrite.Req(
+        partial2 = c.SYS.NVWrite.Req(
             partial=True, SysId=None, ItemId=0x1234, SubId=None, Offset=None, Value=None
         )
         partial2.to_frame()
 
 
 def test_command_equality():
-    command1 = c.Sys.NVWrite.Req(
+    command1 = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
-    command2 = c.Sys.NVWrite.Req(
+    command2 = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
-    command3 = c.Sys.NVWrite.Req(
+    command3 = c.SYS.NVWrite.Req(
         SysId=0xFF, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
@@ -357,22 +357,22 @@ def test_command_equality():
     assert not command1.matches(command3)
     assert not command3.matches(command1)
 
-    assert not command1.matches(c.Sys.NVWrite.Req(partial=True))
-    assert c.Sys.NVWrite.Req(partial=True).matches(command1)
+    assert not command1.matches(c.SYS.NVWrite.Req(partial=True))
+    assert c.SYS.NVWrite.Req(partial=True).matches(command1)
 
     # parameters can be specified explicitly as None
-    assert c.Sys.NVWrite.Req(partial=True, SubId=None).matches(command1)
-    assert c.Sys.NVWrite.Req(partial=True, SubId=0x7890).matches(command1)
-    assert not c.Sys.NVWrite.Req(partial=True, SubId=123).matches(command1)
+    assert c.SYS.NVWrite.Req(partial=True, SubId=None).matches(command1)
+    assert c.SYS.NVWrite.Req(partial=True, SubId=0x7890).matches(command1)
+    assert not c.SYS.NVWrite.Req(partial=True, SubId=123).matches(command1)
 
     # Different frame types do not match, even if they have the same structure
-    assert not c.Sys.NVWrite.Rsp(Status=t.Status.SUCCESS).matches(
-        c.Sys.NVDelete.Rsp(partial=True)
+    assert not c.SYS.NVWrite.Rsp(Status=t.Status.SUCCESS).matches(
+        c.SYS.NVDelete.Rsp(partial=True)
     )
 
 
 def test_command_deserialization(caplog):
-    command = c.Sys.NVWrite.Req(
+    command = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
 
@@ -394,7 +394,7 @@ def test_command_deserialization(caplog):
 
     # Deserialization fails if you attempt to deserialize the wrong frame
     with pytest.raises(ValueError):
-        c.Sys.NVWrite.Req.from_frame(c.Sys.Ping.Req().to_frame())
+        c.SYS.NVWrite.Req.from_frame(c.SYS.Ping.Req().to_frame())
 
 
 def test_command_not_recognized():
