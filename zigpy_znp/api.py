@@ -348,14 +348,14 @@ class ZNP:
 
         return await self.request(
             c.Sys.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)),
-            RspStatus=t.Status.Success,
+            RspStatus=t.Status.SUCCESS,
         )
 
     async def nvram_read(
         self, nv_id: nvids.BaseNvIds, *, offset: t.uint8_t = 0
     ) -> bytes:
         response = await self.request(
-            c.Sys.OSALNVRead.Req(Id=nv_id, Offset=offset), RspStatus=t.Status.Success,
+            c.Sys.OSALNVRead.Req(Id=nv_id, Offset=offset), RspStatus=t.Status.SUCCESS,
         )
 
         return response.Value

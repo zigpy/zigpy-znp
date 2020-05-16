@@ -366,7 +366,7 @@ def test_command_equality():
     assert not c.Sys.NVWrite.Req(partial=True, SubId=123).matches(command1)
 
     # Different frame types do not match, even if they have the same structure
-    assert not c.Sys.NVWrite.Rsp(Status=t.Status.Success).matches(
+    assert not c.Sys.NVWrite.Rsp(Status=t.Status.SUCCESS).matches(
         c.Sys.NVDelete.Rsp(partial=True)
     )
 

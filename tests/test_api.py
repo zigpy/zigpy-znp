@@ -260,8 +260,8 @@ async def test_znp_wait_responses_empty(znp):
 async def test_znp_response_callback_simple(znp, event_loop):
     sync_callback = Mock()
 
-    good_response = c.Sys.SetExtAddr.Rsp(Status=t.Status.Failure)
-    bad_response = c.Sys.SetExtAddr.Rsp(Status=t.Status.Success)
+    good_response = c.Sys.SetExtAddr.Rsp(Status=t.Status.FAILURE)
+    bad_response = c.Sys.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
 
     znp.callback_for_response(good_response, sync_callback)
 
@@ -335,7 +335,7 @@ async def test_znp_response_callbacks(znp, event_loop):
     good_response1 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     good_response2 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
     good_response3 = c.Util.TimeAlive.Rsp(Seconds=12)
-    bad_response1 = c.Sys.SetExtAddr.Rsp(Status=t.Status.Success)
+    bad_response1 = c.Sys.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
     bad_response2 = c.Sys.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
@@ -384,7 +384,7 @@ async def test_znp_wait_for_responses(znp, event_loop):
     response1 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     response2 = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
     response3 = c.Util.TimeAlive.Rsp(Seconds=12)
-    response4 = c.Sys.SetExtAddr.Rsp(Status=t.Status.Success)
+    response4 = c.Sys.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
     response5 = c.Sys.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
@@ -572,7 +572,7 @@ async def test_znp_nvram_writes(znp, event_loop):
     assert nvids.NwkNvIds.STARTUP_OPTION == 0x0003
 
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
+        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
     )
     await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint8_t(0xAB))
     znp._uart.send.assert_called_once_with(
@@ -585,7 +585,7 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # As should explicitly serializing the value to bytes
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
+        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
     )
     await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, t.uint8_t(0xAB).serialize())
     znp._uart.send.assert_called_once_with(
@@ -598,7 +598,7 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # And passing in bytes directly
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success).to_frame(),
+        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS).to_frame(),
     )
     await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, b"\xAB")
     znp._uart.send.assert_called_once_with(
@@ -611,7 +611,7 @@ async def test_znp_nvram_writes(znp, event_loop):
 
     # The SYS_OSAL_NV_WRITE response status should be checked
     event_loop.call_soon(
-        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.Failure).to_frame(),
+        znp.frame_received, c.Sys.OSALNVWrite.Rsp(Status=t.Status.FAILURE).to_frame(),
     )
 
     with pytest.raises(InvalidCommandResponse):
@@ -622,7 +622,7 @@ async def test_znp_nvram_writes(znp, event_loop):
 async def test_znp_nvram_read_success(znp, event_loop):
     event_loop.call_soon(
         znp.frame_received,
-        c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"test",).to_frame(),
+        c.Sys.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"test",).to_frame(),
     )
     result = await znp.nvram_read(nvids.NwkNvIds.STARTUP_OPTION)
 
@@ -633,7 +633,7 @@ async def test_znp_nvram_read_success(znp, event_loop):
 async def test_znp_nvram_read_failure(znp, event_loop):
     event_loop.call_soon(
         znp.frame_received,
-        c.Sys.OSALNVRead.Rsp(Status=t.Status.Failure, Value=b"test",).to_frame(),
+        c.Sys.OSALNVRead.Rsp(Status=t.Status.FAILURE, Value=b"test",).to_frame(),
     )
 
     with pytest.raises(InvalidCommandResponse):
@@ -651,7 +651,7 @@ async def test_listeners_resolve(event_loop):
     one_shot_listener = OneShotResponseListener([c.Sys.Ping.Rsp(partial=True)], future)
 
     match = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    no_match = c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)
+    no_match = c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     assert callback_listener.resolve(match)
     assert not callback_listener.resolve(no_match)
@@ -700,7 +700,7 @@ async def test_listeners_cancel(event_loop):
     one_shot_listener = OneShotResponseListener([c.Sys.Ping.Rsp(partial=True)], future)
 
     match = c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    no_match = c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)
+    no_match = c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     assert callback_listener.resolve(match)
     assert not callback_listener.resolve(no_match)
@@ -722,7 +722,7 @@ async def test_api_cancel_all_listeners(znp, event_loop):
     future = znp.wait_for_responses(
         [
             c.Sys.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
-            c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success),
+            c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS),
         ]
     )
 
@@ -776,11 +776,11 @@ async def test_request_callback_rsp(pingable_serial_port, event_loop):
     def send_responses():
         api._uart.data_received(
             TransportFrame(
-                c.AF.DataRequest.Rsp(Status=t.Status.Success).to_frame()
+                c.AF.DataRequest.Rsp(Status=t.Status.SUCCESS).to_frame()
             ).serialize()
             + TransportFrame(
                 c.AF.DataConfirm.Callback(
-                    Endpoint=56, TSN=1, Status=t.Status.Success
+                    Endpoint=56, TSN=1, Status=t.Status.SUCCESS
                 ).to_frame()
             ).serialize()
         )
@@ -800,11 +800,11 @@ async def test_request_callback_rsp(pingable_serial_port, event_loop):
             Radius=30,
             Data=b"hello",
         ),
-        RspStatus=t.Status.Success,
+        RspStatus=t.Status.SUCCESS,
         callback=c.AF.DataConfirm.Callback(partial=True, Endpoint=56, TSN=1),
     )
 
     # Our response is the callback, not the confirmation response
     assert response == c.AF.DataConfirm.Callback(
-        Endpoint=56, TSN=1, Status=t.Status.Success
+        Endpoint=56, TSN=1, Status=t.Status.SUCCESS
     )

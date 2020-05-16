@@ -7,22 +7,22 @@ import zigpy_znp.types as t
 def test_status():
     """Test Status enum."""
 
-    assert t.Status.Success == 0
-    assert t.Status.Failure == 1
+    assert t.Status.SUCCESS == 0
+    assert t.Status.FAILURE == 1
 
     extra = b"the rest of the owl\xaa\x55\x00\xff"
 
     r, rest = t.Status.deserialize(b"\x00" + extra)
     assert rest == extra
     assert r == 0
-    assert r == t.Status.Success
-    assert r.name == "Success"
+    assert r == t.Status.SUCCESS
+    assert r.name == "SUCCESS"
 
-    r, rest = t.Status.deserialize(b"\xff" + extra)
+    r, rest = t.Status.deserialize(b"\x33" + extra)
     assert rest == extra
-    assert r == 0xFF
-    assert r.value == 0xFF
-    assert r.name.startswith("unknown")
+    assert r == 0x33
+    assert r.value == 0x33
+    assert r.name == "unknown_0x33"
 
 
 def test_addr_mode_address():
@@ -95,9 +95,9 @@ def test_addr_mode_address():
 
 
 def test_missing_status_enum():
-    assert 0xFF not in list(t.Status)
-    assert isinstance(t.Status(0xFF), t.Status)
-    assert t.Status(0xFF).value == 0xFF
+    assert 0x33 not in list(t.Status)
+    assert isinstance(t.Status(0x33), t.Status)
+    assert t.Status(0x33).value == 0x33
 
     # Status values that don't fit can't be created
     with pytest.raises(ValueError):

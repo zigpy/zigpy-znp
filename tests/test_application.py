@@ -164,7 +164,7 @@ def application(znp_server):
     znp_server.reply_to(
         request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
-            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.Success),
+            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.ActiveEpRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
@@ -177,7 +177,7 @@ def application(znp_server):
     znp_server.reply_to(
         request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
-            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.Success),
+            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.ActiveEpRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
@@ -193,7 +193,7 @@ def application(znp_server):
         active_eps.append(req.Endpoint)
         active_eps.sort(reverse=True)
 
-        return c.AF.Register.Rsp(Status=t.Status.Success)
+        return c.AF.Register.Rsp(Status=t.Status.SUCCESS)
 
     znp_server.reply_to(
         request=c.AF.Register.Req(partial=True), responses=[on_endpoint_registration],
@@ -204,7 +204,7 @@ def application(znp_server):
 
         active_eps.remove(req.Endpoint)
 
-        return c.AF.Delete.Rsp(Status=t.Status.Success)
+        return c.AF.Delete.Rsp(Status=t.Status.SUCCESS)
 
     znp_server.reply_to(
         request=c.AF.Delete.Req(partial=True), responses=[on_endpoint_deletion],
@@ -215,7 +215,7 @@ def application(znp_server):
             Mode=c.app_config.BDBCommissioningMode.NwkFormation
         ),
         responses=[
-            c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.Success),
+            c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS),
             c.AppConfig.BDBCommissioningNotification.Callback(
                 Status=c.app_config.BDBCommissioningStatus.Success,
                 Mode=c.app_config.BDBCommissioningMode.NwkSteering,
@@ -234,19 +234,19 @@ def application(znp_server):
     ]:
         znp_server.reply_to(
             request=c.Sys.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),
-            responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)],
+            responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
         )
 
     znp_server.reply_to(
         request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x55")],
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x55")],
     )
 
     znp_server.reply_to(
         request=c.Util.GetDeviceInfo.Req(),
         responses=[
             c.Util.GetDeviceInfo.Rsp(
-                Status=t.Status.Success,
+                Status=t.Status.SUCCESS,
                 IEEE=t.EUI64([0x00, 0x12, 0x4B, 0x00, 0x1C, 0xAA, 0xAC, 0x5C]),
                 NWK=t.NWK(0xFFFE),
                 DeviceType=t.DeviceLogicalType(7),
@@ -288,7 +288,7 @@ async def test_application_startup_failure(application):
 
     znp_server.reply_once_to(
         request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.InvalidParameter, Value=b"")],
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
     )
 
     # We cannot start the application if Z-Stack is not configured and without auto_form
@@ -297,7 +297,7 @@ async def test_application_startup_failure(application):
 
     znp_server.reply_once_to(
         request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.Success, Value=b"\x00")],
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x00")],
     )
 
     with pytest.raises(RuntimeError):
@@ -310,7 +310,7 @@ async def test_application_startup_tx_power(application):
 
     set_tx_power = znp_server.reply_once_to(
         request=c.Sys.SetTxPower.Req(TXPower=19),
-        responses=[c.Sys.SetTxPower.Rsp(Status=t.Status.Success)],
+        responses=[c.Sys.SetTxPower.Rsp(Status=t.Status.SUCCESS)],
     )
 
     app.update_config({conf.CONF_ZNP_CONFIG: {conf.CONF_TX_POWER: 19}})
@@ -327,8 +327,8 @@ async def test_permit_join(application):
     data_req_sent = znp_server.reply_once_to(
         request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AF.DataConfirm.Callback(Status=t.Status.Success, Endpoint=0, TSN=1),
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=0, TSN=1),
         ],
     )
 
@@ -336,7 +336,7 @@ async def test_permit_join(application):
     permit_join_sent = znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
         responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
@@ -356,8 +356,8 @@ async def test_permit_join_failure(application):
     data_req_sent = znp_server.reply_once_to(
         request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AF.DataConfirm.Callback(Status=t.Status.Success, Endpoint=0, TSN=1),
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=0, TSN=1),
         ],
     )
 
@@ -365,7 +365,7 @@ async def test_permit_join_failure(application):
     permit_join_sent = znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
         responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.Success),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFF, Status=t.ZDOStatus.TIMEOUT),
         ],
     )
@@ -606,7 +606,7 @@ async def test_zdo_request_interception(application, mocker):
             DstAddr=device.nwk, NWKAddrOfInterest=device.nwk, Endpoint=1
         ),
         responses=[
-            c.ZDO.SimpleDescReq.Rsp(Status=t.Status.Success),
+            c.ZDO.SimpleDescReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.SimpleDescRsp.Callback(
                 Src=device.nwk,
                 Status=t.ZDOStatus.SUCCESS,
@@ -638,7 +638,7 @@ async def test_zdo_request_interception(application, mocker):
 
     await active_ep_req
 
-    assert status == t.Status.Success
+    assert status == t.Status.SUCCESS
 
 
 @pytest_mark_asyncio_timeout(seconds=10)
@@ -668,8 +668,8 @@ async def test_zigpy_request(application, mocker):
             partial=True,
         ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AF.DataConfirm.Callback(Status=t.Status.Success, Endpoint=1, TSN=TSN,),
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=1, TSN=TSN,),
             c.ZDO.SrcRtgInd.Callback(DstAddr=device.nwk, Relays=[]),
             c.AF.IncomingMsg.Callback(
                 GroupId=0x0000,
@@ -721,8 +721,8 @@ async def test_zigpy_request_failure(application, mocker):
             partial=True,
         ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.Success),
-            c.AF.DataConfirm.Callback(Status=t.Status.Failure, Endpoint=1, TSN=TSN,),
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(Status=t.Status.FAILURE, Endpoint=1, TSN=TSN,),
         ],
     )
 
@@ -797,43 +797,43 @@ async def test_update_network(mocker, caplog, application):
 
     channels_updated = znp_server.reply_once_to(
         request=c.Util.SetChannels.Req(Channels=channels),
-        responses=[c.Util.SetChannels.Rsp(Status=t.Status.Success)],
+        responses=[c.Util.SetChannels.Rsp(Status=t.Status.SUCCESS)],
     )
 
     bdb_set_primary_channel = znp_server.reply_once_to(
         request=c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-        responses=[c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.Success)],
+        responses=[c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.SUCCESS)],
     )
 
     bdb_set_secondary_channel = znp_server.reply_once_to(
         request=c.AppConfig.BDBSetChannel.Req(
             IsPrimary=False, Channel=t.Channels.NO_CHANNELS
         ),
-        responses=[c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.Success)],
+        responses=[c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.SUCCESS)],
     )
 
     set_pan_id = znp_server.reply_once_to(
         request=c.Util.SetPanId.Req(PanId=pan_id),
-        responses=[c.Util.SetPanId.Rsp(Status=t.Status.Success)],
+        responses=[c.Util.SetPanId.Rsp(Status=t.Status.SUCCESS)],
     )
 
     set_extended_pan_id = znp_server.reply_once_to(
         request=c.Sys.OSALNVWrite.Req(
             Id=NwkNvIds.EXTENDED_PAN_ID, Offset=0, Value=extended_pan_id.serialize()
         ),
-        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)],
+        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
     )
 
     set_network_key_util = znp_server.reply_once_to(
         request=c.Util.SetPreConfigKey.Req(PreConfigKey=network_key),
-        responses=[c.Util.SetPreConfigKey.Rsp(Status=t.Status.Success)],
+        responses=[c.Util.SetPreConfigKey.Rsp(Status=t.Status.SUCCESS)],
     )
 
     set_network_key_nvram = znp_server.reply_once_to(
         request=c.Sys.OSALNVWrite.Req(
             Id=NwkNvIds.PRECFGKEYS_ENABLE, Offset=0, Value=t.Bool(True).serialize()
         ),
-        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)],
+        responses=[c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
     )
 
     # But it does succeed with a warning if you explicitly allow it
@@ -900,14 +900,14 @@ async def test_force_remove(application, mocker):
     # Reply to zigpy's leave request
     bad_mgmt_leave_req = znp_server.reply_once_to(
         request=c.ZDO.MgmtLeaveReq.Req(DstAddr=device.nwk, partial=True),
-        responses=[c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.Failure)],
+        responses=[c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.FAILURE)],
     )
 
     # Reply to our own leave request
     good_mgmt_leave_req = znp_server.reply_once_to(
         request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, partial=True),
         responses=[
-            c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.Success),
+            c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtLeaveRsp.Callback(Src=0x000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
@@ -944,19 +944,19 @@ async def test_auto_form_necessary(application, mocker):
     def nvram_writer(req):
         nvram[req.Id] = req.Value
 
-        return c.Sys.OSALNVWrite.Rsp(Status=t.Status.Success)
+        return c.Sys.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     def nvram_init(req):
         nvram[req.Id] = req.Value
 
-        return c.Sys.OSALNVItemInit.Rsp(Status=t.Status.Success)
+        return c.Sys.OSALNVItemInit.Rsp(Status=t.Status.SUCCESS)
 
     # Prevent the fixture's default response
     znp_server._response_listeners[c.Sys.OSALNVRead.Req.header].clear()
 
     read_zstack_configured = znp_server.reply_once_to(
         request=c.Sys.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.InvalidParameter, Value=b"")],
+        responses=[c.Sys.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
     )
 
     znp_server.reply_to(
@@ -972,7 +972,7 @@ async def test_auto_form_necessary(application, mocker):
             Mode=c.app_config.BDBCommissioningMode.NwkFormation
         ),
         responses=[
-            c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.Success),
+            c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
         ],
     )
@@ -981,7 +981,7 @@ async def test_auto_form_necessary(application, mocker):
         request=c.AppConfig.BDBStartCommissioning.Req(
             Mode=c.app_config.BDBCommissioningMode.NwkSteering
         ),
-        responses=[c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.Success)],
+        responses=[c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS)],
     )
 
     await app.startup(auto_form=True)

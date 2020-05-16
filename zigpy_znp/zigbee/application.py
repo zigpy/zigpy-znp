@@ -302,7 +302,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 InputClusters=input_clusters,
                 OutputClusters=output_clusters,
             ),
-            RspStatus=t.Status.Success,
+            RspStatus=t.Status.SUCCESS,
         )
 
     async def startup(self, auto_form=False):
@@ -338,7 +338,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
             ) == b"\x55"
         except InvalidCommandResponse as e:
-            assert e.response.Status == t.Status.InvalidParameter
+            assert e.response.Status == t.Status.INVALID_PARAMETER
             is_configured = False
 
         if not is_configured and not auto_form:
@@ -352,11 +352,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             dbm = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER]
 
             await self._znp.request(
-                c.Sys.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.Success
+                c.Sys.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
             )
 
         device_info = await self._znp.request(
-            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.Success
+            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
         )
 
         self._ieee = device_info.IEEE
@@ -374,14 +374,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Get our active endpoints
         endpoints = await self._znp.request_callback_rsp(
             request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
-            RspStatus=t.Status.Success,
+            RspStatus=t.Status.SUCCESS,
             callback=c.ZDO.ActiveEpRsp.Callback(partial=True),
         )
 
         # Clear out the list of active endpoints
         for endpoint in endpoints.ActiveEndpoints:
             await self._znp.request(
-                c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.Success
+                c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.SUCCESS
             )
 
         # Register our endpoints
@@ -428,24 +428,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if channels is not None:
             await self._znp.request(
-                c.Util.SetChannels.Req(Channels=channels), RspStatus=t.Status.Success,
+                c.Util.SetChannels.Req(Channels=channels), RspStatus=t.Status.SUCCESS,
             )
             await self._znp.request(
                 c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-                RspStatus=t.Status.Success,
+                RspStatus=t.Status.SUCCESS,
             )
             await self._znp.request(
                 c.AppConfig.BDBSetChannel.Req(
                     IsPrimary=False, Channel=t.Channels.NO_CHANNELS
                 ),
-                RspStatus=t.Status.Success,
+                RspStatus=t.Status.SUCCESS,
             )
 
             self._channels = channels
 
         if pan_id is not None:
             await self._znp.request(
-                c.Util.SetPanId.Req(PanId=pan_id), RspStatus=t.Status.Success
+                c.Util.SetPanId.Req(PanId=pan_id), RspStatus=t.Status.SUCCESS
             )
 
             self._pan_id = pan_id
@@ -459,7 +459,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if network_key is not None:
             await self._znp.request(
                 c.Util.SetPreConfigKey.Req(PreConfigKey=network_key),
-                RspStatus=t.Status.Success,
+                RspStatus=t.Status.SUCCESS,
             )
 
             # XXX: The Util request does not actually write to this NV address
@@ -509,7 +509,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NwkFormation
             ),
-            RspStatus=t.Status.Success,
+            RspStatus=t.Status.SUCCESS,
         )
 
         # This may take a while because of some sort of background scanning.
@@ -522,7 +522,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NwkSteering
             ),
-            RspStatus=t.Status.Success,
+            RspStatus=t.Status.SUCCESS,
         )
 
         # Create the NV item that keeps track of whether or not we're configured
@@ -532,7 +532,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
         )
 
-        if osal_create_rsp.Status not in (t.Status.Success, t.Status.ItemCreated):
+        if osal_create_rsp.Status not in (t.Status.SUCCESS, t.Status.NV_ITEM_UNINIT):
             raise RuntimeError(
                 "Could not create HAS_CONFIGURED_ZSTACK3 NV item"
             )  # pragma: no cover
@@ -589,7 +589,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         try:
             async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
                 response = await self._znp.request_callback_rsp(
-                    request=request, RspStatus=t.Status.Success, callback=callback
+                    request=request, RspStatus=t.Status.SUCCESS, callback=callback
                 )
         except InvalidCommandResponse as e:
             raise DeliveryError(f"Could not send command: {e.response.Status}") from e
@@ -628,13 +628,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if dst_addr.mode == t.AddrMode.Broadcast:
             # We won't always get a data confirmation
             response = await self._znp.request(
-                request=request, RspStatus=t.Status.Success
+                request=request, RspStatus=t.Status.SUCCESS
             )
         else:
             async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
                 response = await self._znp.request_callback_rsp(
                     request=request,
-                    RspStatus=t.Status.Success,
+                    RspStatus=t.Status.SUCCESS,
                     callback=c.AF.DataConfirm.Callback(
                         partial=True, Endpoint=dst_ep, TSN=sequence
                     ),
@@ -642,7 +642,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
             LOGGER.debug("Received a data request confirmation: %s", response)
 
-        if response.Status != t.Status.Success:
+        if response.Status != t.Status.SUCCESS:
             return response.Status, "Invalid response status"
 
         return response.Status, "Request sent successfully"
@@ -730,7 +730,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 IEEE=device.ieee,
                 RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
             ),
-            RspStatus=t.Status.Success,
+            RspStatus=t.Status.SUCCESS,
             callback=c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, partial=True),
         )
 
@@ -749,9 +749,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 #  Trust Center policy."
                 TCSignificance=1,
             ),
-            RspStatus=t.Status.Success,
+            RspStatus=t.Status.SUCCESS,
             callback=c.ZDO.MgmtPermitJoinRsp.Callback(partial=True),
         )
 
-        if response.Status != t.Status.Success:
+        if response.Status != t.Status.SUCCESS:
             raise RuntimeError(f"Permit join response failure: {response}")
