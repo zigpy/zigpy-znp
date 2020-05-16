@@ -149,14 +149,12 @@ class Schema:
 class MissingEnumMixin:
     @classmethod
     def _missing_(cls, value):
-        if not isinstance(value, int) or value < 0 or value > 0xFF:
-            # `return None` works with Python 3.7.7, breaks with 3.7.1
+        if not isinstance(value, int):
             raise ValueError(f"{value} is not a valid {cls.__name__}")
 
-        # XXX: infer type from enum
-        new_member = basic.uint8_t.__new__(cls, value)
+        new_member = cls._member_type_.__new__(cls, value)
         new_member._name_ = f"unknown_0x{value:02X}"
-        new_member._value_ = value
+        new_member._value_ = cls._member_type_(value)
 
         if sys.version_info >= (3, 8):
             # Show the warning in the calling code, not in this function

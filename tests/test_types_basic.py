@@ -38,6 +38,19 @@ def test_enum_uint():
     assert TE(0x8012).serialize() == data
 
 
+def test_abstract_ints():
+    assert issubclass(t.uint8_t, t.uint_t)
+    assert not issubclass(t.uint8_t, t.int_t)
+    assert t.int_t._signed is True
+    assert t.uint_t._signed is False
+
+    with pytest.raises(TypeError):
+        t.int_t(0)
+
+    with pytest.raises(TypeError):
+        t.FixedIntType(0)
+
+
 def test_int_too_short():
     with pytest.raises(ValueError):
         t.uint8_t.deserialize(b"")
@@ -159,3 +172,11 @@ def test_fixed_list_deserialize():
     assert r[0] == 0x1234
     assert r[1] == 0xAA55
     assert r[2] == 0xAB89
+
+
+def test_enum_instance_types():
+    class TestEnum(t.enum_uint8):
+        Member = 0x00
+
+    assert TestEnum._member_type_ is t.uint8_t
+    assert type(TestEnum.Member.value) is t.uint8_t

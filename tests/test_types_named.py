@@ -95,13 +95,21 @@ def test_addr_mode_address():
 
 
 def test_missing_status_enum():
-    assert 0x33 not in list(t.Status)
-    assert isinstance(t.Status(0x33), t.Status)
-    assert t.Status(0x33).value == 0x33
+    class TestEnum(t.MissingEnumMixin, t.enum_uint8):
+        Member = 0x00
 
-    # Status values that don't fit can't be created
+    assert 0xFF not in list(TestEnum)
+    assert isinstance(TestEnum(0xFF), TestEnum)
+    assert TestEnum(0xFF).value == 0xFF
+    assert type(TestEnum(0xFF).value) is t.uint8_t
+
+    # Missing members that don't fit can't be created
     with pytest.raises(ValueError):
-        t.Status(0xFF + 1)
+        TestEnum(0xFF + 1)
+
+    # Missing members that aren't integers can't be created
+    with pytest.raises(ValueError):
+        TestEnum("0xFF")
 
 
 def test_zdo_nullable_node_descriptor():

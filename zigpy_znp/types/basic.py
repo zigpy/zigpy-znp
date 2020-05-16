@@ -24,18 +24,32 @@ def serialize_list(objects) -> Bytes:
     return Bytes(b"".join([o.serialize() for o in objects]))
 
 
-class int_t(int):
-    _signed = True
+class FixedIntType(int):
+    _signed = None
     _size = None
 
-    def __new__(cls, value):
-        instance = int.__new__(cls, value)
-
-        if instance._signed is not None and instance._size is not None:
-            # It's a concrete int_t type, check to make sure it's valid
-            instance.serialize()
+    def _concrete_new(cls, value=0):
+        instance = super().__new__(cls, value)
+        instance.serialize()
 
         return instance
+
+    def __new__(cls, value):
+        raise TypeError(f"Instances of abstract type {cls} cannot be created")
+
+    def __init_subclass__(cls, signed=None, size=None, **kwargs) -> None:
+        if signed is not None:
+            cls._signed = signed
+
+        if size is not None:
+            cls._size = size
+
+        # XXX: The enum module uses the first class with `__new__` in its `__dict__`
+        #      as the member type. We have to give each subclass its own `__new__`.
+        if signed is not None or size is not None:
+            cls.__new__ = cls._concrete_new
+
+        super().__init_subclass__(**kwargs)
 
     def serialize(self) -> bytes:
         try:
@@ -54,72 +68,76 @@ class int_t(int):
         return r, data
 
 
-class int8s(int_t):
-    _size = 1
+class uint_t(FixedIntType, signed=False):
+    pass
 
 
-class int16s(int_t):
-    _size = 2
+class int_t(FixedIntType, signed=True):
+    pass
 
 
-class int24s(int_t):
-    _size = 3
+class int8s(int_t, size=1):
+    pass
 
 
-class int32s(int_t):
-    _size = 4
+class int16s(int_t, size=2):
+    pass
 
 
-class int40s(int_t):
-    _size = 5
+class int24s(int_t, size=3):
+    pass
 
 
-class int48s(int_t):
-    _size = 6
+class int32s(int_t, size=4):
+    pass
 
 
-class int56s(int_t):
-    _size = 7
+class int40s(int_t, size=5):
+    pass
 
 
-class int64s(int_t):
-    _size = 8
+class int48s(int_t, size=6):
+    pass
 
 
-class uint_t(int_t):
-    _signed = False
+class int56s(int_t, size=7):
+    pass
 
 
-class uint8_t(uint_t):
-    _size = 1
+class int64s(int_t, size=8):
+    pass
 
 
-class uint16_t(uint_t):
-    _size = 2
+class uint8_t(uint_t, size=1):
+    pass
 
 
-class uint24_t(uint_t):
-    _size = 3
+class uint16_t(uint_t, size=2):
+    pass
 
 
-class uint32_t(uint_t):
-    _size = 4
+class uint24_t(uint_t, size=3):
+    pass
 
 
-class uint40_t(uint_t):
-    _size = 5
+class uint32_t(uint_t, size=4):
+    pass
 
 
-class uint48_t(uint_t):
-    _size = 6
+class uint40_t(uint_t, size=5):
+    pass
 
 
-class uint56_t(uint_t):
-    _size = 7
+class uint48_t(uint_t, size=6):
+    pass
 
 
-class uint64_t(uint_t):
-    _size = 8
+class uint56_t(uint_t, size=7):
+    pass
+
+
+class uint64_t(uint_t, size=8):
+    pass
 
 
 class ShortBytes(Bytes):
