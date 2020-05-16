@@ -46,6 +46,14 @@ def test_int_too_short():
         t.uint16_t.deserialize(b"\x00")
 
 
+def test_int_out_of_bounds():
+    with pytest.raises(ValueError):
+        t.uint8_t(-1)
+
+    with pytest.raises(ValueError):
+        t.uint8_t(0xFF + 1)
+
+
 def test_bytes():
     data = b"abcde\x00\xff"
 
@@ -95,7 +103,7 @@ def test_lvlist():
 
     assert isinstance(d, TestList)
 
-    with pytest.raises(OverflowError):
+    with pytest.raises(ValueError):
         TestList([1, 2, 0xFFFF, 4]).serialize()
 
 

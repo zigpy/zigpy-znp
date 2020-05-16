@@ -28,8 +28,21 @@ class int_t(int):
     _signed = True
     _size = None
 
+    def __new__(cls, value):
+        instance = int.__new__(cls, value)
+
+        if instance._signed is not None and instance._size is not None:
+            # It's a concrete int_t type, check to make sure it's valid
+            instance.serialize()
+
+        return instance
+
     def serialize(self) -> bytes:
-        return self.to_bytes(self._size, "little", signed=self._signed)
+        try:
+            return self.to_bytes(self._size, "little", signed=self._signed)
+        except OverflowError as e:
+            # OverflowError is not a subclass of ValueError, making it annoying to catch
+            raise ValueError(str(e)) from e
 
     @classmethod
     def deserialize(cls, data: bytes) -> typing.Tuple["int_t", bytes]:
