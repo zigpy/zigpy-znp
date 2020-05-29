@@ -25,15 +25,21 @@ custom_zha_radios:
    description: TI CC13x2, CC26x2, and ZZH
 ```
 
+# Backup and restore
+A complete radio NVRAM backup can be performed to migrate between different radios **based on the same chip** (i.e. between the zig-a-zig-ah! and the LAUNCHXL-CC26X2R1 will work). Anything else is untested.
+
+```shell
+(venv) $ python -m zigpy_znp.tools.backup /dev/serial/by-id/old_radio -o backup.json
+(venv) $ python -m zigpy_znp.tools.restore /dev/serial/by-id/new_radio -i backup.json
+```
+
 # Hardware requirements
 USB-adapters, GPIO-modules, and development-boards running recent TI Z-Stack releases (i.e. CC13x2 and CC26x2) are supported. Reference hardware for this project includes:
 
  - [TI LAUNCHXL-CC26X2R1](https://www.ti.com/tool/LAUNCHXL-CC26X2R1) running [Z-Stack 3.30.00.03](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC26X2R1_20191106.hex` using [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH).
  - [Electrolama's zig-a-zig-ah!](https://electrolama.com/projects/zig-a-zig-ah/) running [Z-Stack 4.10.00.78](https://github.com/Koenkk/Z-Stack-firmware/tree/develop/coordinator/Z-Stack_3.x.0/bin). You can flash `CC26X2R1_20200417.hex` using [cc2538-bsl](https://github.com/JelmerT/cc2538-bsl).
 
- Z-Stack versions 3.x and above are currently required and all communication with the radio module is done over the the Z-Stack Monitor and Test (MT) interface via a serial port.
-
-Texas Instruments CC13x2 and CC26x2 based adapters/boards already come with a bootloader so can be flashed over USB using the official "Flash Programmer v2" from Texas Instruments. The zig-a-zig-ah! 
+Z-Stack versions 3.x and above are currently required and all communication with the radio module is done over the the Z-Stack Monitor and Test (MT) interface via a serial port.
 
 ## Texas Instruments Chip Part Numbers
 Texas Instruments (TI) has quite a few different wireless MCU chips and they are all used/mentioned in open-source Zigbee world which can be daunting if you are just starting out. Here is a quick summary of part numbers and key features.
