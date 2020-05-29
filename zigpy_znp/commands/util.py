@@ -38,7 +38,7 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
                 ),
                 t.Param("IEEE", t.EUI64, "Extended address of the device"),
                 t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param("DeviceType", t.DeviceLogicalType, "Device type"),
+                t.Param("DeviceType", t.DeviceTypeCapabilities, "Device type"),
                 t.Param(
                     "DeviceState", t.DeviceState, "Indicated the state of the device"
                 ),

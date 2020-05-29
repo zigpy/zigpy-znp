@@ -40,7 +40,6 @@ class BDBCommissioningStatus(t.enum_uint8):
     TLNotPermitted = 0x06
     TCLKExFailure = 0x07
     FormationFailure = 0x08
-    Initialization = 0x00
     FBTargetInProgress = 0x09
     FBInitiatorInProgress = 0x0A
     FBNoIdentifyQueryResponse = 0x0B

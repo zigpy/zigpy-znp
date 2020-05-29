@@ -249,7 +249,7 @@ def application(znp_server):
                 Status=t.Status.SUCCESS,
                 IEEE=t.EUI64([0x00, 0x12, 0x4B, 0x00, 0x1C, 0xAA, 0xAC, 0x5C]),
                 NWK=t.NWK(0xFFFE),
-                DeviceType=t.DeviceLogicalType(7),
+                DeviceType=t.DeviceTypeCapabilities(7),
                 DeviceState=t.DeviceState.InitializedNotStarted,
                 AssociatedDevices=[],
             )

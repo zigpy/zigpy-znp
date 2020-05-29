@@ -281,7 +281,13 @@ class StartupOptions(basic.enum_flag_uint8):
     AutoStart = 1 << 2
 
 
-class DeviceLogicalType(basic.enum_flag_uint8):
+class DeviceLogicalType(basic.enum_uint8):
+    Coordinator = 0
+    Router = 1
+    EndDevice = 2
+
+
+class DeviceTypeCapabilities(basic.enum_flag_uint8):
     Coordinator = 1 << 0
     Router = 1 << 1
     EndDevice = 1 << 2
