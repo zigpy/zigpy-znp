@@ -231,6 +231,7 @@ def application(znp_server):
         NwkNvIds.CONCENTRATOR_RC,
         NwkNvIds.SRC_RTG_EXPIRY_TIME,
         NwkNvIds.NWK_CHILD_AGE_ENABLE,
+        NwkNvIds.LOGICAL_TYPE,
     ]:
         znp_server.reply_to(
             request=c.SYS.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),

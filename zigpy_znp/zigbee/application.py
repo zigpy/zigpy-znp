@@ -329,6 +329,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram_write(NwkNvIds.SRC_RTG_EXPIRY_TIME, t.uint8_t(255))
         await self._znp.nvram_write(NwkNvIds.NWK_CHILD_AGE_ENABLE, t.Bool(False))
 
+        # XXX: the undocumented `znpBasicCfg` request can do this
+        await self._znp.nvram_write(
+            NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
+        )
+
         # Reset to make the above NVRAM writes take effect.
         # This also ensures any previously-started network joins don't continue.
         await self._reset()
@@ -479,11 +484,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # These options are read only on startup so we perform a soft reset right after
         await self._znp.nvram_write(
             NwkNvIds.STARTUP_OPTION, t.StartupOptions.ClearState
-        )
-
-        # XXX: the undocumented `znpBasicCfg` request can do this
-        await self._znp.nvram_write(
-            NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
         )
 
         pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID]
