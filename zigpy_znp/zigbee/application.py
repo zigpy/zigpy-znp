@@ -521,7 +521,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Create the NV item that keeps track of whether or not we're configured
         osal_create_rsp = await self._znp.request(
             c.SYS.OSALNVItemInit.Req(
-                Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1, Value=b""
+                Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1, Value=b"\x55"
             )
         )
 
