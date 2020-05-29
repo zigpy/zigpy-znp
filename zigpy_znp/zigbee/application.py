@@ -518,13 +518,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
         )
 
-        await self._znp.request(
-            c.AppConfig.BDBStartCommissioning.Req(
-                Mode=c.app_config.BDBCommissioningMode.NwkSteering
-            ),
-            RspStatus=t.Status.SUCCESS,
-        )
-
         # Create the NV item that keeps track of whether or not we're configured
         osal_create_rsp = await self._znp.request(
             c.SYS.OSALNVItemInit.Req(
