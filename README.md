@@ -9,6 +9,22 @@ Together with zigpy and compatible home automation software (namely Home Assista
 
 This zigpy-znp library allows Zigpy to interact with Texas Instruments ZNP (Zigbee Network Processor) coordinator firmware via TI Z-Stack Monitor and Test(MT) APIs using an UART/serial interface. Radio module hardware compatible include but is possibly not limited to Texas Instruments CC13x2 and CC26x2R based chips flashed with Z-Stack 3.x coordinator firmware.
 
+# Installation
+Install the Python module within your virtual environment:
+
+```shell
+(venv) $ pip install zigpy-znp
+```
+
+If you are using Home Assistant, copy `custom_components/custom_zha_radios.py` into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
+
+```yaml
+custom_zha_radios:
+ znp:
+   module: zigpy_znp.zigbee.application
+   description: TI CC13x2, CC26x2, and ZZH
+```
+
 # Hardware requirements
 USB-adapters, GPIO-modules, and development-boards running recent TI Z-Stack releases (i.e. CC13x2 and CC26x2) are supported. Reference hardware for this project includes:
 
