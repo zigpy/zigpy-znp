@@ -29,12 +29,12 @@ async def restore(radio_path, backup):
         value = bytes.fromhex(value)
 
         # XXX: are any NVIDs not filled all the way?
-        init_rsp = await znp.request(
-            c.SYS.OSALNVItemInit.Req(Id=nvid, ItemLen=len(value), Value=value)
-        )
-        assert init_rsp.Status in (t.Status.SUCCESS, t.Status.NV_ITEM_UNINIT)
-
         try:
+            await znp.request(
+                c.SYS.OSALNVItemInit.Req(Id=nvid, ItemLen=len(value), Value=value),
+                RspStatus=t.Status.SUCCESS,
+            )
+
             await znp.nvram_write(nvid, value)
         except InvalidCommandResponse:
             LOGGER.warning("Write failed for %s = %s", nvid, value)
@@ -77,4 +77,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    asyncio.run(main(sys.argv[1:]))  # pragma: no cover

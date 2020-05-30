@@ -82,4 +82,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    asyncio.run(main(sys.argv[1:]))  # pragma: no cover
