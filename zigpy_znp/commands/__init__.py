@@ -8,6 +8,7 @@ from .sys import SYS
 from .util import Util
 from .zdo import ZDO
 from .zgp import ZGP
+from .znp import ZNP
 
 ALL_COMMANDS = [
     RPCError,
@@ -20,6 +21,7 @@ ALL_COMMANDS = [
     Util,
     ZDO,
     ZGP,
+    ZNP,
 ]
 
 COMMANDS_BY_ID = {}
