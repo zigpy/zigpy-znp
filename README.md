@@ -26,12 +26,16 @@ custom_zha_radios:
 ```
 
 # Backup and restore
-A complete radio NVRAM backup can be performed to migrate between different radios **based on the same chip** (i.e. between the zig-a-zig-ah! and the LAUNCHXL-CC26X2R1 will work). Anything else is untested.
+A complete radio NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else is untested.
 
 ```shell
 (venv) $ python -m zigpy_znp.tools.backup /dev/serial/by-id/old_radio -o backup.json
 (venv) $ python -m zigpy_znp.tools.restore /dev/serial/by-id/new_radio -i backup.json
 ```
+
+Tested migrations:
+
+ - LAUNCHXL-CC26X2R1 running 3.30.00.03 to and from the zig-a-zig-ah! running 4.10.00.78.
 
 # Hardware requirements
 USB-adapters, GPIO-modules, and development-boards running recent TI Z-Stack releases (i.e. CC13x2 and CC26x2) are supported. Reference hardware for this project includes:
