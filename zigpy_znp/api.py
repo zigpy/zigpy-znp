@@ -343,8 +343,10 @@ class ZNP:
                 "Extend one of the tables in zigpy_znp.types.nvids."
             )
 
-        if not isinstance(value, bytes):
+        if hasattr(value, "serialize"):
             value = value.serialize()
+        elif not isinstance(value, (bytes, bytearray)):
+            raise TypeError("Only bytes or serializable types can be written to NVRAM")
 
         return await self.request(
             c.SYS.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)),

@@ -565,7 +565,7 @@ async def test_znp_nvram_writes(znp, event_loop):
         await znp.nvram_write(0x0003, t.uint8_t(0xAB))
 
     # Neither is passing in untyped integers
-    with pytest.raises(AttributeError):
+    with pytest.raises(TypeError):
         await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, 0xAB)
 
     # This, however, should work
