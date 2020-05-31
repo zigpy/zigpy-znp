@@ -402,6 +402,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             endpoint=100, profile_id=zigpy.profiles.zll.PROFILE_ID, device_id=0x0005
         )
 
+        # Structure is in `zstack/stack/nwk/nwk.h`
+        nib = await self._znp.nvram_read(NwkNvIds.NIB)
+        self._channel = nib[24]
+        self._channels = t.Channels.deserialize(nib[40:44])[0]
+
     async def update_network(
         self,
         *,
@@ -421,9 +426,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             and not t.Channels.from_channel_list([channel]) & channels
         ):
             raise ValueError("Channel does not overlap with channel mask")
-
-        if channel is not None:
-            LOGGER.warning("Cannot set a specific channel in config: %d", channel)
 
         if tc_link_key is not None:
             LOGGER.warning("Trust center link key in config is not yet supported")
@@ -447,6 +449,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
             self._channels = channels
+
+        if channel is not None:
+            # We modify the logical channel value directly in the NIB
+            nib = bytearray(await self._znp.nvram_read(NwkNvIds.NIB))
+            nib[24] = channel
+            await self._znp.nvram_write(NwkNvIds.NIB, nib)
+
+            self._channel = channel
 
         if pan_id is not None:
             await self._znp.request(

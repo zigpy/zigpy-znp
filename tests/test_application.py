@@ -265,7 +265,32 @@ def application(znp_server):
         ],
     )
 
+    # The NIB matches the above device info
+    NIB = bytes.fromhex(
+        """
+        790502331433001e0000000105018f00070002051e000000190000000000000000000000FFFE0800
+        008010020f0f040001000000010000000000124b001caaac5c010000000000000000000000000000
+        000000000000000000000000000000000000000000000f030001780a0100000020470000
+        """
+    )
+
+    znp_server.reply_to(
+        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.NIB, Offset=0),
+        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=NIB)],
+    )
+
     return app, znp_server
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_application_startup_nib(application):
+    app, znp_server = application
+
+    await app.startup(auto_form=False)
+
+    # This is read from the NIB on startup
+    assert app.channel == 25
+    assert app.channels == t.Channels.from_channel_list([15, 20, 25])
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
@@ -837,6 +862,11 @@ async def test_update_network(mocker, caplog, application):
         responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
     )
 
+    set_nib_nvram = znp_server.reply_once_to(
+        request=c.SYS.OSALNVWrite.Req(Id=NwkNvIds.NIB, Offset=0, partial=True),
+        responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
+    )
+
     # But it does succeed with a warning if you explicitly allow it
     with caplog.at_level(logging.WARNING):
         await app.update_network(
@@ -851,11 +881,8 @@ async def test_update_network(mocker, caplog, application):
             reset=True,
         )
 
-    # We should receive a warning about setting a specific channel
-    assert len(caplog.records) >= 1
-    assert any(
-        "Cannot set a specific channel in config" in r.message for r in caplog.records
-    )
+    # We should receive a few warnings for `tc_` stuff
+    assert len(caplog.records) >= 2
 
     await channels_updated
     await bdb_set_primary_channel
@@ -864,12 +891,13 @@ async def test_update_network(mocker, caplog, application):
     await set_extended_pan_id
     await set_network_key_util
     await set_network_key_nvram
+    await set_nib_nvram
 
     app._reset.assert_called_once_with()
 
     # Ensure we set everything we could
-    assert app.channel is None  # We can't set it
     assert app.nwk_update_id is None  # We can't use it
+    assert app.channel == channel
     assert app.channels == channels
     assert app.pan_id == pan_id
     assert app.extended_pan_id == extended_pan_id
@@ -952,8 +980,14 @@ async def test_auto_form_necessary(application, mocker):
 
         return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.SUCCESS)
 
-    # Prevent the fixture's default response
-    znp_server._response_listeners[c.SYS.OSALNVRead.Req.header].clear()
+    # Prevent the fixture's default NVRAM responses, except for the NIB
+    listeners = znp_server._response_listeners[c.SYS.OSALNVRead.Req.header]
+    znp_server._response_listeners[c.SYS.OSALNVRead.Req.header] = [
+        listener
+        for listener in listeners
+        if listener.matching_commands[0]
+        == c.SYS.OSALNVRead.Req(Id=NwkNvIds.NIB, Offset=0)
+    ]
 
     read_zstack_configured = znp_server.reply_once_to(
         request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
