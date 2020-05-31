@@ -24,6 +24,7 @@ setup(
         "zigpy>=0.20.3",
         "async_timeout",
         "voluptuous",
+        "coloredlogs",
     ],
     tests_require=[
         "asynctest",
