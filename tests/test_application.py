@@ -66,12 +66,12 @@ class ServerZNP(ZNP):
             callback.called = True
 
             for response in responses:
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.001)
                 LOGGER.debug("Replying to %s with %s", request, response)
 
-                try:
+                if callable(response):
                     self.send(response(request))
-                except TypeError:
+                else:
                     self.send(response)
 
             called_future.set_result(True)
@@ -86,12 +86,12 @@ class ServerZNP(ZNP):
             callback.call_count += 1
 
             for response in responses:
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.001)
                 LOGGER.debug("Replying to %s with %s", request, response)
 
-                try:
+                if callable(response):
                     self.send(response(request))
-                except TypeError:
+                else:
                     self.send(response)
 
         callback.call_count = 0
