@@ -309,7 +309,9 @@ class ZNP:
                 response = await response_future
 
         if isinstance(response, c.RPCError.CommandNotRecognized.Rsp):
-            raise CommandNotRecognized(f"Fatal request error: {response}")
+            raise CommandNotRecognized(
+                f"Fatal request error {response} in response to {request}"
+            )
 
         # If the sync response we got is not what we wanted, this is an error
         if not partial_response.matches(response):

@@ -72,12 +72,16 @@ def test_error_code():
 
 
 def _validate_schema(schema):
-    for param in schema.parameters:
+    for index, param in enumerate(schema.parameters):
         assert isinstance(param.name, str)
         assert param.name.isidentifier()
         assert not keyword.iskeyword(param.name)
         assert isinstance(param.type, type)
         assert isinstance(param.description, str)
+
+        # All optional params must be together at the end
+        if param.optional:
+            assert all(p.optional for p in schema.parameters[index:])
 
 
 def test_commands_schema():
@@ -228,6 +232,75 @@ def test_command_param_binding():
             DstEndpoint=0x56,
             ClusterIdList=[0x12, 0x457890],  # 0x457890 doesn't fit into a uint8_t
         )
+
+
+def test_command_optional_params():
+    # Optional params values don't need a value
+    short_version_rsp = c.SYS.Version.Rsp(
+        TransportRev=0, ProductId=1, MajorRel=2, MinorRel=3, MaintRel=4,
+    )
+
+    # Some can still be passed
+    medium_version_rsp = c.SYS.Version.Rsp(
+        TransportRev=0, ProductId=1, MajorRel=2, MinorRel=3, MaintRel=4, CodeRevision=5
+    )
+
+    # As can all
+    long_version_rsp = c.SYS.Version.Rsp(
+        TransportRev=0,
+        ProductId=1,
+        MajorRel=2,
+        MinorRel=3,
+        MaintRel=4,
+        CodeRevision=5,
+        Unknown1=6,
+        Unknown2=7,
+    )
+
+    short_data = short_version_rsp.to_frame().data
+    medium_data = medium_version_rsp.to_frame().data
+    long_data = long_version_rsp.to_frame().data
+
+    assert len(long_data) == len(medium_data) + 5 == len(short_data) + 9
+
+    assert long_data.startswith(medium_data)
+    assert medium_data.startswith(short_data)
+
+    # Deserialization is greedy
+    Version = c.SYS.Version.Rsp
+    assert Version.from_frame(long_version_rsp.to_frame()) == long_version_rsp
+    assert Version.from_frame(medium_version_rsp.to_frame()) == medium_version_rsp
+    assert Version.from_frame(short_version_rsp.to_frame()) == short_version_rsp
+
+
+def test_command_optional_params_failures():
+    with pytest.raises(KeyError):
+        # Optional params cannot be skipped over
+        c.SYS.Version.Rsp(
+            TransportRev=0,
+            ProductId=1,
+            MajorRel=2,
+            MinorRel=3,
+            MaintRel=4,
+            # CodeRevision=5,
+            Unknown1=6,
+        )
+
+    # Unless it's a partial command
+    partial = c.SYS.Version.Rsp(
+        TransportRev=0,
+        ProductId=1,
+        MajorRel=2,
+        MinorRel=3,
+        MaintRel=4,
+        # CodeRevision=5,
+        Unknown1=6,
+        partial=True,
+    )
+
+    # In which case, it cannot be serialized
+    with pytest.raises(ValueError):
+        partial.to_frame()
 
 
 def test_simple_descriptor():

@@ -60,6 +60,15 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
                 t.Param("MajorRel", t.uint8_t, "Software major release number"),
                 t.Param("MinorRel", t.uint8_t, "Software minor release number"),
                 t.Param("MaintRel", t.uint8_t, "Software maintenance release number"),
+                # Optional stuff
+                t.Param(
+                    "CodeRevision",
+                    t.uint32_t,
+                    "User-supplied code revision number",
+                    optional=True,
+                ),
+                t.Param("Unknown1", t.uint8_t, "Unknown 1", optional=True),
+                t.Param("Unknown2", t.uint32_t, "Unknown 2", optional=True),
             )
         ),
     )

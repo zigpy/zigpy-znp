@@ -314,21 +314,37 @@ class CommandBase:
         cls.schema = schema
 
     def __init__(self, *, partial=False, **params):
-        all_params = {param.name for param in self.schema.parameters}
-        given_params = set(params.keys())
+        super().__setattr__("_partial", partial)
 
-        if given_params - all_params:
+        all_params = [p.name for p in self.schema.parameters]
+        optional_params = [p.name for p in self.schema.parameters if p.optional]
+        given_params = set(params.keys())
+        given_optional = [p for p in params.keys() if p in optional_params]
+
+        unknown_params = given_params - set(all_params)
+        missing_params = (set(all_params) - set(optional_params)) - given_params
+
+        if unknown_params:
             raise KeyError(
-                f"Unexpected parameters: {given_params - all_params}. "
-                f"Expected one of {all_params - given_params}"
+                f"Unexpected parameters: {unknown_params}. "
+                f"Expected one of {missing_params}"
             )
-        elif not partial and all_params - given_params:
-            raise KeyError(f"Missing parameters: {all_params - given_params}")
+
+        if not partial:
+            # Optional params must be passed without any skips
+            if optional_params[: len(given_optional)] != given_optional:
+                raise KeyError(
+                    f"Optional parameters cannot be skipped: "
+                    f"expected order {optional_params}, got {given_optional}."
+                )
+
+            if missing_params:
+                raise KeyError(f"Missing parameters: {set(all_params) - given_params}")
 
         bound_params = {}
 
         for param in self.schema.parameters:
-            if partial and params.get(param.name) is None:
+            if params.get(param.name) is None and (partial or param.optional):
                 bound_params[param.name] = (param, None)
                 continue
 
@@ -376,16 +392,15 @@ class CommandBase:
         super().__setattr__("_bound_params", bound_params)
 
     def to_frame(self):
+        if self._partial:
+            raise ValueError(f"Cannot serialize a partial frame: {self}")
+
         from zigpy_znp.frames import GeneralFrame
 
-        missing_params = {p.name for p, v in self._bound_params.values() if v is None}
-
-        if missing_params:
-            raise ValueError(
-                f"Cannot serialize a partial frame: missing {missing_params}"
-            )
-
-        data = b"".join([v.serialize() for p, v in self._bound_params.values()])
+        # At this point the optional params are assumed to be in a valid order
+        data = b"".join(
+            [v.serialize() for p, v in self._bound_params.values() if v is not None]
+        )
 
         return GeneralFrame(self.header, data)
 
@@ -400,7 +415,14 @@ class CommandBase:
         params = {}
 
         for param in cls.schema.parameters:
-            params[param.name], data = param.type.deserialize(data)
+            try:
+                params[param.name], data = param.type.deserialize(data)
+            except ValueError:
+                # Optional parameters can halt parsing
+                if param.optional:
+                    break
+                else:
+                    raise
 
         if data:
             if ignore_unparsed:

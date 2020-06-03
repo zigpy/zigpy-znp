@@ -134,9 +134,10 @@ class ScanType(basic.enum_uint8):
 class Param:
     """Parameter."""
 
-    name = attr.ib(converter=str)
+    name: str = attr.ib(converter=str)
     type = attr.ib()
-    description = attr.ib(default="")
+    description: str = attr.ib(default="")
+    optional: bool = attr.ib(default=False)
 
 
 @attr.s(frozen=True)
