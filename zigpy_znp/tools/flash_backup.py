@@ -2,7 +2,6 @@ import sys
 import asyncio
 import logging
 import argparse
-import itertools
 import coloredlogs
 import async_timeout
 
@@ -17,10 +16,37 @@ logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 
 
+async def get_firmware_size(znp: ZNP, buffer_size: int) -> int:
+    # Quick binary search to find out the total length, for progress
+    valid_index = 0
+    invalid_index = 2 ** 16
+
+    while invalid_index - valid_index > 1:
+        midpoint = (valid_index + invalid_index) // 2
+
+        read_rsp = await znp.request_callback_rsp(
+            request=c.UBL.ReadReq.Req(FlashWordAddr=midpoint),
+            callback=c.UBL.ReadRsp.Callback(partial=True),
+        )
+
+        if read_rsp.Status == c.ubl.BootloaderStatus.SUCCESS:
+            valid_index = midpoint
+        elif read_rsp.Status == c.ubl.BootloaderStatus.FAILURE:
+            invalid_index = midpoint
+        else:
+            raise ValueError(f"Unexpected read response: {read_rsp}")
+
+    # The real addresses are all divided by the flash word size (4)
+    assert invalid_index % (buffer_size // c.ubl.FLASH_WORD_SIZE) == 0
+
+    return invalid_index
+
+
 async def read_firmware(radio_path):
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
 
     # The bootloader handshake must be the very first command
+    await znp.connect(test_port=False)
 
     try:
         async with async_timeout.timeout(5):
@@ -40,25 +66,23 @@ async def read_firmware(radio_path):
 
     # All reads and writes are this size
     buffer_size = handshake_rsp.BufferSize
+    firmware_size = await get_firmware_size(znp, buffer_size)
 
     data = bytearray()
 
-    # Addresses are all divided by the flash word size (4)
-    for address in itertools.count(start=0, step=buffer_size // c.ubl.FLASH_WORD_SIZE):
+    for address in range(0, firmware_size, buffer_size // c.ubl.FLASH_WORD_SIZE):
+        LOGGER.info("Progress: %0.2f%%", (100.0 * address) / firmware_size)
+
         read_rsp = await znp.request_callback_rsp(
             request=c.UBL.ReadReq.Req(FlashWordAddr=address),
             callback=c.UBL.ReadRsp.Callback(partial=True),
         )
 
-        if read_rsp.Status == c.ubl.BootloaderStatus.SUCCESS:
-            assert read_rsp.FlashWordAddr == address
-            assert len(read_rsp.Data) == buffer_size
+        assert read_rsp.Status == c.ubl.BootloaderStatus.SUCCESS
+        assert read_rsp.FlashWordAddr == address
+        assert len(read_rsp.Data) == buffer_size
 
-            data.extend(read_rsp.Data)
-        elif read_rsp.Status == c.ubl.BootloaderStatus.FAILURE:
-            # We're done reading
-            assert address > 0
-            break
+        data.extend(read_rsp.Data)
 
     return data
 
@@ -67,7 +91,11 @@ async def main(argv):
     parser = argparse.ArgumentParser(description="Backup a radio's firmware")
     parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
     parser.add_argument(
-        "--output", "-o", type=argparse.FileType("wb"), help="Output .bin file"
+        "--output",
+        "-o",
+        type=argparse.FileType("wb"),
+        help="Output .bin file",
+        required=True,
     )
 
     args = parser.parse_args(argv)
