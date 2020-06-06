@@ -8,8 +8,8 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
 
-from zigpy_znp.tools.backup import main as backup
-from zigpy_znp.tools.restore import main as restore
+from zigpy_znp.tools.nvram_backup import main as backup
+from zigpy_znp.tools.nvram_restore import main as restore
 
 
 from test_api import pytest_mark_asyncio_timeout, pingable_serial_port  # noqa: F401

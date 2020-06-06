@@ -29,8 +29,8 @@ custom_zha_radios:
 A complete radio NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else is untested.
 
 ```shell
-(venv) $ python -m zigpy_znp.tools.backup /dev/serial/by-id/old_radio -o backup.json
-(venv) $ python -m zigpy_znp.tools.restore /dev/serial/by-id/new_radio -i backup.json
+(venv) $ python -m zigpy_znp.tools.nvram_backup /dev/serial/by-id/old_radio -o backup.json
+(venv) $ python -m zigpy_znp.tools.nvram_restore /dev/serial/by-id/new_radio -i backup.json
 ```
 
 Tested migrations:
