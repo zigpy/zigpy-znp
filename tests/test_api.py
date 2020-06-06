@@ -70,6 +70,11 @@ def pingable_serial_port(mocker):
         # XXX: this assumes that our UART will send packets perfectly framed
         if data == bytes.fromhex("FE  00  21 01  20"):
             protocol.data_received(bytes.fromhex("FE  02  61 01  00 01  63"))
+        elif data == bytes.fromhex("FE  00  21 02  23"):
+            protocol.data_received(
+                b"\xFE\x0E\x61\x02\x02\x01\x02\x07\x01\xE1"
+                b"\x3B\x34\x01\x00\xFF\xFF\xFF\xFF\x85"
+            )
 
     transport.write = mocker.Mock(side_effect=ping_responder)
 
@@ -100,6 +105,17 @@ def pingable_serial_port(mocker):
 async def test_znp_connect(mocker, event_loop, pingable_serial_port):
     api = ZNP(TEST_APP_CONFIG)
     await api.connect()
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_connect_without_test(mocker, event_loop, pingable_serial_port):
+    api = ZNP(TEST_APP_CONFIG)
+    api.request = mocker.Mock(wraps=api.request)
+
+    await api.connect(test_port=False)
+
+    # Nothing should have been sent
+    assert api.request.call_count == 0
 
 
 @pytest_mark_asyncio_timeout()

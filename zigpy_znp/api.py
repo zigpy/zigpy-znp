@@ -142,6 +142,8 @@ class ZNP:
         self._app = None
         self._config = config
 
+        self.version = None
+
         self._response_listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
 
@@ -153,18 +155,21 @@ class ZNP:
     def _port_path(self) -> str:
         return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
-    async def connect(self) -> None:
+    async def connect(self, *, test_port=True) -> None:
         assert self._uart is None
 
         self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
-        LOGGER.debug("Testing connection to %s", self._uart.transport.serial.name)
 
-        try:
-            # Make sure that our port works
-            await self.request(c.SYS.Ping.Req())
-        except Exception:
-            self._uart = None
-            raise
+        if test_port:
+            LOGGER.debug("Testing connection to %s", self._uart.transport.serial.name)
+
+            try:
+                # Make sure that our port works
+                await self.request(c.SYS.Ping.Req())
+                self.version = await self.request(c.SYS.Version.Req())
+            except Exception:
+                self._uart = None
+                raise
 
         LOGGER.debug(
             "Connected to %s at %s baud",
