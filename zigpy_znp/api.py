@@ -158,18 +158,21 @@ class ZNP:
     async def connect(self, *, test_port=True) -> None:
         assert self._uart is None
 
-        self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
+        try:
+            self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
 
-        if test_port:
-            LOGGER.debug("Testing connection to %s", self._uart.transport.serial.name)
+            if test_port:
+                LOGGER.debug(
+                    "Testing connection to %s", self._uart.transport.serial.name
+                )
 
-            try:
                 # Make sure that our port works
                 await self.request(c.SYS.Ping.Req())
                 self.version = await self.request(c.SYS.Version.Req())
-            except Exception:
-                self._uart = None
-                raise
+        except Exception:
+            self.version = None
+            self._uart = None
+            raise
 
         LOGGER.debug(
             "Connected to %s at %s baud",

@@ -27,7 +27,6 @@ async def backup(radio_path):
     data = {
         "osal": {},
         "nwk": {},
-        "version": [znp.version.MajorRel, znp.version.MinorRel, znp.version.MaintRel],
     }
 
     for nwk_nvid in NwkNvIds:
@@ -39,10 +38,6 @@ async def backup(radio_path):
         except InvalidCommandResponse:
             LOGGER.warning("Read failed for %s", nwk_nvid)
             continue
-
-    # Old Z-Stack versions don't have c.SYS.NV*
-    if znp.version.MajorRel < 3:
-        return data
 
     for osal_nvid in OsalExNvIds:
         length_rsp = await znp.request(

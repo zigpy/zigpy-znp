@@ -24,11 +24,6 @@ async def restore(radio_path, backup):
 
     await znp.connect()
 
-    if backup["version"][0] == 2 and znp.MajorRel >= 3:
-        raise RuntimeError(
-            "You cannot restore a Z-Stack 2.x backup onto a newer Z-Stack device"
-        )
-
     for nwk_nvid, value in backup["nwk"].items():
         nvid = NwkNvIds[nwk_nvid]
         value = bytes.fromhex(value)

@@ -53,8 +53,29 @@ class ServerZNP(ZNP):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # We just respond to pings, nothing more
+        # We just respond to pings, nothing more.
+        # XXX: the lambda allows us to replace `ping_replier` if necessary
         self.callback_for_response(c.SYS.Ping.Req(), lambda r: self.ping_replier(r))
+        self.callback_for_response(
+            c.SYS.Version.Req(), lambda r: self.version_replier(r)
+        )
+
+    def ping_replier(self, request):
+        self.send(c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
+
+    def version_replier(self, request):
+        self.send(
+            c.SYS.Version.Rsp(
+                TransportRev=2,
+                ProductId=1,
+                MajorRel=2,
+                MinorRel=7,
+                MaintRel=1,
+                CodeRevision=20200417,
+                BootloaderBuildType=c.sys.BootloaderBuildType.NON_BOOTLOADER_BUILD,
+                BootloaderRevision=0xFFFFFFFF,
+            )
+        )
 
     def reply_once_to(self, request, responses):
         called_future = asyncio.get_running_loop().create_future()
@@ -99,9 +120,6 @@ class ServerZNP(ZNP):
         self.callback_for_response(request, lambda r: asyncio.create_task(callback(r)))
 
         return callback
-
-    def ping_replier(self, request):
-        self.send(c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities(1625)))
 
     def send(self, response):
         self._uart.send(response.to_frame())
