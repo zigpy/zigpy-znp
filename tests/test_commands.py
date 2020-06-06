@@ -83,6 +83,10 @@ def _validate_schema(schema):
         if param.optional:
             assert all(p.optional for p in schema.parameters[index:])
 
+        # Trailing bytes must be at the very end
+        if issubclass(param.type, t.TrailingBytes):
+            assert not schema.parameters[index + 1 :]
+
 
 def test_commands_schema():
     commands_by_id = defaultdict(list)
