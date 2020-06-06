@@ -21,7 +21,6 @@ async def read_firmware(radio_path):
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
 
     # The bootloader handshake must be the very first command
-    await znp.connect(disable_test=True)
 
     try:
         async with async_timeout.timeout(5):
