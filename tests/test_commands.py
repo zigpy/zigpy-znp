@@ -253,8 +253,8 @@ def test_command_optional_params():
         MinorRel=3,
         MaintRel=4,
         CodeRevision=5,
-        Unknown1=6,
-        Unknown2=7,
+        BootloaderBuildType=c.sys.BootloaderBuildType.NON_BOOTLOADER_BUILD,
+        BootloaderRevision=0xFFFFFFFF,
     )
 
     short_data = short_version_rsp.to_frame().data
@@ -283,7 +283,7 @@ def test_command_optional_params_failures():
             MinorRel=3,
             MaintRel=4,
             # CodeRevision=5,
-            Unknown1=6,
+            BootloaderBuildType=c.sys.BootloaderBuildType.BUILT_AS_HEX,
         )
 
     # Unless it's a partial command
@@ -294,7 +294,7 @@ def test_command_optional_params_failures():
         MinorRel=3,
         MaintRel=4,
         # CodeRevision=5,
-        Unknown1=6,
+        BootloaderBuildType=c.sys.BootloaderBuildType.BUILT_AS_HEX,
         partial=True,
     )
 

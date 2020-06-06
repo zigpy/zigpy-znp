@@ -7,6 +7,12 @@ import zigpy_znp.types as t
 from zigpy_znp.types import nvids
 
 
+class BootloaderBuildType(t.enum_uint8):
+    NON_BOOTLOADER_BUILD = 0
+    BUILT_AS_BIN = 1
+    BUILT_AS_HEX = 2
+
+
 class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     # reset the target device
     ResetReq = t.CommandDef(
@@ -67,8 +73,18 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
                     "User-supplied code revision number",
                     optional=True,
                 ),
-                t.Param("Unknown1", t.uint8_t, "Unknown 1", optional=True),
-                t.Param("Unknown2", t.uint32_t, "Unknown 2", optional=True),
+                t.Param(
+                    "BootloaderBuildType",
+                    BootloaderBuildType,
+                    "Bootloader build type",
+                    optional=True,
+                ),
+                t.Param(
+                    "BootloaderRevision",
+                    t.uint32_t,
+                    "Bootloader revision. 0 - not provided, 0xFFFFFFFF - not supported",
+                    optional=True,
+                ),
             )
         ),
     )
