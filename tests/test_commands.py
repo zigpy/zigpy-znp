@@ -276,6 +276,21 @@ def test_command_optional_params():
     assert Version.from_frame(medium_version_rsp.to_frame()) == medium_version_rsp
     assert Version.from_frame(short_version_rsp.to_frame()) == short_version_rsp
 
+    # Deserialization still fails if the frame is incomplete or too long
+    with pytest.raises(ValueError):
+        Version.from_frame(
+            frames.GeneralFrame(
+                header=long_version_rsp.to_frame().header, data=long_data[:-1]
+            )
+        )
+
+    with pytest.raises(ValueError):
+        Version.from_frame(
+            frames.GeneralFrame(
+                header=long_version_rsp.to_frame().header, data=long_data + b"\x00"
+            )
+        )
+
 
 def test_command_optional_params_failures():
     with pytest.raises(KeyError):
