@@ -16,16 +16,18 @@ logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 
 
-async def get_firmware_size(znp: ZNP, buffer_size: int) -> int:
-    # Quick binary search to find out the total length, for progress
-    valid_index = 0
-    invalid_index = 2 ** 16
+async def get_firmware_size(znp: ZNP, block_size: int) -> int:
+    valid_index = 0x0000
+
+    # Z-Stack lets you read beyond the end of the flash (???) if you go too high,
+    # instead of throwing an error. We need to be careful.
+    invalid_index = 0xFFFF // block_size
 
     while invalid_index - valid_index > 1:
         midpoint = (valid_index + invalid_index) // 2
 
         read_rsp = await znp.request_callback_rsp(
-            request=c.UBL.ReadReq.Req(FlashWordAddr=midpoint),
+            request=c.UBL.ReadReq.Req(FlashWordAddr=midpoint * block_size),
             callback=c.UBL.ReadRsp.Callback(partial=True),
         )
 
@@ -36,13 +38,10 @@ async def get_firmware_size(znp: ZNP, buffer_size: int) -> int:
         else:
             raise ValueError(f"Unexpected read response: {read_rsp}")
 
-    # The real addresses are all divided by the flash word size (4)
-    assert invalid_index % (buffer_size // c.ubl.FLASH_WORD_SIZE) == 0
-
-    return invalid_index
+    return invalid_index * block_size
 
 
-async def read_firmware(radio_path):
+async def read_firmware(radio_path: str) -> bytearray:
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
 
     # The bootloader handshake must be the very first command
@@ -66,11 +65,14 @@ async def read_firmware(radio_path):
 
     # All reads and writes are this size
     buffer_size = handshake_rsp.BufferSize
+    block_size = buffer_size // c.ubl.FLASH_WORD_SIZE
     firmware_size = await get_firmware_size(znp, buffer_size)
+
+    LOGGER.info("Total firmware size is %d", firmware_size)
 
     data = bytearray()
 
-    for address in range(0, firmware_size, buffer_size // c.ubl.FLASH_WORD_SIZE):
+    for address in range(0, firmware_size, block_size):
         LOGGER.info("Progress: %0.2f%%", (100.0 * address) / firmware_size)
 
         read_rsp = await znp.request_callback_rsp(
