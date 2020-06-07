@@ -5,6 +5,7 @@ import argparse
 import coloredlogs
 import async_timeout
 
+import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
@@ -16,32 +17,13 @@ logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 
 
-async def get_firmware_size(znp: ZNP, block_size: int) -> int:
-    valid_index = 0x0000
-
-    # Z-Stack lets you read beyond the end of the flash (???) if you go too high,
-    # instead of throwing an error. We need to be careful.
-    invalid_index = 0xFFFF // block_size
-
-    while invalid_index - valid_index > 1:
-        midpoint = (valid_index + invalid_index) // 2
-
-        read_rsp = await znp.request_callback_rsp(
-            request=c.UBL.ReadReq.Req(FlashWordAddr=midpoint * block_size),
-            callback=c.UBL.ReadRsp.Callback(partial=True),
+async def write_firmware(firmware: bytes, radio_path: str):
+    if len(firmware) != c.ubl.IMAGE_SIZE:
+        raise ValueError(
+            f"Firmware is the wrong size."
+            f" Expected {c.ubl.IMAGE_SIZE}, got {len(firmware)}"
         )
 
-        if read_rsp.Status == c.ubl.BootloaderStatus.SUCCESS:
-            valid_index = midpoint
-        elif read_rsp.Status == c.ubl.BootloaderStatus.FAILURE:
-            invalid_index = midpoint
-        else:
-            raise ValueError(f"Unexpected read response: {read_rsp}")
-
-    return invalid_index * block_size
-
-
-async def read_firmware(radio_path: str) -> bytearray:
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
 
     # The bootloader handshake must be the very first command
@@ -65,38 +47,54 @@ async def read_firmware(radio_path: str) -> bytearray:
 
     # All reads and writes are this size
     buffer_size = handshake_rsp.BufferSize
-    block_size = buffer_size // c.ubl.FLASH_WORD_SIZE
-    firmware_size = await get_firmware_size(znp, buffer_size)
 
-    LOGGER.info("Total firmware size is %d", firmware_size)
+    for offset in range(0, c.ubl.IMAGE_SIZE, buffer_size):
+        address = offset // c.ubl.FLASH_WORD_SIZE
+        LOGGER.info("Write progress: %0.2f%%", (100.0 * offset) / c.ubl.IMAGE_SIZE)
 
-    data = bytearray()
+        write_rsp = await znp.request_callback_rsp(
+            request=c.UBL.WriteReq.Req(
+                FlashWordAddr=address,
+                Data=t.TrailingBytes(firmware[offset : offset + buffer_size]),
+            ),
+            callback=c.UBL.WriteRsp.Callback(partial=True),
+        )
 
-    for address in range(0, firmware_size, block_size):
-        LOGGER.info("Progress: %0.2f%%", (100.0 * address) / firmware_size)
+        assert write_rsp.Status == c.ubl.BootloaderStatus.SUCCESS
+
+    # Now we have to read it all back
+    # TODO: figure out how the CRC is computed!
+    for offset in range(0, c.ubl.IMAGE_SIZE, buffer_size):
+        address = offset // c.ubl.FLASH_WORD_SIZE
+        LOGGER.info(
+            "Verification progress: %0.2f%%", (100.0 * offset) / c.ubl.IMAGE_SIZE
+        )
 
         read_rsp = await znp.request_callback_rsp(
-            request=c.UBL.ReadReq.Req(FlashWordAddr=address),
+            request=c.UBL.ReadReq.Req(FlashWordAddr=address,),
             callback=c.UBL.ReadRsp.Callback(partial=True),
         )
 
         assert read_rsp.Status == c.ubl.BootloaderStatus.SUCCESS
         assert read_rsp.FlashWordAddr == address
-        assert len(read_rsp.Data) == buffer_size
+        assert read_rsp.Data == firmware[offset : offset + buffer_size]
 
-        data.extend(read_rsp.Data)
+    # This seems to cause the firmware to compute and verify the CRC
+    enable_rsp = await znp.request_callback_rsp(
+        request=c.UBL.EnableReq.Req(), callback=c.UBL.EnableRsp.Callback(partial=True),
+    )
 
-    return data
+    assert enable_rsp.Status == c.ubl.BootloaderStatus.SUCCESS
 
 
 async def main(argv):
-    parser = argparse.ArgumentParser(description="Backup a radio's firmware")
+    parser = argparse.ArgumentParser(description="Write firmware to a radio")
     parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
     parser.add_argument(
-        "--output",
-        "-o",
-        type=argparse.FileType("wb"),
-        help="Output .bin file",
+        "--input",
+        "-i",
+        type=argparse.FileType("rb"),
+        help="Input .bin file",
         required=True,
     )
 
@@ -105,8 +103,7 @@ async def main(argv):
     # We just want to make sure it exists
     args.serial.close()
 
-    data = await read_firmware(args.serial.name)
-    args.output.write(data)
+    await write_firmware(args.input.read(), args.serial.name)
 
     LOGGER.info("Unplug your adapter to leave bootloader mode!")
 
