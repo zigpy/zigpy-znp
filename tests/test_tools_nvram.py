@@ -8,8 +8,8 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
 
-from zigpy_znp.tools.nvram_backup import main as nvram_backup
-from zigpy_znp.tools.nvram_restore import main as nvram_restore
+from zigpy_znp.tools.nvram_read import main as nvram_read
+from zigpy_znp.tools.nvram_write import main as nvram_write
 
 
 from test_api import pytest_mark_asyncio_timeout  # noqa: F401
@@ -135,7 +135,7 @@ def openable_serial_znp_server(mocker, znp_server):  # noqa: F811
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_nvram_backup(openable_serial_znp_server, tmp_path):
+async def test_nvram_read(openable_serial_znp_server, tmp_path):
     def osal_nv_read(req):
         nvid = NwkNvIds(req.Id).name
 
@@ -178,14 +178,14 @@ async def test_nvram_backup(openable_serial_znp_server, tmp_path):
     )
 
     backup_file = tmp_path / "backup.json"
-    await nvram_backup([openable_serial_znp_server._port_path, "-o", str(backup_file)])
+    await nvram_read([openable_serial_znp_server._port_path, "-o", str(backup_file)])
 
     # The backup JSON written to disk should be an exact copy of our fake NVRAM
     assert json.loads(backup_file.read_text()) == REAL_BACKUP
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_nvram_restore(openable_serial_znp_server, tmp_path):
+async def test_nvram_write(openable_serial_znp_server, tmp_path):
     simulated_nvram = {"osal": {}, "nwk": {}}
 
     def osal_nv_item_init(req):
@@ -264,7 +264,7 @@ async def test_nvram_restore(openable_serial_znp_server, tmp_path):
     backup_file = tmp_path / "backup.json"
     backup_file.write_text(json.dumps(backup_obj))
 
-    await nvram_restore([openable_serial_znp_server._port_path, "-i", str(backup_file)])
+    await nvram_write([openable_serial_znp_server._port_path, "-i", str(backup_file)])
 
     # Convert every value to its hex representation to match the backup format
     simulated_nvram_hex = {
