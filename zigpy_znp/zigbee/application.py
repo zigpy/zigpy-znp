@@ -14,8 +14,8 @@ import zigpy.zcl.foundation
 
 from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
 
+from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
-from zigpy.zcl.clusters.security import IasZone
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.config as conf
@@ -394,10 +394,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._register_endpoint(
             endpoint=8,
             device_id=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
-            output_clusters=[IasZone.cluster_id],
+            output_clusters=[clusters.security.IasZone.cluster_id],
         )
         await self._register_endpoint(endpoint=11)
         await self._register_endpoint(endpoint=12)
+        await self._register_endpoint(
+            endpoint=13, input_clusters=[clusters.general.Ota.cluster_id]
+        )
+
         await self._register_endpoint(
             endpoint=100, profile_id=zigpy.profiles.zll.PROFILE_ID, device_id=0x0005
         )
