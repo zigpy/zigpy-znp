@@ -154,15 +154,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         field_names, field_types = ZDO_CLUSTERS[cluster]
         assert set(zdo_kwargs) == set(field_names)
 
-        zdo_args = []
-
-        for f_name, f_type in zip(field_names, field_types):
-            # XXX: bugfix for zigpy optional struct bug
-            if f_type.__name__ == "Optional":
-                f_type = f_type.__mro__[1]
-
-            zdo_args.append(f_type(zdo_kwargs[f_name]))
-
+        zdo_args = [t(zdo_kwargs[n]) for n, t in zip(field_names, field_types)]
         message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
 
         LOGGER.trace("Pretending we received a ZDO message: %s", message)
