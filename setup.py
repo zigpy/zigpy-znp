@@ -28,9 +28,8 @@ setup(
     ],
     tests_require=[
         "asynctest",
-        "pytest==5.3.5",
-        "pytest-asyncio==0.10.0",
-        "asyncmock",
+        "pytest>=5.4.5",
+        "pytest-asyncio>=0.12.0",
         "pytest-mock",
     ],
 )

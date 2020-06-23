@@ -3,7 +3,11 @@ import logging
 
 import pytest
 
-from asynctest import CoroutineMock
+try:
+    # Python 3.8 already has this
+    from mock import AsyncMock as CoroutineMock
+except ImportError:
+    from asynctest import CoroutineMock
 
 import zigpy
 import zigpy_znp.types as t
@@ -770,9 +774,7 @@ async def test_zigpy_request_failure(application, mocker):
         ],
     )
 
-    mocker.patch.object(
-        app, "_send_request", new=CoroutineMock(wraps=app._send_request)
-    )
+    mocker.spy(app, "_send_request")
 
     # Fail to turn on the light
     with pytest.raises(zigpy.exceptions.DeliveryError):
@@ -793,21 +795,21 @@ async def test_request_use_ieee(application, mocker, use_ieee, dev_addr):
     app, znp_server = application
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
-    send_req = mocker.patch.object(app, "_send_request", new=CoroutineMock())
+    mocker.patch.object(app, "_send_request", new=CoroutineMock())
 
     await app.request(
         device,
         use_ieee=use_ieee,
-        profile=None,
-        cluster=None,
-        src_ep=None,
-        dst_ep=None,
-        sequence=None,
-        data=None,
+        profile=1,
+        cluster=2,
+        src_ep=3,
+        dst_ep=4,
+        sequence=5,
+        data=b"6",
     )
 
-    assert send_req.call_count == 1
-    assert send_req.mock_calls[0][2]["dst_addr"] == dev_addr
+    assert app._send_request.call_count == 1
+    assert app._send_request.mock_calls[0][2]["dst_addr"] == dev_addr
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
@@ -831,7 +833,7 @@ async def test_update_network(mocker, caplog, application):
     app, znp_server = application
 
     await app.startup(auto_form=False)
-    mocker.patch.object(app, "_reset", new=CoroutineMock())
+    mocker.spy(app, "_reset")
 
     channel = t.uint8_t(15)
     pan_id = t.PanId(0x1234)
@@ -974,7 +976,7 @@ async def test_force_remove(application, mocker):
 async def test_auto_form_unnecessary(application, mocker):
     app, znp_server = application
 
-    mocker.patch.object(app, "form_network")
+    mocker.patch.object(app, "form_network", new=CoroutineMock())
 
     await app.startup(auto_form=True)
     assert app.form_network.call_count == 0
@@ -986,7 +988,7 @@ async def test_auto_form_necessary(application, mocker):
     nvram = {}
 
     mocker.patch.object(app, "update_network", new=CoroutineMock())
-    mocker.patch.object(app, "_reset", new=CoroutineMock())
+    mocker.spy(app, "_reset")
 
     def nvram_writer(req):
         nvram[req.Id] = req.Value
