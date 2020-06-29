@@ -77,7 +77,9 @@ class ZnpMtProtocol(asyncio.Protocol):
 
     def send(self, payload: frames.GeneralFrame) -> None:
         """Sends data taking care of framing."""
-        data = frames.TransportFrame(payload).serialize()
+        self._transport_write(frames.TransportFrame(payload).serialize())
+
+    def _transport_write(self, data: bytes) -> None:
         LOGGER.trace("Sending data: %s", Bytes.__repr__(data))
         self.transport.write(data)
 

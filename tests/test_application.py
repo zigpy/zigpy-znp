@@ -305,6 +305,41 @@ def application(znp_server):
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
+async def test_application_startup_skip_bootloader(application, mocker):
+    app, znp_server = application
+
+    first_uart_byte = None
+
+    def create_patched_write(original_write):
+        def patched_write(data):
+            nonlocal first_uart_byte
+
+            # Intercept the first byte if it's destined for the bootloader
+            is_for_bootloader = data[0] in c.ubl.BootloaderRunMode._value2member_map_
+
+            if first_uart_byte is None and is_for_bootloader:
+                first_uart_byte = data[0]
+                data = data[1:]
+
+            return original_write(data)
+
+        return patched_write
+
+    async def patched_uart_connect(config, api):
+        protocol = await uart_connect(config, api)
+        protocol.transport.write = create_patched_write(protocol.transport.write)
+
+        return protocol
+
+    mocker.patch("zigpy_znp.uart.connect", side_effect=patched_uart_connect)
+
+    app.update_config({conf.CONF_ZNP_CONFIG: {conf.CONF_SKIP_BOOTLOADER: True}})
+    await app.startup(auto_form=False)
+
+    assert first_uart_byte == c.ubl.BootloaderRunMode.FORCE_RUN
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
 async def test_application_startup_nib(application):
     app, znp_server = application
 

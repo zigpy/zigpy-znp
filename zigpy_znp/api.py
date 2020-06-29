@@ -155,11 +155,15 @@ class ZNP:
     def _port_path(self) -> str:
         return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
-    async def connect(self, *, test_port=True) -> None:
+    async def connect(self, *, test_port=True, skip_bootloader=False) -> None:
         assert self._uart is None
 
         try:
             self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
+
+            if skip_bootloader:
+                LOGGER.debug("Sending first UART byte to the bootloader")
+                self._uart._transport_write(bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
 
             if test_port:
                 LOGGER.debug(

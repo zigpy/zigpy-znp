@@ -29,6 +29,12 @@ class BootloaderDeviceType(t.enum_uint8):
     CC2530 = 2
 
 
+class BootloaderRunMode(t.enum_uint8):
+    # Read the code, not the spec
+    FORCE_BOOT = 0x10
+    FORCE_RUN = FORCE_BOOT ^ 0xFF
+
+
 class UBL(t.CommandsBase, subsystem=t.Subsystem.UBL_FUNC):
     WriteReq = t.CommandDef(
         t.CommandType.AREQ,

@@ -303,7 +303,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         znp = ZNP(self.config)
         znp.set_application(self)
         self._bind_callbacks(znp)
-        await znp.connect()
+        await znp.connect(
+            skip_bootloader=self.config[conf.CONF_ZNP_CONFIG][conf.CONF_SKIP_BOOTLOADER]
+        )
 
         self._znp = znp
 

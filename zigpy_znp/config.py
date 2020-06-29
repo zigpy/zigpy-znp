@@ -40,6 +40,7 @@ CONF_ZNP_CONFIG = "znp_config"
 CONF_TX_POWER = "tx_power"
 CONF_SREQ_TIMEOUT = "sync_request_timeout"
 CONF_AUTO_RECONNECT_RETRY_DELAY = "auto_reconnect_retry_delay"
+CONF_SKIP_BOOTLOADER = "skip_bootloader"
 
 CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
     {
@@ -53,6 +54,7 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                 vol.Optional(
                     CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
                 ): VolPositiveNumber,
+                vol.Optional(CONF_SKIP_BOOTLOADER, default=True): cv_boolean,
             }
         ),
     }
