@@ -354,6 +354,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.SYS.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
             )
 
+        if self.config[conf.CONF_ZNP_CONFIG][conf.CONF_LED_MODE] is not None:
+            led_mode = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_LED_MODE]
+
+            await self._znp.request(
+                c.Util.LEDControl.Req(LED=0xFF, Mode=led_mode),
+                RspStatus=t.Status.SUCCESS,
+            )
+
         device_info = await self._znp.request(
             c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
         )

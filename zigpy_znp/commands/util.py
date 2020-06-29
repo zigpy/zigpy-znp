@@ -25,6 +25,14 @@ class RandomNumbers(t.FixedList, item_type=t.uint8_t, length=0x64):
     pass
 
 
+class LEDMode(t.enum_uint8):
+    OFF = 0
+    ON = 1
+    BLINK = 2
+    FLASH = 3
+    TOGGLE = 4
+
+
 class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
     # MAC Reset command to reset MAC state machine
     GetDeviceInfo = t.CommandDef(
@@ -189,8 +197,8 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         0x0A,
         req_schema=t.Schema(
             (
-                t.Param("Laded", t.uint8_t, "The LED number"),
-                t.Param("On", t.Bool, "True -- On, False -- Off"),
+                t.Param("LED", t.uint8_t, "The LED number. 0xFF for all."),
+                t.Param("Mode", LEDMode, "LED mode. ON/OFF are static."),
             )
         ),
         rsp_schema=t.STATUS_SCHEMA,

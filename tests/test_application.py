@@ -88,7 +88,7 @@ class ServerZNP(ZNP):
             if callback.called:
                 return
 
-            callback.called = True
+            callback.called = request
 
             for response in responses:
                 await asyncio.sleep(0.001)
@@ -99,7 +99,7 @@ class ServerZNP(ZNP):
                 else:
                     self.send(response)
 
-            called_future.set_result(True)
+            called_future.set_result(request)
 
         callback.called = False
         self.callback_for_response(request, lambda r: asyncio.create_task(callback(r)))
@@ -400,6 +400,24 @@ async def test_application_startup_tx_power(application):
 
     await app.startup(auto_form=False)
     await set_tx_power
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_application_startup_led_mode(application):
+    app, znp_server = application
+
+    set_led_mode = znp_server.reply_once_to(
+        request=c.Util.LEDControl.Req(partial=True),
+        responses=[c.Util.LEDControl.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    app.update_config({conf.CONF_ZNP_CONFIG: {conf.CONF_LED_MODE: "off"}})
+
+    await app.startup(auto_form=False)
+    led_req = await set_led_mode
+
+    assert led_req.Mode == c.util.LEDMode.OFF
+    assert led_req.LED == 0xFF
 
 
 @pytest_mark_asyncio_timeout(seconds=3)

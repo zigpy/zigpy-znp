@@ -2,6 +2,8 @@ import typing
 import numbers
 
 import voluptuous as vol
+
+from zigpy_znp.commands.util import LEDMode
 from zigpy.config import (  # noqa: F401
     CONFIG_SCHEMA,
     SCHEMA_DEVICE,
@@ -36,11 +38,22 @@ SCHEMA_DEVICE = SCHEMA_DEVICE.extend(
 )
 
 
+def EnumValue(enum, transformer=str):
+    def validator(v):
+        if isinstance(v, enum):
+            return v
+
+        return enum[transformer(v)]
+
+    return validator
+
+
 CONF_ZNP_CONFIG = "znp_config"
 CONF_TX_POWER = "tx_power"
+CONF_LED_MODE = "led_mode"
+CONF_SKIP_BOOTLOADER = "skip_bootloader"
 CONF_SREQ_TIMEOUT = "sync_request_timeout"
 CONF_AUTO_RECONNECT_RETRY_DELAY = "auto_reconnect_retry_delay"
-CONF_SKIP_BOOTLOADER = "skip_bootloader"
 
 CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
     {
@@ -55,6 +68,9 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
                 ): VolPositiveNumber,
                 vol.Optional(CONF_SKIP_BOOTLOADER, default=True): cv_boolean,
+                vol.Optional(CONF_LED_MODE, default=None): vol.Any(
+                    None, EnumValue(LEDMode, lambda v: str(v).upper())
+                ),
             }
         ),
     }
