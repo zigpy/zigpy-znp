@@ -1,9 +1,11 @@
+import pytest
+
 import random
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
 from zigpy_znp.tools.flash_read import main as flash_read
-from zigpy_znp.tools.flash_write import main as flash_write
+from zigpy_znp.tools.flash_write import get_firmware_crcs, main as flash_write
 
 from test_api import pytest_mark_asyncio_timeout  # noqa: F401
 from test_application import znp_server  # noqa: F401
@@ -12,7 +14,12 @@ from test_tools_nvram import openable_serial_znp_server  # noqa: F401
 
 random.seed(12345)
 FAKE_IMAGE_SIZE = 2 ** 10
-FAKE_FLASH = random.getrandbits(FAKE_IMAGE_SIZE * 8).to_bytes(FAKE_IMAGE_SIZE, "little")
+FAKE_FLASH = bytearray(
+    random.getrandbits(FAKE_IMAGE_SIZE * 8).to_bytes(FAKE_IMAGE_SIZE, "little")
+)
+FAKE_FLASH[c.ubl.IMAGE_CRC_OFFSET : c.ubl.IMAGE_CRC_OFFSET + 2] = get_firmware_crcs(
+    FAKE_FLASH
+)[1].to_bytes(2, "little")
 random.seed()
 
 
@@ -89,3 +96,26 @@ async def test_flash_backup_write(
 
     # They should be identical
     assert backup_file.read_bytes() == FAKE_FLASH
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_flash_write_bad_crc(
+    openable_serial_znp_server, tmp_path, mocker  # noqa: F811
+):
+    # It takes too long otherwise
+    mocker.patch("zigpy_znp.commands.ubl.IMAGE_SIZE", FAKE_IMAGE_SIZE)
+
+    # Flip the bits in one byte, the CRC should fail
+    BAD_FIRMWARE = bytearray(len(FAKE_FLASH))
+    BAD_FIRMWARE[FAKE_IMAGE_SIZE - 1] = BAD_FIRMWARE[FAKE_IMAGE_SIZE - 1] ^ 0xFF
+
+    # No communication will happen because the CRC will be invalid
+    firmware_file = tmp_path / "bad-firmware.bin"
+    firmware_file.write_bytes(BAD_FIRMWARE)
+
+    with pytest.raises(ValueError) as e:
+        await flash_write(
+            [openable_serial_znp_server._port_path, "-i", str(firmware_file)]
+        )
+
+    assert "Firmware CRC is incorrect" in str(e)

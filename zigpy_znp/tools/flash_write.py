@@ -1,4 +1,5 @@
 import sys
+import typing
 import asyncio
 import logging
 import argparse
@@ -17,11 +18,57 @@ logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 
 
+def compute_crc16(data: bytes) -> int:
+    poly = 0x1021
+    crc = 0x0000
+
+    for byte in data:
+        for _ in range(8):
+            msb = 1 if (crc & 0x8000) else 0
+
+            crc <<= 1
+            crc &= 0xFFFF
+
+            if byte & 0x80:
+                crc |= 0x0001
+
+            if msb:
+                crc ^= poly
+
+            byte <<= 1
+
+    return crc
+
+
+def get_firmware_crcs(firmware: bytes) -> typing.Tuple[int, int]:
+    # There is room for *two* CRCs in the firmware file: the expected and the computed
+    firmware_wihout_crcs = (
+        firmware[: c.ubl.IMAGE_CRC_OFFSET]
+        + firmware[c.ubl.IMAGE_CRC_OFFSET + 4 :]
+        + b"\x00\x00"
+    )
+
+    # We only use the first one. The second one is written by the bootloader into flash.
+    real_crc = int.from_bytes(
+        firmware[c.ubl.IMAGE_CRC_OFFSET : c.ubl.IMAGE_CRC_OFFSET + 2], "little"
+    )
+
+    return real_crc, compute_crc16(firmware_wihout_crcs)
+
+
 async def write_firmware(firmware: bytes, radio_path: str):
     if len(firmware) != c.ubl.IMAGE_SIZE:
         raise ValueError(
             f"Firmware is the wrong size."
             f" Expected {c.ubl.IMAGE_SIZE}, got {len(firmware)}"
+        )
+
+    expected_crc, computed_crc = get_firmware_crcs(firmware)
+
+    if expected_crc != computed_crc:
+        raise ValueError(
+            f"Firmware CRC is incorrect. "
+            f"Expected 0x{expected_crc:04X}, got 0x{computed_crc:04X}"
         )
 
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
@@ -63,7 +110,6 @@ async def write_firmware(firmware: bytes, radio_path: str):
         assert write_rsp.Status == c.ubl.BootloaderStatus.SUCCESS
 
     # Now we have to read it all back
-    # TODO: figure out how the CRC is computed!
     for offset in range(0, c.ubl.IMAGE_SIZE, buffer_size):
         address = offset // c.ubl.FLASH_WORD_SIZE
         LOGGER.info(
@@ -79,7 +125,7 @@ async def write_firmware(firmware: bytes, radio_path: str):
         assert read_rsp.FlashWordAddr == address
         assert read_rsp.Data == firmware[offset : offset + buffer_size]
 
-    # This seems to cause the firmware to compute and verify the CRC
+    # This seems to cause the bootloader to compute and verify the CRC
     enable_rsp = await znp.request_callback_rsp(
         request=c.UBL.EnableReq.Req(), callback=c.UBL.EnableRsp.Callback(partial=True),
     )
