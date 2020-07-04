@@ -10,11 +10,11 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.exceptions import InvalidCommandResponse
+from zigpy_znp.exceptions import InvalidCommandResponse, CommandNotRecognized
 from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
 
-coloredlogs.install(level=logging.DEBUG - 5)
-logging.getLogger("zigpy_znp").setLevel(logging.DEBUG - 5)
+coloredlogs.install(level=logging.DEBUG)
+logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +38,14 @@ async def backup(radio_path):
         except InvalidCommandResponse:
             LOGGER.warning("Read failed for %s", nwk_nvid)
             continue
+
+    try:
+        # Old versions of Z-Stack do not have the OSAL NVIDs
+        await znp.request(
+            c.SYS.NVLength.Req(SysId=1, ItemId=OsalExNvIds.DEVICE_LIST, SubId=0)
+        )
+    except CommandNotRecognized:
+        return data
 
     for osal_nvid in OsalExNvIds:
         length_rsp = await znp.request(

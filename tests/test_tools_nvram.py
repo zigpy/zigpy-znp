@@ -134,36 +134,45 @@ def openable_serial_znp_server(mocker, znp_server):  # noqa: F811
     return znp_server
 
 
+def osal_nv_read(req):
+    nvid = NwkNvIds(req.Id).name
+
+    if nvid not in REAL_BACKUP["nwk"]:
+        return c.SYS.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")
+
+    value = bytes.fromhex(REAL_BACKUP["nwk"][nvid])
+
+    return c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=value[req.Offset :])
+
+
+def nv_length(req):
+    nvid = OsalExNvIds(req.ItemId).name
+
+    if nvid not in REAL_BACKUP["osal"]:
+        return c.SYS.NVLength.Rsp(Length=0)
+
+    value = bytes.fromhex(REAL_BACKUP["osal"][nvid])
+
+    return c.SYS.NVLength.Rsp(Length=len(value))
+
+
+def nv_read(req):
+    nvid = OsalExNvIds(req.ItemId).name
+    value = bytes.fromhex(REAL_BACKUP["osal"][nvid])
+
+    return c.SYS.NVRead.Rsp(
+        Status=t.Status.SUCCESS, Value=value[req.Offset :][: req.Length]
+    )
+
+
+def not_recognized(req):
+    return c.RPCError.CommandNotRecognized.Rsp(
+        ErrorCode=c.rpc_error.ErrorCode.InvalidCommandId, RequestHeader=req.header
+    )
+
+
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_nvram_read(openable_serial_znp_server, tmp_path):
-    def osal_nv_read(req):
-        nvid = NwkNvIds(req.Id).name
-
-        if nvid not in REAL_BACKUP["nwk"]:
-            return c.SYS.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")
-
-        value = bytes.fromhex(REAL_BACKUP["nwk"][nvid])
-
-        return c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=value[req.Offset :])
-
-    def nv_length(req):
-        nvid = OsalExNvIds(req.ItemId).name
-
-        if nvid not in REAL_BACKUP["osal"]:
-            return c.SYS.NVLength.Rsp(Length=0)
-
-        value = bytes.fromhex(REAL_BACKUP["osal"][nvid])
-
-        return c.SYS.NVLength.Rsp(Length=len(value))
-
-    def nv_read(req):
-        nvid = OsalExNvIds(req.ItemId).name
-        value = bytes.fromhex(REAL_BACKUP["osal"][nvid])
-
-        return c.SYS.NVRead.Rsp(
-            Status=t.Status.SUCCESS, Value=value[req.Offset :][: req.Length]
-        )
-
     openable_serial_znp_server.reply_to(
         request=c.SYS.OSALNVRead.Req(partial=True), responses=[osal_nv_read],
     )
@@ -182,6 +191,34 @@ async def test_nvram_read(openable_serial_znp_server, tmp_path):
 
     # The backup JSON written to disk should be an exact copy of our fake NVRAM
     assert json.loads(backup_file.read_text()) == REAL_BACKUP
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_nvram_read_old_zstack(openable_serial_znp_server, tmp_path):
+    openable_serial_znp_server.reply_to(
+        request=c.SYS.OSALNVRead.Req(partial=True), responses=[osal_nv_read],
+    )
+
+    # SYS.NVLength doesn't exist
+    openable_serial_znp_server.reply_to(
+        request=c.SYS.NVLength.Req(partial=True), responses=[not_recognized],
+    )
+
+    # Nor does SYS.NVRead
+    openable_serial_znp_server.reply_to(
+        request=c.SYS.NVRead.Req(SysId=1, SubId=0, partial=True),
+        responses=[not_recognized],
+    )
+
+    backup_file = tmp_path / "backup.json"
+    await nvram_read([openable_serial_znp_server._port_path, "-o", str(backup_file)])
+
+    backup_without_osal = REAL_BACKUP.copy()
+    backup_without_osal["osal"] = {}
+
+    # The backup JSON written to disk should be an exact copy of our fake NVRAM,
+    # without the OSAL NVIDs
+    assert json.loads(backup_file.read_text()) == backup_without_osal
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
