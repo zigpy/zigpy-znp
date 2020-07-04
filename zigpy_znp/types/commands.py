@@ -420,7 +420,7 @@ class CommandBase:
             elif not param.optional:
                 # If we're out of data but the parameter is required, this is bad
                 raise ValueError(
-                    f"Frame has been parsed but parameters remain: {param}"
+                    f"Data has been consumed but required parameters remain: {param}"
                 )
             else:
                 # If we're out of data and the parameter is optional, we're done

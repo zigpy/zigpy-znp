@@ -276,11 +276,19 @@ def test_command_optional_params():
     assert Version.from_frame(medium_version_rsp.to_frame()) == medium_version_rsp
     assert Version.from_frame(short_version_rsp.to_frame()) == short_version_rsp
 
-    # Deserialization still fails if the frame is incomplete or too long
+    # Deserialization still fails if the frame is incomplete
     with pytest.raises(ValueError):
         Version.from_frame(
             frames.GeneralFrame(
                 header=long_version_rsp.to_frame().header, data=long_data[:-1]
+            )
+        )
+
+    # Deserialization will fail if the frame is incomplete but has no truncated fields
+    with pytest.raises(ValueError):
+        Version.from_frame(
+            frames.GeneralFrame(
+                header=long_version_rsp.to_frame().header, data=long_data[:4]
             )
         )
 

@@ -124,3 +124,12 @@ def test_zdo_nullable_node_descriptor():
 
     assert not data
     assert desc2.serialize() == desc3.serialize()
+
+
+def test_missing_enum_mixin():
+    class TestEnum(t.MissingEnumMixin, t.enum_uint8):
+        FOO = 0x01
+
+    assert TestEnum(0x01) == 0x01 == TestEnum.FOO
+    assert TestEnum(0x02) == 0x02
+    assert 0x02 not in TestEnum._value2member_map_
