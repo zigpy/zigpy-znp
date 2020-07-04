@@ -296,7 +296,7 @@ class ZNP:
 
         # If our request has no response, we cannot wait for one
         if not request.Rsp:
-            LOGGER.debug("Request has no response, not waiting for one.")
+            LOGGER.trace("Request has no response, not waiting for one.")
             self._uart.send(request.to_frame())
             return
 
