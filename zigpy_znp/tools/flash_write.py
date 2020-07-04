@@ -42,7 +42,7 @@ def compute_crc16(data: bytes) -> int:
 
 def get_firmware_crcs(firmware: bytes) -> typing.Tuple[int, int]:
     # There is room for *two* CRCs in the firmware file: the expected and the computed
-    firmware_wihout_crcs = (
+    firmware_without_crcs = (
         firmware[: c.ubl.IMAGE_CRC_OFFSET]
         + firmware[c.ubl.IMAGE_CRC_OFFSET + 4 :]
         + b"\x00\x00"
@@ -53,7 +53,7 @@ def get_firmware_crcs(firmware: bytes) -> typing.Tuple[int, int]:
         firmware[c.ubl.IMAGE_CRC_OFFSET : c.ubl.IMAGE_CRC_OFFSET + 2], "little"
     )
 
-    return real_crc, compute_crc16(firmware_wihout_crcs)
+    return real_crc, compute_crc16(firmware_without_crcs)
 
 
 async def write_firmware(firmware: bytes, radio_path: str):
