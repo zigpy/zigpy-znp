@@ -420,10 +420,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             endpoint=100, profile_id=zigpy.profiles.zll.PROFILE_ID, device_id=0x0005
         )
 
-        # Structure is in `zstack/stack/nwk/nwk.h`
+        # Structure is in `zstack/stack/nwk/nwk.h`.
+        #
+        # This is hacky but since there are exactly two distinct firmwares, it doesn't
+        # make sense to try and write some fancys struct padding guesser.
         nib = await self._znp.nvram_read(NwkNvIds.NIB)
-        self._channel = nib[24]
-        self._channels = t.Channels.deserialize(nib[40:44])[0]
+
+        if len(nib) == 116:
+            # Structs aligned to 16 bits: CC26x2, CC13X2
+            self._channel = nib[24]
+            self._channels, _ = t.Channels.deserialize(nib[40:44])
+        elif len(nib) == 110:
+            # No struct alignment: CC2531
+            self._channel = nib[22]
+            self._channels, _ = t.Channels.deserialize(nib[36:40])
+        else:
+            LOGGER.warning("Could not extract channel information from NIB: %r", nib)
 
     async def update_network(
         self,
@@ -469,9 +481,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._channels = channels
 
         if channel is not None:
-            # We modify the logical channel value directly in the NIB
+            # XXX: We modify the logical channel value directly in the NIB
             nib = bytearray(await self._znp.nvram_read(NwkNvIds.NIB))
-            nib[24] = channel
+
+            if len(nib) == 116:
+                nib[24] = channel
+            elif len(nib) == 110:
+                nib[22] = channel
+            else:
+                raise RuntimeError(f"Cannot set channel in unknown NIB struct: {nib!r}")
+
             await self._znp.nvram_write(NwkNvIds.NIB, nib)
 
             self._channel = channel
