@@ -17,7 +17,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 async def read_firmware(radio_path: str) -> bytearray:
-    znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
+    znp = ZNP(
+        CONFIG_SCHEMA(
+            {"znp_config": {"skip_bootloader": False}, "device": {"path": radio_path}}
+        )
+    )
 
     # The bootloader handshake must be the very first command
     await znp.connect(test_port=False)

@@ -71,7 +71,11 @@ async def write_firmware(firmware: bytes, radio_path: str):
             f"Expected 0x{expected_crc:04X}, got 0x{computed_crc:04X}"
         )
 
-    znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
+    znp = ZNP(
+        CONFIG_SCHEMA(
+            {"znp_config": {"skip_bootloader": False}, "device": {"path": radio_path}}
+        )
+    )
 
     # The bootloader handshake must be the very first command
     await znp.connect(test_port=False)
