@@ -216,7 +216,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """Shutdown application."""
 
         self._reconnect_task.cancel()
-        self._znp.close()
+
+        if self._znp is not None:
+            self._znp.close()
 
     def _bind_callbacks(self, api):
         api.callback_for_response(

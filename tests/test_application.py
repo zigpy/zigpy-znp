@@ -1103,3 +1103,20 @@ async def test_auto_form_necessary(application, mocker):
     assert nvram[NwkNvIds.STARTUP_OPTION] == t.StartupOptions.ClearState.serialize()
     assert nvram[NwkNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
     assert nvram[NwkNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_clean_shutdown(application, mocker):
+    app, znp_server = application
+
+    # This should not throw
+    await app.shutdown()
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_unclean_shutdown(application, mocker):
+    app, znp_server = application
+    app._znp = None
+
+    # This should also not throw
+    await app.shutdown()
