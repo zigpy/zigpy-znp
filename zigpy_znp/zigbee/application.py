@@ -21,9 +21,11 @@ from zigpy.exceptions import DeliveryError
 import zigpy_znp.config as conf
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
+
 from zigpy_znp.exceptions import InvalidCommandResponse
 
 from zigpy_znp.api import ZNP
+from zigpy_znp.znp.nib import parse_nib
 from zigpy_znp.types.nvids import NwkNvIds
 
 
@@ -420,22 +422,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             endpoint=100, profile_id=zigpy.profiles.zll.PROFILE_ID, device_id=0x0005
         )
 
-        # Structure is in `zstack/stack/nwk/nwk.h`.
-        #
-        # This is hacky but since there are exactly two distinct firmwares, it doesn't
-        # make sense to try and write some fancys struct padding guesser.
-        nib = await self._znp.nvram_read(NwkNvIds.NIB)
+        nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+        LOGGER.debug("Parsed NIB: %s", nib)
 
-        if len(nib) == 116:
-            # Structs aligned to 16 bits: CC26x2, CC13X2
-            self._channel = nib[24]
-            self._channels, _ = t.Channels.deserialize(nib[40:44])
-        elif len(nib) == 110:
-            # No struct alignment: CC2531
-            self._channel = nib[22]
-            self._channels, _ = t.Channels.deserialize(nib[36:40])
-        else:
-            LOGGER.warning("Could not extract channel information from NIB: %r", nib)
+        self._channel = nib.nwkLogicalChannel
+        self._channels = nib.channelList
+        self._pan_id = nib.nwkPanId
+        self._ext_pan_id = nib.extendedPANID
+        self._nwk = nib.nwkDevAddress
+
+        LOGGER.info(
+            "Using channel mask %s, currently on channel %d",
+            self.channels,
+            self.channel,
+        )
 
     async def update_network(
         self,
@@ -481,17 +481,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._channels = channels
 
         if channel is not None:
-            # XXX: We modify the logical channel value directly in the NIB
-            nib = bytearray(await self._znp.nvram_read(NwkNvIds.NIB))
-
-            if len(nib) == 116:
-                nib[24] = channel
-            elif len(nib) == 110:
-                nib[22] = channel
-            else:
-                raise RuntimeError(f"Cannot set channel in unknown NIB struct: {nib!r}")
-
-            await self._znp.nvram_write(NwkNvIds.NIB, nib)
+            # We modify the logical channel value directly in the NIB.
+            # Does this actually work?
+            nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+            nib.nwkLogicalChannel = channel
+            await self._znp.nvram_write(NwkNvIds.NIB, nib.serialize())
 
             self._channel = channel
 

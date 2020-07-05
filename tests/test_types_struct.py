@@ -84,10 +84,6 @@ def test_struct_converter():
     assert nstd.cmd.id_0 == 2
     assert nstd.cmd.id_1 == 3
 
-    test_2 = Nested((4, 5))
-    assert test_2.cmd.id_0 == 4
-    assert test_2.cmd.id_1 == 5
-
 
 def test_struct_converter_2():
     @attr.s
