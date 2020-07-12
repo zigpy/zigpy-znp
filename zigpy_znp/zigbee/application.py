@@ -756,7 +756,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         hops=0,
         non_member_radius=3,
     ):
-        raise NotImplementedError()  # pragma: no cover
+        return await self._send_request(
+            dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=group_id),
+            dst_ep=src_ep,
+            src_ep=src_ep,  # not actually used?
+            cluster=cluster,
+            sequence=sequence,
+            options=c.af.TransmitOptions.NONE,
+            radius=hops,
+            data=data,
+        )
 
     async def force_remove(self, device) -> None:
         """Forcibly remove device from NCP."""
