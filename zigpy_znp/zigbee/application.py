@@ -698,8 +698,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ):
         tx_options = c.af.TransmitOptions.RouteDiscovery
 
-        # if expect_reply:
-        #    tx_options |= c.af.TransmitOptions.APSAck
+        if expect_reply:
+            tx_options |= c.af.TransmitOptions.APSAck
 
         if use_ieee:
             destination = t.AddrModeAddress(mode=t.AddrMode.IEEE, address=device.ieee)
