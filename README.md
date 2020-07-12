@@ -14,10 +14,10 @@ Install the Python module within your virtual environment:
 (venv) $ pip install zigpy-znp
 ```
 
-If you are using Home Assistant, copy `custom_components/custom_zha_radios.py` into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
+If you are using Home Assistant, copy `custom_components/zha_custom_radios.py` into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
 
 ```yaml
-custom_zha_radios:
+zha_custom_radios:
  znp:
    module: zigpy_znp.zigbee.application
    description: TI CC13x2, CC26x2, ZZH, and CC2531
