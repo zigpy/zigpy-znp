@@ -405,17 +405,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.SUCCESS
             )
 
-        # Register our endpoints
-        await self._register_endpoint(endpoint=1)
         await self._register_endpoint(
-            endpoint=8,
-            device_id=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
-            output_clusters=[clusters.security.IasZone.cluster_id],
+            endpoint=1,
+            profile_id=zigpy.profiles.zha.PROFILE_ID,
+            input_clusters=[clusters.general.Ota.cluster_id],
         )
-        await self._register_endpoint(endpoint=11)
-        await self._register_endpoint(endpoint=12)
+
         await self._register_endpoint(
-            endpoint=13, input_clusters=[clusters.general.Ota.cluster_id]
+            endpoint=2,
+            device_id=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
+            output_clusters=[
+                clusters.security.IasZone.cluster_id,
+                clusters.security.IasWd.cluster_id,
+            ],
         )
 
         await self._register_endpoint(
@@ -540,7 +542,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             reset=False,
         )
 
-        # We want to receive all ZDO callbacks to proxy them back go zipgy
+        # We want to receive all ZDO callbacks to proxy them back to zipgy
         await self._znp.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
 
         # Reset now so that the changes take effect
