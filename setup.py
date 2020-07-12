@@ -21,7 +21,7 @@ setup(
     install_requires=[
         "attrs",
         "pyserial-asyncio",
-        "zigpy>=0.21.0",
+        "zigpy>=0.22.1",
         "async_timeout",
         "voluptuous",
         "coloredlogs",

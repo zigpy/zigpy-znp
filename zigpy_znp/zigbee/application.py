@@ -12,7 +12,7 @@ import zigpy.application
 import zigpy.profiles
 import zigpy.zcl.foundation
 
-from zigpy.zdo.types import ZDOCmd, ZDOHeader, NodeDescriptor, CLUSTERS as ZDO_CLUSTERS
+from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
 
 from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
@@ -156,19 +156,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         field_names, field_types = ZDO_CLUSTERS[cluster]
         assert set(zdo_kwargs) == set(field_names)
 
-        # TODO: Remove this fix when https://github.com/zigpy/zigpy/pull/434 is merged
-        zdo_args = []
-
-        for name, field_type in zip(field_names, field_types):
-            zdo_arg = zdo_kwargs[name]
-
-            if issubclass(field_type, NodeDescriptor):
-                # XXX: `t.Optional(NodeDescriptor).__init__` doesn't work well
-                assert isinstance(zdo_arg, NodeDescriptor)
-                zdo_args.append(zdo_arg)
-            else:
-                zdo_args.append(field_type(zdo_arg))
-
+        zdo_args = [t(zdo_kwargs[n]) for n, t in zip(field_names, field_types)]
         message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
 
         LOGGER.trace("Pretending we received a ZDO message: %s", message)
