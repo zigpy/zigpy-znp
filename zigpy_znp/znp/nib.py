@@ -235,7 +235,6 @@ def parse_nib(data: bytes) -> typing.Union[NIB, OldNIB]:
     else:
         raise ValueError(f"Unknown NIB format: {data!r}")
 
-    if remaining:
-        raise ValueError(f"NIB was parsed but trailing bytes remain: {remaining!r}")
+    assert not remaining
 
     return nib

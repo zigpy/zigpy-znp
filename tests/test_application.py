@@ -1120,3 +1120,19 @@ async def test_unclean_shutdown(application, mocker):
 
     # This should also not throw
     await app.shutdown()
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_mrequest(application, mocker):
+    app, znp_server = application
+
+    mocker.patch.object(app, "_send_request", new=CoroutineMock())
+    group = app.groups.add_group(0x1234, "test group")
+
+    await group.endpoint.on_off.on()
+
+    assert app._send_request.call_count == 1
+    assert app._send_request.mock_calls[0][2]["dst_addr"] == t.AddrModeAddress(
+        mode=t.AddrMode.Group, address=0x1234
+    )
+    assert app._send_request.mock_calls[0][2]["data"] == b"\x01\x01\x01"
