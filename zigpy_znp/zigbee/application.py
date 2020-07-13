@@ -159,7 +159,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         zdo_args = [t(zdo_kwargs[n]) for n, t in zip(field_names, field_types)]
         message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
 
-        LOGGER.trace("Pretending we received a ZDO message: %s", message)
+        LOGGER.debug("Pretending we received a ZDO message: %s", message)
         self.handle_message(
             sender=sender,
             profile=zigpy.profiles.zha.PROFILE_ID,
@@ -575,7 +575,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         This method translates the ZDO_* MT response into one zigpy can handle.
         """
 
-        LOGGER.trace(
+        LOGGER.debug(
             "Intercepted a ZDO request: dst_addr=%s, dst_ep=%s, src_ep=%s, "
             "cluster=%s, sequence=%s, options=%s, radius=%s, data=%s",
             dst_addr,

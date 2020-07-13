@@ -63,10 +63,10 @@ class ZnpMtProtocol(asyncio.Protocol):
         """Callback when data is received."""
         self._buffer += data
 
-        LOGGER.trace("Received data: %s", Bytes.__repr__(data))
+        LOGGER.debug("Received data: %s", Bytes.__repr__(data))
 
         for frame in self._extract_frames():
-            LOGGER.trace("Parsed frame: %s", frame)
+            LOGGER.debug("Parsed frame: %s", frame)
 
             try:
                 self._api.frame_received(frame.payload)
@@ -80,7 +80,7 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._transport_write(frames.TransportFrame(payload).serialize())
 
     def _transport_write(self, data: bytes) -> None:
-        LOGGER.trace("Sending data: %s", Bytes.__repr__(data))
+        LOGGER.debug("Sending data: %s", Bytes.__repr__(data))
         self.transport.write(data)
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:

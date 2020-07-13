@@ -206,17 +206,17 @@ class ZNP:
         self._cancel_all_listeners()
 
     def _remove_listener(self, listener: BaseResponseListener) -> None:
-        LOGGER.trace("Removing listener %s", listener)
+        LOGGER.debug("Removing listener %s", listener)
 
         for header in listener.matching_headers():
             self._response_listeners[header].remove(listener)
 
             if not self._response_listeners[header]:
-                LOGGER.trace("Cleaning up empty listener list for header %s", header)
+                LOGGER.debug("Cleaning up empty listener list for header %s", header)
                 del self._response_listeners[header]
 
         total_listeners = sum(map(len, self._response_listeners.values()))
-        LOGGER.trace("There are %d listeners remaining", total_listeners)
+        LOGGER.debug("There are %d listeners remaining", total_listeners)
 
     def frame_received(self, frame: GeneralFrame) -> None:
         """
@@ -233,11 +233,11 @@ class ZNP:
 
         for listener in self._response_listeners[command.header]:
             if not listener.resolve(command):
-                LOGGER.trace("%s does not match %s", command, listener)
+                LOGGER.debug("%s does not match %s", command, listener)
                 continue
 
             matched = True
-            LOGGER.trace("%s matches %s", command, listener)
+            LOGGER.debug("%s matches %s", command, listener)
 
         if not matched:
             LOGGER.warning("Received an unhandled command: %s", command)
@@ -245,7 +245,7 @@ class ZNP:
     def callback_for_responses(self, responses, callback) -> None:
         listener = CallbackResponseListener(responses, callback=callback)
 
-        LOGGER.trace("Creating callback %s", listener)
+        LOGGER.debug("Creating callback %s", listener)
 
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
@@ -256,7 +256,7 @@ class ZNP:
     def wait_for_responses(self, responses) -> asyncio.Future:
         listener = OneShotResponseListener(responses)
 
-        LOGGER.trace("Creating one-shot listener %s", listener)
+        LOGGER.debug("Creating one-shot listener %s", listener)
 
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
@@ -296,7 +296,7 @@ class ZNP:
 
         # If our request has no response, we cannot wait for one
         if not request.Rsp:
-            LOGGER.trace("Request has no response, not waiting for one.")
+            LOGGER.debug("Request has no response, not waiting for one.")
             self._uart.send(request.to_frame())
             return
 
