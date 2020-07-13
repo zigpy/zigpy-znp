@@ -12,6 +12,12 @@ import zigpy.zdo.types
 import zigpy_znp.types as t
 
 
+# ZDO status is very similar to the normal Status but they differ on some fields
+ZDO_STATUS_SCHEMA = t.Schema(
+    (t.Param("Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"),)
+)
+
+
 class SecurityEntry(t.FixedList, item_type=t.uint8_t, length=5):
     pass
 
@@ -105,7 +111,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request a device’s IEEE 64-bit address
@@ -125,7 +131,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # inquire about the Node Descriptor information of the destination device
@@ -146,7 +152,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # inquire about the Power Descriptor information of the destination device
@@ -167,7 +173,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # inquire as to the Simple Descriptor of the destination device’s Endpoint
@@ -189,7 +195,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Endpoint", t.uint8_t, "application endpoint the data is from"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request a list of active endpoint from the destination device
@@ -210,7 +216,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request the device match descriptor
@@ -234,7 +240,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request for the destination device’s complex descriptor
@@ -255,7 +261,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request for the destination device’s user descriptor
@@ -276,7 +282,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # This command will cause the CC2480 device to issue an “End device announce”
@@ -296,7 +302,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # write a User Descriptor value to the targeted device
@@ -316,7 +322,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("UserDescriptor", t.ShortBytes, "User descriptor array"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # discover the location of a particular system server or servers as indicated by
@@ -332,7 +338,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request an End Device Bind with the destination device
@@ -361,7 +367,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request a Bind
@@ -379,7 +385,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request a UnBind
@@ -400,7 +406,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("DstEndpoint", t.uint8_t, "Binding destination endpoint"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request the destination device to perform a network discovery
@@ -419,7 +425,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request the destination device to perform a LQI query of other devices
@@ -437,7 +443,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request the Routing Table of the destination device
@@ -454,7 +460,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request the Binding Table of the destination device
@@ -471,7 +477,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request a Management Leave Request for the target device
@@ -503,7 +509,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request the Management Direct Join Request of a designated device
@@ -517,7 +523,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # set the Permit Join for the destination device
@@ -540,7 +546,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # allow updating of network configuration parameters or to request information
@@ -566,7 +572,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # register for a ZDO callback
@@ -582,7 +588,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # de-register for a ZDO callback
@@ -598,7 +604,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # starts the device in the network
@@ -636,7 +642,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("LinkKeyData", t.KeyData, "128bit link key"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # remove the application link key for a given device
@@ -646,7 +652,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (t.Param("IEEE", t.EUI64, "Extended address of the device"),)
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # get the application link key for a given device
@@ -677,7 +683,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("ScanDuration", t.uint8_t, "Scanning time"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # request the device to join itself to a parent device on a network
@@ -702,7 +708,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # set rejoin backoff duration and rejoin scan duration for an end device
@@ -722,7 +728,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handles the ZDO security add link key extension message
@@ -736,7 +742,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("LinkKeyData", t.KeyData, "128bit link key"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO security entry lookup extended extension message
@@ -765,7 +771,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (t.Param("IEEE", t.EUI64, "Extended address of the device"),)
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO route discovery extension message
@@ -779,7 +785,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Radius", t.uint8_t, "Broadcast radius"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO route check extension messags
@@ -793,7 +799,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Options", t.uint8_t, "Route options"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO extended remove group extension message
@@ -806,7 +812,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("GroupId", t.GroupId, "ID to look for group"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO extended remove all group extension message
@@ -814,7 +820,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         t.CommandType.SREQ,
         0x48,
         req_schema=t.Schema((t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),)),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO extension find all groups for endpoint message
@@ -855,7 +861,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("GroupName", t.CharacterString, "Group name"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO extension count all groups message
@@ -878,7 +884,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("SetValue", t.uint8_t, "Value to be set to ZMac message"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO security update network key extension message
@@ -892,7 +898,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Key", t.KeyData, "Network key"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO security switch network key extension message
@@ -905,7 +911,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("KeySeqNum", t.uint8_t, "Key sequence number"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle the ZDO extension network message
@@ -936,7 +942,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("ParentNWK", t.NWK, "Short address of the parent"),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # forces a network concentrator change by resetting zgConcentratorEnable and
@@ -952,7 +958,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=t.Schema(
             (t.Param("UseMulticast", t.Bool, "Set or reset of multicast"),)
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # handle ZDO network address of interest request
@@ -974,7 +980,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 ),
             )
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=ZDO_STATUS_SCHEMA,
     )
 
     # ZDO Callbacks
@@ -1416,7 +1422,9 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     )
 
     # indication to inform host device the completion of network discovery scan
-    NwkDiscoveryCnf = t.CommandDef(t.CommandType.AREQ, 0xC7, rsp_schema=t.STATUS_SCHEMA)
+    NwkDiscoveryCnf = t.CommandDef(
+        t.CommandType.AREQ, 0xC7, rsp_schema=ZDO_STATUS_SCHEMA
+    )
 
     # an indication to inform the host of a device leaving the network
     LeaveInd = t.CommandDef(

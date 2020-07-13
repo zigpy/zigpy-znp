@@ -383,7 +383,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Get our active endpoints
         endpoints = await self._znp.request_callback_rsp(
             request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
-            RspStatus=t.Status.SUCCESS,
+            RspStatus=t.ZDOStatus.SUCCESS,
             callback=c.ZDO.ActiveEpRsp.Callback(partial=True),
         )
 
@@ -613,7 +613,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         try:
             async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
                 response = await self._znp.request_callback_rsp(
-                    request=request, RspStatus=t.Status.SUCCESS, callback=callback
+                    request=request, RspStatus=t.ZDOStatus.SUCCESS, callback=callback
                 )
         except InvalidCommandResponse as e:
             raise DeliveryError(f"Could not send command: {e.response.Status}") from e

@@ -186,7 +186,7 @@ def application(znp_server):
     znp_server.reply_to(
         request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
-            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.ActiveEpReq.Rsp(Status=t.ZDOStatus.SUCCESS),
             c.ZDO.ActiveEpRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
@@ -199,7 +199,7 @@ def application(znp_server):
     znp_server.reply_to(
         request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
         responses=[
-            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.ActiveEpReq.Rsp(Status=t.ZDOStatus.SUCCESS),
             c.ZDO.ActiveEpRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
@@ -466,7 +466,7 @@ async def test_permit_join_failure(application):
     permit_join_sent = znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
         responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.ZDOStatus.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFF, Status=t.ZDOStatus.TIMEOUT),
         ],
     )
