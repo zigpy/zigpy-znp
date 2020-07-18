@@ -75,7 +75,12 @@ class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
 
     def serialize(self) -> bytes:
         # Special case when the node descriptor is completely empty
-        if all(getattr(self, field) is None for field, _ in self._fields):
+        if hasattr(self, "_fields"):
+            is_empty = all(getattr(self, field) is None for field, _ in self._fields)
+        else:
+            is_empty = not self.assigned_fields()
+
+        if is_empty:
             return b"\x00"
 
         return super().serialize()
