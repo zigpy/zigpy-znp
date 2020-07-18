@@ -5,6 +5,7 @@ import importlib
 from homeassistant.core import HomeAssistant
 from homeassistant.config import load_yaml_config_file, YAML_CONFIG_FILE
 from homeassistant.__main__ import get_arguments
+from homeassistant.util.package import install_package
 
 LOGGER = logging.getLogger(__name__)
 DOMAIN = "zha_custom_radios"
@@ -73,6 +74,9 @@ def inject(config):
         module = importlib.import_module(obj["module"])
         app = module.ControllerApplication
         description = obj["description"]
+
+        if obj.get("package"):
+            install_package(obj["package"])
 
         LOGGER.warning("Injecting %s (%s) as a new radio type", name, obj)
         inject_enum_member(RadioType, name, (description, app))
