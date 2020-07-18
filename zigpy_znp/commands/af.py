@@ -22,7 +22,7 @@ class LatencyReq(t.enum_uint8):
 
 
 class AF(t.CommandsBase, subsystem=t.Subsystem.AF):
-    # This command enables the tester to register an application’s endpoint description
+    # This command enables the tester to register an application's endpoint description
     Register = t.CommandDef(
         t.CommandType.SREQ,
         0x00,

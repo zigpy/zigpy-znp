@@ -38,7 +38,7 @@ class SAPI(t.CommandsBase, subsystem=t.Subsystem.SAPI):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # establishes or removes a ‘binding’ between two devices. Once bound, an
+    # establishes or removes a 'binding' between two devices. Once bound, an
     # application can send messages to a device by referencing the commandId
     # for the binding
     ZBBindDevice = t.CommandDef(

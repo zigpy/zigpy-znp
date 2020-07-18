@@ -1,5 +1,5 @@
 """This interface allows the tester to interact with the target at system level such
-as reset, read/write memory, read/write extended address…etc.
+as reset, read/write memory, read/write extended address, etc.
 """
 
 import zigpy_znp.types as t
@@ -25,7 +25,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
                     t.ResetType,
                     (
                         "This command will reset the device by using a hardware reset "
-                        "(i.e. watchdog reset) if ‘Type’ is zero. Otherwise a soft "
+                        "(i.e. watchdog reset) if 'Type' is zero. Otherwise a soft "
                         "reset (i.e. a jump to the reset vector) is done. This "
                         "is especially useful in the CC2531, for instance, so that the "
                         "USB host does not have to contend with the USB H/W resetting "
@@ -54,7 +54,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         ),
     )
 
-    # request for the device’s version string
+    # request for the device's version string
     Version = t.CommandDef(
         t.CommandType.SREQ,
         0x02,
@@ -151,7 +151,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     # data for the NV item will be initialized (starting at offset of zero) with the
     # values from InitData. Note that it is not necessary to initialize the entire NV
     # item (InitLen < ItemLen). It is also possible to create an NV item that is larger
-    # than the maximum length InitData – use the SYS_OSAL_NV_WRITE command to finish
+    # than the maximum length InitData - use the SYS_OSAL_NV_WRITE command to finish
     # the initialization
     OSALNVItemInit = t.CommandDef(
         t.CommandType.SREQ,
@@ -323,7 +323,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     )
 
     # set the target system date and time. The time can be specified in
-    # “seconds since 00:00:00 on January 1, 2000”
+    # "seconds since 00:00:00 on January 1, 2000"
     # or in parsed date/time components
     SetTime = t.CommandDef(
         t.CommandType.SREQ,
@@ -347,7 +347,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     )
 
     # get the target system date and time. The time is returned in
-    # “seconds since 00:00:00 on January 1, 2000” and parsed date/time components
+    # "seconds since 00:00:00 on January 1, 2000" and parsed date/time components
     GetTime = t.CommandDef(
         t.CommandType.SREQ,
         0x11,
@@ -370,7 +370,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     )
 
     # set the target system radio transmit power. The returned TX power is the actual
-    # setting applied to the radio – nearest characterized value for the specific
+    # setting applied to the radio - nearest characterized value for the specific
     # radio
     SetTxPower = t.CommandDef(
         t.CommandType.SREQ,
@@ -379,7 +379,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
             (t.Param("TXPower", t.int8s, "Requested TX power setting, in dBm"),)
         ),
         # While the docs say "the returned TX power is the actual setting applied to
-        # the radio – nearest characterized value for the specific radio.", the code
+        # the radio - nearest characterized value for the specific radio.", the code
         # matches the documentation.
         rsp_schema=t.STATUS_SCHEMA,
     )

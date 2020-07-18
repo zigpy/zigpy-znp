@@ -30,7 +30,7 @@ class App(t.CommandsBase, subsystem=t.Subsystem.APP):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # This command is used by tester to issue user’s defined commands to the
+    # This command is used by tester to issue user's defined commands to the
     # application
     UserTest = t.CommandDef(
         t.CommandType.SREQ,

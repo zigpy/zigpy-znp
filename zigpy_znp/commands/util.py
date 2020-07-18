@@ -1,5 +1,5 @@
 """This interface provides tester supporting functionalities such as setting PanId,
-getting device info, getting NV info, subscribing callbacks…etc."""
+getting device info, getting NV info, subscribing callbacks, etc."""
 
 import zigpy_znp.types as t
 
@@ -177,7 +177,7 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # get the board’s time alive
+    # get the board's time alive
     TimeAlive = t.CommandDef(
         t.CommandType.SREQ,
         0x09,

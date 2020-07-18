@@ -82,9 +82,9 @@ class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
 
 
 class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
-    # send a “Network Address Request”. This message sends a broadcast message looking
+    # send a "Network Address Request". This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
-    # “ZDO Network Address Response” to receive the response to this message
+    # "ZDO Network Address Response" to receive the response to this message
     NwkAddrReq = t.CommandDef(
         t.CommandType.SREQ,
         0x00,
@@ -108,7 +108,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # request a device’s IEEE 64-bit address
+    # request a device's IEEE 64-bit address
     IEEEAddrReq = t.CommandDef(
         t.CommandType.SREQ,
         0x01,
@@ -170,7 +170,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # inquire as to the Simple Descriptor of the destination device’s Endpoint
+    # inquire as to the Simple Descriptor of the destination device's Endpoint
     SimpleDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x04,
@@ -237,7 +237,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # request for the destination device’s complex descriptor
+    # request for the destination device's complex descriptor
     ComplexDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x07,
@@ -258,7 +258,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # request for the destination device’s user descriptor
+    # request for the destination device's user descriptor
     UserDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x08,
@@ -279,7 +279,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # This command will cause the CC2480 device to issue an “End device announce”
+    # This command will cause the CC2480 device to issue an "End device announce"
     # broadcast packet to the network. This is typically used by an end-device to
     # announce itself to the network
     EndDeviceAnnce = t.CommandDef(
@@ -321,7 +321,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
 
     # discover the location of a particular system server or servers as indicated by
     # the ServerMask parameter. The destination addressing on this request is
-    # ‘broadcast to all RxOnWhenIdle devices’
+    # 'broadcast to all RxOnWhenIdle devices'
     ServerDiscReq = t.CommandDef(
         t.CommandType.SREQ,
         0x0C,
@@ -350,8 +350,8 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                     "LocalCoordinator",
                     t.NWK,
                     (
-                        "local coordinator’s short address. In the case of source "
-                        "binding, it’s the short address of the source address"
+                        "local coordinator's short address. In the case of source "
+                        "binding, it's the short address of the source address"
                     ),
                 ),
                 t.Param("IEEE", t.EUI64, "Local coordinator's IEEE address"),
@@ -1026,13 +1026,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x82,
         rsp_schema=t.Schema(
             (
-                t.Param("Src", t.NWK, "The message’s source network address."),
+                t.Param("Src", t.NWK, "The message's source network address."),
                 t.Param(
                     "Status",
                     t.ZDOStatus,
                     "This field indicates either SUCCESS or FAILURE.",
                 ),
-                t.Param("NWK", t.NWK, "Device’s short address of this Node descriptor"),
+                t.Param("NWK", t.NWK, "Device's short address of this Node descriptor"),
                 t.Param("NodeDescriptor", NullableNodeDescriptor, "Node descriptor"),
             )
         ),
@@ -1338,7 +1338,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.Schema(
             (
                 t.Param("Src", t.NWK, "Source address of the message."),
-                t.Param("NWK", t.NWK, "Specifies the device’s short address"),
+                t.Param("NWK", t.NWK, "Specifies the device's short address"),
                 t.Param(
                     "IEEE",
                     t.EUI64,

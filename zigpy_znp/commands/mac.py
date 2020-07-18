@@ -15,7 +15,7 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
                 t.Param(
                     "SetDefault",
                     t.Bool,
-                    "TRUE – Set the MAC pib values to default values",
+                    "TRUE - Set the MAC pib values to default values",
                 ),
             )
         ),
@@ -358,7 +358,7 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
     SetRxGainReq = t.CommandDef(
         t.CommandType.SREQ,
         0x0F,
-        req_schema=t.Schema((t.Param("Mode", t.Bool, "PA/PNA mode – True/False"),)),
+        req_schema=t.Schema((t.Param("Mode", t.Bool, "PA/PNA mode - True/False"),)),
         rsp_schema=t.STATUS_SCHEMA,
     )
 

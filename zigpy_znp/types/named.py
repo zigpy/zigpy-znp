@@ -51,7 +51,7 @@ class StackTuneOperation(basic.enum_uint8):
 
     PowerLevel = 0x00  # XXX: [Value] should correspond to the valid values
     # specified by the ZMacTransmitPower_t
-    # enumeration (0xFD – 0x16)
+    # enumeration (0xFD - 0x16)
 
     SetRxOnWhenIdle = 0x01  # Set RxOnWhenIdle off/on if the value of Value is 0/1;
     # otherwise return the 0x01 current setting of RxOnWhenIdle.
@@ -79,7 +79,7 @@ class AddrModeAddress(struct.Struct):
         mode, data = AddrMode.deserialize(data)
         if mode in (AddrMode.NWK, AddrMode.Group, AddrMode.Broadcast):
             # a value of 2 indicates 2-byte (16-bit) address mode,
-            # using only the 2 LSB’s of the DstAddr field to form
+            # using only the 2 LSB's of the DstAddr field to form
             # a 2-byte short address.
             addr64, data = basic.uint64_t.deserialize(data)
             addr = NWK(addr64 & 0xFFFF)
