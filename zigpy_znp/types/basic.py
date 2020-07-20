@@ -173,24 +173,10 @@ class LongBytes(ShortBytes):
     _header = uint16_t
 
 
-class TypedListMeta(list):
+class LVList(list):
     _item_type = None
-    _length = None
+    _header = None
 
-    def serialize(self) -> bytes:
-        if self._length is not None and len(self) != self._length:
-            raise ValueError(
-                f"Invalid length for {self!r}: expected {self._length}, got {len(self)}"
-            )
-
-        return b"".join([self._item_type(i).serialize() for i in self])
-
-    @classmethod
-    def deserialize(cls, data: bytes):
-        raise NotImplementedError()  # pragma: no cover
-
-
-class LVList(TypedListMeta):
     def __init_subclass__(cls, *, item_type, length_type) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
@@ -198,10 +184,12 @@ class LVList(TypedListMeta):
 
     def serialize(self) -> bytes:
         assert self._item_type is not None
-        return self._header(len(self)).serialize() + super().serialize()
+        return self._header(len(self)).serialize() + serialize_list(
+            [self._item_type(i) for i in self]
+        )
 
     @classmethod
-    def deserialize(cls, data: bytes):
+    def deserialize(cls, data: bytes) -> typing.Tuple["LVList", bytes]:
         assert cls._item_type is not None
         length, data = cls._header.deserialize(data)
         r = cls()
