@@ -132,8 +132,8 @@ def test_lvlist_too_short():
 
 
 def test_hex_repr():
-    class NwkAsHex(t.HexRepr, t.uint16_t):
-        _hex_len = 4
+    class NwkAsHex(t.uint16_t, hex_repr=True):
+        pass
 
     nwk = NwkAsHex(0x123A)
     assert str(nwk) == "0x123A"
@@ -141,6 +141,17 @@ def test_hex_repr():
 
     assert str([nwk]) == "[0x123A]"
     assert repr([nwk]) == "[0x123A]"
+
+    # You can turn it off as well
+    class NwkWithoutHex(NwkAsHex, hex_repr=False):
+        pass
+
+    nwk = NwkWithoutHex(1234)
+    assert str(nwk) == "1234"
+    assert repr(nwk) == "1234"
+
+    assert str([nwk]) == "[1234]"
+    assert repr([nwk]) == "[1234]"
 
 
 def test_fixed_list():

@@ -117,7 +117,7 @@ class Beacon(struct.Struct):
     ExtendedPanId = attr.ib(type=ExtendedPanId, converter=ExtendedPanId)
 
 
-class GroupId(basic.HexRepr, basic.uint16_t):
+class GroupId(basic.uint16_t, hex_repr=True):
     """"Group ID class"""
 
     pass

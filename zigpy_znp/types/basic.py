@@ -36,28 +36,35 @@ class FixedIntType(int):
     _signed = None
     _size = None
 
-    def _concrete_new(cls, value=0):
-        instance = super().__new__(cls, value)
+    def __new__(cls, *args, **kwargs):
+        if cls._signed is None or cls._size is None:
+            raise TypeError(f"{cls} is abstract and cannot be created")
+
+        instance = super().__new__(cls, *args, **kwargs)
         instance.serialize()
 
         return instance
 
-    def __new__(cls, value):
-        raise TypeError(f"Instances of abstract type {cls} cannot be created")
+    def __init_subclass__(cls, signed=None, size=None, hex_repr=None) -> None:
+        super().__init_subclass__()
 
-    def __init_subclass__(cls, signed=None, size=None, **kwargs) -> None:
         if signed is not None:
             cls._signed = signed
 
         if size is not None:
             cls._size = size
 
-        # XXX: The enum module uses the first class with `__new__` in its `__dict__`
-        #      as the member type. We have to give each subclass its own `__new__`.
-        if signed is not None or size is not None:
-            cls.__new__ = cls._concrete_new
+        if hex_repr:
+            fmt = f"0x{{:0{cls._size * 2}X}}"
+            cls.__str__ = cls.__repr__ = lambda self: fmt.format(self)
+        elif hex_repr is not None and not hex_repr:
+            cls.__str__ = super().__str__
+            cls.__repr__ = super().__repr__
 
-        super().__init_subclass__(**kwargs)
+        # XXX: The enum module uses the first class with __new__ in its __dict__ as the
+        #      member type. We have to ensure this is true for every subclass.
+        if "__new__" not in cls.__dict__:
+            cls.__new__ = cls.__new__
 
     def serialize(self) -> bytes:
         try:
@@ -67,7 +74,7 @@ class FixedIntType(int):
             raise ValueError(str(e)) from e
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["int_t", bytes]:
+    def deserialize(cls, data: bytes) -> typing.Tuple["FixedIntType", bytes]:
         if len(data) < cls._size:
             raise ValueError(f"Data is too short to contain {cls._size} bytes")
 
@@ -204,27 +211,33 @@ class LVList(TypedListMeta):
         return r, data
 
 
-class FixedList(TypedListMeta):
+class FixedList(list):
+    _item_type = None
+    _length = None
+
     def __init_subclass__(cls, *, item_type, length) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
         cls._length = length
 
+    def serialize(self) -> bytes:
+        assert self._length is not None
+
+        if len(self) != self._length:
+            raise ValueError(
+                f"Invalid length for {self!r}: expected {self._length}, got {len(self)}"
+            )
+
+        return serialize_list([self._item_type(i) for i in self])
+
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: bytes) -> typing.Tuple["FixedList", bytes]:
         assert cls._item_type is not None
         r = cls()
         for i in range(cls._length):
             item, data = cls._item_type.deserialize(data)
             r.append(item)
         return r, data
-
-
-class HexRepr:
-    def __str__(self):
-        return ("0x{:0" + str(self._size * 2) + "X}").format(self)
-
-    __repr__ = __str__
 
 
 class EnumIntFlagMixin:
