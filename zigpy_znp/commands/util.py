@@ -4,24 +4,47 @@ getting device info, getting NV info, subscribing callbacks, etc."""
 import zigpy_znp.types as t
 
 
-class BindEntry(t.FixedList, item_type=t.uint8_t, length=14):
-    """"The packed BindingEntry_t structure returned by the proxy call."""
+class BindEntry(t.Struct):
+    srcEP: t.uint8_t
+    dstGroupMode: t.uint8_t  # 0 - Normal address index, 1 - Group address
+    dstIdx: t.uint16_t
+    dstEP: t.uint8_t
+    clusterIdList: t.ClusterIdList
 
-    pass
 
+class Device(t.Struct):
+    class AgingEndDevice(t.Struct):
+        endDevCfg: t.uint8_t
+        deviceTimeout: t.uint32_t
 
-class Device(t.FixedList, item_type=t.uint8_t, length=18):
-    """associated_devices_t structure returned by the proxy call to
-        AssocFindDevice()"""
+    class LinkInfo(t.Struct):
+        txCounter: t.uint8_t  # Counter of transmission success/failures
+        txCost: t.uint8_t  # Average of sending rssi values if link staus is enabled
+        #   i.e. NWK_LINK_STATUS_PERIOD is defined as non zero
+        rxLqi: t.uint8_t  # average of received rssi values
+        # needs to be converted to link cost (1-7) before used
+        inKeySeqNum: t.uint8_t  # security key sequence number
+        inFrmCntr: t.uint32_t  # security frame counter..
+        txFailure: t.uint16_t  # higher values indicate more failures
 
-    pass
+    shortAddr: t.NWK
+    addrIdx: t.uint16_t
+    nodeRelation: t.uint8_t
+    devStatus: t.uint8_t
+    assocCnt: t.uint8_t
+    age: t.uint8_t
+    linkInfo: LinkInfo
+    endDev: AgingEndDevice
+    timeoutCounter: t.uint32_t
+    keepaliveRcv: t.Bool
+    ctrl: t.uint8_t
 
 
 class Key(t.FixedList, item_type=t.uint8_t, length=42):
     pass
 
 
-class RandomNumbers(t.FixedList, item_type=t.uint8_t, length=0x64):
+class RandomNumbers(t.FixedList, item_type=t.uint8_t, length=100):
     pass
 
 
