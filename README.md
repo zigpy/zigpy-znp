@@ -31,8 +31,8 @@ Below are the defaults with the top-level Home Assistant `zha:` key:
 zha:
   zigpy_config:
     znp_config:
-      tx_power: None           # if set, must be between -22 (low) and 19 (high)
-      led_mode: None           # if set, must be one of: off, on, blink, flash, toggle
+      tx_power:                # if set, must be between -22 (low) and 19 (high)
+      led_mode:                # if set, must be one of: off, on, blink, flash, toggle
       skip_bootloader: True    # skips the 60s bootloader delay on some CC2531 sticks
 ```
 
