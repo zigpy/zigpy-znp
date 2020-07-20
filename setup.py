@@ -13,7 +13,7 @@ setup(
     description="A library for zigpy which communicates with TI ZNP radios",
     long_description=(root / "README.md").read_text(),
     long_description_content_type="text/markdown",
-    url="http://github.com/zha-ng/zigpy-znp",
+    url="https://github.com/zha-ng/zigpy-znp",
     author="Alexei Chetroi",
     author_email="alexei.chetroi@outlook.com",
     license="GPL-3.0",
