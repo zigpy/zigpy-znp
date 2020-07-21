@@ -181,7 +181,7 @@ def application(znp_server):
         ],
     )
 
-    active_eps = [100, 2, 1]
+    active_eps = [1]
 
     znp_server.reply_to(
         request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
@@ -346,7 +346,7 @@ async def test_application_startup_endpoints(application):
 
     await app.startup(auto_form=False)
 
-    assert len(endpoints) == 3
+    assert len(endpoints) == 1
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
@@ -425,7 +425,7 @@ async def test_permit_join(application):
         request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
@@ -454,7 +454,7 @@ async def test_permit_join_failure(application):
         request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFF, Status=t.ZDOStatus.TIMEOUT),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.TIMEOUT),
         ],
     )
 

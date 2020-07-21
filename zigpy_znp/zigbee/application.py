@@ -818,8 +818,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def permit_ncp(self, time_s: int) -> None:
         response = await self._znp.request_callback_rsp(
             request=c.ZDO.MgmtPermitJoinReq.Req(
-                AddrMode=t.AddrMode.Broadcast,
-                Dst=zigpy.types.BroadcastAddress.ALL_DEVICES,
+                AddrMode=t.AddrMode.NWK,
+                Dst=0x0000,
                 Duration=time_s,
                 # "This field shall always have a value of 1,
                 #  indicating a request to change the
