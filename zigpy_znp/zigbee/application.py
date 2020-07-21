@@ -7,6 +7,7 @@ import async_timeout
 
 import zigpy.util
 import zigpy.types
+import zigpy.device
 import zigpy.config
 import zigpy.application
 import zigpy.profiles
@@ -453,6 +454,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.channel,
         )
 
+        # Add the coordinator as a device to make groups work
+        self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
+
     async def update_network(
         self,
         *,
@@ -828,3 +832,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if response.Status != t.Status.SUCCESS:
             raise RuntimeError(f"Permit join response failure: {response}")
+
+
+class ZNPCoordinator(zigpy.device.Device):
+    @property
+    def manufacturer(self):
+        return "Texas Instruments"
+
+    @property
+    def model(self):
+        return "ZNP Coordinator"
