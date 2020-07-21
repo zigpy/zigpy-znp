@@ -15,7 +15,11 @@ import zigpy.zcl.foundation
 from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
 
 from zigpy.zcl import clusters
-from zigpy.types import ExtendedPanId, deserialize as list_deserialize
+from zigpy.types import (
+    ExtendedPanId,
+    deserialize as list_deserialize,
+    Struct as ZigpyStruct,
+)
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.config as conf
@@ -156,7 +160,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         field_names, field_types = ZDO_CLUSTERS[cluster]
         assert set(zdo_kwargs) == set(field_names)
 
-        zdo_args = [t(zdo_kwargs[n]) for n, t in zip(field_names, field_types)]
+        # Type cast all of the field args and kwargs
+        zdo_args = []
+
+        for name, field_type in zip(field_names, field_types):
+            zdo_arg = zdo_kwargs[name]
+
+            if issubclass(field_type, ZigpyStruct) and hasattr(ZigpyStruct, "_fields"):
+                # Old-style zigpy structs do not have "copy constructors"
+                new_obj = field_type()
+
+                for field_name, _ in new_obj._fields:
+                    setattr(new_obj, field_name, getattr(zdo_arg, field_name))
+            else:
+                new_obj = field_type(zdo_arg)
+
+            zdo_args.append(zdo_arg)
+
         message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
 
         LOGGER.debug("Pretending we received a ZDO message: %s", message)
