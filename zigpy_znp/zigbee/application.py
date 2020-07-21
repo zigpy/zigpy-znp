@@ -12,24 +12,22 @@ import zigpy.application
 import zigpy.profiles
 import zigpy.zcl.foundation
 
-from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
-
 from zigpy.zcl import clusters
 from zigpy.types import (
     ExtendedPanId,
     deserialize as list_deserialize,
     Struct as ZigpyStruct,
 )
+from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
 from zigpy.exceptions import DeliveryError
 
-import zigpy_znp.config as conf
 import zigpy_znp.types as t
+import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-
-from zigpy_znp.exceptions import InvalidCommandResponse
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.znp.nib import parse_nib
+from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds
 
 
@@ -148,7 +146,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._znp = None
 
-        # It's easier to deal with this if it's never None
+        # It's simpler to work with Task objects if they're never actually None
         self._reconnect_task = asyncio.Future()
         self._reconnect_task.cancel()
 
@@ -194,6 +192,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
 
         LOGGER.debug("Pretending we received a ZDO message: %s", message)
+
         self.handle_message(
             sender=sender,
             profile=zigpy.profiles.zha.PROFILE_ID,
@@ -317,7 +316,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         endpoint,
         profile_id=zigpy.profiles.zha.PROFILE_ID,
         device_id=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
-        device_version=0x00,
+        device_version=0b0000,
         latency_req=c.af.LatencyReq.NoLatencyReqs,
         input_clusters=[],
         output_clusters=[],
@@ -328,7 +327,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ProfileId=profile_id,
                 DeviceId=device_id,
                 DeviceVersion=device_version,
-                LatencyReq=latency_req,
+                LatencyReq=latency_req,  # completely ignored by Z-Stack
                 InputClusters=input_clusters,
                 OutputClusters=output_clusters,
             ),
@@ -427,23 +426,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.SUCCESS
             )
 
+        # We really need only a single endpoint
         await self._register_endpoint(
             endpoint=1,
             profile_id=zigpy.profiles.zha.PROFILE_ID,
-            input_clusters=[clusters.general.Ota.cluster_id],
-        )
-
-        await self._register_endpoint(
-            endpoint=2,
             device_id=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
+            input_clusters=[clusters.general.Ota.cluster_id],
             output_clusters=[
                 clusters.security.IasZone.cluster_id,
                 clusters.security.IasWd.cluster_id,
             ],
-        )
-
-        await self._register_endpoint(
-            endpoint=100, profile_id=zigpy.profiles.zll.PROFILE_ID, device_id=0x0005
         )
 
         nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
@@ -679,6 +671,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return await self._send_zdo_request(
                 dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
             )
+
+        # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
+        # We use endpoint 1 for everything.
+        if dst_ep != ZDO_ENDPOINT:
+            src_ep = 1
 
         request = c.AF.DataRequestExt.Req(
             DstAddrModeAddress=dst_addr,
