@@ -96,6 +96,20 @@ ZDO_COMPLEX_CONVERTERS = {
             )
         ),
     ),
+    ZDOCmd.Mgmt_Permit_Joining_req: (
+        (
+            lambda addr, device, PermitDuration, TC_Significant: (
+                c.ZDO.MgmtPermitJoinReq.Req(
+                    AddrMode=t.AddrMode.NWK,
+                    Dst=addr,
+                    Duration=PermitDuration,
+                    TCSignificance=TC_Significant,
+                )
+            )
+        ),
+        (lambda addr: c.ZDO.MgmtPermitJoinRsp.Callback(partial=True, Src=addr)),
+        (lambda rsp: (ZDOCmd.Mgmt_Permit_Joining_rsp, {"Status": rsp.Status})),
+    ),
     ZDOCmd.Mgmt_Leave_req: (
         (
             lambda addr, device, DeviceAddress, Options: c.ZDO.MgmtLeaveReq.Req(
@@ -617,6 +631,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         zdo_kwargs = dict(zip(field_names, zdo_args))
 
         device = self.get_device(nwk=dst_addr.address)
+
+        if cluster not in ZDO_COMPLEX_CONVERTERS:
+            LOGGER.error(
+                "ZDO converter for cluster %s has not been implemented!"
+                " Please open a GitHub issue and attach a debug log:"
+                " https://github.com/zha-ng/zigpy-znp/issues/new",
+                cluster,
+            )
+            return t.Status.FAILURE, "No ZDO converter"
 
         # Call the converter with the ZDO request's kwargs
         req_factory, rsp_factory, zdo_rsp_factory = ZDO_COMPLEX_CONVERTERS[cluster]
