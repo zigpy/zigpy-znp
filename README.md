@@ -78,6 +78,26 @@ Texas Instruments (TI) has quite a few different wireless MCU chips and they are
 ### Auxiliary TI chips
 - CC2591 and CC2592 = 2.4 GHz range extenders. These are not wireless MCUs, just auxillary PA (Power Amplifier) and LNA (Low Noise Amplifier) in the same package to improve RF (Radio Frequency) range of any 2.4 GHz radio chip.
 
+## Firmware requirement
+Firmware requirement is that they support Texas Instruments "Z-Stack Monitor and Test" APIs using an UART interface (serial communcation protocol) in TI Z-Stack 3.0.x or 3.x.0 "coordinator" firmware (which contains the TI Zigbee 3.0 stack), that can easiest be downloaded from the Zigbee2mqtt project who maintains compatible firmware images.
+
+- https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator
+
+The necessary hardware and equipment for flashing firmware and the device preparation process is best described by the [Zigbee2mqtt](https://www.zigbee2mqtt.io/) project whos community maintain and distribute a custom pre-compiled Z-Stack coordinator firmware (.hex files) for their [Zigbee-Heardsman](https://github.com/Koenkk/zigbee-herdsman/) libary which also makes it compatible with the zigpy-znp library.
+
+CC13x2 and CC26x2 based adapters/boards in general already come with a bootloader from the factory so can be software flashed with a pre-compiled Z-Stack coordinator firmware (.hex file) directly over USB using the official "SmartRF Flash-Programmer-2" (v1.8+) or "UniFlash" (6.x) from Texas Instruments, or comparative alternative metods and software.
+
+CC253x based adapters/boards in general does not come with a bootloader from the factory so needs to first be hardware flashed with a pre-compiled Z-Stack coordinator firmware (.hex file) via a Texas Instruments CC Debugger or a DIY GPIO debug adapter using the official "SmartRF Flash-Programmer" (v1.1x) software from Texas Instruments, or comparative alternative metods and software.
+
+The [Zigbee2mqtt](https://www.zigbee2mqtt.io/) project has step-by-step intructions for both flashing with Texas Instruments official software as well as several alternative metods on how to initially flash their custom Z-Stack coordinator firmware on a unflashed CC253x, CC13x2, CC26x2 and other Texas Instruments CCxxxx based USB adapters and development boards that comes or do not come with a bootloader. 
+
+- https://www.zigbee2mqtt.io/information/supported_adapters.html
+- https://www.zigbee2mqtt.io/getting_started/what_do_i_need.html
+- https://www.zigbee2mqtt.io/getting_started/flashing_the_cc2531.html
+- https://www.zigbee2mqtt.io/information/alternative_flashing_methods.html
+
+Note that the [Zigbee2mqtt](https://www.zigbee2mqtt.io/) project also have a FAQ and knowledgebase that can be useful for working with these Texas Instruments ZNP coordinator hardware adapters/equipment for their Z-Stack as well as lists Zigbee devices which should be supported.
+
 # Releases via PyPI
 
 Tagged versions will also be released via PyPI
