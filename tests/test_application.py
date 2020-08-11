@@ -181,7 +181,7 @@ def application(znp_server):
         ],
     )
 
-    active_eps = [1]
+    active_eps = [1, 2]
 
     znp_server.reply_to(
         request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
@@ -346,7 +346,7 @@ async def test_application_startup_endpoints(application):
 
     await app.startup(auto_form=False)
 
-    assert len(endpoints) == 1
+    assert len(endpoints) == 2
 
 
 @pytest_mark_asyncio_timeout(seconds=5)

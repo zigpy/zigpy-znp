@@ -427,7 +427,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.SUCCESS
             )
 
-        # We really need only a single endpoint
         await self._register_endpoint(
             endpoint=1,
             profile_id=zigpy.profiles.zha.PROFILE_ID,
@@ -437,6 +436,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 clusters.security.IasZone.cluster_id,
                 clusters.security.IasWd.cluster_id,
             ],
+        )
+
+        await self._register_endpoint(
+            endpoint=2,
+            profile_id=zigpy.profiles.zll.PROFILE_ID,
+            device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
         )
 
         nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
@@ -594,6 +599,28 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Initializing the item won't guarantee that it holds this exact value
         await self._znp.nvram_write(NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55")
 
+    def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
+        """
+        Zigpy defaults to sending messages with src_ep == dst_ep. This does not work
+        with Z-Stack, which requires endpoints to be registered explicitly on startup.
+
+        At the moment only the ZHA and ZLL profiles are supported so we registed only
+        two endpoints.
+        """
+
+        if dst_ep == ZDO_ENDPOINT:
+            return ZDO_ENDPOINT
+
+        if profile == zigpy.profiles.zha.PROFILE_ID or profile is None:
+            return 1
+        elif profile == zigpy.profiles.zll.PROFILE_ID:
+            return 2
+
+        raise ValueError(
+            f"Could not pick endpoint for dst_ep={dst_ep},"
+            f" profile={profile}, and cluster={cluster}"
+        )
+
     async def _send_zdo_request(
         self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
     ):
@@ -666,7 +693,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         return response.Status, "Request sent successfully"
 
     async def _send_request(
-        self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
+        self,
+        dst_addr,
+        dst_ep,
+        src_ep,
+        profile,
+        cluster,
+        sequence,
+        options,
+        radius,
+        data,
     ):
         if dst_ep == ZDO_ENDPOINT and not (
             cluster == ZDOCmd.Mgmt_Permit_Joining_req
@@ -677,9 +713,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
         # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
-        # We use endpoint 1 for everything.
-        if dst_ep != ZDO_ENDPOINT:
-            src_ep = 1
+        # We pick ours based on the registered endpoints.
+        src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
 
         request = c.AF.DataRequestExt.Req(
             DstAddrModeAddress=dst_addr,
@@ -742,6 +777,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             dst_addr=destination,
             dst_ep=dst_ep,
             src_ep=src_ep,
+            profile=profile,
             cluster=cluster,
             sequence=sequence,
             options=tx_options,
@@ -769,6 +805,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
             dst_ep=dst_ep,
             src_ep=src_ep,
+            profile=profile,
             cluster=cluster,
             sequence=sequence,
             options=c.af.TransmitOptions.NONE,
@@ -792,6 +829,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=group_id),
             dst_ep=src_ep,
             src_ep=src_ep,  # not actually used?
+            profile=profile,
             cluster=cluster,
             sequence=sequence,
             options=c.af.TransmitOptions.NONE,
