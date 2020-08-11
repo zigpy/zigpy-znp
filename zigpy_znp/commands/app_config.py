@@ -59,6 +59,11 @@ class BDBCommissioningMode(t.enum_flag_uint8):
     ParentLost = 1 << 5
 
 
+class InstallCodeFormat(t.enum_uint8):
+    InstallCodeAndCRC = 0x01
+    KeyDeriveFromInstallCode = 0x02
+
+
 class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     # sets the network frame counter to the value specified in the Frame Counter Value.
     # For projects with multiple instances of frame counter, the message sets the
@@ -150,7 +155,7 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
             (
                 t.Param(
                     "InstallCodeFormat",
-                    t.uint8_t,
+                    InstallCodeFormat,
                     (
                         "0x01 -- Install code + CRC"
                         "0x02 -- Key derived from install code"
