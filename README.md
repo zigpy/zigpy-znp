@@ -71,10 +71,6 @@ Texas Instruments (TI) has quite a few different wireless MCU chips and they are
 - CC1352R = Sub 1 GHz & 2.4 GHz wireless MCU. Essentially CC2652R with an extra sub-1GHz radio.
 - CC1352P = CC1352R with a built in RF PA.
 
-### Unsupported older generation TI chips
-- CC2530 = 2.4GHz Zigbee and IEEE 802.15.4 wireless MCU. 8051 core, has very little RAM. Needs expensive compiler license for official TI stack.
-- CC2531 = CC2530 with built-in USB. Used in the cheap "Zigbee sticks" sold everywhere.
-
 ### Auxiliary TI chips
 - CC2591 and CC2592 = 2.4 GHz range extenders. These are not wireless MCUs, just auxillary PA (Power Amplifier) and LNA (Low Noise Amplifier) in the same package to improve RF (Radio Frequency) range of any 2.4 GHz radio chip.
 
