@@ -335,7 +335,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.SUCCESS,
         )
 
-    async def startup(self, auto_form=False):
+    async def startup(self, auto_form=False, write_nvram=True):
         """Perform a complete application startup"""
 
         znp = ZNP(self.config)
@@ -352,17 +352,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 conf.CONF_DEVICE_PATH
             ] = self._znp._uart.transport.serial.name
 
-        # It's better to configure these explicitly than rely on the NVRAM defaults
-        await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_ENABLE, t.Bool(True))
-        await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_DISCOVERY, t.uint8_t(120))
-        await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_RC, t.Bool(True))
-        await self._znp.nvram_write(NwkNvIds.SRC_RTG_EXPIRY_TIME, t.uint8_t(255))
-        await self._znp.nvram_write(NwkNvIds.NWK_CHILD_AGE_ENABLE, t.Bool(False))
+        # Only modify the NVRAM if we allow it
+        if write_nvram:
+            # It's better to configure these explicitly than rely on the NVRAM defaults
+            await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_ENABLE, t.Bool(True))
+            await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_DISCOVERY, t.uint8_t(120))
+            await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_RC, t.Bool(True))
+            await self._znp.nvram_write(NwkNvIds.SRC_RTG_EXPIRY_TIME, t.uint8_t(255))
+            await self._znp.nvram_write(NwkNvIds.NWK_CHILD_AGE_ENABLE, t.Bool(False))
 
-        # XXX: the undocumented `znpBasicCfg` request can do this
-        await self._znp.nvram_write(
-            NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
-        )
+            # XXX: the undocumented `znpBasicCfg` request can do this
+            await self._znp.nvram_write(
+                NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
+            )
 
         # Reset to make the above NVRAM writes take effect.
         # This also ensures any previously-started network joins don't continue.

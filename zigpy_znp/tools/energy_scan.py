@@ -22,9 +22,11 @@ def channels_from_channel_mask(channels: t.Channels):
 
 
 async def perform_energy_scan(radio_path):
-    app = await ControllerApplication.new(
-        ControllerApplication.SCHEMA({"device": {"path": radio_path}}), auto_form=True
+    app = ControllerApplication(
+        ControllerApplication.SCHEMA({"device": {"path": radio_path}})
     )
+
+    await app.startup(auto_form=False, write_nvram=False)
 
     channels = defaultdict(lambda: deque([], maxlen=5))
 
