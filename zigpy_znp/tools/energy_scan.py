@@ -8,8 +8,7 @@ from collections import defaultdict, deque
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from zigpy_znp.api import ZNP
-from zigpy_znp.config import CONFIG_SCHEMA
+from zigpy_znp.zigbee.application import ControllerApplication
 
 logging.getLogger("zigpy_znp").setLevel(logging.INFO)
 
@@ -23,14 +22,14 @@ def channels_from_channel_mask(channels: t.Channels):
 
 
 async def perform_energy_scan(radio_path):
-    znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
-
-    await znp.connect()
+    app = await ControllerApplication.new(
+        ControllerApplication.SCHEMA({"device": {"path": radio_path}}), auto_form=True
+    )
 
     channels = defaultdict(lambda: deque([], maxlen=5))
 
     while True:
-        rsp = await znp.request_callback_rsp(
+        rsp = await app._znp.request_callback_rsp(
             request=c.ZDO.MgmtNWKUpdateReq.Req(
                 Dst=0x0000,
                 DstAddrMode=t.AddrMode.NWK,
@@ -40,7 +39,7 @@ async def perform_energy_scan(radio_path):
                 NwkManagerAddr=0x0000,
             ),
             RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtNWKUpdateNotify.Callback(partial=True, Src=0x0000,),
+            callback=c.ZDO.MgmtNWKUpdateNotify.Callback(partial=True, Src=0x0000),
         )
 
         for channel, energy in zip(
