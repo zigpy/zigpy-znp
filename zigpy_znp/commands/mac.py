@@ -286,6 +286,7 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
                     "ScanDuration", t.uint8_t, "The exponent used in the scan duration"
                 ),
                 t.Param("ChannelPage", t.uint8_t, "The channel page to use"),
+                t.Param("MaxResults", t.uint8_t, "Max results (UNDOCUMENTED)"),
                 t.Param("KeySource", t.KeySource, "Key Source of this data frame"),
                 # ToDo: Make this an enum
                 t.Param(

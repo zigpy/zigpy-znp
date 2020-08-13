@@ -65,6 +65,10 @@ class BeaconList(t.LVList, item_type=t.Beacon, length_type=t.uint8_t):
     pass
 
 
+class EnergyValues(t.LVList, item_type=t.uint8_t, length_type=t.uint8_t):
+    pass
+
+
 class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
     @classmethod
     def deserialize(cls, data: bytes) -> typing.Tuple["NullableNodeDescriptor", bytes]:
@@ -1324,6 +1328,26 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Src", t.NWK, "message's source network address"),
                 t.Param(
                     "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+                ),
+            )
+        ),
+    )
+
+    # return the results to the MgmtPermitJoinReq
+    MgmtNWKUpdateNotify = t.CommandDef(
+        t.CommandType.AREQ,
+        0xB8,
+        rsp_schema=t.Schema(
+            (
+                t.Param("Src", t.NWK, "message's source network address"),
+                t.Param("Status", t.ZDOStatus, "Status"),
+                t.Param("ScannedChannels", t.Channels, "Scanned channels"),
+                t.Param("TotalTransmissions", t.uint16_t, "Total transmissions"),
+                t.Param("TransmissionFailures", t.uint16_t, "Transmission failures"),
+                t.Param(
+                    "EnergyValues",
+                    EnergyValues,
+                    "The result of an energy measurement made on this channel",
                 ),
             )
         ),
