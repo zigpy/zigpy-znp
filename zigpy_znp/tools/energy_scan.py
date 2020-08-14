@@ -2,6 +2,7 @@ import sys
 import asyncio
 import logging
 import argparse
+import coloredlogs
 
 from collections import defaultdict, deque
 
@@ -10,7 +11,10 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.zigbee.application import ControllerApplication
 
-logging.getLogger("zigpy_znp").setLevel(logging.INFO)
+
+logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
+
+coloredlogs.install(level=logging.DEBUG)
 
 LOGGER = logging.getLogger(__name__)
 
