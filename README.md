@@ -48,6 +48,36 @@ Tested migrations:
 
  - LAUNCHXL-CC26X2R1 running 3.30.00.03 to and from the zig-a-zig-ah! running 4.10.00.78.
 
+
+# Energy scan
+Perform an energy scan to find a quiet Zigbee channel:
+
+```
+$ python -m zigpy_znp.tools.energy_scan /dev/cu.usbmodem14101
+2020-08-15 14:24:09 computer __main__[12018] INFO Starting up zigpy-znp
+2020-08-15 14:24:12 computer zigpy_znp.api[12018] WARNING Received an unhandled command: AppConfig.BDBCommissioningNotification.Callback(Status=<BDBCommissioningStatus.NetworkRestored: 13>, Mode=<BDBCommissioningMode.NONE: 0>, RemainingModes=<BDBCommissioningMode.NwkFormation: 4>)
+2020-08-15 14:24:13 computer zigpy_znp.zigbee.application[12018] INFO Using channel mask Channels.CHANNEL_15, currently on channel 15
+2020-08-15 14:24:13 computer __main__[12018] INFO Running scan...
+2020-08-15 14:24:13 computer zigpy_znp.api[12018] WARNING Received an unhandled command: AppConfig.BDBCommissioningNotification.Callback(Status=<BDBCommissioningStatus.FormationFailure: 8>, Mode=<BDBCommissioningMode.NwkSteering: 2>, RemainingModes=<BDBCommissioningMode.NONE: 0>)
+Channel energy (1 / 5):
+ - 11:   0.00%
+ - 12:   0.39%
+ - 13:   0.39%
+ - 14:   1.02%  #
+ - 15:   1.80%  #
+ - 16:   8.00%  ########
+ - 17:  10.27%  ##########
+ - 18:   9.41%  #########
+ - 19:   6.75%  ######
+ - 20:   0.00%
+ - 21:   5.33%  #####
+ - 22:   2.20%  ##
+ - 23:   8.63%  ########
+ - 24:   2.82%  ##
+ - 25:   0.00%
+ - 26:   0.55%
+```
+
 # Hardware requirements
 USB-adapters, GPIO-modules, and development-boards running recent TI Z-Stack releases (above version 3.0.0) are supported. Reference hardware for this project includes:
 
