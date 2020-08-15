@@ -2,7 +2,6 @@ import sys
 import asyncio
 import logging
 import argparse
-import coloredlogs
 
 from collections import defaultdict, deque
 
@@ -10,11 +9,6 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
 from zigpy_znp.zigbee.application import ControllerApplication
-
-
-logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
-
-coloredlogs.install(level=logging.DEBUG)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,14 +19,27 @@ def channels_from_channel_mask(channels: t.Channels):
             yield channel
 
 
-async def perform_energy_scan(radio_path):
+async def perform_energy_scan(radio_path, auto_form=False):
+    LOGGER.info("Starting up zigpy-znp")
+
     app = ControllerApplication(
         ControllerApplication.SCHEMA({"device": {"path": radio_path}})
     )
 
-    await app.startup(auto_form=False, write_nvram=False)
+    try:
+        await app.startup(auto_form=auto_form, write_nvram=auto_form)
+    except RuntimeError:
+        LOGGER.error("The hardware needs to be configured before this tool can work.")
+        LOGGER.error(
+            "Either re-run this command with -f (--form) or use the hardware "
+            "once with either ZHA or Zigbee2Mqtt."
+        )
+        return
 
-    channels = defaultdict(lambda: deque([], maxlen=5))
+    LOGGER.info("Running scan...")
+
+    # We compute an average over the last 5 scans
+    channel_energies = defaultdict(lambda: deque([], maxlen=5))
 
     while True:
         rsp = await app._znp.request_callback_rsp(
@@ -40,7 +47,7 @@ async def perform_energy_scan(radio_path):
                 Dst=0x0000,
                 DstAddrMode=t.AddrMode.NWK,
                 Channels=t.Channels.ALL_CHANNELS,
-                ScanDuration=0x02,
+                ScanDuration=0x02,  # exponent
                 ScanCount=1,
                 NwkManagerAddr=0x0000,
             ),
@@ -51,14 +58,15 @@ async def perform_energy_scan(radio_path):
         for channel, energy in zip(
             channels_from_channel_mask(rsp.ScannedChannels), rsp.EnergyValues
         ):
-            channels[channel].append(energy)
+            energies = channel_energies[channel]
+            energies.append(energy)
 
-        total = sum(sum(counts) for counts in channels.values())
+        total = 0xFF * energies.maxlen
 
-        print("Relative channel energy:")
+        print(f"Channel energy ({len(energies)} / {energies.maxlen}):")
 
-        for channel, counts in channels.items():
-            count = sum(counts)
+        for channel, energies in channel_energies.items():
+            count = sum(energies)
 
             print(
                 f" - {channel:>02}: {count / total:>7.2%}  "
@@ -69,15 +77,37 @@ async def perform_energy_scan(radio_path):
 
 
 async def main(argv):
+    import coloredlogs
+
     parser = argparse.ArgumentParser(description="Perform an energy scan")
     parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="count",
+        default=0,
+        help="Increases verbosity",
+    )
+    parser.add_argument(
+        "-f",
+        "--form",
+        dest="form",
+        action="store_true",
+        default=False,
+        help="Initializes the hardware by writing to NVRAM",
+    )
 
     args = parser.parse_args(argv)
+
+    log_level = [logging.INFO, logging.DEBUG][min(max(0, args.verbose), 1)]
+    logging.getLogger("zigpy_znp").setLevel(log_level)
+    coloredlogs.install(level=log_level)
 
     # We just want to make sure it exists
     args.serial.close()
 
-    await perform_energy_scan(args.serial.name)
+    await perform_energy_scan(args.serial.name, auto_form=args.form)
 
 
 if __name__ == "__main__":

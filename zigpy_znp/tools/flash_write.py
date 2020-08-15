@@ -3,7 +3,6 @@ import typing
 import asyncio
 import logging
 import argparse
-import coloredlogs
 import async_timeout
 
 import zigpy_znp.types as t
@@ -11,9 +10,6 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-
-coloredlogs.install(level=logging.DEBUG)
-logging.getLogger("zigpy_znp").setLevel(logging.DEBUG)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -139,6 +135,8 @@ async def write_firmware(firmware: bytes, radio_path: str):
 
 
 async def main(argv):
+    import coloredlogs
+
     parser = argparse.ArgumentParser(description="Write firmware to a radio")
     parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
     parser.add_argument(
@@ -148,8 +146,20 @@ async def main(argv):
         help="Input .bin file",
         required=True,
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="count",
+        default=0,
+        help="increases verbosity",
+    )
 
     args = parser.parse_args(argv)
+
+    log_level = [logging.INFO, logging.DEBUG][min(max(0, args.verbose), 1)]
+    logging.getLogger("zigpy_znp").setLevel(log_level)
+    coloredlogs.install(level=log_level)
 
     # We just want to make sure it exists
     args.serial.close()
