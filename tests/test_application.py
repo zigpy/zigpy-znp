@@ -162,8 +162,7 @@ async def znp_server(mocker):
     return server_znp
 
 
-@pytest.fixture
-def application(znp_server):
+def make_application(znp_server):
     app = ControllerApplication(config_for_port_path("/dev/ttyFAKE0"))
 
     # Handle the entire startup sequence
@@ -289,6 +288,11 @@ def application(znp_server):
     )
 
     return app, znp_server
+
+
+@pytest.fixture
+def application(znp_server):
+    return make_application(znp_server)
 
 
 @pytest_mark_asyncio_timeout(seconds=5)

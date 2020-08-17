@@ -2,6 +2,7 @@ import sys
 import asyncio
 import logging
 import argparse
+import itertools
 
 from collections import defaultdict, deque
 
@@ -19,7 +20,7 @@ def channels_from_channel_mask(channels: t.Channels):
             yield channel
 
 
-async def perform_energy_scan(radio_path, auto_form=False):
+async def perform_energy_scan(radio_path, num_scans=None, auto_form=False):
     LOGGER.info("Starting up zigpy-znp")
 
     app = ControllerApplication(
@@ -30,10 +31,7 @@ async def perform_energy_scan(radio_path, auto_form=False):
         await app.startup(auto_form=auto_form, write_nvram=auto_form)
     except RuntimeError:
         LOGGER.error("The hardware needs to be configured before this tool can work.")
-        LOGGER.error(
-            "Either re-run this command with -f (--form) or use the hardware "
-            "once with either ZHA or Zigbee2Mqtt."
-        )
+        LOGGER.error("Re-run this command with -f (--form).")
         return
 
     LOGGER.info("Running scan...")
@@ -41,7 +39,10 @@ async def perform_energy_scan(radio_path, auto_form=False):
     # We compute an average over the last 5 scans
     channel_energies = defaultdict(lambda: deque([], maxlen=5))
 
-    while True:
+    for i in itertools.count(start=1):
+        if num_scans is not None and i > num_scans:
+            break
+
         rsp = await app._znp.request_callback_rsp(
             request=c.ZDO.MgmtNWKUpdateReq.Req(
                 Dst=0x0000,
@@ -61,7 +62,7 @@ async def perform_energy_scan(radio_path, auto_form=False):
             energies = channel_energies[channel]
             energies.append(energy)
 
-        total = 0xFF * energies.maxlen
+        total = 0xFF * len(energies)
 
         print(f"Channel energy ({len(energies)} / {energies.maxlen}):")
 
@@ -90,6 +91,14 @@ async def main(argv):
         help="Increases verbosity",
     )
     parser.add_argument(
+        "-n",
+        "--num-scans",
+        dest="num_scans",
+        type=int,
+        default=None,
+        help="Number of scans to perform before exiting",
+    )
+    parser.add_argument(
         "-f",
         "--form",
         dest="form",
@@ -107,7 +116,9 @@ async def main(argv):
     # We just want to make sure it exists
     args.serial.close()
 
-    await perform_energy_scan(args.serial.name, auto_form=args.form)
+    await perform_energy_scan(
+        args.serial.name, auto_form=args.form, num_scans=args.num_scans
+    )
 
 
 if __name__ == "__main__":
