@@ -21,7 +21,7 @@ from zigpy.types import (
     deserialize as list_deserialize,
     Struct as ZigpyStruct,
 )
-from zigpy.zdo.types import ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
+from zigpy.zdo.types import MultiAddress, ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
@@ -619,6 +619,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Initializing the item won't guarantee that it holds this exact value
         await self._znp.nvram_write(NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55")
+
+    def get_dst_address(self, cluster):
+        """
+        Helper to get a dst address for bind/unbind operations.
+
+        Allows radios to provide correct information especially for radios which listen
+        on specific endpoints only.
+        """
+
+        dst_addr = MultiAddress()
+        dst_addr.addrmode = 0x03
+        dst_addr.ieee = self.ieee
+        dst_addr.endpoint = self._find_endpoint(
+            dst_ep=cluster.endpoint,
+            profile=cluster.endpoint.profile_id,
+            cluster=cluster.cluster_id,
+        )
+
+        return dst_addr
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
