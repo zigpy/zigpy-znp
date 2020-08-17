@@ -5,12 +5,14 @@ import logging
 import itertools
 import async_timeout
 
+import zigpy.zdo
 import zigpy.util
 import zigpy.types
 import zigpy.device
 import zigpy.config
-import zigpy.application
 import zigpy.profiles
+import zigpy.endpoint
+import zigpy.application
 import zigpy.zcl.foundation
 
 from zigpy.zcl import clusters
@@ -312,6 +314,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._reconnect_task.cancel()
         self._reconnect_task = asyncio.create_task(self._reconnect())
 
+    @property
+    def zigpy_device(self):
+        return self.devices[self.ieee]
+
     async def _register_endpoint(
         self,
         endpoint,
@@ -322,6 +328,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         input_clusters=[],
         output_clusters=[],
     ):
+        # Create a corresponding endpoint on our Zigpy device first
+        zigpy_ep = self.zigpy_device.add_endpoint(endpoint)
+        zigpy_ep.profile_id = profile_id
+        zigpy_ep.device_type = device_id
+
+        for cluster in input_clusters:
+            zigpy_ep.add_input_cluster(cluster)
+
+        for cluster in output_clusters:
+            zigpy_ep.add_output_cluster(cluster)
+
+        zigpy_ep.status = zigpy.endpoint.Status.ZDO_INIT
+
         return await self._znp.request(
             c.AF.Register.Req(
                 Endpoint=endpoint,
@@ -405,6 +424,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         self._ieee = device_info.IEEE
+        self._nwk = 0x0000
+
+        # Add the coordinator as a zigpy device
+        self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
 
         if device_info.DeviceState != t.DeviceState.StartedAsCoordinator:
             # Start the application and wait until it's ready
@@ -453,16 +476,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._channels = nib.channelList
         self._pan_id = nib.nwkPanId
         self._ext_pan_id = nib.extendedPANID
-        self._nwk = nib.nwkDevAddress
 
         LOGGER.info(
             "Using channel mask %s, currently on channel %d",
             self.channels,
             self.channel,
         )
-
-        # Add the coordinator as a device to make groups work
-        self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
 
     async def update_network(
         self,
@@ -605,23 +624,37 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
         Zigpy defaults to sending messages with src_ep == dst_ep. This does not work
         with Z-Stack, which requires endpoints to be registered explicitly on startup.
-
-        At the moment only the ZHA and ZLL profiles are supported so we registed only
-        two endpoints.
         """
 
         if dst_ep == ZDO_ENDPOINT:
             return ZDO_ENDPOINT
 
-        if profile == zigpy.profiles.zha.PROFILE_ID or profile is None:
-            return 1
-        elif profile == zigpy.profiles.zll.PROFILE_ID:
-            return 2
+        candidates = []
 
-        raise ValueError(
-            f"Could not pick endpoint for dst_ep={dst_ep},"
-            f" profile={profile}, and cluster={cluster}"
-        )
+        for ep_id, endpoint in self.zigpy_device.endpoints.items():
+            if ep_id == ZDO_ENDPOINT:
+                continue
+
+            if endpoint.profile_id != profile:
+                continue
+
+            # An exact match, no need to continue further
+            # TODO: pass in `is_server_cluster` or something similar
+            if cluster in endpoint.out_clusters or cluster in endpoint.in_clusters:
+                return endpoint.endpoint_id
+
+            # Otherwise, keep track of the candidate cluster
+            # if we don't find anything better
+            candidates.append(endpoint.endpoint_id)
+
+        if not candidates:
+            raise ValueError(
+                f"Could not pick endpoint for dst_ep={dst_ep},"
+                f" profile={profile}, and cluster={cluster}"
+            )
+
+        # XXX: pick the first one?
+        return candidates[0]
 
     async def _send_zdo_request(
         self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data

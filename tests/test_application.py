@@ -740,7 +740,9 @@ async def test_zigpy_request(application, mocker):
     device.status = zigpy.device.Status.ENDPOINTS_INIT
     device.initializing = False
 
-    device.add_endpoint(1).add_input_cluster(6)
+    ep = device.add_endpoint(1)
+    ep.profile_id = 260
+    ep.add_input_cluster(6)
 
     # Respond to a light turn on request
     data_req = znp_server.reply_once_to(
@@ -793,7 +795,9 @@ async def test_zigpy_request_failure(application, mocker):
     device.status = zigpy.device.Status.ENDPOINTS_INIT
     device.initializing = False
 
-    device.add_endpoint(1).add_input_cluster(6)
+    ep = device.add_endpoint(1)
+    ep.profile_id = 260
+    ep.add_input_cluster(6)
 
     # Fail to respond to a light turn on request
     znp_server.reply_to(
