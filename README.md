@@ -8,10 +8,15 @@
 Together with zigpy and compatible home automation software (namely Home Assistant's [ZHA (Zigbee Home Automation) integration component](https://www.home-assistant.io/integrations/zha/)), you can directly control most Zigbee devices such as Philips Hue, GE, OSRAM LIGHTIFY, Xiaomi/Aqara, IKEA Tradfri, Samsung SmartThings, and many more.
 
 # Installation
-Install the Python module within your virtual environment:
+Install the Python module from the PyPI within your virtual environment:
 
 ```shell
 (venv) $ pip install zigpy-znp
+```
+
+Or the most recent commit directly from Git:
+```shell
+(venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/
 ```
 
 If you are using Home Assistant, copy `custom_components/zha_custom_radios.py` into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
