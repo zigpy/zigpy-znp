@@ -1129,7 +1129,7 @@ async def test_mrequest(application, mocker):
     assert app._send_request.mock_calls[0][2]["data"] == b"\x01\x01\x01"
 
 
-@pytest_mark_asyncio_timeout(seconds=30)
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_new_device_join_and_bind(application, mocker):
     app, znp_server = application
     await app.startup(auto_form=False)

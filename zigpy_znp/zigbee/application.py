@@ -792,9 +792,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 response = await self._znp.request_callback_rsp(
                     request=request,
                     RspStatus=t.Status.SUCCESS,
-                    callback=c.AF.DataConfirm.Callback(
-                        partial=True, Endpoint=dst_ep, TSN=sequence
-                    ),
+                    callback=c.AF.DataConfirm.Callback(partial=True, TSN=sequence),
                 )
 
             LOGGER.debug("Received a data request confirmation: %s", response)
