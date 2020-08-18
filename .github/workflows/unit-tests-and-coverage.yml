@@ -2,7 +2,7 @@ name: Run unit tests and code coverage
 on: ["push", "pull_request"]
 
 jobs:
-  tests:
+  test:
     name: Runs unit tests and computes code coverage
     runs-on: ${{ matrix.os }}
     strategy:
@@ -33,12 +33,12 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         parallel: true
 
-finish:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-    - name: Coveralls Finished
-      uses: coverallsapp/github-action@master
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        parallel-finished: true
+  finish:
+      needs: test
+      runs-on: ubuntu-latest
+      steps:
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
