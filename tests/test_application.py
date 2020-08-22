@@ -347,17 +347,36 @@ async def test_application_startup_skip_bootloader(application, mocker):
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_application_startup_nib(application):
+async def test_application_startup_nib_cc26x2(application):
     app, znp_server = application
 
     await app.startup(auto_form=False)
 
-    # This is read from the NIB on startup
     assert app.channel == 25
     assert app.channels == t.Channels.from_channel_list([15, 20, 25])
 
     assert app.zigpy_device.manufacturer == "Texas Instruments"
     assert app.zigpy_device.model == "CC13X2/CC26X2"
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+async def test_application_startup_nib_cc2531(application):
+    app, znp_server = application
+
+    # Use a CC2531 NIB
+    znp_server._nvram_state[NwkNvIds.NIB] = (
+        b"\xCC\x05\x02\x10\x14\x10\x00\x14\x00\x00\x00\x01\x05\x01\x8F\x07\x00\x02\x05"
+        b"\x1E\x00\x00\x0B\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xFC\x8D\x08\x00\x08"
+        b"\x00\x00\x0F\x0F\x04\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00\x85\x33\xCE\x1C"
+        b"\x00\x4B\x12\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x3C\x03\x00\x01\x78\x0A\x01\x00\x00\x00\x00\x00"
+    )
+
+    await app.startup(auto_form=False)
+
+    assert app.zigpy_device.manufacturer == "Texas Instruments"
+    assert app.zigpy_device.model == "CC2531"
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
