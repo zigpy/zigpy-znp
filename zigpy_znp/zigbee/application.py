@@ -157,6 +157,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
+        """
+        Checks whether the device represented by `device_config` is a valid ZNP radio.
+        Doesn't throw any errors.
+        """
+
         znp = ZNP(conf.CONFIG_SCHEMA({conf.CONF_DEVICE: device_config}))
         LOGGER.debug("Probing %s", znp._port_path)
 
@@ -172,8 +177,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             znp.close()
 
     def _receive_zdo_message(
-        self, cluster: ZDOCmd, *, tsn: t.uint8_t, sender, **zdo_kwargs
+        self,
+        cluster: ZDOCmd,
+        *,
+        tsn: t.uint8_t,
+        sender: zigpy.device.Device,
+        **zdo_kwargs,
     ) -> None:
+        """
+        Internal method that is mainly called by our ZDO request/response converters to
+        receive a "fake" ZDO message constructed from a cluster and args/kwargs.
+        """
+
         field_names, field_types = ZDO_CLUSTERS[cluster]
         assert set(zdo_kwargs) == set(field_names)
 
@@ -208,13 +223,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
+        """
+        ZDO source routing message callback
+        """
+
         LOGGER.info("ZDO device relays: %s", msg)
         device = self.get_device(nwk=msg.DstAddr)
         device.relays = msg.Relays
 
     def on_zdo_device_announce(self, msg: c.ZDO.EndDeviceAnnceInd.Callback) -> None:
+        """
+        ZDO end device announcement callback
+        """
+
         LOGGER.info("ZDO device announce: %s", msg)
 
+        # We turn this back into a ZDO message and let zigpy handle it
         self._receive_zdo_message(
             cluster=ZDOCmd.Device_annce,
             tsn=0xFF,
@@ -224,7 +248,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             Capability=msg.Capabilities,
         )
 
-    def on_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
+    def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
+        """
+        ZDO trust center device join callback
+        """
+
         LOGGER.info("TC device join: %s", msg)
         self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
 
@@ -233,6 +261,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
 
     def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
+        """
+        Handler for all non-ZDO messages.
+        """
+
         try:
             device = self.get_device(nwk=msg.SrcAddr)
         except KeyError:
@@ -245,7 +277,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self.handle_message(
             sender=device,
-            profile=zigpy.profiles.zha.PROFILE_ID,
+            profile=zigpy.profiles.zha.PROFILE_ID,  # XXX: does this kwarg matter?
             cluster=msg.ClusterId,
             src_ep=msg.SrcEndpoint,
             dst_ep=msg.DstEndpoint,
@@ -253,25 +285,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     async def shutdown(self):
-        """Shutdown application."""
+        """
+        Gracefully shuts down the application and cleans up all resources.
+        This method calls ZNP.close, which calls UART.close, etc.
+        """
 
         self._reconnect_task.cancel()
 
         if self._znp is not None:
             self._znp.close()
 
-    def _bind_callbacks(self, api):
+    def _bind_callbacks(self, api: ZNP) -> None:
+        """
+        Binds all of the necessary message callbacks to their associated methods.
+
+        Z-Stack intercepts most (but not all!) ZDO requests/responses and replaces them
+        ZNP requests/responses.
+        """
+
         api.callback_for_response(
             c.AF.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
-        # ZDO requests need to be handled explicitly
+        # ZDO requests need to be handled explicitly, one by one
         api.callback_for_response(
             c.ZDO.EndDeviceAnnceInd.Callback(partial=True), self.on_zdo_device_announce,
         )
 
         api.callback_for_response(
-            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_tc_device_join,
+            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_zdo_tc_device_join,
         )
 
         api.callback_for_response(
@@ -283,6 +325,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     async def _reconnect(self) -> None:
+        """
+        Endlessly tries to reconnect to the currently configured radio.
+
+        Relies on the fact that `self.startup()` only modifies `self` upon a successful
+        connection to be essentially stateless.
+        """
+
         for attempt in itertools.count(start=1):
             LOGGER.debug(
                 "Trying to reconnect to %s, attempt %d",
@@ -303,6 +352,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 )
 
     def connection_lost(self, exc):
+        """
+        Propagated up from lower layers (UART and ZNP) when the connection is lost.
+        Spawns the auto-reconnect task.
+        """
+
         self._znp = None
 
         # exc=None means that the connection was closed
@@ -318,6 +372,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     @property
     def zigpy_device(self):
+        """
+        Reference to zigpy device 0x0000, the coordinator.
+        """
+
         return self.devices[self.ieee]
 
     async def _register_endpoint(
@@ -330,6 +388,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         input_clusters=[],
         output_clusters=[],
     ):
+        """
+        Method to register an endpoint simultaneously with both zigpy and Z-Stack.
+
+        This lets us keep track of our own endpoint information without duplicating
+        that information again, and exposing it to higher layers (e.g. Home Assistant).
+        """
+
         # Create a corresponding endpoint on our Zigpy device first
         zigpy_ep = self.zigpy_device.add_endpoint(endpoint)
         zigpy_ep.profile_id = profile_id
@@ -357,7 +422,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     async def startup(self, auto_form=False, write_nvram=True):
-        """Perform a complete application startup"""
+        """
+        Performs application startup.
+
+        This entails creating the ZNP object, connecting to the radio, potentially
+        forming a network, and configuring our settings.
+        """
 
         znp = ZNP(self.config)
         znp.set_application(self)
@@ -454,6 +524,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.SUCCESS
             )
 
+        # And finally register our own
         await self._register_endpoint(
             endpoint=1,
             profile_id=zigpy.profiles.zha.PROFILE_ID,
@@ -510,6 +581,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         update_id: int = 0,
         reset: bool = True,
     ):
+        """
+        Updates network settings at runtime, after the application has started.
+        """
+
         if (
             channel is not None
             and channels is not None
@@ -576,13 +651,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._reset()
 
     async def _reset(self):
+        """
+        Performs a soft reset within Z-Stack, which does not reset the serial connection
+        """
+
         await self._znp.request_callback_rsp(
             request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
             callback=c.SYS.ResetInd.Callback(partial=True),
         )
 
     async def form_network(self):
+        """
+        Clears the current config and forms a new network with a random network key,
+        PAN ID, and extended PAN ID.
+        """
+
         # These options are read only on startup so we perform a soft reset right after
+        # XXX: do we also need ` | t.StartupOptions.ClearConfig`?
         await self._znp.nvram_write(
             NwkNvIds.STARTUP_OPTION, t.StartupOptions.ClearState
         )
@@ -619,7 +704,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
         )
 
-        # Create the NV item that keeps track of whether or not we're configured
+        # Create the NV item that keeps track of whether or not we're configured.
+        # This is the NV item used by Zigbee2MQTT, pulled in from zigbee-shepherd.
         osal_create_rsp = await self._znp.request(
             c.SYS.OSALNVItemInit.Req(
                 Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1, Value=b"\x55"
@@ -771,7 +857,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         options,
         radius,
         data,
-    ):
+    ) -> typing.Tuple[t.Status, str]:
+        """
+        Used by `request`/`mrequest`/`broadcast` to send a request.
+        Picks the correct request sending mechanism and fixes endpoint information.
+        """
+
         if dst_ep == ZDO_ENDPOINT and not (
             cluster == ZDOCmd.Mgmt_Permit_Joining_req
             and dst_addr.mode == t.AddrMode.Broadcast
@@ -828,7 +919,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         data,
         expect_reply=True,
         use_ieee=False,
-    ):
+    ) -> typing.Tuple[t.Status, str]:
         tx_options = c.af.TransmitOptions.RouteDiscovery
 
         if expect_reply:
@@ -862,7 +953,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         sequence,
         data,
         broadcast_address=zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
-    ):
+    ) -> typing.Tuple[t.Status, str]:
         assert grpid == 0
 
         return await self._send_request(
@@ -890,7 +981,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         *,
         hops=0,
         non_member_radius=3,
-    ):
+    ) -> typing.Tuple[t.Status, str]:
         return await self._send_request(
             dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=group_id),
             dst_ep=src_ep,
@@ -904,7 +995,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     async def force_remove(self, device) -> None:
-        """Forcibly remove device from NCP."""
+        """
+        Forcibly removes a direct child from the network.
+        """
+
         leave_rsp = await self._znp.request_callback_rsp(
             request=c.ZDO.MgmtLeaveReq.Req(
                 DstAddr=0x0000,  # We handle it
@@ -920,10 +1014,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # TODO: see what happens when we forcibly remove a device that isn't our child
 
     async def permit_ncp(self, time_s: int) -> None:
+        """
+        Permits new devices to join the network *only through us*.
+        Zigpy sends a broadcast to all routers on its own.
+        """
+
         response = await self._znp.request_callback_rsp(
             request=c.ZDO.MgmtPermitJoinReq.Req(
                 AddrMode=t.AddrMode.NWK,
-                Dst=0x0000,
+                Dst=0x0000,  # Only us!
                 Duration=time_s,
                 # "This field shall always have a value of 1,
                 #  indicating a request to change the
