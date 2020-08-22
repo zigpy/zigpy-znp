@@ -142,8 +142,6 @@ class ZNP:
         self._app = None
         self._config = config
 
-        self.version = None
-
         self._response_listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
 
@@ -162,7 +160,7 @@ class ZNP:
             self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
 
             if self._config[conf.CONF_ZNP_CONFIG][conf.CONF_SKIP_BOOTLOADER]:
-                LOGGER.debug("Sending first UART byte to the bootloader")
+                LOGGER.debug("Sending special byte to skip the bootloader")
                 self._uart._transport_write(bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
 
             if test_port:
@@ -171,10 +169,14 @@ class ZNP:
                 )
 
                 # Make sure that our port works
-                await self.request(c.SYS.Ping.Req())
-                self.version = await self.request(c.SYS.Version.Req())
+                ping_rsp = await self.request(c.SYS.Ping.Req())
+
+                if not ping_rsp.Capabilities & t.MTCapabilities.CAP_APP_CNF:
+                    raise RuntimeError(
+                        "Your device appears to be running an old version of Z-Stack. "
+                        " The earliest supported release is Z-Stack 3.0.1."
+                    )
         except Exception:
-            self.version = None
             self._uart = None
             raise
 

@@ -59,25 +59,6 @@ def znp(mocker):
 @pytest.fixture
 def pingable_serial_port(mocker):
     port_name = "/dev/ttyWorkingUSB1"
-    transport = mocker.Mock()
-    protocol = None
-
-    api = ZNP(config_for_port_path(port_name))
-    api.set_application(mocker.Mock())
-    api._app.startup = Mock(return_value=lambda: asyncio.sleep(0))
-
-    def ping_responder(data):
-        # XXX: this assumes that our UART will send packets perfectly framed
-        if data == bytes.fromhex("FE  00  21 01  20"):
-            protocol.data_received(bytes.fromhex("FE  02  61 01  00 01  63"))
-        elif data == bytes.fromhex("FE  00  21 02  23"):
-            protocol.data_received(
-                b"\xFE\x0E\x61\x02\x02\x01\x02\x07\x01\xE1"
-                b"\x3B\x34\x01\x00\xFF\xFF\xFF\xFF\x85"
-            )
-
-    transport.write = mocker.Mock(side_effect=ping_responder)
-
     old_serial_connect = serial_asyncio.create_serial_connection
 
     def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
@@ -88,13 +69,21 @@ def pingable_serial_port(mocker):
         fut = loop.create_future()
         assert url == port_name
 
-        nonlocal protocol
-        protocol = protocol_factory()
-        protocol.connection_made(transport)
+        dummy_serial_conn.protocol = protocol_factory()
+        dummy_serial_conn.protocol.connection_made(dummy_serial_conn.mock_transport)
 
-        fut.set_result((transport, protocol))
+        fut.set_result((dummy_serial_conn.mock_transport, dummy_serial_conn.protocol))
 
         return fut
+
+    def ping_responder(data):
+        # XXX: this assumes that our UART will send packets perfectly framed
+        if data == bytes.fromhex("FE  00  21 01  20"):
+            # Ping
+            dummy_serial_conn.protocol.data_received(b"\xFE\x02\x61\x01\x59\x06\x3D")
+
+    dummy_serial_conn.mock_transport = mocker.Mock()
+    dummy_serial_conn.mock_transport.write = mocker.Mock(side_effect=ping_responder)
 
     mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
 
@@ -116,6 +105,31 @@ async def test_znp_connect_without_test(mocker, event_loop, pingable_serial_port
 
     # Nothing should have been sent
     assert api.request.call_count == 0
+
+
+@pytest_mark_asyncio_timeout()
+async def test_znp_connect_old_version(mocker, event_loop, pingable_serial_port):
+    old_write = serial_asyncio.create_serial_connection.mock_transport.write
+
+    def ping_responder(data):
+        # XXX: this assumes that our UART will send packets perfectly framed
+        if data == bytes.fromhex("FE  00  21 01  20"):
+            # Ping response from the CC2531 running old Z-Stack
+            serial_asyncio.create_serial_connection.protocol.data_received(
+                b"\xFE\x02\x61\x01\x79\x01\x1A"
+            )
+        else:
+            old_write(data)
+
+    mocker.patch(
+        "serial_asyncio.create_serial_connection.mock_transport.write",
+        new=ping_responder,
+    )
+
+    api = ZNP(TEST_APP_CONFIG)
+
+    with pytest.raises(RuntimeError):
+        await api.connect()
 
 
 @pytest_mark_asyncio_timeout()
