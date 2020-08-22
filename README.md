@@ -8,6 +8,8 @@
 Together with zigpy and compatible home automation software (namely Home Assistant's [ZHA (Zigbee Home Automation) integration component](https://www.home-assistant.io/integrations/zha/)), you can directly control most Zigbee devices such as Philips Hue, GE, OSRAM LIGHTIFY, Xiaomi/Aqara, IKEA Tradfri, Samsung SmartThings, and many more.
 
 # Installation
+
+## Python module
 Install the Python module from the PyPI within your virtual environment:
 
 ```shell
@@ -19,6 +21,8 @@ Or the most recent commit directly from Git:
 (venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/
 ```
 
+
+## Home Assistant
 If you are using Home Assistant, copy [`custom_components/zha_custom_radios.py`](https://github.com/zha-ng/zigpy-znp/blob/dev/custom_components/zha_custom_radios.py) into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
 
 ```yaml
@@ -29,6 +33,22 @@ zha_custom_radios:
 ```
 
 If you have already setup Home Assistant's ZHA component with a TI radio, ZHA will already be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. To switch ZHA over to zigpy-znp, navigate to the folder containing your `configuration.yaml` file and edit the `.storage/core.config_entries`, changing `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
+
+## Firmware
+
+CC2531 users will need to upgrade their firmware to Z-Stack 3.0.1. This is quick and simple if you are already running a build of Z-Stack from the Zigbee2MQTT project. Make sure to plug your CC2531 in and run the below commands within 60s:
+
+```shell
+(venv) $ curl -L -o CC2531_20190425.zip https://github.com/Koenkk/Z-Stack-firmware/raw/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip
+(venv) $ unzip CC2531_20190425.zip
+(venv) $ python -m zigpy_znp.tools.flash_write -i CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531
+2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.00%
+2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.03%
+2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.05%
+2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.08%
+2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.11%
+...
+```
 
 # Configuration
 
