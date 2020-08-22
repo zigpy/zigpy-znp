@@ -29,7 +29,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp.nib import parse_nib
+from zigpy_znp.znp.nib import parse_nib, OldNIB
 from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds
 
@@ -152,6 +152,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # It's simpler to work with Task objects if they're never actually None
         self._reconnect_task = asyncio.Future()
         self._reconnect_task.cancel()
+
+        self._nib = None
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
@@ -469,19 +471,31 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
         )
 
-        nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
-        LOGGER.debug("Parsed NIB: %s", nib)
-
-        self._channel = nib.nwkLogicalChannel
-        self._channels = nib.channelList
-        self._pan_id = nib.nwkPanId
-        self._ext_pan_id = nib.extendedPANID
+        # Parsing the NIB struct gives us access to low-level info, like the channel
+        self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+        LOGGER.debug("Parsed NIB: %s", self._nib)
 
         LOGGER.info(
             "Using channel mask %s, currently on channel %d",
             self.channels,
             self.channel,
         )
+
+    @property
+    def channel(self):
+        return self._nib.nwkLogicalChannel
+
+    @property
+    def channels(self):
+        return self._nib.channelList
+
+    @property
+    def pan_id(self):
+        return self._nib.nwkPanId
+
+    @property
+    def ext_pan_id(self):
+        return self._nib.extendedPANID
 
     async def update_network(
         self,
@@ -931,4 +945,7 @@ class ZNPCoordinator(zigpy.device.Device):
 
     @property
     def model(self):
-        return "ZNP Coordinator"
+        if isinstance(self.application._nib, OldNIB):
+            return "CC2531"
+        else:
+            return "CC13X2/CC26X2"

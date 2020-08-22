@@ -340,6 +340,9 @@ async def test_application_startup_nib(application):
     assert app.channel == 25
     assert app.channels == t.Channels.from_channel_list([15, 20, 25])
 
+    assert app.zigpy_device.manufacturer == "Texas Instruments"
+    assert app.zigpy_device.model == "CC13X2/CC26X2"
+
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_application_startup_endpoints(application):
