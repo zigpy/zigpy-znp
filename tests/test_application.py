@@ -126,7 +126,8 @@ class ServerZNP(ZNP):
         return callback
 
     def send(self, response):
-        self._uart.send(response.to_frame())
+        if response is not None:
+            self._uart.send(response.to_frame())
 
 
 @pytest.fixture
@@ -232,23 +233,50 @@ def make_application(znp_server):
         ],
     )
 
-    # Reply to the initialization NVID writes
-    for nvid in [
-        NwkNvIds.CONCENTRATOR_ENABLE,
-        NwkNvIds.CONCENTRATOR_DISCOVERY,
-        NwkNvIds.CONCENTRATOR_RC,
-        NwkNvIds.SRC_RTG_EXPIRY_TIME,
-        NwkNvIds.NWK_CHILD_AGE_ENABLE,
-        NwkNvIds.LOGICAL_TYPE,
-    ]:
-        znp_server.reply_to(
-            request=c.SYS.OSALNVWrite.Req(Id=nvid, Offset=0, partial=True),
-            responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
-        )
+    # Simulate a bit of NVRAM
+    nvram = {
+        NwkNvIds.HAS_CONFIGURED_ZSTACK3: b"\x55",
+        NwkNvIds.NIB: (
+            b"\xCB\x05\x02\x33\x14\x33\x00\x1E\x00\x00\x00\x01\x05\x01\x8F"
+            b"\x00\x07\x00\x02\x05\x1E\x00\x00\x00\x19\x00\x00\x00\x00\x00"
+            b"\x00\x00\x00\x00\x00\x00\x95\x86\x08\x00\x00\x80\x10\x02\x0F"
+            b"\x0F\x04\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00\xA8\x60\xCA"
+            b"\x53\xDB\x3B\xC0\xA8\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0F\x03\x00"
+            b"\x01\x78\x0A\x01\x00\x00\x00\xB7\x15\x00\x00"
+        ),
+        NwkNvIds.EXTENDED_PAN_ID: b"\xA8\x60\xCA\x53\xDB\x3B\xC0\xA8",
+        NwkNvIds.EXTADDR: b"\x5C\xAC\xAA\x1C\x00\x4B\x12\x00",
+        NwkNvIds.CHANLIST: b"\x00\x80\x10\x02",
+        NwkNvIds.PANID: b"\x95\x86",
+    }
+
+    def nvram_write(req):
+        nvram[req.Id] = req.Value
+        return c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     znp_server.reply_to(
-        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x55")],
+        request=c.SYS.OSALNVWrite.Req(Offset=0, partial=True), responses=[nvram_write],
+    )
+
+    def nvram_read(req):
+        if req.Id not in nvram:
+            return c.SYS.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")
+
+        return c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=nvram[req.Id],)
+
+    znp_server.reply_to(
+        request=c.SYS.OSALNVRead.Req(Offset=0, partial=True), responses=[nvram_read],
+    )
+
+    def nvram_init(req):
+        nvram[req.Id] = req.Value
+
+        return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.SUCCESS)
+
+    znp_server.reply_to(
+        request=c.SYS.OSALNVItemInit.Req(partial=True), responses=[nvram_init]
     )
 
     znp_server.reply_to(
@@ -256,7 +284,7 @@ def make_application(znp_server):
         responses=[
             c.Util.GetDeviceInfo.Rsp(
                 Status=t.Status.SUCCESS,
-                IEEE=t.EUI64([0x00, 0x12, 0x4B, 0x00, 0x1C, 0xAA, 0xAC, 0x5C]),
+                IEEE=t.EUI64.deserialize(nvram[NwkNvIds.EXTADDR])[0],
                 NWK=t.NWK(0xFFFE),
                 DeviceType=t.DeviceTypeCapabilities(7),
                 DeviceState=t.DeviceState.InitializedNotStarted,
@@ -273,19 +301,7 @@ def make_application(znp_server):
         ],
     )
 
-    # The NIB matches the above device info
-    NIB = bytes.fromhex(
-        """
-        790502331433001e0000000105018f00070002051e000000190000000000000000000000FFFE0800
-        008010020f0f040001000000010000000000124b001caaac5c010000000000000000000000000000
-        000000000000000000000000000000000000000000000f030001780a0100000020470000
-        """
-    )
-
-    znp_server.reply_to(
-        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.NIB, Offset=0),
-        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=NIB)],
-    )
+    znp_server._nvram_state = nvram
 
     return app, znp_server
 
@@ -880,22 +896,17 @@ async def test_update_network_noop(mocker, application):
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_update_network(mocker, caplog, application):
+async def test_update_network_extensive(mocker, caplog, application):
     app, znp_server = application
 
     await app.startup(auto_form=False)
     mocker.spy(app, "_reset")
 
-    channel = t.uint8_t(15)
+    channel = t.uint8_t(20)
     pan_id = t.PanId(0x1234)
     extended_pan_id = t.ExtendedPanId(range(8))
     channels = t.Channels.from_channel_list([11, 15, 20])
     network_key = t.KeyData(range(16))
-
-    channels_updated = znp_server.reply_once_to(
-        request=c.Util.SetChannels.Req(Channels=channels),
-        responses=[c.Util.SetChannels.Rsp(Status=t.Status.SUCCESS)],
-    )
 
     bdb_set_primary_channel = znp_server.reply_once_to(
         request=c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
@@ -909,36 +920,11 @@ async def test_update_network(mocker, caplog, application):
         responses=[c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.SUCCESS)],
     )
 
-    set_pan_id = znp_server.reply_once_to(
-        request=c.Util.SetPanId.Req(PanId=pan_id),
-        responses=[c.Util.SetPanId.Rsp(Status=t.Status.SUCCESS)],
-    )
+    # Make sure we actually change things
+    assert app.channel != channel
+    assert app.pan_id != pan_id
+    assert app.extended_pan_id != extended_pan_id
 
-    set_extended_pan_id = znp_server.reply_once_to(
-        request=c.SYS.OSALNVWrite.Req(
-            Id=NwkNvIds.EXTENDED_PAN_ID, Offset=0, Value=extended_pan_id.serialize()
-        ),
-        responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    set_network_key_util = znp_server.reply_once_to(
-        request=c.Util.SetPreConfigKey.Req(PreConfigKey=network_key),
-        responses=[c.Util.SetPreConfigKey.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    set_network_key_nvram = znp_server.reply_once_to(
-        request=c.SYS.OSALNVWrite.Req(
-            Id=NwkNvIds.PRECFGKEYS_ENABLE, Offset=0, Value=t.Bool(True).serialize()
-        ),
-        responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    set_nib_nvram = znp_server.reply_once_to(
-        request=c.SYS.OSALNVWrite.Req(Id=NwkNvIds.NIB, Offset=0, partial=True),
-        responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    # But it does succeed with a warning if you explicitly allow it
     with caplog.at_level(logging.WARNING):
         await app.update_network(
             channel=channel,
@@ -955,14 +941,8 @@ async def test_update_network(mocker, caplog, application):
     # We should receive a few warnings for `tc_` stuff
     assert len(caplog.records) >= 2
 
-    await channels_updated
     await bdb_set_primary_channel
     await bdb_set_secondary_channel
-    await set_pan_id
-    await set_extended_pan_id
-    await set_network_key_util
-    await set_network_key_nvram
-    await set_nib_nvram
 
     app._reset.assert_called_once_with()
 
@@ -1036,42 +1016,12 @@ async def test_auto_form_unnecessary(application, mocker):
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_auto_form_necessary(application, mocker):
     app, znp_server = application
-    nvram = {}
+    nvram = znp_server._nvram_state
+
+    nvram.pop(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
 
     mocker.patch.object(app, "update_network", new=CoroutineMock())
     mocker.spy(app, "_reset")
-
-    def nvram_writer(req):
-        nvram[req.Id] = req.Value
-
-        return c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
-
-    def nvram_init(req):
-        nvram[req.Id] = req.Value
-
-        return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.SUCCESS)
-
-    # Prevent the fixture's default NVRAM responses, except for the NIB
-    listeners = znp_server._response_listeners[c.SYS.OSALNVRead.Req.header]
-    znp_server._response_listeners[c.SYS.OSALNVRead.Req.header] = [
-        listener
-        for listener in listeners
-        if listener.matching_commands[0]
-        == c.SYS.OSALNVRead.Req(Id=NwkNvIds.NIB, Offset=0)
-    ]
-
-    read_zstack_configured = znp_server.reply_once_to(
-        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
-    )
-
-    znp_server.reply_to(
-        request=c.SYS.OSALNVWrite.Req(Offset=0, partial=True), responses=[nvram_writer]
-    )
-
-    znp_server.reply_to(
-        request=c.SYS.OSALNVItemInit.Req(partial=True), responses=[nvram_init]
-    )
 
     znp_server.reply_to(
         request=c.AppConfig.BDBStartCommissioning.Req(
@@ -1092,10 +1042,7 @@ async def test_auto_form_necessary(application, mocker):
 
     await app.startup(auto_form=True)
 
-    await read_zstack_configured
-
     assert app.update_network.call_count == 1
-    assert app._reset.call_count == 2
 
     assert nvram[NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
     assert nvram[NwkNvIds.STARTUP_OPTION] == t.StartupOptions.ClearState.serialize()

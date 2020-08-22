@@ -542,9 +542,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
         )
 
-        # Parsing the NIB struct gives us access to low-level info, like the channel
-        self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
-        LOGGER.debug("Parsed NIB: %s", self._nib)
+        await self._load_device_info()
 
         LOGGER.info(
             "Using channel mask %s, currently on channel %d",
@@ -552,21 +550,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.channel,
         )
 
+    async def _load_device_info(self):
+        # Parsing the NIB struct gives us access to low-level info, like the channel
+        self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+        LOGGER.debug("Parsed NIB: %s", self._nib)
+
+        # Util.GetNvInfo reads all of these but it has an endianness bug with CHANLIST
+        self._pan_id, _ = t.PanId.deserialize(
+            await self._znp.nvram_read(NwkNvIds.PANID)
+        )
+        self._channels, _ = t.Channels.deserialize(
+            await self._znp.nvram_read(NwkNvIds.CHANLIST)
+        )
+        self._ext_pan_id, _ = t.EUI64.deserialize(
+            await self._znp.nvram_read(NwkNvIds.EXTENDED_PAN_ID)
+        )
+
     @property
     def channel(self):
         return self._nib.nwkLogicalChannel
-
-    @property
-    def channels(self):
-        return self._nib.channelList
-
-    @property
-    def pan_id(self):
-        return self._nib.nwkPanId
-
-    @property
-    def ext_pan_id(self):
-        return self._nib.extendedPANID
 
     async def update_network(
         self,
@@ -599,9 +601,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning("Trust center address in config is not yet supported")
 
         if channels is not None:
-            await self._znp.request(
-                c.Util.SetChannels.Req(Channels=channels), RspStatus=t.Status.SUCCESS,
-            )
+            await self._znp.nvram_write(NwkNvIds.CHANLIST, channels)
             await self._znp.request(
                 c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
                 RspStatus=t.Status.SUCCESS,
@@ -613,42 +613,28 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 RspStatus=t.Status.SUCCESS,
             )
 
-            self._channels = channels
-
         if channel is not None:
-            # We modify the logical channel value directly in the NIB.
-            # Does this actually work?
+            # XXX: We modify the logical channel value directly in the NIB
+            # Might be better to send a ZDO request to ourself
             nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
             nib.nwkLogicalChannel = channel
             await self._znp.nvram_write(NwkNvIds.NIB, nib.serialize())
 
-            self._channel = channel
-
         if pan_id is not None:
-            await self._znp.request(
-                c.Util.SetPanId.Req(PanId=pan_id), RspStatus=t.Status.SUCCESS
-            )
-
-            self._pan_id = pan_id
+            await self._znp.nvram_write(NwkNvIds.PANID, pan_id)
 
         if extended_pan_id is not None:
             # There is no Util request to do this
             await self._znp.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
 
-            self._ext_pan_id = extended_pan_id
-
         if network_key is not None:
-            await self._znp.request(
-                c.Util.SetPreConfigKey.Req(PreConfigKey=network_key),
-                RspStatus=t.Status.SUCCESS,
-            )
-
-            # XXX: The Util request does not actually write to this NV address
+            await self._znp.nvram_write(NwkNvIds.PRECFGKEY, network_key)
             await self._znp.nvram_write(NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True))
 
         if reset:
             # We have to reset afterwards
             await self._reset()
+            await self._load_device_info()
 
     async def _reset(self):
         """
@@ -719,6 +705,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Initializing the item won't guarantee that it holds this exact value
         await self._znp.nvram_write(NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55")
+
+        # Finally, reload the NIB after our changes
+        self._load_device_info()
 
     def get_dst_address(self, cluster):
         """

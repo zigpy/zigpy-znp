@@ -98,8 +98,8 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
                 t.Param("IEEE", t.EUI64, "IEEE address of the device"),
                 t.Param(
                     "ScanChannels",
-                    t.Channels,
-                    "Channels to be scanned when starting the device",
+                    t.uint32_t,
+                    "Channels to be scanned when starting the device. Big endian!",
                 ),
                 t.Param(
                     "PanId",
