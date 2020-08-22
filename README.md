@@ -19,7 +19,7 @@ Or the most recent commit directly from Git:
 (venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/
 ```
 
-If you are using Home Assistant, copy `custom_components/zha_custom_radios.py` into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
+If you are using Home Assistant, copy [`custom_components/zha_custom_radios.py`](https://github.com/zha-ng/zigpy-znp/blob/dev/custom_components/zha_custom_radios.py) into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
 
 ```yaml
 zha_custom_radios:
@@ -27,6 +27,8 @@ zha_custom_radios:
    module: zigpy_znp.zigbee.application
    description: TI CC13x2, CC26x2, ZZH, and CC2531
 ```
+
+If you have already setup Home Assistant's ZHA component with a TI radio, ZHA will already be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. To switch ZHA over to zigpy-znp, navigate to the folder containing your `configuration.yaml` file and edit the `.storage/core.config_entries`, changing `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
 
 # Configuration
 
