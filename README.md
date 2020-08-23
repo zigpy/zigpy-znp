@@ -10,15 +10,15 @@ Together with zigpy and compatible home automation software (namely Home Assista
 # Installation
 
 ## Python module
-Install the Python module from the PyPI within your virtual environment:
+Install the Python module within your virtual environment:
 
-```shell
-(venv) $ pip install zigpy-znp
-```
-
-Or the most recent commit directly from Git:
 ```shell
 (venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/
+```
+
+Or the latest stable release from the PyPI:
+```shell
+(venv) $ pip install zigpy-znp
 ```
 
 
