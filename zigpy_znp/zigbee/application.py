@@ -32,6 +32,7 @@ from zigpy_znp.api import ZNP
 from zigpy_znp.znp.nib import parse_nib, OldNIB
 from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds
+from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
 
 
 ZDO_ENDPOINT = 0
@@ -40,104 +41,23 @@ DATA_CONFIRM_TIMEOUT = 5  # seconds
 LOGGER = logging.getLogger(__name__)
 
 
-ZDO_COMPLEX_CONVERTERS = {
-    ZDOCmd.Node_Desc_req: (
-        (
-            lambda addr, device, NWKAddrOfInterest: c.ZDO.NodeDescReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
-            )
-        ),
-        (lambda addr: c.ZDO.NodeDescRsp.Callback(partial=True, Src=addr)),
-        (
-            lambda rsp: (
-                ZDOCmd.Node_Desc_rsp,
-                {
-                    "Status": rsp.Status,
-                    "NWKAddrOfInterest": rsp.NWK,
-                    "NodeDescriptor": rsp.NodeDescriptor,
-                },
-            )
-        ),
-    ),
-    ZDOCmd.Active_EP_req: (
-        (
-            lambda addr, device, NWKAddrOfInterest: c.ZDO.ActiveEpReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
-            )
-        ),
-        (lambda addr: c.ZDO.ActiveEpRsp.Callback(partial=True, Src=addr)),
-        (
-            lambda rsp: (
-                ZDOCmd.Active_EP_rsp,
-                {
-                    "Status": rsp.Status,
-                    "NWKAddrOfInterest": rsp.NWK,
-                    "ActiveEPList": rsp.ActiveEndpoints,
-                },
-            )
-        ),
-    ),
-    ZDOCmd.Simple_Desc_req: (
-        (
-            lambda addr, device, NWKAddrOfInterest, EndPoint: (
-                c.ZDO.SimpleDescReq.Req(
-                    DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest, Endpoint=EndPoint
-                )
-            )
-        ),
-        (lambda addr: c.ZDO.SimpleDescRsp.Callback(partial=True, Src=addr)),
-        (
-            lambda rsp: (
-                ZDOCmd.Simple_Desc_rsp,
-                {
-                    "Status": rsp.Status,
-                    "NWKAddrOfInterest": rsp.NWK,
-                    "SimpleDescriptor": rsp.SimpleDescriptor,
-                },
-            )
-        ),
-    ),
-    ZDOCmd.Mgmt_Permit_Joining_req: (
-        (
-            lambda addr, device, PermitDuration, TC_Significant: (
-                c.ZDO.MgmtPermitJoinReq.Req(
-                    AddrMode=t.AddrMode.NWK,
-                    Dst=addr,
-                    Duration=PermitDuration,
-                    TCSignificance=TC_Significant,
-                )
-            )
-        ),
-        (lambda addr: c.ZDO.MgmtPermitJoinRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Mgmt_Permit_Joining_rsp, {"Status": rsp.Status})),
-    ),
-    ZDOCmd.Mgmt_Leave_req: (
-        (
-            lambda addr, device, DeviceAddress, Options: c.ZDO.MgmtLeaveReq.Req(
-                DstAddr=addr,
-                IEEE=device.ieee,
-                RemoveChildren_Rejoin=c.zdo.LeaveOptions(Options),
-            )
-        ),
-        (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, {"Status": rsp.Status})),
-    ),
-    ZDOCmd.Bind_req: (
-        (
-            lambda addr, device, SrcAddress, SrcEndpoint, ClusterID, DstAddress: (
-                c.ZDO.BindReq.Req(
-                    Dst=addr,
-                    Src=SrcAddress,
-                    SrcEndpoint=SrcEndpoint,
-                    ClusterId=ClusterID,
-                    Address=DstAddress,
-                )
-            )
-        ),
-        (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Bind_rsp, {"Status": rsp.Status})),
-    ),
-}
+class ZNPCoordinator(zigpy.device.Device):
+    """
+    Coordinator zigpy device that keeps track of our endpoints and clusters.
+    """
+
+    @property
+    def manufacturer(self):
+        return "Texas Instruments"
+
+    @property
+    def model(self):
+        # There is no way to query the Z-Stack version or even the hardware at runtime.
+        # Instead we have to rely on these sorts of "hints"
+        if isinstance(self.application._nib, OldNIB):
+            return "CC2531"
+        else:
+            return "CC13X2/CC26X2"
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
@@ -147,13 +67,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     def __init__(self, config: conf.ConfigType):
         super().__init__(config=conf.CONFIG_SCHEMA(config))
 
-        self._znp = None
+        self._znp: typing.Optional[ZNP] = None
 
         # It's simpler to work with Task objects if they're never actually None
         self._reconnect_task = asyncio.Future()
         self._reconnect_task.cancel()
 
         self._nib = None
+
+    ##################################################################
+    # Implementation of the core zigpy ControllerApplication methods #
+    ##################################################################
+
+    @property
+    def channel(self):
+        return self._nib.nwkLogicalChannel
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
@@ -176,114 +104,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         finally:
             znp.close()
 
-    def _receive_zdo_message(
-        self,
-        cluster: ZDOCmd,
-        *,
-        tsn: t.uint8_t,
-        sender: zigpy.device.Device,
-        **zdo_kwargs,
-    ) -> None:
-        """
-        Internal method that is mainly called by our ZDO request/response converters to
-        receive a "fake" ZDO message constructed from a cluster and args/kwargs.
-        """
-
-        field_names, field_types = ZDO_CLUSTERS[cluster]
-        assert set(zdo_kwargs) == set(field_names)
-
-        # Type cast all of the field args and kwargs
-        zdo_args = []
-
-        for name, field_type in zip(field_names, field_types):
-            zdo_arg = zdo_kwargs[name]
-
-            if issubclass(field_type, ZigpyStruct) and hasattr(ZigpyStruct, "_fields"):
-                # Old-style zigpy structs do not have "copy constructors"
-                new_obj = field_type()
-
-                for field_name, _ in new_obj._fields:
-                    setattr(new_obj, field_name, getattr(zdo_arg, field_name))
-            else:
-                new_obj = field_type(zdo_arg)
-
-            zdo_args.append(zdo_arg)
-
-        message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
-
-        LOGGER.debug("Pretending we received a ZDO message: %s", message)
-
-        self.handle_message(
-            sender=sender,
-            profile=zigpy.profiles.zha.PROFILE_ID,
-            cluster=cluster,
-            src_ep=ZDO_ENDPOINT,
-            dst_ep=ZDO_ENDPOINT,
-            message=message,
-        )
-
-    def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
-        """
-        ZDO source routing message callback
-        """
-
-        LOGGER.info("ZDO device relays: %s", msg)
-        device = self.get_device(nwk=msg.DstAddr)
-        device.relays = msg.Relays
-
-    def on_zdo_device_announce(self, msg: c.ZDO.EndDeviceAnnceInd.Callback) -> None:
-        """
-        ZDO end device announcement callback
-        """
-
-        LOGGER.info("ZDO device announce: %s", msg)
-
-        # We turn this back into a ZDO message and let zigpy handle it
-        self._receive_zdo_message(
-            cluster=ZDOCmd.Device_annce,
-            tsn=0xFF,
-            sender=self.get_device(ieee=msg.IEEE),
-            NWKAddr=msg.NWK,
-            IEEEAddr=msg.IEEE,
-            Capability=msg.Capabilities,
-        )
-
-    def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
-        """
-        ZDO trust center device join callback
-        """
-
-        LOGGER.info("TC device join: %s", msg)
-        self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
-
-    def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
-        LOGGER.info("ZDO device left: %s", msg)
-        self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
-
-    def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
-        """
-        Handler for all non-ZDO messages.
-        """
-
-        try:
-            device = self.get_device(nwk=msg.SrcAddr)
-        except KeyError:
-            LOGGER.warning(
-                "Received an AF message from an unknown device: 0x%04x", msg.SrcAddr
-            )
-            return
-
-        device.radio_details(lqi=msg.LQI, rssi=None)
-
-        self.handle_message(
-            sender=device,
-            profile=zigpy.profiles.zha.PROFILE_ID,  # XXX: does this kwarg matter?
-            cluster=msg.ClusterId,
-            src_ep=msg.SrcEndpoint,
-            dst_ep=msg.DstEndpoint,
-            message=msg.Data,
-        )
-
     async def shutdown(self):
         """
         Gracefully shuts down the application and cleans up all resources.
@@ -294,132 +114,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if self._znp is not None:
             self._znp.close()
-
-    def _bind_callbacks(self, api: ZNP) -> None:
-        """
-        Binds all of the necessary message callbacks to their associated methods.
-
-        Z-Stack intercepts most (but not all!) ZDO requests/responses and replaces them
-        ZNP requests/responses.
-        """
-
-        api.callback_for_response(
-            c.AF.IncomingMsg.Callback(partial=True), self.on_af_message
-        )
-
-        # ZDO requests need to be handled explicitly, one by one
-        api.callback_for_response(
-            c.ZDO.EndDeviceAnnceInd.Callback(partial=True), self.on_zdo_device_announce,
-        )
-
-        api.callback_for_response(
-            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_zdo_tc_device_join,
-        )
-
-        api.callback_for_response(
-            c.ZDO.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
-        )
-
-        api.callback_for_response(
-            c.ZDO.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
-        )
-
-    async def _reconnect(self) -> None:
-        """
-        Endlessly tries to reconnect to the currently configured radio.
-
-        Relies on the fact that `self.startup()` only modifies `self` upon a successful
-        connection to be essentially stateless.
-        """
-
-        for attempt in itertools.count(start=1):
-            LOGGER.debug(
-                "Trying to reconnect to %s, attempt %d",
-                self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH],
-                attempt,
-            )
-
-            try:
-                await self.startup()
-
-                return
-            except Exception as e:
-                LOGGER.error("Failed to reconnect", exc_info=e)
-                await asyncio.sleep(
-                    self._config[conf.CONF_ZNP_CONFIG][
-                        conf.CONF_AUTO_RECONNECT_RETRY_DELAY
-                    ]
-                )
-
-    def connection_lost(self, exc):
-        """
-        Propagated up from lower layers (UART and ZNP) when the connection is lost.
-        Spawns the auto-reconnect task.
-        """
-
-        self._znp = None
-
-        # exc=None means that the connection was closed
-        if exc is None:
-            LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
-            return
-
-        # Reconnect in the background using our previously-detected port.
-        LOGGER.debug("Starting background reconnection task")
-
-        self._reconnect_task.cancel()
-        self._reconnect_task = asyncio.create_task(self._reconnect())
-
-    @property
-    def zigpy_device(self):
-        """
-        Reference to zigpy device 0x0000, the coordinator.
-        """
-
-        return self.devices[self.ieee]
-
-    async def _register_endpoint(
-        self,
-        endpoint,
-        profile_id=zigpy.profiles.zha.PROFILE_ID,
-        device_id=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
-        device_version=0b0000,
-        latency_req=c.af.LatencyReq.NoLatencyReqs,
-        input_clusters=[],
-        output_clusters=[],
-    ):
-        """
-        Method to register an endpoint simultaneously with both zigpy and Z-Stack.
-
-        This lets us keep track of our own endpoint information without duplicating
-        that information again, and exposing it to higher layers (e.g. Home Assistant).
-        """
-
-        # Create a corresponding endpoint on our Zigpy device first
-        zigpy_ep = self.zigpy_device.add_endpoint(endpoint)
-        zigpy_ep.profile_id = profile_id
-        zigpy_ep.device_type = device_id
-
-        for cluster in input_clusters:
-            zigpy_ep.add_input_cluster(cluster)
-
-        for cluster in output_clusters:
-            zigpy_ep.add_output_cluster(cluster)
-
-        zigpy_ep.status = zigpy.endpoint.Status.ZDO_INIT
-
-        return await self._znp.request(
-            c.AF.Register.Req(
-                Endpoint=endpoint,
-                ProfileId=profile_id,
-                DeviceId=device_id,
-                DeviceVersion=device_version,
-                LatencyReq=latency_req,  # completely ignored by Z-Stack
-                InputClusters=input_clusters,
-                OutputClusters=output_clusters,
-            ),
-            RspStatus=t.Status.SUCCESS,
-        )
 
     async def startup(self, auto_form=False, write_nvram=True):
         """
@@ -550,26 +244,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.channel,
         )
 
-    async def _load_device_info(self):
-        # Parsing the NIB struct gives us access to low-level info, like the channel
-        self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
-        LOGGER.debug("Parsed NIB: %s", self._nib)
-
-        # Util.GetNvInfo reads all of these but it has an endianness bug with CHANLIST
-        self._pan_id, _ = t.PanId.deserialize(
-            await self._znp.nvram_read(NwkNvIds.PANID)
-        )
-        self._channels, _ = t.Channels.deserialize(
-            await self._znp.nvram_read(NwkNvIds.CHANLIST)
-        )
-        self._ext_pan_id, _ = t.EUI64.deserialize(
-            await self._znp.nvram_read(NwkNvIds.EXTENDED_PAN_ID)
-        )
-
-    @property
-    def channel(self):
-        return self._nib.nwkLogicalChannel
-
     async def update_network(
         self,
         *,
@@ -635,16 +309,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # We have to reset afterwards
             await self._reset()
             await self._load_device_info()
-
-    async def _reset(self):
-        """
-        Performs a soft reset within Z-Stack, which does not reset the serial connection
-        """
-
-        await self._znp.request_callback_rsp(
-            request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
-            callback=c.SYS.ResetInd.Callback(partial=True),
-        )
 
     async def form_network(self):
         """
@@ -727,174 +391,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         return dst_addr
-
-    def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
-        """
-        Zigpy defaults to sending messages with src_ep == dst_ep. This does not work
-        with Z-Stack, which requires endpoints to be registered explicitly on startup.
-        """
-
-        if dst_ep == ZDO_ENDPOINT:
-            return ZDO_ENDPOINT
-
-        candidates = []
-
-        for ep_id, endpoint in self.zigpy_device.endpoints.items():
-            if ep_id == ZDO_ENDPOINT:
-                continue
-
-            if endpoint.profile_id != profile:
-                continue
-
-            # An exact match, no need to continue further
-            # TODO: pass in `is_server_cluster` or something similar
-            if cluster in endpoint.out_clusters or cluster in endpoint.in_clusters:
-                return endpoint.endpoint_id
-
-            # Otherwise, keep track of the candidate cluster
-            # if we don't find anything better
-            candidates.append(endpoint.endpoint_id)
-
-        if not candidates:
-            raise ValueError(
-                f"Could not pick endpoint for dst_ep={dst_ep},"
-                f" profile={profile}, and cluster={cluster}"
-            )
-
-        # XXX: pick the first one?
-        return candidates[0]
-
-    async def _send_zdo_request(
-        self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
-    ):
-        """
-        Zigpy doesn't send ZDO requests via TI's ZDO_* MT commands,
-        so it will never receive a reply because ZNP intercepts ZDO replies, never
-        sends a DataConfirm, and instead replies with one of its ZDO_* MT responses.
-
-        This method translates the ZDO_* MT response into one zigpy can handle.
-        """
-
-        LOGGER.debug(
-            "Intercepted a ZDO request: dst_addr=%s, dst_ep=%s, src_ep=%s, "
-            "cluster=%s, sequence=%s, options=%s, radius=%s, data=%s",
-            dst_addr,
-            dst_ep,
-            src_ep,
-            cluster,
-            sequence,
-            options,
-            radius,
-            data,
-        )
-
-        assert dst_ep == ZDO_ENDPOINT
-
-        # Deserialize the ZDO request
-        zdo_hdr, data = ZDOHeader.deserialize(cluster, data)
-        field_names, field_types = ZDO_CLUSTERS[cluster]
-        zdo_args, _ = list_deserialize(data, field_types)
-        zdo_kwargs = dict(zip(field_names, zdo_args))
-
-        device = self.get_device(nwk=dst_addr.address)
-
-        if cluster not in ZDO_COMPLEX_CONVERTERS:
-            LOGGER.error(
-                "ZDO converter for cluster %s has not been implemented!"
-                " Please open a GitHub issue and attach a debug log:"
-                " https://github.com/zha-ng/zigpy-znp/issues/new",
-                cluster,
-            )
-            return t.Status.FAILURE, "No ZDO converter"
-
-        # Call the converter with the ZDO request's kwargs
-        req_factory, rsp_factory, zdo_rsp_factory = ZDO_COMPLEX_CONVERTERS[cluster]
-        request = req_factory(dst_addr.address, device, **zdo_kwargs)
-        callback = rsp_factory(dst_addr.address)
-
-        LOGGER.debug(
-            "Intercepted AP ZDO request %s(%s) and replaced with %s",
-            cluster,
-            zdo_kwargs,
-            request,
-        )
-
-        try:
-            async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
-                response = await self._znp.request_callback_rsp(
-                    request=request, RspStatus=t.Status.SUCCESS, callback=callback
-                )
-        except InvalidCommandResponse as e:
-            raise DeliveryError(f"Could not send command: {e.response.Status}") from e
-
-        zdo_rsp_cluster, zdo_response_kwargs = zdo_rsp_factory(response)
-
-        self._receive_zdo_message(
-            cluster=zdo_rsp_cluster, tsn=sequence, sender=device, **zdo_response_kwargs
-        )
-
-        return response.Status, "Request sent successfully"
-
-    async def _send_request(
-        self,
-        dst_addr,
-        dst_ep,
-        src_ep,
-        profile,
-        cluster,
-        sequence,
-        options,
-        radius,
-        data,
-    ) -> typing.Tuple[t.Status, str]:
-        """
-        Used by `request`/`mrequest`/`broadcast` to send a request.
-        Picks the correct request sending mechanism and fixes endpoint information.
-        """
-
-        if dst_ep == ZDO_ENDPOINT and not (
-            cluster == ZDOCmd.Mgmt_Permit_Joining_req
-            and dst_addr.mode == t.AddrMode.Broadcast
-        ):
-            return await self._send_zdo_request(
-                dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
-            )
-
-        # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
-        # We pick ours based on the registered endpoints.
-        src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
-
-        request = c.AF.DataRequestExt.Req(
-            DstAddrModeAddress=dst_addr,
-            DstEndpoint=dst_ep,
-            DstPanId=0x0000,
-            SrcEndpoint=src_ep,
-            ClusterId=cluster,
-            TSN=sequence,
-            Options=options,
-            Radius=radius,
-            Data=data,
-        )
-
-        if dst_addr.mode == t.AddrMode.Broadcast:
-            # We won't always get a data confirmation
-            response = await self._znp.request(
-                request=request, RspStatus=t.Status.SUCCESS
-            )
-        else:
-            async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-                response = await self._znp.request_callback_rsp(
-                    request=request,
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.AF.DataConfirm.Callback(partial=True, TSN=sequence),
-                )
-
-            LOGGER.debug("Received a data request confirmation: %s", response)
-
-        if response.Status != t.Status.SUCCESS:
-            return response.Status, "Invalid response status"
-
-        return response.Status, "Request sent successfully"
 
     @zigpy.util.retryable_request
     async def request(
@@ -1025,15 +521,438 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if response.Status != t.Status.SUCCESS:
             raise RuntimeError(f"Permit join response failure: {response}")
 
+    def connection_lost(self, exc):
+        """
+        Propagated up from lower layers (UART and ZNP) when the connection is lost.
+        Spawns the auto-reconnect task.
+        """
 
-class ZNPCoordinator(zigpy.device.Device):
-    @property
-    def manufacturer(self):
-        return "Texas Instruments"
+        self._znp = None
+
+        # exc=None means that the connection was closed
+        if exc is None:
+            LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
+            return
+
+        # Reconnect in the background using our previously-detected port.
+        LOGGER.debug("Starting background reconnection task")
+
+        self._reconnect_task.cancel()
+        self._reconnect_task = asyncio.create_task(self._reconnect())
+
+    #####################################################
+    # Z-Stack message callbacks attached during startup #
+    #####################################################
+
+    def _bind_callbacks(self, api: ZNP) -> None:
+        """
+        Binds all of the necessary message callbacks to their associated methods.
+
+        Z-Stack intercepts most (but not all!) ZDO requests/responses and replaces them
+        ZNP requests/responses.
+        """
+
+        api.callback_for_response(
+            c.AF.IncomingMsg.Callback(partial=True), self.on_af_message
+        )
+
+        # ZDO requests need to be handled explicitly, one by one
+        api.callback_for_response(
+            c.ZDO.EndDeviceAnnceInd.Callback(partial=True), self.on_zdo_device_announce,
+        )
+
+        api.callback_for_response(
+            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_zdo_tc_device_join,
+        )
+
+        api.callback_for_response(
+            c.ZDO.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
+        )
+
+        api.callback_for_response(
+            c.ZDO.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
+        )
+
+    def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
+        """
+        ZDO source routing message callback
+        """
+
+        LOGGER.info("ZDO device relays: %s", msg)
+        device = self.get_device(nwk=msg.DstAddr)
+        device.relays = msg.Relays
+
+    def on_zdo_device_announce(self, msg: c.ZDO.EndDeviceAnnceInd.Callback) -> None:
+        """
+        ZDO end device announcement callback
+        """
+
+        LOGGER.info("ZDO device announce: %s", msg)
+
+        # We turn this back into a ZDO message and let zigpy handle it
+        self._receive_zdo_message(
+            cluster=ZDOCmd.Device_annce,
+            tsn=0xFF,
+            sender=self.get_device(ieee=msg.IEEE),
+            NWKAddr=msg.NWK,
+            IEEEAddr=msg.IEEE,
+            Capability=msg.Capabilities,
+        )
+
+    def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
+        """
+        ZDO trust center device join callback
+        """
+
+        LOGGER.info("TC device join: %s", msg)
+        self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
+
+    def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
+        LOGGER.info("ZDO device left: %s", msg)
+        self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
+
+    def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
+        """
+        Handler for all non-ZDO messages.
+        """
+
+        try:
+            device = self.get_device(nwk=msg.SrcAddr)
+        except KeyError:
+            LOGGER.warning(
+                "Received an AF message from an unknown device: 0x%04x", msg.SrcAddr
+            )
+            return
+
+        device.radio_details(lqi=msg.LQI, rssi=None)
+
+        self.handle_message(
+            sender=device,
+            profile=zigpy.profiles.zha.PROFILE_ID,  # XXX: does this kwarg matter?
+            cluster=msg.ClusterId,
+            src_ep=msg.SrcEndpoint,
+            dst_ep=msg.DstEndpoint,
+            message=msg.Data,
+        )
+
+    ####################
+    # Internal methods #
+    ####################
 
     @property
-    def model(self):
-        if isinstance(self.application._nib, OldNIB):
-            return "CC2531"
+    def zigpy_device(self):
+        """
+        Reference to zigpy device 0x0000, the coordinator.
+        """
+
+        return self.devices[self.ieee]
+
+    def _receive_zdo_message(
+        self,
+        cluster: ZDOCmd,
+        *,
+        tsn: t.uint8_t,
+        sender: zigpy.device.Device,
+        **zdo_kwargs,
+    ) -> None:
+        """
+        Internal method that is mainly called by our ZDO request/response converters to
+        receive a "fake" ZDO message constructed from a cluster and args/kwargs.
+        """
+
+        field_names, field_types = ZDO_CLUSTERS[cluster]
+        assert set(zdo_kwargs) == set(field_names)
+
+        # Type cast all of the field args and kwargs
+        zdo_args = []
+
+        for name, field_type in zip(field_names, field_types):
+            zdo_arg = zdo_kwargs[name]
+
+            if issubclass(field_type, ZigpyStruct) and hasattr(ZigpyStruct, "_fields"):
+                # Old-style zigpy structs do not have "copy constructors"
+                new_obj = field_type()
+
+                for field_name, _ in new_obj._fields:
+                    setattr(new_obj, field_name, getattr(zdo_arg, field_name))
+            else:
+                new_obj = field_type(zdo_arg)
+
+            zdo_args.append(zdo_arg)
+
+        message = t.serialize_list([t.uint8_t(tsn)] + zdo_args)
+
+        LOGGER.debug("Pretending we received a ZDO message: %s", message)
+
+        self.handle_message(
+            sender=sender,
+            profile=zigpy.profiles.zha.PROFILE_ID,
+            cluster=cluster,
+            src_ep=ZDO_ENDPOINT,
+            dst_ep=ZDO_ENDPOINT,
+            message=message,
+        )
+
+    async def _reconnect(self) -> None:
+        """
+        Endlessly tries to reconnect to the currently configured radio.
+
+        Relies on the fact that `self.startup()` only modifies `self` upon a successful
+        connection to be essentially stateless.
+        """
+
+        for attempt in itertools.count(start=1):
+            LOGGER.debug(
+                "Trying to reconnect to %s, attempt %d",
+                self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH],
+                attempt,
+            )
+
+            try:
+                await self.startup()
+
+                return
+            except Exception as e:
+                LOGGER.error("Failed to reconnect", exc_info=e)
+                await asyncio.sleep(
+                    self._config[conf.CONF_ZNP_CONFIG][
+                        conf.CONF_AUTO_RECONNECT_RETRY_DELAY
+                    ]
+                )
+
+    async def _register_endpoint(
+        self,
+        endpoint,
+        profile_id=zigpy.profiles.zha.PROFILE_ID,
+        device_id=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
+        device_version=0b0000,
+        latency_req=c.af.LatencyReq.NoLatencyReqs,
+        input_clusters=[],
+        output_clusters=[],
+    ):
+        """
+        Method to register an endpoint simultaneously with both zigpy and Z-Stack.
+
+        This lets us keep track of our own endpoint information without duplicating
+        that information again, and exposing it to higher layers (e.g. Home Assistant).
+        """
+
+        # Create a corresponding endpoint on our Zigpy device first
+        zigpy_ep = self.zigpy_device.add_endpoint(endpoint)
+        zigpy_ep.profile_id = profile_id
+        zigpy_ep.device_type = device_id
+
+        for cluster in input_clusters:
+            zigpy_ep.add_input_cluster(cluster)
+
+        for cluster in output_clusters:
+            zigpy_ep.add_output_cluster(cluster)
+
+        zigpy_ep.status = zigpy.endpoint.Status.ZDO_INIT
+
+        return await self._znp.request(
+            c.AF.Register.Req(
+                Endpoint=endpoint,
+                ProfileId=profile_id,
+                DeviceId=device_id,
+                DeviceVersion=device_version,
+                LatencyReq=latency_req,  # completely ignored by Z-Stack
+                InputClusters=input_clusters,
+                OutputClusters=output_clusters,
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
+
+    async def _load_device_info(self):
+        # Parsing the NIB struct gives us access to low-level info, like the channel
+        self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+        LOGGER.debug("Parsed NIB: %s", self._nib)
+
+        # Util.GetNvInfo reads all of these but it has an endianness bug with CHANLIST
+        self._pan_id, _ = t.PanId.deserialize(
+            await self._znp.nvram_read(NwkNvIds.PANID)
+        )
+        self._channels, _ = t.Channels.deserialize(
+            await self._znp.nvram_read(NwkNvIds.CHANLIST)
+        )
+        self._ext_pan_id, _ = t.EUI64.deserialize(
+            await self._znp.nvram_read(NwkNvIds.EXTENDED_PAN_ID)
+        )
+
+    async def _reset(self):
+        """
+        Performs a soft reset within Z-Stack, which does not reset the serial connection
+        """
+
+        await self._znp.request_callback_rsp(
+            request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
+            callback=c.SYS.ResetInd.Callback(partial=True),
+        )
+
+    def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
+        """
+        Zigpy defaults to sending messages with src_ep == dst_ep. This does not work
+        with Z-Stack, which requires endpoints to be registered explicitly on startup.
+        """
+
+        if dst_ep == ZDO_ENDPOINT:
+            return ZDO_ENDPOINT
+
+        candidates = []
+
+        for ep_id, endpoint in self.zigpy_device.endpoints.items():
+            if ep_id == ZDO_ENDPOINT:
+                continue
+
+            if endpoint.profile_id != profile:
+                continue
+
+            # An exact match, no need to continue further
+            # TODO: pass in `is_server_cluster` or something similar
+            if cluster in endpoint.out_clusters or cluster in endpoint.in_clusters:
+                return endpoint.endpoint_id
+
+            # Otherwise, keep track of the candidate cluster
+            # if we don't find anything better
+            candidates.append(endpoint.endpoint_id)
+
+        if not candidates:
+            raise ValueError(
+                f"Could not pick endpoint for dst_ep={dst_ep},"
+                f" profile={profile}, and cluster={cluster}"
+            )
+
+        # XXX: pick the first one?
+        return candidates[0]
+
+    async def _send_zdo_request(
+        self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
+    ):
+        """
+        Zigpy doesn't send ZDO requests via TI's ZDO_* MT commands,
+        so it will never receive a reply because ZNP intercepts ZDO replies, never
+        sends a DataConfirm, and instead replies with one of its ZDO_* MT responses.
+
+        This method translates the ZDO_* MT response into one zigpy can handle.
+        """
+
+        LOGGER.debug(
+            "Intercepted a ZDO request: dst_addr=%s, dst_ep=%s, src_ep=%s, "
+            "cluster=%s, sequence=%s, options=%s, radius=%s, data=%s",
+            dst_addr,
+            dst_ep,
+            src_ep,
+            cluster,
+            sequence,
+            options,
+            radius,
+            data,
+        )
+
+        assert dst_ep == ZDO_ENDPOINT
+
+        # Deserialize the ZDO request
+        zdo_hdr, data = ZDOHeader.deserialize(cluster, data)
+        field_names, field_types = ZDO_CLUSTERS[cluster]
+        zdo_args, _ = list_deserialize(data, field_types)
+        zdo_kwargs = dict(zip(field_names, zdo_args))
+
+        device = self.get_device(nwk=dst_addr.address)
+
+        if cluster not in ZDO_CONVERTERS:
+            LOGGER.error(
+                "ZDO converter for cluster %s has not been implemented!"
+                " Please open a GitHub issue and attach a debug log:"
+                " https://github.com/zha-ng/zigpy-znp/issues/new",
+                cluster,
+            )
+            return t.Status.FAILURE, "No ZDO converter"
+
+        # Call the converter with the ZDO request's kwargs
+        req_factory, rsp_factory, zdo_rsp_factory = ZDO_CONVERTERS[cluster]
+        request = req_factory(dst_addr.address, device, **zdo_kwargs)
+        callback = rsp_factory(dst_addr.address)
+
+        LOGGER.debug(
+            "Intercepted AP ZDO request %s(%s) and replaced with %s",
+            cluster,
+            zdo_kwargs,
+            request,
+        )
+
+        try:
+            async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
+                response = await self._znp.request_callback_rsp(
+                    request=request, RspStatus=t.Status.SUCCESS, callback=callback
+                )
+        except InvalidCommandResponse as e:
+            raise DeliveryError(f"Could not send command: {e.response.Status}") from e
+
+        zdo_rsp_cluster, zdo_response_kwargs = zdo_rsp_factory(response)
+
+        self._receive_zdo_message(
+            cluster=zdo_rsp_cluster, tsn=sequence, sender=device, **zdo_response_kwargs
+        )
+
+        return response.Status, "Request sent successfully"
+
+    async def _send_request(
+        self,
+        dst_addr,
+        dst_ep,
+        src_ep,
+        profile,
+        cluster,
+        sequence,
+        options,
+        radius,
+        data,
+    ) -> typing.Tuple[t.Status, str]:
+        """
+        Used by `request`/`mrequest`/`broadcast` to send a request.
+        Picks the correct request sending mechanism and fixes endpoint information.
+        """
+
+        if dst_ep == ZDO_ENDPOINT and not (
+            cluster == ZDOCmd.Mgmt_Permit_Joining_req
+            and dst_addr.mode == t.AddrMode.Broadcast
+        ):
+            return await self._send_zdo_request(
+                dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
+            )
+
+        # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
+        # We pick ours based on the registered endpoints.
+        src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
+
+        request = c.AF.DataRequestExt.Req(
+            DstAddrModeAddress=dst_addr,
+            DstEndpoint=dst_ep,
+            DstPanId=0x0000,
+            SrcEndpoint=src_ep,
+            ClusterId=cluster,
+            TSN=sequence,
+            Options=options,
+            Radius=radius,
+            Data=data,
+        )
+
+        if dst_addr.mode == t.AddrMode.Broadcast:
+            # We won't always get a data confirmation
+            response = await self._znp.request(
+                request=request, RspStatus=t.Status.SUCCESS
+            )
         else:
-            return "CC13X2/CC26X2"
+            async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+                response = await self._znp.request_callback_rsp(
+                    request=request,
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.AF.DataConfirm.Callback(partial=True, TSN=sequence),
+                )
+
+            LOGGER.debug("Received a data request confirmation: %s", response)
+
+        if response.Status != t.Status.SUCCESS:
+            return response.Status, "Invalid response status"
+
+        return response.Status, "Request sent successfully"
