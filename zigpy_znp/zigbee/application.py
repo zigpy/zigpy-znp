@@ -2,6 +2,7 @@ import os
 import typing
 import asyncio
 import logging
+import warnings
 import itertools
 import async_timeout
 
@@ -12,7 +13,6 @@ import zigpy.device
 import zigpy.config
 import zigpy.profiles
 import zigpy.endpoint
-import zigpy.application
 import zigpy.zcl.foundation
 
 from zigpy.zcl import clusters
@@ -33,6 +33,16 @@ from zigpy_znp.znp.nib import parse_nib, OldNIB
 from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
+
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        action="ignore",
+        module="aiohttp",
+        message='"@coroutine" decorator is deprecated',
+        category=DeprecationWarning,
+    )
+    import zigpy.application
 
 
 ZDO_ENDPOINT = 0

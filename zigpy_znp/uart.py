@@ -1,10 +1,10 @@
+import typing
 import asyncio
 import logging
-import typing
+import warnings
 
 import serial
 import serial.tools
-import serial_asyncio
 
 from serial.tools.list_ports import comports as list_com_ports
 
@@ -13,6 +13,15 @@ import zigpy_znp.frames as frames
 
 from zigpy_znp.types import Bytes
 from zigpy_znp.exceptions import InvalidFrame
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        action="ignore",
+        module="serial_asyncio",
+        message='"@coroutine" decorator is deprecated',
+        category=DeprecationWarning,
+    )
+    import serial_asyncio  # noqa: E402
 
 LOGGER = logging.getLogger(__name__)
 

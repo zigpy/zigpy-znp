@@ -1,8 +1,8 @@
 import pytest
 import asyncio
+import warnings
 import functools
 import async_timeout
-import serial_asyncio
 
 from unittest.mock import Mock, call
 
@@ -21,6 +21,15 @@ from zigpy_znp.api import (
 )
 from zigpy_znp.frames import TransportFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        action="ignore",
+        module="serial_asyncio",
+        message='"@coroutine" decorator is deprecated',
+        category=DeprecationWarning,
+    )
+    import serial_asyncio
 
 
 def config_for_port_path(path):

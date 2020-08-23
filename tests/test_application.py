@@ -714,7 +714,7 @@ async def test_shutdown(mocker, application):
 
     await app.startup(auto_form=False)
 
-    mocker.patch.object(app, "_reconnect_task")
+    mocker.patch.object(app, "_reconnect_task", autospec=app._reconnect_task)
     mocker.patch.object(app, "_znp")
 
     await app.shutdown()
