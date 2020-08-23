@@ -381,7 +381,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram_write(NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55")
 
         # Finally, reload the NIB after our changes
-        self._load_device_info()
+        await self._load_device_info()
 
     def get_dst_address(self, cluster):
         """
