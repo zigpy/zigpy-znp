@@ -752,7 +752,7 @@ async def test_listeners_cancel(event_loop):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_api_cancel_all_listeners(znp, event_loop):
+async def test_api_cancel_listeners(znp, event_loop):
     callback = Mock()
 
     znp.callback_for_response(
@@ -766,7 +766,7 @@ async def test_api_cancel_all_listeners(znp, event_loop):
     )
 
     assert not future.done()
-    znp._cancel_all_listeners()
+    znp.close()
 
     with pytest.raises(asyncio.CancelledError):
         await future
@@ -774,37 +774,52 @@ async def test_api_cancel_all_listeners(znp, event_loop):
     # add_done_callback won't be executed immediately
     await asyncio.sleep(0.1)
 
-    assert len(znp._response_listeners) == 1
+    assert len(znp._response_listeners) == 0
+
+
+async def wait_for_spy(spy):
+    while True:
+        if spy.called:
+            return
+
+        await asyncio.sleep(0.01)
 
 
 @pytest_mark_asyncio_timeout()
-async def test_api_close(znp, event_loop):
-    closed_future = event_loop.create_future()
-
-    znp_connection_lost = znp.connection_lost
-
-    def intercepted_connection_lost(exc):
-        closed_future.set_result(exc)
-        return znp_connection_lost(exc)
-
-    znp._reconnect_task = Mock()
-    znp._reconnect_task.done = lambda: False
-    znp.connection_lost = intercepted_connection_lost
+async def test_api_close(znp, event_loop, mocker):
+    mocker.spy(znp, "connection_lost")
     znp.close()
 
+    await wait_for_spy(znp.connection_lost)
+
     # connection_lost with no exc indicates the port was closed
-    assert (await closed_future) is None
+    znp.connection_lost.assert_called_once_with(None)
 
     # Make sure our UART was actually closed
     assert znp._uart is None
+    assert znp._app is None
 
-    # ZNP.close should not throw any errors
+    # ZNP.close should not throw any errors if called multiple times
+    znp.close()
+    znp.close()
+
+    def dict_minus(d, minus):
+        return {k: v for k, v in d.items() if k not in minus}
+
+    # Closing ZNP should reset it completely to that of a fresh object
+    # We have to ignore our mocked method and the lock
     znp2 = ZNP(TEST_APP_CONFIG)
+    assert znp2._sync_request_lock.locked() == znp._sync_request_lock.locked()
+    assert dict_minus(
+        znp.__dict__, ["_sync_request_lock", "connection_lost"]
+    ) == dict_minus(znp2.__dict__, ["_sync_request_lock", "connection_lost"])
+
     znp2.close()
     znp2.close()
 
-    znp.close()
-    znp.close()
+    assert dict_minus(
+        znp.__dict__, ["_sync_request_lock", "connection_lost"]
+    ) == dict_minus(znp2.__dict__, ["_sync_request_lock", "connection_lost"])
 
 
 @pytest_mark_asyncio_timeout()

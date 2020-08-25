@@ -6,10 +6,10 @@ import async_timeout
 
 from collections import defaultdict
 
-import zigpy_znp.commands
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
+
 from zigpy_znp.types import nvids
 
 from zigpy_znp import uart
@@ -154,6 +154,14 @@ class ZNP:
         return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
     async def connect(self, *, test_port=True) -> None:
+        """
+        Connects to the device specified by the "device" section of the config dict.
+
+        The `test_port` kwarg allows port testing to be disabled, mainly to get into the
+        bootloader.
+        """
+
+        # So we cannot connect twice
         assert self._uart is None
 
         try:
@@ -163,6 +171,8 @@ class ZNP:
                 LOGGER.debug("Sending special byte to skip the bootloader")
                 self._uart._transport_write(bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
 
+            # We have to disable this all non-bootloader commands to enter the
+            # bootloader upon connecting to the UART.
             if test_port:
                 LOGGER.debug(
                     "Testing connection to %s", self._uart.transport.serial.name
@@ -186,28 +196,54 @@ class ZNP:
             self._uart.transport.serial.baudrate,
         )
 
-    def _cancel_all_listeners(self) -> None:
-        for header, listeners in self._response_listeners.items():
-            for listener in listeners:
-                listener.cancel()
-
     def connection_lost(self, exc) -> None:
+        """
+        Called by the UART object to indicate that the port was closed. Propagates up
+        to the ControllerApplication that owns this ZNP instance.
+        """
+
         LOGGER.debug("We were disconnected from %s: %s", self._port_path, exc)
 
+        # The UART is already closed, there is no point in closing it again
         self._uart = None
-        self.close()
 
         if self._app is not None:
             self._app.connection_lost(exc)
 
+        self.close()
+
     def close(self) -> None:
+        """
+        Cleans up resources, namely the listener queues.
+
+        Calling this will reset ZNP to the same internal state as a fresh ZNP instance.
+        """
+
+        for header, listeners in self._response_listeners.items():
+            for listener in listeners:
+                listener.cancel()
+
+        self._response_listeners.clear()
+
         if self._uart is not None:
             self._uart.close()
             self._uart = None
 
-        self._cancel_all_listeners()
+        self._app = None
 
     def _remove_listener(self, listener: BaseResponseListener) -> None:
+        """
+        Internal method that unbinds a listener from ZNP.
+
+        Used by `wait_for_responses` to remove listeners for completed futures,
+        regardless of their completion reason.
+        """
+
+        # If ZNP is closed while it's still running, `self._response_listeners`
+        # will be empty.
+        if not self._response_listeners:
+            return
+
         LOGGER.debug("Removing listener %s", listener)
 
         for header in listener.matching_headers():
@@ -223,10 +259,11 @@ class ZNP:
     def frame_received(self, frame: GeneralFrame) -> None:
         """
         Called when a frame has been received.
-        Can be called multiple times in a single event loop step.
+
+        XXX: Can be called multiple times in a single event loop step!
         """
 
-        command_cls = zigpy_znp.commands.COMMANDS_BY_ID[frame.header]
+        command_cls = c.COMMANDS_BY_ID[frame.header]
         command = command_cls.from_frame(frame)
 
         LOGGER.debug("Received command: %s", command)
@@ -245,6 +282,13 @@ class ZNP:
             LOGGER.warning("Received an unhandled command: %s", command)
 
     def callback_for_responses(self, responses, callback) -> None:
+        """
+        Creates a callback listener that matches any of the provided responses.
+
+        Only exists for consistency with `wait_for_responses`, since callbacks can be
+        executed more than once.
+        """
+
         listener = CallbackResponseListener(responses, callback=callback)
 
         LOGGER.debug("Creating callback %s", listener)
@@ -252,10 +296,18 @@ class ZNP:
         for header in listener.matching_headers():
             self._response_listeners[header].append(listener)
 
-    def callback_for_response(self, response, callback) -> None:
+    def callback_for_response(self, response: t.CommandBase, callback) -> None:
+        """
+        Creates a callback listener for a single response.
+        """
+
         return self.callback_for_responses([response], callback)
 
     def wait_for_responses(self, responses) -> asyncio.Future:
+        """
+        Creates a one-shot listener that matches any *one* of the given responses.
+        """
+
         listener = OneShotResponseListener(responses)
 
         LOGGER.debug("Creating one-shot listener %s", listener)
@@ -269,9 +321,18 @@ class ZNP:
         return listener.future
 
     def wait_for_response(self, response: t.CommandBase) -> asyncio.Future:
+        """
+        Creates a one-shot listener for a single response.
+        """
+
         return self.wait_for_responses([response])
 
-    async def request(self, request, **response_params):
+    async def request(self, request: t.CommandBase, **response_params) -> t.CommandBase:
+        """
+        Sends a SREQ/AREQ request and returns its SRSP (only for SREQ), failing if any
+        of the SRSP's parameters don't match `response_params`.
+        """
+
         if type(request) is not request.Req:
             raise ValueError(f"Cannot send a command that isn't a request: {request!r}")
 
@@ -337,10 +398,14 @@ class ZNP:
 
     async def request_callback_rsp(self, *, request, callback, **response_params):
         """
-        Sends a [SA]REQ request and waits for its AREQ response. A bug-free version of:
+        Sends an SREQ, gets its SRSP confirmation, and waits for its real AREQ response.
+        A bug-free version of:
 
             req_rsp = await req
             callback_rsp = await req_callback
+
+        This is necessary because the SRSP and the AREQ may arrive in the same "chunk"
+        from the UART and be handled in the same event loop step by ZNP.
         """
 
         callback_response = self.wait_for_response(callback)
@@ -352,7 +417,6 @@ class ZNP:
     async def nvram_write(
         self, nv_id: nvids.BaseNvIds, value, *, offset: t.uint8_t = 0
     ):
-        # While unpythonic, explicit type checking here means we can detect overflows
         if not isinstance(nv_id, nvids.BaseNvIds):
             raise ValueError(
                 "The nv_id param must be an instance of BaseNvIds. "

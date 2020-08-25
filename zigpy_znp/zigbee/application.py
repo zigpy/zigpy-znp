@@ -94,6 +94,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     @property
     def channel(self):
+        # This value is accessible only from the NIB struct. There does not appear to be
+        # a MT command to read it.
         return self._nib.nwkLogicalChannel
 
     @classmethod
@@ -138,10 +140,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         znp = ZNP(self.config)
         znp.set_application(self)
-        self._bind_callbacks(znp)
         await znp.connect()
 
+        # We only assign `self._znp` after it has successfully connected
         self._znp = znp
+        self._bind_callbacks()
 
         # XXX: To make sure we don't switch to the wrong device upon reconnect,
         #      update our config to point to the last-detected port.
@@ -568,7 +571,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     # Z-Stack message callbacks attached during startup #
     #####################################################
 
-    def _bind_callbacks(self, api: ZNP) -> None:
+    def _bind_callbacks(self) -> None:
         """
         Binds all of the necessary message callbacks to their associated methods.
 
@@ -576,24 +579,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ZNP requests/responses.
         """
 
-        api.callback_for_response(
+        self._znp.callback_for_response(
             c.AF.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
         # ZDO requests need to be handled explicitly, one by one
-        api.callback_for_response(
+        self._znp.callback_for_response(
             c.ZDO.EndDeviceAnnceInd.Callback(partial=True), self.on_zdo_device_announce,
         )
 
-        api.callback_for_response(
+        self._znp.callback_for_response(
             c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_zdo_tc_device_join,
         )
 
-        api.callback_for_response(
+        self._znp.callback_for_response(
             c.ZDO.LeaveInd.Callback(partial=True), self.on_zdo_device_leave
         )
 
-        api.callback_for_response(
+        self._znp.callback_for_response(
             c.ZDO.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
         )
 
@@ -690,8 +693,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     @contextlib.asynccontextmanager
     async def _limit_concurrency(self):
         """
-        Async context manager that prevents slow devices (i.e. the CC2531) from being
-        overwhelmed by requests.
+        Async context manager that prevents devices from being overwhelmed by requests.
+        Mainly a thin wrapper around `asyncio.Semaphore` that logs when it has to wait.
+
+        TODO: it would be better to also delay requests in response to `TABLE_FULL`.
         """
 
         start_time = time.time()
@@ -700,7 +705,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if was_locked:
             LOGGER.warning("Max concurrency reached, delaying requests")
 
-        # The CC2531 struggles with high concurrency
         async with self._concurrent_requests_semaphore:
             if was_locked:
                 LOGGER.warning(
