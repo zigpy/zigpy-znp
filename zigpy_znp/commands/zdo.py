@@ -562,7 +562,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.Param("Dst", t.NWK, "Short address of the destination device"),
                 t.Param("DstAddrMode", t.AddrMode, "Destination Address mode"),
                 t.Param("Channels", t.Channels, "Bitmask of channels to scan"),
-                t.Param("ScanDuration", t.uint8_t, "Scanning time"),
+                t.Param(
+                    "ScanDuration",
+                    t.uint8_t,
+                    " - 0x00-0x05: Scanning time\n"
+                    " - 0xFE: Command to switch channels\n"
+                    " - 0xFF: Set a new channel mask and NWK manager addr",
+                ),
                 t.Param(
                     "ScanCount",
                     t.uint8_t,
