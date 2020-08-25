@@ -1,9 +1,11 @@
 import os
+import time
 import typing
 import asyncio
 import logging
 import warnings
 import itertools
+import contextlib
 import async_timeout
 
 import zigpy.zdo
@@ -84,6 +86,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._reconnect_task.cancel()
 
         self._nib = None
+        self._concurrent_requests_semaphore = None
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
@@ -180,15 +183,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         elif auto_form and not is_configured:
             await self.form_network()
 
-        if self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER] is not None:
-            dbm = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER]
+        if self.znp_config[conf.CONF_TX_POWER] is not None:
+            dbm = self.znp_config[conf.CONF_TX_POWER]
 
             await self._znp.request(
                 c.SYS.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
             )
 
-        if self.config[conf.CONF_ZNP_CONFIG][conf.CONF_LED_MODE] is not None:
-            led_mode = self.config[conf.CONF_ZNP_CONFIG][conf.CONF_LED_MODE]
+        if self.znp_config[conf.CONF_LED_MODE] is not None:
+            led_mode = self.znp_config[conf.CONF_LED_MODE]
 
             await self._znp.request(
                 c.Util.LEDControl.Req(LED=0xFF, Mode=led_mode),
@@ -248,10 +251,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._load_device_info()
 
+        # Now that we know what device we are, set the max concurrent requests
+        if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
+            max_concurrent_requests = 5 if self.is_cc2531 else 20
+        else:
+            max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
+
+        self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
+
         LOGGER.info(
-            "Using channel mask %s, currently on channel %d",
+            "Using channel mask %s, currently on channel %d."
+            " Limiting concurrent requests to %d",
             self.channels,
             self.channel,
+            max_concurrent_requests,
         )
 
     async def update_network(
@@ -494,15 +507,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Forcibly removes a direct child from the network.
         """
 
-        leave_rsp = await self._znp.request_callback_rsp(
-            request=c.ZDO.MgmtLeaveReq.Req(
-                DstAddr=0x0000,  # We handle it
-                IEEE=device.ieee,
-                RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, partial=True),
-        )
+        async with self._limit_concurrency():
+            leave_rsp = await self._znp.request_callback_rsp(
+                request=c.ZDO.MgmtLeaveReq.Req(
+                    DstAddr=0x0000,  # We handle it
+                    IEEE=device.ieee,
+                    RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, partial=True),
+            )
 
         assert leave_rsp.Status == t.ZDOStatus.SUCCESS
 
@@ -650,12 +664,52 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ####################
 
     @property
-    def zigpy_device(self):
+    def zigpy_device(self) -> zigpy.device.Device:
         """
         Reference to zigpy device 0x0000, the coordinator.
         """
 
         return self.devices[self.ieee]
+
+    @property
+    def is_cc2531(self) -> bool:
+        """
+        There really are only two ZNP radios: the cheap CC2531 and the high-power ones.
+        """
+
+        return isinstance(self._nib, OldNIB)
+
+    @property
+    def znp_config(self) -> conf.ConfigType:
+        """
+        Shortcut property to access the ZNP radio config.
+        """
+
+        return self.config[conf.CONF_ZNP_CONFIG]
+
+    @contextlib.asynccontextmanager
+    async def _limit_concurrency(self):
+        """
+        Async context manager that prevents slow devices (i.e. the CC2531) from being
+        overwhelmed by requests.
+        """
+
+        start_time = time.time()
+        was_locked = self._concurrent_requests_semaphore.locked()
+
+        if was_locked:
+            LOGGER.warning("Max concurrency reached, delaying requests")
+
+        # The CC2531 struggles with high concurrency
+        async with self._concurrent_requests_semaphore:
+            if was_locked:
+                LOGGER.warning(
+                    "Previously delayed request is now running, "
+                    "delayed by %0.2f seconds",
+                    time.time() - start_time,
+                )
+
+            yield
 
     def _receive_zdo_message(
         self,
@@ -891,10 +945,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         try:
-            async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
-                response = await self._znp.request_callback_rsp(
-                    request=request, RspStatus=t.Status.SUCCESS, callback=callback
-                )
+            async with self._limit_concurrency():
+                async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
+                    response = await self._znp.request_callback_rsp(
+                        request=request, RspStatus=t.Status.SUCCESS, callback=callback
+                    )
         except InvalidCommandResponse as e:
             raise DeliveryError(f"Could not send command: {e.response.Status}") from e
 
@@ -953,16 +1008,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 request=request, RspStatus=t.Status.SUCCESS
             )
         else:
-            async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-                response = await self._znp.request_callback_rsp(
-                    request=request,
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.AF.DataConfirm.Callback(partial=True, TSN=sequence),
-                )
+            async with self._limit_concurrency():
+                async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+                    response = await self._znp.request_callback_rsp(
+                        request=request,
+                        RspStatus=t.Status.SUCCESS,
+                        callback=c.AF.DataConfirm.Callback(partial=True, TSN=sequence),
+                    )
 
-            LOGGER.debug("Received a data request confirmation: %s", response)
+                LOGGER.debug("Received a data request confirmation: %s", response)
 
         if response.Status != t.Status.SUCCESS:
+            LOGGER.warning("Failed to send request %s: %s", request, response.Status)
             return response.Status, "Invalid response status"
 
         return response.Status, "Request sent successfully"

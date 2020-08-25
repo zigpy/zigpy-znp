@@ -54,6 +54,7 @@ CONF_LED_MODE = "led_mode"
 CONF_SKIP_BOOTLOADER = "skip_bootloader"
 CONF_SREQ_TIMEOUT = "sync_request_timeout"
 CONF_AUTO_RECONNECT_RETRY_DELAY = "auto_reconnect_retry_delay"
+CONF_MAX_CONCURRENT_REQUESTS = "max_concurrent_requests"
 
 CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
     {
@@ -70,6 +71,9 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                 vol.Optional(CONF_SKIP_BOOTLOADER, default=True): cv_boolean,
                 vol.Optional(CONF_LED_MODE, default=None): vol.Any(
                     None, EnumValue(LEDMode, lambda v: str(v).upper())
+                ),
+                vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default="auto"): vol.Any(
+                    "auto", VolPositiveNumber
                 ),
             }
         ),

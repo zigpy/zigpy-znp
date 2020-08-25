@@ -163,8 +163,8 @@ async def znp_server(mocker):
     return server_znp
 
 
-def make_application(znp_server):
-    app = ControllerApplication(config_for_port_path("/dev/ttyFAKE0"))
+def make_application(znp_server, config=None):
+    app = ControllerApplication(config or config_for_port_path("/dev/ttyFAKE0"))
 
     # Handle the entire startup sequence
     znp_server.reply_to(
@@ -308,12 +308,12 @@ def make_application(znp_server):
 
 @pytest.fixture
 def application(znp_server):
-    return make_application(znp_server)
+    return lambda config=None: make_application(znp_server, config)
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_application_startup_skip_bootloader(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
 
     first_uart_byte = None
 
@@ -348,7 +348,7 @@ async def test_application_startup_skip_bootloader(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_application_startup_nib_cc26x2(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     await app.startup(auto_form=False)
 
@@ -361,7 +361,7 @@ async def test_application_startup_nib_cc26x2(application):
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_application_startup_nib_cc2531(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     # Use a CC2531 NIB
     znp_server._nvram_state[NwkNvIds.NIB] = (
@@ -381,7 +381,7 @@ async def test_application_startup_nib_cc2531(application):
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_application_startup_endpoints(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     endpoints = []
     znp_server.callback_for_response(c.AF.Register.Req(partial=True), endpoints.append)
@@ -393,7 +393,7 @@ async def test_application_startup_endpoints(application):
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_application_startup_failure(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     # Prevent the fixture's default response
     znp_server._response_listeners[c.SYS.OSALNVRead.Req.header].clear()
@@ -418,7 +418,7 @@ async def test_application_startup_failure(application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_application_startup_tx_power(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     set_tx_power = znp_server.reply_once_to(
         request=c.SYS.SetTxPower.Req(TXPower=19),
@@ -433,7 +433,7 @@ async def test_application_startup_tx_power(application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_application_startup_led_mode(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     set_led_mode = znp_server.reply_once_to(
         request=c.Util.LEDControl.Req(partial=True),
@@ -451,7 +451,7 @@ async def test_application_startup_led_mode(application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_permit_join(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     # Handle the ZDO broadcast sent by Zigpy
     data_req_sent = znp_server.reply_once_to(
@@ -480,7 +480,7 @@ async def test_permit_join(application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_permit_join_failure(application):
-    app, znp_server = application
+    app, znp_server = application()
 
     # Handle the ZDO broadcast sent by Zigpy
     data_req_sent = znp_server.reply_once_to(
@@ -511,7 +511,7 @@ async def test_permit_join_failure(application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_relays_message_callback(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     device = mocker.Mock()
@@ -523,7 +523,7 @@ async def test_on_zdo_relays_message_callback(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_device_announce(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_message")
@@ -544,7 +544,7 @@ async def test_on_zdo_device_announce(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_device_join(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_join")
@@ -558,7 +558,7 @@ async def test_on_zdo_device_join(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_zdo_device_leave_callback(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_leave")
@@ -576,7 +576,7 @@ async def test_on_zdo_device_leave_callback(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_on_af_message_callback(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     device = mocker.Mock()
@@ -635,7 +635,7 @@ async def test_probe(pingable_serial_port):  # noqa: F811
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_reconnect(event_loop, application):
-    app, znp_server = application
+    app, znp_server = application()
     app._config[conf.CONF_ZNP_CONFIG][conf.CONF_AUTO_RECONNECT_RETRY_DELAY] = 0.01
 
     await app.startup(auto_form=False)
@@ -673,7 +673,7 @@ async def test_reconnect(event_loop, application):
 async def test_auto_connect(mocker, application):
     AUTO_DETECTED_PORT = "/dev/ttyFAKE0"
 
-    app, znp_server = application
+    app, znp_server = application()
 
     uart_guess_port = mocker.patch(
         "zigpy_znp.uart.guess_port", return_value=AUTO_DETECTED_PORT
@@ -699,7 +699,7 @@ async def test_auto_connect(mocker, application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_close(mocker, application):
-    app, znp_server = application
+    app, znp_server = application()
     app.connection_lost = mocker.MagicMock(wraps=app.connection_lost)
 
     await app.startup(auto_form=False)
@@ -710,7 +710,7 @@ async def test_close(mocker, application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_shutdown(mocker, application):
-    app, znp_server = application
+    app, znp_server = application()
 
     await app.startup(auto_form=False)
 
@@ -725,7 +725,7 @@ async def test_shutdown(mocker, application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_zdo_request_interception(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
@@ -773,7 +773,7 @@ async def test_zdo_request_interception(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=10)
 async def test_zigpy_request(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     TSN = 1
@@ -828,7 +828,7 @@ async def test_zigpy_request(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=10)
 async def test_zigpy_request_failure(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     TSN = 1
@@ -878,7 +878,7 @@ async def test_zigpy_request_failure(application, mocker):
     ],
 )
 async def test_request_use_ieee(application, mocker, use_ieee, dev_addr):
-    app, znp_server = application
+    app, znp_server = application()
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     mocker.patch.object(app, "_send_request", new=CoroutineMock())
@@ -900,7 +900,7 @@ async def test_request_use_ieee(application, mocker, use_ieee, dev_addr):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_update_network_noop(mocker, application):
-    app, znp_server = application
+    app, znp_server = application()
 
     await app.startup(auto_form=False)
 
@@ -916,7 +916,7 @@ async def test_update_network_noop(mocker, application):
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_update_network_extensive(mocker, caplog, application):
-    app, znp_server = application
+    app, znp_server = application()
 
     await app.startup(auto_form=False)
     mocker.spy(app, "_reset")
@@ -975,7 +975,7 @@ async def test_update_network_extensive(mocker, caplog, application):
 
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_update_network_bad_channel(mocker, caplog, application):
-    app, znp_server = application
+    app, znp_server = application()
 
     with pytest.raises(ValueError):
         # 12 is not in the mask
@@ -986,7 +986,7 @@ async def test_update_network_bad_channel(mocker, caplog, application):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_force_remove(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
 
     await app.startup(auto_form=False)
 
@@ -1024,7 +1024,7 @@ async def test_force_remove(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_auto_form_unnecessary(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
 
     mocker.patch.object(app, "form_network", new=CoroutineMock())
 
@@ -1034,7 +1034,7 @@ async def test_auto_form_unnecessary(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_auto_form_necessary(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     nvram = znp_server._nvram_state
 
     nvram.pop(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
@@ -1071,7 +1071,7 @@ async def test_auto_form_necessary(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_clean_shutdown(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
 
     # This should not throw
     await app.shutdown()
@@ -1079,7 +1079,7 @@ async def test_clean_shutdown(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_unclean_shutdown(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     app._znp = None
 
     # This should also not throw
@@ -1088,7 +1088,7 @@ async def test_unclean_shutdown(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_mrequest(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
 
     mocker.patch.object(app, "_send_request", new=CoroutineMock())
     group = app.groups.add_group(0x1234, "test group")
@@ -1104,7 +1104,7 @@ async def test_mrequest(application, mocker):
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_new_device_join_and_bind(application, mocker):
-    app, znp_server = application
+    app, znp_server = application()
     await app.startup(auto_form=False)
 
     nwk = 0x6A7C
@@ -1355,3 +1355,60 @@ async def test_new_device_join_and_bind(application, mocker):
 
         for cluster in endpoint.in_clusters.values():
             await cluster.bind()
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_request_concurrency(application, mocker):
+    config = config_for_port_path("/dev/ttyFAKE0")
+    config[conf.CONF_MAX_CONCURRENT_REQUESTS] = 2
+
+    app, znp_server = application(conf.CONFIG_SCHEMA(config))
+    await app.startup()
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+
+    # Keep track of how many requests we receive at once
+    in_flight_requests = 0
+
+    def make_response(req):
+        async def callback(req):
+            nonlocal in_flight_requests
+            in_flight_requests += 1
+            assert in_flight_requests <= 2
+
+            await asyncio.sleep(0.1)
+            znp_server.send(c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS))
+            await asyncio.sleep(0.01)
+            znp_server.send(
+                c.AF.DataConfirm.Callback(
+                    Status=t.Status.SUCCESS, Endpoint=1, TSN=req.TSN,
+                )
+            )
+            await asyncio.sleep(0)
+
+            in_flight_requests -= 1
+            assert in_flight_requests >= 0
+
+        asyncio.create_task(callback(req))
+
+    znp_server.reply_to(
+        request=c.AF.DataRequestExt.Req(partial=True), responses=[make_response]
+    )
+
+    # We create a whole bunch at once
+    responses = await asyncio.gather(
+        *[
+            app.request(
+                device,
+                profile=260,
+                cluster=1,
+                src_ep=1,
+                dst_ep=1,
+                sequence=seq,
+                data=b"\x00",
+            )
+            for seq in range(20)
+        ]
+    )
+
+    assert all(status == t.Status.SUCCESS for status, msg in responses)
