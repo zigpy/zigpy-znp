@@ -143,7 +143,7 @@ class ZNP:
         self._app = None
         self._config = config
 
-        self._response_listeners = defaultdict(list)
+        self._listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
 
     def set_application(self, app):
@@ -220,11 +220,11 @@ class ZNP:
         Calling this will reset ZNP to the same internal state as a fresh ZNP instance.
         """
 
-        for header, listeners in self._response_listeners.items():
+        for header, listeners in self._listeners.items():
             for listener in listeners:
                 listener.cancel()
 
-        self._response_listeners.clear()
+        self._listeners.clear()
 
         if self._uart is not None:
             self._uart.close()
@@ -240,24 +240,24 @@ class ZNP:
         regardless of their completion reason.
         """
 
-        # If ZNP is closed while it's still running, `self._response_listeners`
+        # If ZNP is closed while it's still running, `self._listeners`
         # will be empty.
-        if not self._response_listeners:
+        if not self._listeners:
             return
 
         LOGGER.debug("Removing listener %s", listener)
 
         for header in listener.matching_headers():
-            self._response_listeners[header].remove(listener)
+            self._listeners[header].remove(listener)
 
-            if not self._response_listeners[header]:
+            if not self._listeners[header]:
                 LOGGER.debug("Cleaning up empty listener list for header %s", header)
-                del self._response_listeners[header]
+                del self._listeners[header]
 
         counts = Counter()
 
-        for l in itertools.chain.from_iterable(self._response_listeners.values()):
-            counts[type(l)] += 1
+        for listener in itertools.chain.from_iterable(self._listeners.values()):
+            counts[type(listener)] += 1
 
         LOGGER.debug(
             "There are %d callbacks and %d one-shot listeners remaining",
@@ -265,7 +265,7 @@ class ZNP:
             counts[OneShotResponseListener],
         )
 
-        LOGGER.debug("%r", self._response_listeners)
+        LOGGER.debug("%r", self._listeners)
 
     def frame_received(self, frame: GeneralFrame) -> None:
         """
@@ -281,7 +281,7 @@ class ZNP:
 
         matched = False
 
-        for listener in self._response_listeners[command.header]:
+        for listener in self._listeners[command.header]:
             if not listener.resolve(command):
                 LOGGER.debug("%s does not match %s", command, listener)
                 continue
@@ -305,7 +305,7 @@ class ZNP:
         LOGGER.debug("Creating callback %s", listener)
 
         for header in listener.matching_headers():
-            self._response_listeners[header].append(listener)
+            self._listeners[header].append(listener)
 
     def callback_for_response(self, response: t.CommandBase, callback) -> None:
         """
@@ -324,7 +324,7 @@ class ZNP:
         LOGGER.debug("Creating one-shot listener %s", listener)
 
         for header in listener.matching_headers():
-            self._response_listeners[header].append(listener)
+            self._listeners[header].append(listener)
 
         # Remove the listener when the future is done, not only when it gets a result
         listener.future.add_done_callback(lambda _: self._remove_listener(listener))

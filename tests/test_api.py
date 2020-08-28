@@ -143,11 +143,11 @@ async def test_znp_connect_old_version(mocker, event_loop, pingable_serial_port)
 
 @pytest_mark_asyncio_timeout()
 async def test_znp_responses(znp):
-    assert not znp._response_listeners
+    assert not znp._listeners
 
     future = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
 
-    assert znp._response_listeners
+    assert znp._listeners
 
     response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     znp.frame_received(response.to_frame())
@@ -156,7 +156,7 @@ async def test_znp_responses(znp):
 
     # Our listener will have been cleaned up after a step
     await asyncio.sleep(0)
-    assert not znp._response_listeners
+    assert not znp._listeners
 
 
 @pytest_mark_asyncio_timeout()
@@ -174,7 +174,7 @@ async def test_znp_response_timeouts(znp):
 
     # The response was successfully received so we should have no outstanding listeners
     await asyncio.sleep(0)
-    assert not znp._response_listeners
+    assert not znp._listeners
 
     asyncio.create_task(send_soon(0.6))
 
@@ -187,7 +187,7 @@ async def test_znp_response_timeouts(znp):
     # Our future still completed, albeit unsuccesfully.
     # We should have no leaked listeners here.
     await asyncio.sleep(0)
-    assert not znp._response_listeners
+    assert not znp._listeners
 
 
 @pytest_mark_asyncio_timeout()
@@ -774,7 +774,7 @@ async def test_api_cancel_listeners(znp, event_loop):
     # add_done_callback won't be executed immediately
     await asyncio.sleep(0.1)
 
-    assert len(znp._response_listeners) == 0
+    assert len(znp._listeners) == 0
 
 
 async def wait_for_spy(spy):
