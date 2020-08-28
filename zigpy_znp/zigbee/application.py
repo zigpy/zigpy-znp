@@ -657,9 +657,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         device.radio_details(lqi=msg.LQI, rssi=None)
 
+        # XXX: Is it possible to receive messages on non-assigned endpoints?
+        if msg.DstEndpoint in self.zigpy_device.endpoints:
+            profile = self.zigpy_device.endpoints[msg.DstEndpoint].profile_id
+        else:
+            LOGGER.warning("Received a message on an unregistered endpoint: %s", msg)
+            profile = zigpy.profiles.zha.PROFILE_ID
+
         self.handle_message(
             sender=device,
-            profile=zigpy.profiles.zha.PROFILE_ID,  # XXX: does this kwarg matter?
+            profile=profile,
             cluster=msg.ClusterId,
             src_ep=msg.SrcEndpoint,
             dst_ep=msg.DstEndpoint,

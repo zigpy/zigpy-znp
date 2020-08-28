@@ -629,7 +629,9 @@ async def test_on_af_message_callback(application, mocker):
 
     device = mocker.Mock()
     mocker.patch.object(
-        app, "get_device", side_effect=[device, KeyError("No such device")]
+        app,
+        "get_device",
+        side_effect=[device, device, device, KeyError("No such device")],
     )
     mocker.patch.object(app, "handle_message")
 
@@ -638,7 +640,7 @@ async def test_on_af_message_callback(application, mocker):
         ClusterId=2,
         SrcAddr=0xABCD,
         SrcEndpoint=4,
-        DstEndpoint=5,
+        DstEndpoint=1,  # ZHA endpoint
         WasBroadcast=False,
         LQI=19,
         SecurityUse=False,
@@ -654,14 +656,38 @@ async def test_on_af_message_callback(application, mocker):
     app.get_device.assert_called_once_with(nwk=0xABCD)
     device.radio_details.assert_called_once_with(lqi=19, rssi=None)
     app.handle_message.assert_called_once_with(
-        sender=device, profile=260, cluster=2, src_ep=4, dst_ep=5, message=b"test"
+        sender=device, profile=260, cluster=2, src_ep=4, dst_ep=1, message=b"test"
     )
 
+    # ZLL message
     device.reset_mock()
     app.handle_message.reset_mock()
     app.get_device.reset_mock()
 
+    znp_server.send(af_message.replace(DstEndpoint=2))
+    app.get_device.assert_called_once_with(nwk=0xABCD)
+    device.radio_details.assert_called_once_with(lqi=19, rssi=None)
+    app.handle_message.assert_called_once_with(
+        sender=device, profile=49246, cluster=2, src_ep=4, dst_ep=2, message=b"test"
+    )
+
+    # Message on an unknown endpoint (is this possible?)
+    device.reset_mock()
+    app.handle_message.reset_mock()
+    app.get_device.reset_mock()
+
+    znp_server.send(af_message.replace(DstEndpoint=3))
+    app.get_device.assert_called_once_with(nwk=0xABCD)
+    device.radio_details.assert_called_once_with(lqi=19, rssi=None)
+    app.handle_message.assert_called_once_with(
+        sender=device, profile=260, cluster=2, src_ep=4, dst_ep=3, message=b"test"
+    )
+
     # Message from an unknown device
+    device.reset_mock()
+    app.handle_message.reset_mock()
+    app.get_device.reset_mock()
+
     znp_server.send(af_message)
     app.get_device.assert_called_once_with(nwk=0xABCD)
     assert device.radio_details.call_count == 0
