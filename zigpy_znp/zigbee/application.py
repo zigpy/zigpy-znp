@@ -256,7 +256,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
-            max_concurrent_requests = 5 if self.is_cc2531 else 16
+            max_concurrent_requests = 2 if self.is_cc2531 else 16
         else:
             max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
