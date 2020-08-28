@@ -250,6 +250,12 @@ def make_application(znp_server, config=None):
         NwkNvIds.EXTADDR: b"\x5C\xAC\xAA\x1C\x00\x4B\x12\x00",
         NwkNvIds.CHANLIST: b"\x00\x80\x10\x02",
         NwkNvIds.PANID: b"\x95\x86",
+        NwkNvIds.CONCENTRATOR_ENABLE: b"\x01",
+        NwkNvIds.CONCENTRATOR_DISCOVERY: b"\x78",
+        NwkNvIds.CONCENTRATOR_RC: b"\x01",
+        NwkNvIds.SRC_RTG_EXPIRY_TIME: b"\xFF",
+        NwkNvIds.NWK_CHILD_AGE_ENABLE: b"\x00",
+        NwkNvIds.LOGICAL_TYPE: b"\x00",
     }
 
     def nvram_write(req):
@@ -277,6 +283,17 @@ def make_application(znp_server, config=None):
 
     znp_server.reply_to(
         request=c.SYS.OSALNVItemInit.Req(partial=True), responses=[nvram_init]
+    )
+
+    # Reply to `self.permit_ncp(0)`
+    znp_server.reply_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, TCSignificance=1,
+        ),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+        ],
     )
 
     znp_server.reply_to(
@@ -395,25 +412,56 @@ async def test_application_startup_endpoints(application):
 async def test_application_startup_failure(application):
     app, znp_server = application()
 
-    # Prevent the fixture's default response
-    znp_server._response_listeners[c.SYS.OSALNVRead.Req.header].clear()
-
-    znp_server.reply_once_to(
-        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.INVALID_PARAMETER, Value=b"")],
-    )
+    znp_server._nvram_state.pop(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
 
     # We cannot start the application if Z-Stack is not configured and without auto_form
     with pytest.raises(RuntimeError):
         await app.startup(auto_form=False)
 
-    znp_server.reply_once_to(
-        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, Offset=0),
-        responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=b"\x00")],
-    )
+    # An invalid value is still bad
+    znp_server._nvram_state[NwkNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
 
     with pytest.raises(RuntimeError):
         await app.startup(auto_form=False)
+
+
+@pytest_mark_asyncio_timeout()
+async def test_application_startup_prevent_unintended_joins(application, mocker):
+    app, znp_server = application()
+
+    joins_were_disabled = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, TCSignificance=1,
+        ),
+        responses=[],
+    )
+
+    await app.startup()
+
+    # Make sure joins were disabled during startup
+    await joins_were_disabled
+
+
+@pytest_mark_asyncio_timeout()
+async def test_application_startup_fast(application, mocker):
+    app, znp_server = application()
+
+    mocker.spy(app, "_reset")
+    await app.startup()
+
+    assert app._reset.call_count == 0
+
+
+@pytest_mark_asyncio_timeout()
+async def test_application_startup_slow(application, mocker):
+    app, znp_server = application()
+
+    znp_server._nvram_state[NwkNvIds.LOGICAL_TYPE] = b"\x01"
+
+    mocker.spy(app, "_reset")
+    await app.startup()
+
+    assert app._reset.call_count == 1
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
@@ -464,7 +512,7 @@ async def test_permit_join(application):
 
     # Handle the permit join request sent by us
     permit_join_sent = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
+        request=c.ZDO.MgmtPermitJoinReq.Req(Duration=10, partial=True),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
@@ -493,7 +541,7 @@ async def test_permit_join_failure(application):
 
     # Handle the permit join request sent by us
     permit_join_sent = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
+        request=c.ZDO.MgmtPermitJoinReq.Req(Duration=10, partial=True),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.TIMEOUT),

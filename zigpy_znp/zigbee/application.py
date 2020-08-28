@@ -155,21 +155,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Only modify the NVRAM if we allow it
         if write_nvram:
-            # It's better to configure these explicitly than rely on the NVRAM defaults
-            await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_ENABLE, t.Bool(True))
-            await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_DISCOVERY, t.uint8_t(120))
-            await self._znp.nvram_write(NwkNvIds.CONCENTRATOR_RC, t.Bool(True))
-            await self._znp.nvram_write(NwkNvIds.SRC_RTG_EXPIRY_TIME, t.uint8_t(255))
-            await self._znp.nvram_write(NwkNvIds.NWK_CHILD_AGE_ENABLE, t.Bool(False))
-
-            # XXX: the undocumented `znpBasicCfg` request can do this
-            await self._znp.nvram_write(
-                NwkNvIds.LOGICAL_TYPE, t.DeviceLogicalType.Coordinator
+            any_changed = await self._write_nvram_items(
+                {
+                    # It's better to be explicit these than rely on the NVRAM defaults
+                    NwkNvIds.CONCENTRATOR_ENABLE: t.Bool(True),
+                    NwkNvIds.CONCENTRATOR_DISCOVERY: t.uint8_t(120),
+                    NwkNvIds.CONCENTRATOR_RC: t.Bool(True),
+                    NwkNvIds.SRC_RTG_EXPIRY_TIME: t.uint8_t(255),
+                    NwkNvIds.NWK_CHILD_AGE_ENABLE: t.Bool(False),
+                    # XXX: the undocumented `znpBasicCfg` request can do this
+                    NwkNvIds.LOGICAL_TYPE: t.DeviceLogicalType.Coordinator,
+                }
             )
 
-        # Reset to make the above NVRAM writes take effect.
-        # This also ensures any previously-started network joins don't continue.
-        await self._reset()
+            if any_changed:
+                # Reset to make the above NVRAM writes take effect.
+                await self._reset()
 
         try:
             is_configured = (
@@ -220,6 +221,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     State=t.DeviceState.StartedAsCoordinator
                 ),
             )
+
+        # At this point Z-Stack is ready. Make sure that we aren't permitting joins.
+        await self.permit_ncp(0)
 
         # Get our active endpoints
         endpoints = await self._znp.request_callback_rsp(
@@ -690,6 +694,29 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return self.config[conf.CONF_ZNP_CONFIG]
 
+    async def _write_nvram_items(
+        self, items: typing.Dict[NwkNvIds, typing.Any]
+    ) -> bool:
+        """
+        Writes a dictionary of key, value pairs to NVRAM and returns whether or not any
+        values were actually changed.
+        """
+
+        any_changed = False
+
+        for nvid, value in items.items():
+            try:
+                current_value = await self._znp.nvram_read(nvid)
+            except InvalidCommandResponse:
+                current_value = None
+
+            # There is no point in issuing a write if the value will not change
+            if current_value != value.serialize():
+                await self._znp.nvram_write(nvid, value)
+                any_changed = True
+
+        return any_changed
+
     @contextlib.asynccontextmanager
     async def _limit_concurrency(self):
         """
@@ -849,7 +876,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def _reset(self):
         """
-        Performs a soft reset within Z-Stack, which does not reset the serial connection
+        Performs a soft reset within Z-Stack.
+        A hard reset resets the serial port, causing the device to disconnect.
         """
 
         await self._znp.request_callback_rsp(
