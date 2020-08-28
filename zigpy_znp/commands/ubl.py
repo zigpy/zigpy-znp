@@ -39,7 +39,7 @@ class UBL(t.CommandsBase, subsystem=t.Subsystem.UBL_FUNC):
     WriteReq = t.CommandDef(
         t.CommandType.AREQ,
         0x01,
-        req_schema=t.Schema(
+        req_schema=(
             (
                 t.Param("FlashWordAddr", t.uint16_t, "Write address, in flash words"),
                 t.Param(
@@ -52,63 +52,57 @@ class UBL(t.CommandsBase, subsystem=t.Subsystem.UBL_FUNC):
     WriteRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x81,
-        rsp_schema=t.Schema((t.Param("Status", BootloaderStatus, "Write status"),)),
+        rsp_schema=((t.Param("Status", BootloaderStatus, "Write status"),)),
     )
 
     ReadReq = t.CommandDef(
         t.CommandType.AREQ,
         0x02,
-        req_schema=t.Schema(
-            (t.Param("FlashWordAddr", t.uint16_t, "Read address, in flash words"),)
+        req_schema=(
+            t.Param("FlashWordAddr", t.uint16_t, "Read address, in flash words"),
         ),
     )
 
     ReadRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x82,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Status", BootloaderStatus, "Read status"),
-                # These are missing if the request is bad
-                t.Param(
-                    "FlashWordAddr",
-                    t.uint16_t,
-                    "Address read from, in flash words",
-                    optional=True,
-                ),
-                t.Param(
-                    "Data",
-                    t.TrailingBytes,
-                    "HandshakeRsp.BufferSize bytes of data",
-                    optional=True,
-                ),
-            )
+        rsp_schema=(
+            t.Param("Status", BootloaderStatus, "Read status"),
+            # These are missing if the request is bad
+            t.Param(
+                "FlashWordAddr",
+                t.uint16_t,
+                "Address read from, in flash words",
+                optional=True,
+            ),
+            t.Param(
+                "Data",
+                t.TrailingBytes,
+                "HandshakeRsp.BufferSize bytes of data",
+                optional=True,
+            ),
         ),
     )
 
-    EnableReq = t.CommandDef(t.CommandType.AREQ, 0x03, req_schema=t.Schema())
+    EnableReq = t.CommandDef(t.CommandType.AREQ, 0x03, req_schema=())
 
     EnableRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x83,
-        rsp_schema=t.Schema((t.Param("Status", BootloaderStatus, "Enable status"),)),
+        rsp_schema=(t.Param("Status", BootloaderStatus, "Enable status"),),
     )
 
-    HandshakeReq = t.CommandDef(t.CommandType.AREQ, 0x04, req_schema=t.Schema())
+    HandshakeReq = t.CommandDef(t.CommandType.AREQ, 0x04, req_schema=())
 
     HandshakeRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x84,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Status", BootloaderStatus, "Handshake status"),
-                t.Param("BootloaderRevision", t.uint32_t, "Bootloader revision"),
-                t.Param("DeviceType", BootloaderDeviceType, "Device type"),
-                t.Param("BufferSize", t.uint32_t, "Read/write buffer size"),
-                t.Param("PageSize", t.uint32_t, "Device page size"),
-                t.Param(
-                    "BootloaderCodeRevision", t.uint32_t, "Bootloader code revision"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Status", BootloaderStatus, "Handshake status"),
+            t.Param("BootloaderRevision", t.uint32_t, "Bootloader revision"),
+            t.Param("DeviceType", BootloaderDeviceType, "Device type"),
+            t.Param("BufferSize", t.uint32_t, "Read/write buffer size"),
+            t.Param("PageSize", t.uint32_t, "Device page size"),
+            t.Param("BootloaderCodeRevision", t.uint32_t, "Bootloader code revision"),
         ),
     )

@@ -140,13 +140,6 @@ class Param:
     optional: bool = attr.ib(default=False)
 
 
-@attr.s(frozen=True)
-class Schema:
-    """List of Parameters."""
-
-    parameters: typing.Tuple[Param, ...] = attr.ib(factory=tuple, converter=tuple)
-
-
 class MissingEnumMixin:
     @classmethod
     def _missing_(cls, value):

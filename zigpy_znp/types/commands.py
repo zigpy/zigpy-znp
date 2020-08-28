@@ -164,11 +164,11 @@ class CommandHeader(t.uint16_t):
 class CommandDef:
     command_type: CommandType = attr.ib()
     command_id: int = attr.ib()
-    req_schema: typing.Optional[t.Schema] = attr.ib(
-        factory=lambda *v: None if not v else t.Schema(*v)
+    req_schema: typing.Optional[tuple] = attr.ib(
+        factory=lambda *v: None if not v else tuple(*v)
     )
-    rsp_schema: typing.Optional[t.Schema] = attr.ib(
-        factory=lambda *v: None if not v else t.Schema(*v)
+    rsp_schema: typing.Optional[tuple] = attr.ib(
+        factory=lambda *v: None if not v else tuple(*v)
     )
 
 
@@ -316,8 +316,8 @@ class CommandBase:
     def __init__(self, *, partial=False, **params):
         super().__setattr__("_partial", partial)
 
-        all_params = [p.name for p in self.schema.parameters]
-        optional_params = [p.name for p in self.schema.parameters if p.optional]
+        all_params = [p.name for p in self.schema]
+        optional_params = [p.name for p in self.schema if p.optional]
         given_params = set(params.keys())
         given_optional = [p for p in params.keys() if p in optional_params]
 
@@ -343,7 +343,7 @@ class CommandBase:
 
         bound_params = {}
 
-        for param in self.schema.parameters:
+        for param in self.schema:
             if params.get(param.name) is None and (partial or param.optional):
                 bound_params[param.name] = (param, None)
                 continue
@@ -414,7 +414,7 @@ class CommandBase:
         data = frame.data
         params = {}
 
-        for param in cls.schema.parameters:
+        for param in cls.schema:
             if data:
                 params[param.name], data = param.type.deserialize(data)
             elif not param.optional:
@@ -547,6 +547,6 @@ class Network(t.Struct):
     PermitJoining = attr.ib(type=t.uint8_t, converter=t.uint8_t)
 
 
-STATUS_SCHEMA = t.Schema(
-    (t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),)
+STATUS_SCHEMA = (
+    t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
 )

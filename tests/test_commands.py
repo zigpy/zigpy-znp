@@ -72,7 +72,7 @@ def test_error_code():
 
 
 def _validate_schema(schema):
-    for index, param in enumerate(schema.parameters):
+    for index, param in enumerate(schema):
         assert isinstance(param.name, str)
         assert param.name.isidentifier()
         assert not keyword.iskeyword(param.name)
@@ -81,11 +81,11 @@ def _validate_schema(schema):
 
         # All optional params must be together at the end
         if param.optional:
-            assert all(p.optional for p in schema.parameters[index:])
+            assert all(p.optional for p in schema[index:])
 
         # Trailing bytes must be at the very end
         if issubclass(param.type, t.TrailingBytes):
-            assert not schema.parameters[index + 1 :]
+            assert not schema[index + 1 :]
 
 
 def test_commands_schema():

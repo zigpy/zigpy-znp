@@ -15,16 +15,12 @@ class RPCError(t.CommandsBase, subsystem=t.Subsystem.RPCError):
         t.CommandType.SRSP,
         0x00,
         req_schema=None,  # XXX: There is no REQ, only a RSP
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "ErrorCode",
-                    ErrorCode,
-                    "The error code maps to one of the following enumerated values.",
-                ),
-                t.Param(
-                    "RequestHeader", t.CommandHeader, "Header of the invalid request"
-                ),
-            )
+        rsp_schema=(
+            t.Param(
+                "ErrorCode",
+                ErrorCode,
+                "The error code maps to one of the following enumerated values.",
+            ),
+            t.Param("RequestHeader", t.CommandHeader, "Header of the invalid request"),
         ),
     )

@@ -71,10 +71,9 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     SetNwkFrameCounter = t.CommandDef(
         t.CommandType.SREQ,
         0xFF,
-        req_schema=t.Schema(
-            (
-                t.Param("FrameCounterValue", t.uint32_t, "network frame counter"),
-            )  # XXX: check source for actual size
+        req_schema=(
+            t.Param("FrameCounterValue", t.uint32_t, "network frame counter"),
+            # XXX: check source for actual size
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -83,12 +82,8 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     SetDefaultRemoteEndDeviceTimeout = t.CommandDef(
         t.CommandType.SREQ,
         0x01,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "TimeoutIndex", TimeoutIndex, "0x00 -- 10s otherwise 2^N minutes"
-                ),
-            )
+        req_schema=(
+            t.Param("TimeoutIndex", TimeoutIndex, "0x00 -- 10s otherwise 2^N minutes"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -97,12 +92,8 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     SetEndDeviceTimeout = t.CommandDef(
         t.CommandType.SREQ,
         0x02,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "TimeoutIndex", TimeoutIndex, "0x00 -- 10s otherwise 2^N minutes"
-                ),
-            )
+        req_schema=(
+            t.Param("TimeoutIndex", TimeoutIndex, "0x00 -- 10s otherwise 2^N minutes"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -111,14 +102,10 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     SetAllowRejoinTCPolicy = t.CommandDef(
         t.CommandType.SREQ,
         0x03,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "AllowRejoin",
-                    t.Bool,
-                    "whether or not the Trust center allows rejoins",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "AllowRejoin", t.Bool, "whether or not the Trust center allows rejoins",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -128,9 +115,7 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     BDBStartCommissioning = t.CommandDef(
         t.CommandType.SREQ,
         0x05,
-        req_schema=t.Schema(
-            (t.Param("Mode", BDBCommissioningMode, "Commissioning mode"),)
-        ),
+        req_schema=(t.Param("Mode", BDBCommissioningMode, "Commissioning mode"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -138,11 +123,9 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     BDBSetChannel = t.CommandDef(
         t.CommandType.SREQ,
         0x08,
-        req_schema=t.Schema(
-            (
-                t.Param("IsPrimary", t.Bool, "True -- is primary channel"),
-                t.Param("Channel", t.Channels, "Channel set mask"),
-            )
+        req_schema=(
+            t.Param("IsPrimary", t.Bool, "True -- is primary channel"),
+            t.Param("Channel", t.Channels, "Channel set mask"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -151,21 +134,16 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     BDBAddInstallCode = t.CommandDef(
         t.CommandType.SREQ,
         0x04,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "InstallCodeFormat",
-                    InstallCodeFormat,
-                    (
-                        "0x01 -- Install code + CRC"
-                        "0x02 -- Key derived from install code"
-                    ),
-                ),
-                t.Param("IEEE", t.EUI64, "IEEE address of the joining device"),
-                t.Param(
-                    "InstallCode", t.Bytes, "16 bytes for derived key, 18 for IC + CRC"
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "InstallCodeFormat",
+                InstallCodeFormat,
+                ("0x01 -- Install code + CRC" "0x02 -- Key derived from install code"),
+            ),
+            t.Param("IEEE", t.EUI64, "IEEE address of the joining device"),
+            t.Param(
+                "InstallCode", t.Bytes, "16 bytes for derived key, 18 for IC + CRC"
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -175,12 +153,8 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     BDBSetTcRequireKeyExchange = t.CommandDef(
         t.CommandType.SREQ,
         0x09,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "BdbTrustCenterRequireKeyExchange", t.Bool, "Require key exchange"
-                ),
-            )
+        req_schema=(
+            t.Param("BdbTrustCenterRequireKeyExchange", t.Bool, "Require key exchange"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -189,9 +163,7 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     BDBSetJoinUsesInstallCodeKey = t.CommandDef(
         t.CommandType.SREQ,
         0x06,
-        req_schema=t.Schema(
-            (t.Param("BdbJoinUsesInstallCodeKey", t.Bool, "Use install code"),)
-        ),
+        req_schema=(t.Param("BdbJoinUsesInstallCodeKey", t.Bool, "Use install code"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -200,25 +172,23 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     BDBSetActiveDefaultCentralizedKey = t.CommandDef(
         t.CommandType.SREQ,
         0x07,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "CentralizedLinkKeyModes",
-                    CentralizedLinkKeyMode,
-                    (
-                        "which key will be used when performing association "
-                        "to a centralized network"
-                    ),
+        req_schema=(
+            t.Param(
+                "CentralizedLinkKeyModes",
+                CentralizedLinkKeyMode,
+                (
+                    "which key will be used when performing association "
+                    "to a centralized network"
                 ),
-                t.Param("InstallCode", t.Bytes, "key in any of its formats"),
-            )
+            ),
+            t.Param("InstallCode", t.Bytes, "key in any of its formats"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
     # Instruct the ZED to try to rejoin its previews network. Use only in ZED devices
     BDBZedAttemptRecoverNWK = t.CommandDef(
-        t.CommandType.SREQ, 0x0A, req_schema=t.Schema(), rsp_schema=t.STATUS_SCHEMA
+        t.CommandType.SREQ, 0x0A, req_schema=(), rsp_schema=t.STATUS_SCHEMA
     )
 
     # MT_APP_CONFIG Callbacks
@@ -226,26 +196,24 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     BDBCommissioningNotification = t.CommandDef(
         t.CommandType.AREQ,
         0x80,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status",
-                    BDBCommissioningStatus,
-                    "Status of the commissioning mode notified",
+        rsp_schema=(
+            t.Param(
+                "Status",
+                BDBCommissioningStatus,
+                "Status of the commissioning mode notified",
+            ),
+            t.Param(
+                "Mode",
+                BDBCommissioningMode,
+                "Commissioning mode to which status is related",
+            ),
+            t.Param(
+                "RemainingModes",
+                BDBCommissioningMode,
+                (
+                    "Bitmask of the remaining commissioning modes after "
+                    "this notification"
                 ),
-                t.Param(
-                    "Mode",
-                    BDBCommissioningMode,
-                    "Commissioning mode to which status is related",
-                ),
-                t.Param(
-                    "RemainingModes",
-                    BDBCommissioningMode,
-                    (
-                        "Bitmask of the remaining commissioning modes after "
-                        "this notification"
-                    ),
-                ),
-            )
+            ),
         ),
     )

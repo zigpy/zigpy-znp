@@ -18,22 +18,20 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     ResetReq = t.CommandDef(
         t.CommandType.AREQ,
         0x00,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "Type",
-                    t.ResetType,
-                    (
-                        "This command will reset the device by using a hardware reset "
-                        "(i.e. watchdog reset) if 'Type' is zero. Otherwise a soft "
-                        "reset (i.e. a jump to the reset vector) is done. This "
-                        "is especially useful in the CC2531, for instance, so that the "
-                        "USB host does not have to contend with the USB H/W resetting "
-                        "(and thus causing the USB host to reenumerate the device "
-                        "which can cause an open virtual serial port to hang.)"
-                    ),
+        req_schema=(
+            t.Param(
+                "Type",
+                t.ResetType,
+                (
+                    "This command will reset the device by using a hardware reset "
+                    "(i.e. watchdog reset) if 'Type' is zero. Otherwise a soft "
+                    "reset (i.e. a jump to the reset vector) is done. This "
+                    "is especially useful in the CC2531, for instance, so that the "
+                    "USB host does not have to contend with the USB H/W resetting "
+                    "(and thus causing the USB host to reenumerate the device "
+                    "which can cause an open virtual serial port to hang.)"
                 ),
-            )
+            ),
         ),
     )
 
@@ -42,15 +40,13 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     Ping = t.CommandDef(
         t.CommandType.SREQ,
         0x01,
-        req_schema=t.Schema(),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Capabilities",
-                    t.MTCapabilities,
-                    "Represents the intefaces this device can handle",
-                ),
-            )
+        req_schema=(),
+        rsp_schema=(
+            t.Param(
+                "Capabilities",
+                t.MTCapabilities,
+                "Represents the intefaces this device can handle",
+            ),
         ),
     )
 
@@ -58,34 +54,32 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     Version = t.CommandDef(
         t.CommandType.SREQ,
         0x02,
-        req_schema=t.Schema(),
-        rsp_schema=t.Schema(
-            (
-                t.Param("TransportRev", t.uint8_t, "Transport protocol revision"),
-                t.Param("ProductId", t.uint8_t, "Product ID"),
-                t.Param("MajorRel", t.uint8_t, "Software major release number"),
-                t.Param("MinorRel", t.uint8_t, "Software minor release number"),
-                t.Param("MaintRel", t.uint8_t, "Software maintenance release number"),
-                # Optional stuff
-                t.Param(
-                    "CodeRevision",
-                    t.uint32_t,
-                    "User-supplied code revision number",
-                    optional=True,
-                ),
-                t.Param(
-                    "BootloaderBuildType",
-                    BootloaderBuildType,
-                    "Bootloader build type",
-                    optional=True,
-                ),
-                t.Param(
-                    "BootloaderRevision",
-                    t.uint32_t,
-                    "Bootloader revision. 0 - not provided, 0xFFFFFFFF - not supported",
-                    optional=True,
-                ),
-            )
+        req_schema=(),
+        rsp_schema=(
+            t.Param("TransportRev", t.uint8_t, "Transport protocol revision"),
+            t.Param("ProductId", t.uint8_t, "Product ID"),
+            t.Param("MajorRel", t.uint8_t, "Software major release number"),
+            t.Param("MinorRel", t.uint8_t, "Software minor release number"),
+            t.Param("MaintRel", t.uint8_t, "Software maintenance release number"),
+            # Optional stuff
+            t.Param(
+                "CodeRevision",
+                t.uint32_t,
+                "User-supplied code revision number",
+                optional=True,
+            ),
+            t.Param(
+                "BootloaderBuildType",
+                BootloaderBuildType,
+                "Bootloader build type",
+                optional=True,
+            ),
+            t.Param(
+                "BootloaderRevision",
+                t.uint32_t,
+                "Bootloader revision. 0 - not provided, 0xFFFFFFFF - not supported",
+                optional=True,
+            ),
         ),
     )
 
@@ -93,9 +87,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     SetExtAddr = t.CommandDef(
         t.CommandType.SREQ,
         0x03,
-        req_schema=t.Schema(
-            (t.Param("ExtAddr", t.EUI64, "The device's extended address"),)
-        ),
+        req_schema=(t.Param("ExtAddr", t.EUI64, "The device's extended address"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -104,9 +96,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x04,
         req_schema=t.STATUS_SCHEMA,
-        rsp_schema=t.Schema(
-            (t.Param("ExtAddr", t.EUI64, "The device's extended address"),)
-        ),
+        rsp_schema=(t.Param("ExtAddr", t.EUI64, "The device's extended address"),),
     )
 
     # read a single memory location in the target RAM. The command accepts an address
@@ -114,19 +104,13 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     RamRead = t.CommandDef(
         t.CommandType.SREQ,
         0x05,
-        req_schema=t.Schema(
-            (
-                t.Param("Address", t.uint16_t, "Address of the memory to read"),
-                t.Param("Len", t.uint8_t, "The number of bytes to read"),
-            )
+        req_schema=(
+            t.Param("Address", t.uint16_t, "Address of the memory to read"),
+            t.Param("Len", t.uint8_t, "The number of bytes to read"),
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("Value", t.ShortBytes, "The value read from memory address"),
-            )
+        rsp_schema=(
+            t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
+            t.Param("Value", t.ShortBytes, "The value read from memory address"),
         ),
     )
 
@@ -136,11 +120,9 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     RamWrite = t.CommandDef(
         t.CommandType.SREQ,
         0x06,
-        req_schema=t.Schema(
-            (
-                t.Param("Address", t.uint16_t, "Address of the memory to read"),
-                t.Param("Value", t.ShortBytes, "The value read from memory address"),
-            )
+        req_schema=(
+            t.Param("Address", t.uint16_t, "Address of the memory to read"),
+            t.Param("Value", t.ShortBytes, "The value read from memory address"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -156,12 +138,10 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALNVItemInit = t.CommandDef(
         t.CommandType.SREQ,
         0x07,
-        req_schema=t.Schema(
-            (
-                t.Param("Id", nvids.NwkNvIds, "The Id of the NV Item"),
-                t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
-                t.Param("Value", t.ShortBytes, "The value of the NV item"),
-            )
+        req_schema=(
+            t.Param("Id", nvids.NwkNvIds, "The Id of the NV Item"),
+            t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
+            t.Param("Value", t.ShortBytes, "The value of the NV item"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -172,23 +152,17 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALNVRead = t.CommandDef(
         t.CommandType.SREQ,
         0x08,
-        req_schema=t.Schema(
-            (
-                t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
-                t.Param(
-                    "Offset",
-                    t.uint8_t,
-                    "Number of bytes offset from the beginning of the NV value",
-                ),
-            )
+        req_schema=(
+            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param(
+                "Offset",
+                t.uint8_t,
+                "Number of bytes offset from the beginning of the NV value",
+            ),
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("Value", t.ShortBytes, "The value of the NV item"),
-            )
+        rsp_schema=(
+            t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
+            t.Param("Value", t.ShortBytes, "The value of the NV item"),
         ),
     )
 
@@ -198,16 +172,14 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALNVWrite = t.CommandDef(
         t.CommandType.SREQ,
         0x09,
-        req_schema=t.Schema(
-            (
-                t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
-                t.Param(
-                    "Offset",
-                    t.uint8_t,
-                    "Number of bytes offset from the beginning of the NV value",
-                ),
-                t.Param("Value", t.ShortBytes, "The value of the NV item"),
-            )
+        req_schema=(
+            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param(
+                "Offset",
+                t.uint8_t,
+                "Number of bytes offset from the beginning of the NV value",
+            ),
+            t.Param("Value", t.ShortBytes, "The value of the NV item"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -217,11 +189,9 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALNVDelete = t.CommandDef(
         t.CommandType.SREQ,
         0x12,
-        req_schema=t.Schema(
-            (
-                t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
-                t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
-            )
+        req_schema=(
+            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -231,10 +201,8 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALNVLength = t.CommandDef(
         t.CommandType.SREQ,
         0x13,
-        req_schema=t.Schema((t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),)),
-        rsp_schema=t.Schema(
-            (t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),)
-        ),
+        req_schema=(t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),),
+        rsp_schema=(t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),),
     )
 
     # start a timer event. The event will expired after the indicated amount of time
@@ -242,11 +210,9 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALStartTimer = t.CommandDef(
         t.CommandType.SREQ,
         0x0A,
-        req_schema=t.Schema(
-            (
-                t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),
-                t.Param("Timeout", t.uint16_t, "Timer timeout in millliseconds"),
-            )
+        req_schema=(
+            t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),
+            t.Param("Timeout", t.uint16_t, "Timer timeout in millliseconds"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -255,9 +221,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALStopTimer = t.CommandDef(
         t.CommandType.SREQ,
         0x0B,
-        req_schema=t.Schema(
-            (t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),)
-        ),
+        req_schema=(t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -265,59 +229,53 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     Random = t.CommandDef(
         t.CommandType.SREQ,
         0x0C,
-        req_schema=t.Schema(),
-        rsp_schema=t.Schema((t.Param("Value", t.uint16_t, "The random value"),)),
+        req_schema=(),
+        rsp_schema=(t.Param("Value", t.uint16_t, "The random value"),),
     )
 
     # read a value from the ADC based on specified channel and resolution
     ADCRead = t.CommandDef(
         t.CommandType.SREQ,
         0x0D,
-        req_schema=t.Schema(
-            (
-                t.Param("Channel", t.ADCChannel, "The channel of ADC to read"),
-                t.Param(
-                    "Resolution",
-                    t.ADCResolution,
-                    "Resolution of the reading: 8/10/12/14 bits",
-                ),
-            )
+        req_schema=(
+            t.Param("Channel", t.ADCChannel, "The channel of ADC to read"),
+            t.Param(
+                "Resolution",
+                t.ADCResolution,
+                "Resolution of the reading: 8/10/12/14 bits",
+            ),
         ),
-        rsp_schema=t.Schema((t.Param("Value", t.uint16_t, "Value of ADC channel"),)),
+        rsp_schema=(t.Param("Value", t.uint16_t, "Value of ADC channel"),),
     )
 
     # control the 4 GPIO pins on the CC2530-ZNP build
     GPIO = t.CommandDef(
         t.CommandType.SREQ,
         0x0E,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "Operation",
-                    t.GpioOperation,
-                    "Specifies type of operation on GPIO pins",
-                ),
-                t.Param("Value", t.uint8_t, "GPIO value for specified operation"),
-            )
+        req_schema=(
+            t.Param(
+                "Operation",
+                t.GpioOperation,
+                "Specifies type of operation on GPIO pins",
+            ),
+            t.Param("Value", t.uint8_t, "GPIO value for specified operation"),
         ),
-        rsp_schema=t.Schema((t.Param("Value", t.uint8_t, "GPIO value"),)),
+        rsp_schema=(t.Param("Value", t.uint8_t, "GPIO value"),),
     )
 
     # tune intricate or arcane settings at runtime
     StackTune = t.CommandDef(
         t.CommandType.SREQ,
         0x0F,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "Operation",
-                    t.StackTuneOperation,
-                    "Specifies type of operation on GPIO pins",
-                ),
-                t.Param("Value", t.uint8_t, "Tuning value"),
-            )
+        req_schema=(
+            t.Param(
+                "Operation",
+                t.StackTuneOperation,
+                "Specifies type of operation on GPIO pins",
+            ),
+            t.Param("Value", t.uint8_t, "Tuning value"),
         ),
-        rsp_schema=t.Schema(
+        rsp_schema=(
             (t.Param("Value", t.uint8_t, "Applicable status of the tuning operation"),)
         ),
     )
@@ -328,20 +286,16 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     SetTime = t.CommandDef(
         t.CommandType.SREQ,
         0x10,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "UTCTime",
-                    t.uint32_t,
-                    "Number of seconds since 00:00:00 on Jan 2000",
-                ),
-                t.Param("Hour", t.uint8_t, "Hour of the day (0 -- 23)"),
-                t.Param("Minute", t.uint8_t, "Minute of the hour (0 -- 59)"),
-                t.Param("Second", t.uint8_t, "Seconds of the minute (0 -- 59)"),
-                t.Param("Month", t.uint8_t, "Month of the year (1 -- 12)"),
-                t.Param("Day", t.uint8_t, "Day of the month (1 -- 31)"),
-                t.Param("Year", t.uint16_t, "Year (2000 -- )"),
-            )
+        req_schema=(
+            t.Param(
+                "UTCTime", t.uint32_t, "Number of seconds since 00:00:00 on Jan 2000",
+            ),
+            t.Param("Hour", t.uint8_t, "Hour of the day (0 -- 23)"),
+            t.Param("Minute", t.uint8_t, "Minute of the hour (0 -- 59)"),
+            t.Param("Second", t.uint8_t, "Seconds of the minute (0 -- 59)"),
+            t.Param("Month", t.uint8_t, "Month of the year (1 -- 12)"),
+            t.Param("Day", t.uint8_t, "Day of the month (1 -- 31)"),
+            t.Param("Year", t.uint16_t, "Year (2000 -- )"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -351,21 +305,17 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     GetTime = t.CommandDef(
         t.CommandType.SREQ,
         0x11,
-        req_schema=t.Schema(),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "UTCTime",
-                    t.uint32_t,
-                    "Number of seconds since 00:00:00 on Jan 2000",
-                ),
-                t.Param("Hour", t.uint8_t, "Hour of the day (0 -- 23)"),
-                t.Param("Minute", t.uint8_t, "Minute of the hour (0 -- 59)"),
-                t.Param("Second", t.uint8_t, "Seconds of the minute (0 -- 59)"),
-                t.Param("Month", t.uint8_t, "Month of the year (1 -- 12)"),
-                t.Param("Day", t.uint8_t, "Day of the month (1 -- 31)"),
-                t.Param("Year", t.uint16_t, "Year (2000 -- )"),
-            )
+        req_schema=(),
+        rsp_schema=(
+            t.Param(
+                "UTCTime", t.uint32_t, "Number of seconds since 00:00:00 on Jan 2000",
+            ),
+            t.Param("Hour", t.uint8_t, "Hour of the day (0 -- 23)"),
+            t.Param("Minute", t.uint8_t, "Minute of the hour (0 -- 59)"),
+            t.Param("Second", t.uint8_t, "Seconds of the minute (0 -- 59)"),
+            t.Param("Month", t.uint8_t, "Month of the year (1 -- 12)"),
+            t.Param("Day", t.uint8_t, "Day of the month (1 -- 31)"),
+            t.Param("Year", t.uint16_t, "Year (2000 -- )"),
         ),
     )
 
@@ -375,9 +325,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     SetTxPower = t.CommandDef(
         t.CommandType.SREQ,
         0x14,
-        req_schema=t.Schema(
-            (t.Param("TXPower", t.int8s, "Requested TX power setting, in dBm"),)
-        ),
+        req_schema=(t.Param("TXPower", t.int8s, "Requested TX power setting, in dBm"),),
         # While the docs say "the returned TX power is the actual setting applied to
         # the radio - nearest characterized value for the specific radio.", the code
         # matches the documentation.
@@ -386,7 +334,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
 
     # initialize the statistics table in NV memory
     ZDiagsInitStats = t.CommandDef(
-        t.CommandType.SREQ, 0x17, req_schema=t.Schema(), rsp_schema=t.STATUS_SCHEMA
+        t.CommandType.SREQ, 0x17, req_schema=(), rsp_schema=t.STATUS_SCHEMA
     )
 
     # clear the statistics table. To clear data in NV (including the Boot
@@ -394,53 +342,45 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     ZDiagsClearStats = t.CommandDef(
         t.CommandType.SREQ,
         0x018,
-        req_schema=t.Schema(
-            (t.Param("ClearNV", t.Bool, "True -- clear statistics in NV memory"),)
+        req_schema=(
+            t.Param("ClearNV", t.Bool, "True -- clear statistics in NV memory"),
         ),
-        rsp_schema=t.Schema(
-            (t.Param("SycClock", t.uint32_t, "Milliseconds since last reset"),)
-        ),
+        rsp_schema=(t.Param("SycClock", t.uint32_t, "Milliseconds since last reset"),),
     )
 
     # read a specific system (attribute) ID statistics and/or metrics value
     ZDiagsGetStats = t.CommandDef(
         t.CommandType.SREQ,
         0x19,
-        req_schema=t.Schema(
+        req_schema=(
             # as defined in ZDiags.h
-            (t.Param("AttributeId", t.uint16_t, "System diagnostics attribute ID"),)
+            t.Param("AttributeId", t.uint16_t, "System diagnostics attribute ID"),
         ),
-        rsp_schema=t.Schema(
-            (t.Param("Value", t.uint32_t, "Value of the requested attribute"),)
-        ),
+        rsp_schema=(t.Param("Value", t.uint32_t, "Value of the requested attribute"),),
     )
 
     # restore the statistics table from NV into the RAM table
     ZDiagsRestoreStatsNV = t.CommandDef(
-        t.CommandType.SREQ, 0x1A, req_schema=t.Schema(), rsp_schema=t.STATUS_SCHEMA
+        t.CommandType.SREQ, 0x1A, req_schema=(), rsp_schema=t.STATUS_SCHEMA
     )
 
     # save the statistics table from RAM to NV
     ZDiagsSaveStatsToNV = t.CommandDef(
         t.CommandType.SREQ,
         0x1B,
-        req_schema=t.Schema(),
-        rsp_schema=t.Schema(
-            (t.Param("SycClock", t.uint32_t, "Milliseconds since last reset"),)
-        ),
+        req_schema=(),
+        rsp_schema=(t.Param("SycClock", t.uint32_t, "Milliseconds since last reset"),),
     )
 
     # attempt to create an item in non-volatile memory
     NVCreate = t.CommandDef(
         t.CommandType.SREQ,
         0x30,
-        req_schema=t.Schema(
-            (
-                t.Param("SysId", t.uint8_t, "System ID of the NV item"),
-                t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
-                t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
-                t.Param("Length", t.uint32_t, "Number of bytes in the NV item"),
-            )
+        req_schema=(
+            t.Param("SysId", t.uint8_t, "System ID of the NV item"),
+            t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
+            t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
+            t.Param("Length", t.uint32_t, "Number of bytes in the NV item"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -449,12 +389,10 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     NVDelete = t.CommandDef(
         t.CommandType.SREQ,
         0x31,
-        req_schema=t.Schema(
-            (
-                t.Param("SysId", t.uint8_t, "System ID of the NV item"),
-                t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
-                t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
-            )
+        req_schema=(
+            t.Param("SysId", t.uint8_t, "System ID of the NV item"),
+            t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
+            t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -463,40 +401,32 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     NVLength = t.CommandDef(
         t.CommandType.SREQ,
         0x32,
-        req_schema=t.Schema(
-            (
-                t.Param("SysId", t.uint8_t, "System ID of the NV item"),
-                t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
-                t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
-            )
+        req_schema=(
+            t.Param("SysId", t.uint8_t, "System ID of the NV item"),
+            t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
+            t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
         ),
-        rsp_schema=t.Schema((t.Param("Length", t.uint32_t, "Length of NV item"),)),
+        rsp_schema=(t.Param("Length", t.uint32_t, "Length of NV item"),),
     )
 
     # read an item in non-volatile memory
     NVRead = t.CommandDef(
         t.CommandType.SREQ,
         0x33,
-        req_schema=t.Schema(
-            (
-                t.Param("SysId", t.uint8_t, "System ID of the NV item"),
-                t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
-                t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
-                t.Param(
-                    "Offset",
-                    t.uint16_t,
-                    "Number of bytes offset from the beginning of the NV value",
-                ),
-                t.Param("Length", t.uint8_t, "Length of data to read"),
-            )
+        req_schema=(
+            t.Param("SysId", t.uint8_t, "System ID of the NV item"),
+            t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
+            t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
+            t.Param(
+                "Offset",
+                t.uint16_t,
+                "Number of bytes offset from the beginning of the NV value",
+            ),
+            t.Param("Length", t.uint8_t, "Length of data to read"),
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("Value", t.ShortBytes, "Value of the NV item read"),
-            )
+        rsp_schema=(
+            t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
+            t.Param("Value", t.ShortBytes, "Value of the NV item read"),
         ),
     )
 
@@ -504,20 +434,18 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     NVWrite = t.CommandDef(
         t.CommandType.SREQ,
         0x34,
-        req_schema=t.Schema(
-            (
-                t.Param("SysId", t.uint8_t, "System ID of the NV item"),
-                t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
-                t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
-                t.Param(
-                    "Offset",
-                    t.uint16_t,
-                    "Number of bytes offset from the beginning of the NV value",
-                ),
-                # XXX: the spec has length as a a 16-bit integer but then shows it as
-                # an 8-bit integer in the table below, which matches the code
-                t.Param("Value", t.ShortBytes, "Value of the NV item to write"),
-            )
+        req_schema=(
+            t.Param("SysId", t.uint8_t, "System ID of the NV item"),
+            t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
+            t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
+            t.Param(
+                "Offset",
+                t.uint16_t,
+                "Number of bytes offset from the beginning of the NV value",
+            ),
+            # XXX: the spec has length as a a 16-bit integer but then shows it as
+            # an 8-bit integer in the table below, which matches the code
+            t.Param("Value", t.ShortBytes, "Value of the NV item to write"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -526,13 +454,11 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     NVUpdate = t.CommandDef(
         t.CommandType.SREQ,
         0x35,
-        req_schema=t.Schema(
-            (
-                t.Param("SysId", t.uint8_t, "System ID of the NV item"),
-                t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
-                t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
-                t.Param("Value", t.ShortBytes, "Value of the NV item to update"),
-            )
+        req_schema=(
+            t.Param("SysId", t.uint8_t, "System ID of the NV item"),
+            t.Param("ItemId", t.uint16_t, "Item ID of the NV item"),
+            t.Param("SubId", t.uint16_t, "Sub ID of the NV item"),
+            t.Param("Value", t.ShortBytes, "Value of the NV item to update"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -541,14 +467,12 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     NVCompact = t.CommandDef(
         t.CommandType.SREQ,
         0x36,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "Threshold",
-                    t.uint16_t,
-                    "Compaction occurs when NV bytes are less than this value",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "Threshold",
+                t.uint16_t,
+                "Compaction occurs when NV bytes are less than this value",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -558,15 +482,13 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     ResetInd = t.CommandDef(
         t.CommandType.AREQ,
         0x80,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Reason", t.ResetReason, "Reason for the reset"),
-                t.Param("TransportRev", t.uint8_t, "Transport protocol revision"),
-                t.Param("ProductId", t.uint8_t, "Product ID"),
-                t.Param("MajorRel", t.uint8_t, "Software major release number"),
-                t.Param("MinorRel", t.uint8_t, "Software minor release number"),
-                t.Param("MaintRel", t.uint8_t, "Software maintenance release number"),
-            )
+        rsp_schema=(
+            t.Param("Reason", t.ResetReason, "Reason for the reset"),
+            t.Param("TransportRev", t.uint8_t, "Transport protocol revision"),
+            t.Param("ProductId", t.uint8_t, "Product ID"),
+            t.Param("MajorRel", t.uint8_t, "Software major release number"),
+            t.Param("MinorRel", t.uint8_t, "Software minor release number"),
+            t.Param("MaintRel", t.uint8_t, "Software maintenance release number"),
         ),
     )
 
@@ -574,7 +496,5 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALTimerExpired = t.CommandDef(
         t.CommandType.AREQ,
         0x81,
-        rsp_schema=t.Schema(
-            (t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),)
-        ),
+        rsp_schema=(t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),),
     )

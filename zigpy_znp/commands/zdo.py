@@ -97,22 +97,20 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     NwkAddrReq = t.CommandDef(
         t.CommandType.SREQ,
         0x00,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "IEEE",
-                    t.EUI64,
-                    "Extended address of the device requesting association",
-                ),
-                t.Param(
-                    "RequestType",
-                    t.uint8_t,
-                    "0x00 -- single device request, 0x01 -- Extended",
-                ),
-                t.Param(
-                    "StartIndex", t.uint8_t, "Starting index into the list of children"
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "IEEE",
+                t.EUI64,
+                "Extended address of the device requesting association",
+            ),
+            t.Param(
+                "RequestType",
+                t.uint8_t,
+                "0x00 -- single device request, 0x01 -- Extended",
+            ),
+            t.Param(
+                "StartIndex", t.uint8_t, "Starting index into the list of children"
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -121,18 +119,16 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     IEEEAddrReq = t.CommandDef(
         t.CommandType.SREQ,
         0x01,
-        req_schema=t.Schema(
-            (
-                t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param(
-                    "RequestType",
-                    t.uint8_t,
-                    "0x00 -- single device request, 0x01 -- Extended",
-                ),
-                t.Param(
-                    "StartIndex", t.uint8_t, "Starting index into the list of children"
-                ),
-            )
+        req_schema=(
+            t.Param("NWK", t.NWK, "Short address of the device"),
+            t.Param(
+                "RequestType",
+                t.uint8_t,
+                "0x00 -- single device request, 0x01 -- Extended",
+            ),
+            t.Param(
+                "StartIndex", t.uint8_t, "Starting index into the list of children"
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -141,19 +137,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     NodeDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x02,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the inquiry",
-                ),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+            ),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -162,19 +152,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     PowerDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x03,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the inquiry",
-                ),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+            ),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -183,20 +167,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     SimpleDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x04,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the inquiry",
-                ),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-                t.Param("Endpoint", t.uint8_t, "application endpoint the data is from"),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+            ),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
+            t.Param("Endpoint", t.uint8_t, "application endpoint the data is from"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -205,19 +183,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ActiveEpReq = t.CommandDef(
         t.CommandType.SREQ,
         0x05,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the inquiry",
-                ),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+            ),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -226,22 +198,16 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MatchDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x06,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the inquiry",
-                ),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-                t.Param("ProfileId", t.uint16_t, "profile id of the device"),
-                t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
-                t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+            ),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
+            t.Param("ProfileId", t.uint16_t, "profile id of the device"),
+            t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
+            t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -250,19 +216,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ComplexDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x07,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the inquiry",
-                ),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+            ),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -271,19 +231,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     UserDescReq = t.CommandDef(
         t.CommandType.SREQ,
         0x08,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the inquiry",
-                ),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+            ),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -294,16 +248,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     EndDeviceAnnce = t.CommandDef(
         t.CommandType.SREQ,
         0x0A,
-        req_schema=t.Schema(
-            (
-                t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param(
-                    "IEEE",
-                    t.EUI64,
-                    "Extended address of the device generating the request",
-                ),
-                t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
-            )
+        req_schema=(
+            t.Param("NWK", t.NWK, "Short address of the device"),
+            t.Param(
+                "IEEE",
+                t.EUI64,
+                "Extended address of the device generating the request",
+            ),
+            t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -312,18 +264,16 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     UserDescSet = t.CommandDef(
         t.CommandType.SREQ,
         0x0B,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "network address of the device generating the set request",
-                ),
-                t.Param(
-                    "NWK", t.NWK, "NWK address of the destination device being queried"
-                ),
-                t.Param("UserDescriptor", t.ShortBytes, "User descriptor array"),
-            )
+        req_schema=(
+            t.Param(
+                "DstAddr",
+                t.NWK,
+                "network address of the device generating the set request",
+            ),
+            t.Param(
+                "NWK", t.NWK, "NWK address of the destination device being queried"
+            ),
+            t.Param("UserDescriptor", t.ShortBytes, "User descriptor array"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -334,12 +284,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ServerDiscReq = t.CommandDef(
         t.CommandType.SREQ,
         0x0C,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "ServerMask", t.uint16_t, "system server capabilities of the device"
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "ServerMask", t.uint16_t, "system server capabilities of the device"
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -348,27 +296,23 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     EndDeviceBindReq = t.CommandDef(
         t.CommandType.SREQ,
         0x20,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device generating the request",
+        req_schema=(
+            t.Param(
+                "DstAddr", t.NWK, "Short address of the device generating the request",
+            ),
+            t.Param(
+                "LocalCoordinator",
+                t.NWK,
+                (
+                    "local coordinator's short address. In the case of source "
+                    "binding, it's the short address of the source address"
                 ),
-                t.Param(
-                    "LocalCoordinator",
-                    t.NWK,
-                    (
-                        "local coordinator's short address. In the case of source "
-                        "binding, it's the short address of the source address"
-                    ),
-                ),
-                t.Param("IEEE", t.EUI64, "Local coordinator's IEEE address"),
-                t.Param("Endpoint", t.uint8_t, "device's endpoint"),
-                t.Param("ProfileId", t.uint16_t, "profile id of the device"),
-                t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
-                t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
-            )
+            ),
+            t.Param("IEEE", t.EUI64, "Local coordinator's IEEE address"),
+            t.Param("Endpoint", t.uint8_t, "device's endpoint"),
+            t.Param("ProfileId", t.uint16_t, "profile id of the device"),
+            t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
+            t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -377,16 +321,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     BindReq = t.CommandDef(
         t.CommandType.SREQ,
         0x21,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination device"),
-                t.Param("Src", t.EUI64, "Binding source IEEE address"),
-                t.Param("SrcEndpoint", t.uint8_t, "binding source endpoint"),
-                t.Param("ClusterId", t.ClusterId, "Cluster id to match in messages"),
-                t.Param(
-                    "Address", zigpy.zdo.types.MultiAddress, "Binding address/endpoint"
-                ),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination device"),
+            t.Param("Src", t.EUI64, "Binding source IEEE address"),
+            t.Param("SrcEndpoint", t.uint8_t, "binding source endpoint"),
+            t.Param("ClusterId", t.ClusterId, "Cluster id to match in messages"),
+            t.Param(
+                "Address", zigpy.zdo.types.MultiAddress, "Binding address/endpoint"
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -395,19 +337,17 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     UnBindReq = t.CommandDef(
         t.CommandType.SREQ,
         0x22,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination device"),
-                t.Param("Src", t.EUI64, "Binding source IEEE address"),
-                t.Param("SrcEndpoint", t.uint8_t, "binding source endpoint"),
-                t.Param("ClusterId", t.ClusterId, "Cluster id to match in messages"),
-                t.Param(
-                    "Address",
-                    t.AddrModeAddress,
-                    "Binding address mode destination address",
-                ),
-                t.Param("DstEndpoint", t.uint8_t, "Binding destination endpoint"),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination device"),
+            t.Param("Src", t.EUI64, "Binding source IEEE address"),
+            t.Param("SrcEndpoint", t.uint8_t, "binding source endpoint"),
+            t.Param("ClusterId", t.ClusterId, "Cluster id to match in messages"),
+            t.Param(
+                "Address",
+                t.AddrModeAddress,
+                "Binding address mode destination address",
+            ),
+            t.Param("DstEndpoint", t.uint8_t, "Binding destination endpoint"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -416,17 +356,15 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtNwkDiscReq = t.CommandDef(
         t.CommandType.SREQ,
         0x30,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination device"),
-                t.Param("Channels", t.Channels, "Bitmask of channels to scan"),
-                t.Param("ScanDuration", t.uint8_t, "Scanning time"),
-                t.Param(
-                    "StartIndex",
-                    t.uint8_t,
-                    "Specifies where to start in the response array",
-                ),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination device"),
+            t.Param("Channels", t.Channels, "Bitmask of channels to scan"),
+            t.Param("ScanDuration", t.uint8_t, "Scanning time"),
+            t.Param(
+                "StartIndex",
+                t.uint8_t,
+                "Specifies where to start in the response array",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -436,15 +374,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtLqiReq = t.CommandDef(
         t.CommandType.SREQ,
         0x31,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination device"),
-                t.Param(
-                    "StartIndex",
-                    t.uint8_t,
-                    "Specifies where to start in the response array",
-                ),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination device"),
+            t.Param(
+                "StartIndex",
+                t.uint8_t,
+                "Specifies where to start in the response array",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -453,15 +389,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtRtgReq = t.CommandDef(
         t.CommandType.SREQ,
         0x32,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination device"),
-                t.Param(
-                    "StartIndex",
-                    t.uint8_t,
-                    "Specifies where to start in the response array",
-                ),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination device"),
+            t.Param(
+                "StartIndex",
+                t.uint8_t,
+                "Specifies where to start in the response array",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -470,15 +404,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtBindReq = t.CommandDef(
         t.CommandType.SREQ,
         0x33,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination device"),
-                t.Param(
-                    "StartIndex",
-                    t.uint8_t,
-                    "Specifies where to start in the response array",
-                ),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination device"),
+            t.Param(
+                "StartIndex",
+                t.uint8_t,
+                "Specifies where to start in the response array",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -487,30 +419,28 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtLeaveReq = t.CommandDef(
         t.CommandType.SREQ,
         0x34,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Short address of the device that will process the "
-                    "mgmt leave (remote or self)",
+        req_schema=(
+            t.Param(
+                "DstAddr",
+                t.NWK,
+                "Short address of the device that will process the "
+                "mgmt leave (remote or self)",
+            ),
+            t.Param(
+                "IEEE",
+                t.EUI64,
+                (
+                    "The 64-bit IEEE address of the entity to be removed from the "
+                    "network or 0x0000000000000000 if the device removes itself "
+                    "from the network."
                 ),
-                t.Param(
-                    "IEEE",
-                    t.EUI64,
-                    (
-                        "The 64-bit IEEE address of the entity to be removed from the "
-                        "network or 0x0000000000000000 if the device removes itself "
-                        "from the network."
-                    ),
-                ),
-                t.Param(
-                    "RemoveChildren_Rejoin",
-                    LeaveOptions,
-                    "Specifies actions to be performed by "
-                    "device when leaving the network.",
-                ),
-            )
+            ),
+            t.Param(
+                "RemoveChildren_Rejoin",
+                LeaveOptions,
+                "Specifies actions to be performed by "
+                "device when leaving the network.",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -519,12 +449,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtDirectJoinReq = t.CommandDef(
         t.CommandType.SREQ,
         0x35,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the device to join"),
-                t.Param("IEEE", t.EUI64, "IEEE address of the device to join"),
-                t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the device to join"),
+            t.Param("IEEE", t.EUI64, "IEEE address of the device to join"),
+            t.Param("Capabilities", t.uint8_t, "MAC Capabilities"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -533,21 +461,15 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtPermitJoinReq = t.CommandDef(
         t.CommandType.SREQ,
         0x36,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "AddrMode", t.AddrMode, "Address mode of DST: short or broadcast"
-                ),
-                t.Param("Dst", t.NWK, "Short address of the device to join"),
-                t.Param(
-                    "Duration", t.uint8_t, "Specifies the duration to permit joining"
-                ),
-                t.Param(
-                    "TCSignificance",
-                    t.uint8_t,
-                    "Trust Center Significance  -- unused in the code!",
-                ),
-            )
+        req_schema=(
+            t.Param("AddrMode", t.AddrMode, "Address mode of DST: short or broadcast"),
+            t.Param("Dst", t.NWK, "Short address of the device to join"),
+            t.Param("Duration", t.uint8_t, "Specifies the duration to permit joining"),
+            t.Param(
+                "TCSignificance",
+                t.uint8_t,
+                "Trust Center Significance  -- unused in the code!",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -557,29 +479,27 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtNWKUpdateReq = t.CommandDef(
         t.CommandType.SREQ,
         0x37,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination device"),
-                t.Param("DstAddrMode", t.AddrMode, "Destination Address mode"),
-                t.Param("Channels", t.Channels, "Bitmask of channels to scan"),
-                t.Param(
-                    "ScanDuration",
-                    t.uint8_t,
-                    " - 0x00-0x05: Scanning time\n"
-                    " - 0xFE: Command to switch channels\n"
-                    " - 0xFF: Set a new channel mask and NWK manager addr",
-                ),
-                t.Param(
-                    "ScanCount",
-                    t.uint8_t,
-                    "The number of energy scans to be conducted and reported",
-                ),
-                t.Param(
-                    "NwkManagerAddr",
-                    t.NWK,
-                    "NWK address for the device with the Network Manager bit set",
-                ),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination device"),
+            t.Param("DstAddrMode", t.AddrMode, "Destination Address mode"),
+            t.Param("Channels", t.Channels, "Bitmask of channels to scan"),
+            t.Param(
+                "ScanDuration",
+                t.uint8_t,
+                " - 0x00-0x05: Scanning time\n"
+                " - 0xFE: Command to switch channels\n"
+                " - 0xFF: Set a new channel mask and NWK manager addr",
+            ),
+            t.Param(
+                "ScanCount",
+                t.uint8_t,
+                "The number of energy scans to be conducted and reported",
+            ),
+            t.Param(
+                "NwkManagerAddr",
+                t.NWK,
+                "NWK address for the device with the Network Manager bit set",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -588,14 +508,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MsgCallbackRegister = t.CommandDef(
         t.CommandType.SREQ,
         0x3E,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "ClusterId",
-                    t.ClusterId,
-                    "Cluster id for which to receive ZDO callback",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "ClusterId",
+                t.ClusterId,
+                "Cluster id for which to receive ZDO callback",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -604,14 +522,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MsgCallbackRemove = t.CommandDef(
         t.CommandType.SREQ,
         0x3F,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "ClusterId",
-                    t.ClusterId,
-                    "Cluster id for which to receive ZDO callback",
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "ClusterId",
+                t.ClusterId,
+                "Cluster id for which to receive ZDO callback",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -620,8 +536,8 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     StartupFromApp = t.CommandDef(
         t.CommandType.SREQ,
         0x40,
-        req_schema=t.Schema((t.Param("StartDelay", t.uint16_t, "Startup delay"),)),
-        rsp_schema=t.Schema((t.Param("State", StartupState, "State after startup"),)),
+        req_schema=(t.Param("StartDelay", t.uint16_t, "Startup delay"),),
+        rsp_schema=(t.Param("State", StartupState, "State after startup"),),
     )
 
     # Extended version of ZDO to indicate to router devices to create
@@ -629,27 +545,23 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     StartupFromAppExt = t.CommandDef(
         t.CommandType.SREQ,
         0x54,
-        req_schema=t.Schema(
-            (
-                t.Param("StartDelay", t.uint16_t, "Startup delay"),
-                t.Param(
-                    "Mode", t.Bool, "True -- ZR devices to create a distributed network"
-                ),
-            )
+        req_schema=(
+            t.Param("StartDelay", t.uint16_t, "Startup delay"),
+            t.Param(
+                "Mode", t.Bool, "True -- ZR devices to create a distributed network"
+            ),
         ),
-        rsp_schema=t.Schema((t.Param("State", StartupState, "State after startup"),)),
+        rsp_schema=(t.Param("State", StartupState, "State after startup"),),
     )
 
     # set the application link key for a given device
     SetLinkKey = t.CommandDef(
         t.CommandType.SREQ,
         0x23,
-        req_schema=t.Schema(
-            (
-                t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param("IEEE", t.EUI64, "Extended address of the device"),
-                t.Param("LinkKeyData", t.KeyData, "128bit link key"),
-            )
+        req_schema=(
+            t.Param("NWK", t.NWK, "Short address of the device"),
+            t.Param("IEEE", t.EUI64, "Extended address of the device"),
+            t.Param("LinkKeyData", t.KeyData, "128bit link key"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -658,9 +570,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     RemoveLinkKey = t.CommandDef(
         t.CommandType.SREQ,
         0x24,
-        req_schema=t.Schema(
-            (t.Param("IEEE", t.EUI64, "Extended address of the device"),)
-        ),
+        req_schema=(t.Param("IEEE", t.EUI64, "Extended address of the device"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -668,17 +578,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     GetLinkKey = t.CommandDef(
         t.CommandType.SREQ,
         0x25,
-        req_schema=t.Schema(
-            (t.Param("IEEE", t.EUI64, "Extended address of the device"),)
-        ),
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.Status, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("IEEE", t.EUI64, "Extended address of the device"),
-                t.Param("LinkKeyData", t.KeyData, "128bit link key"),
-            )
+        req_schema=(t.Param("IEEE", t.EUI64, "Extended address of the device"),),
+        rsp_schema=(
+            t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
+            t.Param("IEEE", t.EUI64, "Extended address of the device"),
+            t.Param("LinkKeyData", t.KeyData, "128bit link key"),
         ),
     )
 
@@ -686,11 +590,9 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     NetworkDiscoveryReq = t.CommandDef(
         t.CommandType.SREQ,
         0x26,
-        req_schema=t.Schema(
-            (
-                t.Param("Channels", t.Channels, "Bitmask of channels to scan"),
-                t.Param("ScanDuration", t.uint8_t, "Scanning time"),
-            )
+        req_schema=(
+            t.Param("Channels", t.Channels, "Bitmask of channels to scan"),
+            t.Param("ScanDuration", t.uint8_t, "Scanning time"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -699,23 +601,17 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     JoinReq = t.CommandDef(
         t.CommandType.SREQ,
         0x27,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "LogicalChannel", t.uint8_t, "Channel where the PAN is located"
-                ),
-                t.Param("PanId", t.PanId, "The PAN Id to join."),
-                t.Param("ExtendedPanId", t.ExtendedPanId, "64-bit extended PAN ID"),
-                t.Param(
-                    "ChosenParent",
-                    t.NWK,
-                    "Short address of the parent device chosen to join",
-                ),
-                t.Param("Depth", t.uint8_t, "Depth of the parent"),
-                t.Param(
-                    "StackProfile", t.uint8_t, "Stack profile of the network to use"
-                ),
-            )
+        req_schema=(
+            t.Param("LogicalChannel", t.uint8_t, "Channel where the PAN is located"),
+            t.Param("PanId", t.PanId, "The PAN Id to join."),
+            t.Param("ExtendedPanId", t.ExtendedPanId, "64-bit extended PAN ID"),
+            t.Param(
+                "ChosenParent",
+                t.NWK,
+                "Short address of the parent device chosen to join",
+            ),
+            t.Param("Depth", t.uint8_t, "Depth of the parent"),
+            t.Param("StackProfile", t.uint8_t, "Stack profile of the network to use"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -725,17 +621,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         t.CommandType.SREQ,
         # in documentation CmdId=0x26 which conflict with discover req
         0x28,
-        req_schema=t.Schema(
-            (
-                t.Param(
-                    "BackoffDuraation",
-                    t.uint32_t,
-                    "Rejoin backoff  duration for end device",
-                ),
-                t.Param(
-                    "ScanDuration", t.uint32_t, "Rejoin scan duration for end device"
-                ),
-            )
+        req_schema=(
+            t.Param(
+                "BackoffDuraation",
+                t.uint32_t,
+                "Rejoin backoff  duration for end device",
+            ),
+            t.Param("ScanDuration", t.uint32_t, "Rejoin scan duration for end device"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -744,12 +636,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     SecAddLinkKey = t.CommandDef(
         t.CommandType.SREQ,
         0x42,
-        req_schema=t.Schema(
-            (
-                t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param("IEEE", t.EUI64, "Extended address of the device"),
-                t.Param("LinkKeyData", t.KeyData, "128bit link key"),
-            )
+        req_schema=(
+            t.Param("NWK", t.NWK, "Short address of the device"),
+            t.Param("IEEE", t.EUI64, "Extended address of the device"),
+            t.Param("LinkKeyData", t.KeyData, "128bit link key"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -758,18 +648,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     SecEntryLookupExt = t.CommandDef(
         t.CommandType.SREQ,
         0x43,
-        req_schema=t.Schema(
-            (
-                t.Param("IEEE", t.EUI64, "Extended address of the device"),
-                t.Param("Entry", SecurityEntry, "Valid entry"),
-            )
+        req_schema=(
+            t.Param("IEEE", t.EUI64, "Extended address of the device"),
+            t.Param("Entry", SecurityEntry, "Valid entry"),
         ),
-        rsp_schema=t.Schema(
-            (
-                t.Param("AMI", t.uint16_t, "Address manager index"),
-                t.Param("KeyNVID", t.uint16_t, "Index to link key table in NV"),
-                t.Param("Option", t.uint8_t, "Authentication option for device"),
-            )
+        rsp_schema=(
+            t.Param("AMI", t.uint16_t, "Address manager index"),
+            t.Param("KeyNVID", t.uint16_t, "Index to link key table in NV"),
+            t.Param("Option", t.uint8_t, "Authentication option for device"),
         ),
     )
 
@@ -777,9 +663,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     SecDeviceRemove = t.CommandDef(
         t.CommandType.SREQ,
         0x44,
-        req_schema=t.Schema(
-            (t.Param("IEEE", t.EUI64, "Extended address of the device"),)
-        ),
+        req_schema=(t.Param("IEEE", t.EUI64, "Extended address of the device"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -787,12 +671,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtRouteDisc = t.CommandDef(
         t.CommandType.SREQ,
         0x45,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination"),
-                t.Param("Options", RouteDiscoveryOptions, "Route options"),
-                t.Param("Radius", t.uint8_t, "Broadcast radius"),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination"),
+            t.Param("Options", RouteDiscoveryOptions, "Route options"),
+            t.Param("Radius", t.uint8_t, "Broadcast radius"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -801,12 +683,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtRouteChk = t.CommandDef(
         t.CommandType.SREQ,
         0x46,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination"),
-                t.Param("RtStatus", t.uint8_t, "Status value for routing entries"),
-                t.Param("Options", t.uint8_t, "Route options"),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination"),
+            t.Param("RtStatus", t.uint8_t, "Status value for routing entries"),
+            t.Param("Options", t.uint8_t, "Route options"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -815,11 +695,9 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtRemoveGroup = t.CommandDef(
         t.CommandType.SREQ,
         0x47,
-        req_schema=t.Schema(
-            (
-                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
-                t.Param("GroupId", t.GroupId, "ID to look for group"),
-            )
+        req_schema=(
+            t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+            t.Param("GroupId", t.GroupId, "ID to look for group"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -828,7 +706,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtRemoveAllGroups = t.CommandDef(
         t.CommandType.SREQ,
         0x48,
-        req_schema=t.Schema((t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),)),
+        req_schema=(t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -836,39 +714,33 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtFindAllGroupsEndpoint = t.CommandDef(
         t.CommandType.SREQ,
         0x49,
-        req_schema=t.Schema(
-            (
-                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
-                # this parameter does not make sense
-                t.Param("Groups", t.uint16_t, "List to hold group IDs"),
-            )
+        req_schema=(
+            t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+            # this parameter does not make sense
+            t.Param("Groups", t.uint16_t, "List to hold group IDs"),
         ),
-        rsp_schema=t.Schema((t.Param("Groups", GroupIdList, "List of Group IDs"),)),
+        rsp_schema=(t.Param("Groups", GroupIdList, "List of Group IDs"),),
     )
 
     # handle the ZDO extension find group message
     ExtFindGroup = t.CommandDef(
         t.CommandType.SREQ,
         0x4A,
-        req_schema=t.Schema(
-            (
-                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
-                t.Param("GroupId", t.GroupId, "ID to look for group"),
-            )
+        req_schema=(
+            t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+            t.Param("GroupId", t.GroupId, "ID to look for group"),
         ),
-        rsp_schema=t.Schema((t.Param("Group", t.Bytes, "Group information"),)),
+        rsp_schema=(t.Param("Group", t.Bytes, "Group information"),),
     )
 
     # handle the ZDO extension add group message
     ExtAddGroup = t.CommandDef(
         t.CommandType.SREQ,
         0x4B,
-        req_schema=t.Schema(
-            (
-                t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
-                t.Param("GroupId", t.GroupId, "ID to look for group"),
-                t.Param("GroupName", t.CharacterString, "Group name"),
-            )
+        req_schema=(
+            t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
+            t.Param("GroupId", t.GroupId, "ID to look for group"),
+            t.Param("GroupName", t.CharacterString, "Group name"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -877,21 +749,17 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtCountAllGroups = t.CommandDef(
         t.CommandType.SREQ,
         0x4C,
-        req_schema=t.Schema(),
-        rsp_schema=t.Schema(
-            (t.Param("GroupCount", t.uint8_t, "Total number of groups"),)
-        ),
+        req_schema=(),
+        rsp_schema=(t.Param("GroupCount", t.uint8_t, "Total number of groups"),),
     )
 
     # handle the ZDO extension Get/Set RxOnIdle to ZMac message
     ExtRxIdle = t.CommandDef(
         t.CommandType.SREQ,
         0x4D,
-        req_schema=t.Schema(
-            (
-                t.Param("SetFlag", t.uint8_t, "Set or get value"),
-                t.Param("SetValue", t.uint8_t, "Value to be set to ZMac message"),
-            )
+        req_schema=(
+            t.Param("SetFlag", t.uint8_t, "Set or get value"),
+            t.Param("SetValue", t.uint8_t, "Value to be set to ZMac message"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -900,12 +768,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtUpdateNwkKey = t.CommandDef(
         t.CommandType.SREQ,
         0x4E,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination"),
-                t.Param("KeySeqNum", t.uint8_t, "Key sequence number"),
-                t.Param("Key", t.KeyData, "Network key"),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination"),
+            t.Param("KeySeqNum", t.uint8_t, "Key sequence number"),
+            t.Param("Key", t.KeyData, "Network key"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -914,11 +780,9 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtSwitchNwkKey = t.CommandDef(
         t.CommandType.SREQ,
         0x4F,
-        req_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination"),
-                t.Param("KeySeqNum", t.uint8_t, "Key sequence number"),
-            )
+        req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination"),
+            t.Param("KeySeqNum", t.uint8_t, "Key sequence number"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -927,16 +791,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtNwkInfo = t.CommandDef(
         t.CommandType.SREQ,
         0x50,
-        req_schema=t.Schema(),
-        rsp_schema=t.Schema(
-            (
-                t.Param("Dst", t.NWK, "Short address of the destination"),
-                t.Param("PanId", t.PanId, "The PAN Id to join."),
-                t.Param("ParentNWK", t.NWK, "Short address of the parent"),
-                t.Param("ExtendedPanId", t.ExtendedPanId, "64-bit extended PAN ID"),
-                t.Param("ParentIEEE", t.EUI64, "IEEE address of the parent"),
-                t.Param("Channel", t.Channels, "Current Channel"),
-            )
+        req_schema=(),
+        rsp_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination"),
+            t.Param("PanId", t.PanId, "The PAN Id to join."),
+            t.Param("ParentNWK", t.NWK, "Short address of the parent"),
+            t.Param("ExtendedPanId", t.ExtendedPanId, "64-bit extended PAN ID"),
+            t.Param("ParentIEEE", t.EUI64, "IEEE address of the parent"),
+            t.Param("Channel", t.Channels, "Current Channel"),
         ),
     )
 
@@ -944,12 +806,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ExtSecApsRemoveReq = t.CommandDef(
         t.CommandType.SREQ,
         0x51,
-        req_schema=t.Schema(
-            (
-                t.Param("NWK", t.NWK, "Short address of the device"),
-                t.Param("IEEE", t.EUI64, "IEEE address of the device"),
-                t.Param("ParentNWK", t.NWK, "Short address of the parent"),
-            )
+        req_schema=(
+            t.Param("NWK", t.NWK, "Short address of the device"),
+            t.Param("IEEE", t.EUI64, "IEEE address of the device"),
+            t.Param("ParentNWK", t.NWK, "Short address of the parent"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -957,16 +817,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     # forces a network concentrator change by resetting zgConcentratorEnable and
     # zgConcentratorDiscoveryTime from NV and set nwk event
     ForceConcentratorChange = t.CommandDef(
-        t.CommandType.SREQ, 0x52, req_schema=t.Schema(), rsp_schema=t.Schema()
+        t.CommandType.SREQ, 0x52, req_schema=(), rsp_schema=()
     )
 
     # set parameters not settable through NV
     ExtSetParams = t.CommandDef(
         t.CommandType.SREQ,
         0x53,
-        req_schema=t.Schema(
-            (t.Param("UseMulticast", t.Bool, "Set or reset of multicast"),)
-        ),
+        req_schema=(t.Param("UseMulticast", t.Bool, "Set or reset of multicast"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 
@@ -974,20 +832,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     NwkAddrOfInterestReq = t.CommandDef(
         t.CommandType.SREQ,
         0x29,
-        req_schema=t.Schema(
-            (
-                t.Param("NWK", t.NWK, "Short address of the destination"),
-                t.Param(
-                    "NWKAddrOfInterest",
-                    t.NWK,
-                    "Short address of the device being queried",
-                ),
-                t.Param(
-                    "Cmd",
-                    t.uint8_t,
-                    "A valid Cluser ID command as specified by profile",
-                ),
-            )
+        req_schema=(
+            t.Param("NWK", t.NWK, "Short address of the destination"),
+            t.Param(
+                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+            ),
+            t.Param(
+                "Cmd", t.uint8_t, "A valid Cluser ID command as specified by profile",
+            ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -997,20 +849,18 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     NwkAddrRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x80,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("IEEE", t.EUI64, "Extended address of the source device"),
-                t.Param("NWK", t.NWK, "Short address of the source device"),
-                t.Param(
-                    "Index",
-                    t.uint8_t,
-                    "Starting index into the list of associated devices",
-                ),
-                t.Param("Devices", t.NWKList, "List of the associated devices"),
-            )
+        rsp_schema=(
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("IEEE", t.EUI64, "Extended address of the source device"),
+            t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param(
+                "Index",
+                t.uint8_t,
+                "Starting index into the list of associated devices",
+            ),
+            t.Param("Devices", t.NWKList, "List of the associated devices"),
         ),
     )
 
@@ -1018,20 +868,18 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     IEEEAddrRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x81,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("IEEE", t.EUI64, "Extended address of the source device"),
-                t.Param("NWK", t.NWK, "Short address of the source device"),
-                t.Param(
-                    "Index",
-                    t.uint8_t,
-                    "Starting index into the list of associated devices",
-                ),
-                t.Param("Devices", t.NWKList, "List of the associated devices"),
-            )
+        rsp_schema=(
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("IEEE", t.EUI64, "Extended address of the source device"),
+            t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param(
+                "Index",
+                t.uint8_t,
+                "Starting index into the list of associated devices",
+            ),
+            t.Param("Devices", t.NWKList, "List of the associated devices"),
         ),
     )
 
@@ -1039,17 +887,15 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     NodeDescRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x82,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "The message's source network address."),
-                t.Param(
-                    "Status",
-                    t.ZDOStatus,
-                    "This field indicates either SUCCESS or FAILURE.",
-                ),
-                t.Param("NWK", t.NWK, "Device's short address of this Node descriptor"),
-                t.Param("NodeDescriptor", NullableNodeDescriptor, "Node descriptor"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "The message's source network address."),
+            t.Param(
+                "Status",
+                t.ZDOStatus,
+                "This field indicates either SUCCESS or FAILURE.",
+            ),
+            t.Param("NWK", t.NWK, "Device's short address of this Node descriptor"),
+            t.Param("NodeDescriptor", NullableNodeDescriptor, "Node descriptor"),
         ),
     )
 
@@ -1057,19 +903,17 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     PowerDescRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x83,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param(
-                    "PowerDescriptor",
-                    zigpy.zdo.types.PowerDescriptor,
-                    "Power descriptor response",
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NWK", t.NWK, "Short address of the device response describes"),
+            t.Param(
+                "PowerDescriptor",
+                zigpy.zdo.types.PowerDescriptor,
+                "Power descriptor response",
+            ),
         ),
     )
 
@@ -1077,19 +921,17 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     SimpleDescRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x84,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param(
-                    "SimpleDescriptor",
-                    zigpy.zdo.types.SizePrefixedSimpleDescriptor,
-                    "Simple descriptor",
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NWK", t.NWK, "Short address of the device response describes"),
+            t.Param(
+                "SimpleDescriptor",
+                zigpy.zdo.types.SizePrefixedSimpleDescriptor,
+                "Simple descriptor",
+            ),
         ),
     )
 
@@ -1097,15 +939,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ActiveEpRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x85,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("ActiveEndpoints", EndpointList, "Active endpoints list"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NWK", t.NWK, "Short address of the device response describes"),
+            t.Param("ActiveEndpoints", EndpointList, "Active endpoints list"),
         ),
     )
 
@@ -1113,15 +953,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MatchDescRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x86,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("MatchList", EndpointList, "Endpoints list"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NWK", t.NWK, "Short address of the device response describes"),
+            t.Param("MatchList", EndpointList, "Endpoints list"),
         ),
     )
 
@@ -1129,15 +967,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ComplexDescRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x87,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("ComplexDesc", t.ShortBytes, "Complex descriptor"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NWK", t.NWK, "Short address of the device response describes"),
+            t.Param("ComplexDesc", t.ShortBytes, "Complex descriptor"),
         ),
     )
 
@@ -1145,15 +981,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     UserDescRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x88,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NWK", t.NWK, "Short address of the device response describes"),
-                t.Param("UserDesc", t.ShortBytes, "User descriptor"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NWK", t.NWK, "Short address of the device response describes"),
+            t.Param("UserDesc", t.ShortBytes, "User descriptor"),
         ),
     )
 
@@ -1161,14 +995,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     UserDescCnf = t.CommandDef(
         t.CommandType.AREQ,
         0x89,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NWK", t.NWK, "Short address of the device response describes"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NWK", t.NWK, "Short address of the device response describes"),
         ),
     )
 
@@ -1176,14 +1008,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     ServerDiscRsp = t.CommandDef(
         t.CommandType.AREQ,
         0x8A,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("ServerMask", t.ZDOStatus, "Server mask response"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("ServerMask", t.ZDOStatus, "Server mask response"),
         ),
     )
 
@@ -1191,13 +1021,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     EndDeviceBindRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xA0,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1205,13 +1033,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     BindRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xA1,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1219,13 +1045,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     UnBindRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xA2,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1233,16 +1057,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtNwkDiscRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xB0,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("NetworkCount", t.uint8_t, "Total number of entries available"),
-                t.Param("Index", t.uint8_t, "Where the response starts"),
-                t.Param("Networks", NetworkList, "Discovered networks list"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("NetworkCount", t.uint8_t, "Total number of entries available"),
+            t.Param("Index", t.uint8_t, "Where the response starts"),
+            t.Param("Networks", NetworkList, "Discovered networks list"),
         ),
     )
 
@@ -1250,14 +1072,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtLqiRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xB1,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("Neighbours", zigpy.zdo.types.Neighbors, "Neighbours"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("Neighbours", zigpy.zdo.types.Neighbors, "Neighbours"),
         ),
     )
 
@@ -1265,14 +1085,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtRtgRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xB2,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("Routes", zigpy.zdo.types.Routes, "Routes"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("Routes", zigpy.zdo.types.Routes, "Routes"),
         ),
     )
 
@@ -1280,20 +1098,18 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtBindRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xB3,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param(
-                    "BindTableEntries",
-                    t.uint8_t,
-                    "Total number of entries available on the device",
-                ),
-                t.Param("Index", t.uint8_t, "Index where the response starts"),
-                t.Param("BindTable", BindEntryList, "list of BindEntries"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param(
+                "BindTableEntries",
+                t.uint8_t,
+                "Total number of entries available on the device",
+            ),
+            t.Param("Index", t.uint8_t, "Index where the response starts"),
+            t.Param("BindTable", BindEntryList, "list of BindEntries"),
         ),
     )
 
@@ -1301,13 +1117,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtLeaveRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xB4,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1315,13 +1129,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtDirectJoinRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xB5,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1329,13 +1141,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtPermitJoinRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xB6,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1343,19 +1153,17 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MgmtNWKUpdateNotify = t.CommandDef(
         t.CommandType.AREQ,
         0xB8,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param("Status", t.ZDOStatus, "Status"),
-                t.Param("ScannedChannels", t.Channels, "Scanned channels"),
-                t.Param("TotalTransmissions", t.uint16_t, "Total transmissions"),
-                t.Param("TransmissionFailures", t.uint16_t, "Transmission failures"),
-                t.Param(
-                    "EnergyValues",
-                    EnergyValues,
-                    "The result of an energy measurement made on this channel",
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param("Status", t.ZDOStatus, "Status"),
+            t.Param("ScannedChannels", t.Channels, "Scanned channels"),
+            t.Param("TotalTransmissions", t.uint16_t, "Total transmissions"),
+            t.Param("TransmissionFailures", t.uint16_t, "Transmission failures"),
+            t.Param(
+                "EnergyValues",
+                EnergyValues,
+                "The result of an energy measurement made on this channel",
+            ),
         ),
     )
 
@@ -1363,24 +1171,22 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     StateChangeInd = t.CommandDef(
         t.CommandType.AREQ,
         0xC0,
-        rsp_schema=t.Schema((t.Param("State", t.DeviceState, "New ZDO state"),)),
+        rsp_schema=(t.Param("State", t.DeviceState, "New ZDO state"),),
     )
 
     # indicates the ZDO End Device Announce
     EndDeviceAnnceInd = t.CommandDef(
         t.CommandType.AREQ,
         0xC1,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "Source address of the message."),
-                t.Param("NWK", t.NWK, "Specifies the device's short address"),
-                t.Param(
-                    "IEEE",
-                    t.EUI64,
-                    "Extended address of the device generating the request",
-                ),
-                t.Param("Capabilities", MACCapabilities, "MAC Capabilities"),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "Source address of the message."),
+            t.Param("NWK", t.NWK, "Specifies the device's short address"),
+            t.Param(
+                "IEEE",
+                t.EUI64,
+                "Extended address of the device generating the request",
+            ),
+            t.Param("Capabilities", MACCapabilities, "MAC Capabilities"),
         ),
     )
 
@@ -1388,12 +1194,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MatchDescRspSent = t.CommandDef(
         t.CommandType.AREQ,
         0xC2,
-        rsp_schema=t.Schema(
-            (
-                t.Param("NWK", t.NWK, "Device's network address"),
-                t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
-                t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
-            )
+        rsp_schema=(
+            t.Param("NWK", t.NWK, "Device's network address"),
+            t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
+            t.Param("OutputClusters", t.ClusterIdList, "Output cluster id list"),
         ),
     )
 
@@ -1401,13 +1205,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     StatusErrorRsp = t.CommandDef(
         t.CommandType.AREQ,
         0xC3,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "message's source network address"),
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1415,15 +1217,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     SrcRtgInd = t.CommandDef(
         t.CommandType.AREQ,
         0xC4,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "DstAddr",
-                    t.NWK,
-                    "Network address of the destination of the source route",
-                ),
-                t.Param("Relays", t.NWKList, "List of relay devices"),
-            )
+        rsp_schema=(
+            t.Param(
+                "DstAddr",
+                t.NWK,
+                "Network address of the destination of the source route",
+            ),
+            t.Param("Relays", t.NWKList, "List of relay devices"),
         ),
     )
 
@@ -1431,21 +1231,19 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     BeaconNotifyInd = t.CommandDef(
         t.CommandType.AREQ,
         0xC5,
-        rsp_schema=t.Schema((t.Param("Beacons", BeaconList, "Beacons list"),)),
+        rsp_schema=(t.Param("Beacons", BeaconList, "Beacons list"),),
     )
 
     # inform the host device of a ZDO join request result
     JoinCnf = t.CommandDef(
         t.CommandType.AREQ,
         0xC6,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-                t.Param("Nwk", t.NWK, "device's network address"),
-                t.Param("ParentNwk", t.NWK, "Parent's network address"),
-            )
+        rsp_schema=(
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("Nwk", t.NWK, "device's network address"),
+            t.Param("ParentNwk", t.NWK, "Parent's network address"),
         ),
     )
 
@@ -1453,12 +1251,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     NwkDiscoveryCnf = t.CommandDef(
         t.CommandType.AREQ,
         0xC7,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
-                ),
-            )
+        rsp_schema=(
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
         ),
     )
 
@@ -1466,20 +1262,16 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     LeaveInd = t.CommandDef(
         t.CommandType.AREQ,
         0xC9,
-        rsp_schema=t.Schema(
-            (
-                t.Param(
-                    "NWK", t.NWK, "Short address of the source of the leave indication"
-                ),
-                t.Param(
-                    "IEEE",
-                    t.EUI64,
-                    "IEEE address of the source of the leave indication",
-                ),
-                t.Param("Request", t.Bool, "True -- request, False -- indication"),
-                t.Param("Remove", t.Bool, "True -- Remove children"),
-                t.Param("Rejoin", t.Bool, "True -- Rejoin"),
-            )
+        rsp_schema=(
+            t.Param(
+                "NWK", t.NWK, "Short address of the source of the leave indication"
+            ),
+            t.Param(
+                "IEEE", t.EUI64, "IEEE address of the source of the leave indication",
+            ),
+            t.Param("Request", t.Bool, "True -- request, False -- indication"),
+            t.Param("Remove", t.Bool, "True -- Remove children"),
+            t.Param("Rejoin", t.Bool, "True -- Rejoin"),
         ),
     )
 
@@ -1488,26 +1280,22 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     MsgCbIncoming = t.CommandDef(
         t.CommandType.AREQ,
         0xFF,
-        rsp_schema=t.Schema(
-            (
-                t.Param("Src", t.NWK, "Source address of the ZDO message"),
-                t.Param(
-                    "IsBroadcast",
-                    t.Bool,
-                    "Indicates whether the message was a broadcast",
-                ),
-                t.Param("ClusterId", t.ClusterId, "Cluster Id of this ZDO message"),
-                t.Param("SecurityUse", t.uint8_t, "Not used"),
-                t.Param("TSN", t.uint8_t, "Transaction sequence number"),
-                t.Param(
-                    "MacDst", t.NWK, "Mac destination short address of the ZDO message"
-                ),
-                t.Param(
-                    "Data",
-                    t.Bytes,
-                    "Data that corresponds to the cluster ID of the message",
-                ),
-            )
+        rsp_schema=(
+            t.Param("Src", t.NWK, "Source address of the ZDO message"),
+            t.Param(
+                "IsBroadcast", t.Bool, "Indicates whether the message was a broadcast",
+            ),
+            t.Param("ClusterId", t.ClusterId, "Cluster Id of this ZDO message"),
+            t.Param("SecurityUse", t.uint8_t, "Not used"),
+            t.Param("TSN", t.uint8_t, "Transaction sequence number"),
+            t.Param(
+                "MacDst", t.NWK, "Mac destination short address of the ZDO message"
+            ),
+            t.Param(
+                "Data",
+                t.Bytes,
+                "Data that corresponds to the cluster ID of the message",
+            ),
         ),
     )
 
@@ -1515,12 +1303,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     TCDevInd = t.CommandDef(
         t.CommandType.AREQ,
         0xCA,
-        rsp_schema=t.Schema(
-            (
-                t.Param("SrcNwk", t.NWK, "device's network address"),
-                t.Param("SrcIEEE", t.EUI64, "IEEE address of the source"),
-                t.Param("ParentNwk", t.NWK, "Parent's network address"),
-            )
+        rsp_schema=(
+            t.Param("SrcNwk", t.NWK, "device's network address"),
+            t.Param("SrcIEEE", t.EUI64, "IEEE address of the source"),
+            t.Param("ParentNwk", t.NWK, "Parent's network address"),
         ),
     )
 
@@ -1528,5 +1314,5 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     PermitJoinInd = t.CommandDef(
         t.CommandType.AREQ,
         0xCB,
-        rsp_schema=t.Schema((t.Param("Duration", t.uint8_t, "Permit join duration"),)),
+        rsp_schema=(t.Param("Duration", t.uint8_t, "Permit join duration"),),
     )
