@@ -331,15 +331,19 @@ def test_command_optional_params_failures():
 
 
 def test_simple_descriptor():
+    # Support both old and new zigpy types
+    try:
+        lvlist16_type = zigpy_t.LVList(t.uint16_t)
+    except TypeError:
+        lvlist16_type = zigpy_t.LVList[t.uint16_t]
+
     simple_descriptor = zigpy.zdo.types.SimpleDescriptor()
     simple_descriptor.endpoint = zigpy_t.uint8_t(1)
     simple_descriptor.profile = zigpy_t.uint16_t(260)
     simple_descriptor.device_type = zigpy_t.uint16_t(257)
     simple_descriptor.device_version = zigpy_t.uint8_t(0)
-    simple_descriptor.input_clusters = zigpy_t.LVList(t.uint16_t)(
-        [0, 3, 4, 5, 6, 8, 2821, 1794]
-    )
-    simple_descriptor.output_clusters = zigpy_t.LVList(t.uint16_t)([10, 25])
+    simple_descriptor.input_clusters = lvlist16_type([0, 3, 4, 5, 6, 8, 2821, 1794])
+    simple_descriptor.output_clusters = lvlist16_type([10, 25])
 
     c1 = c.ZDO.SimpleDescRsp.Callback(
         Src=t.NWK(0x1234),
@@ -353,10 +357,8 @@ def test_simple_descriptor():
     sp_simple_descriptor.profile = zigpy_t.uint16_t(260)
     sp_simple_descriptor.device_type = zigpy_t.uint16_t(257)
     sp_simple_descriptor.device_version = zigpy_t.uint8_t(0)
-    sp_simple_descriptor.input_clusters = zigpy_t.LVList(t.uint16_t)(
-        [0, 3, 4, 5, 6, 8, 2821, 1794]
-    )
-    sp_simple_descriptor.output_clusters = zigpy_t.LVList(t.uint16_t)([10, 25])
+    sp_simple_descriptor.input_clusters = lvlist16_type([0, 3, 4, 5, 6, 8, 2821, 1794])
+    sp_simple_descriptor.output_clusters = lvlist16_type([10, 25])
 
     c2 = c.ZDO.SimpleDescRsp.Callback(
         Src=t.NWK(0x1234),
@@ -506,3 +508,25 @@ def test_command_not_recognized():
     transport_frame = frames.TransportFrame(command.to_frame())
 
     assert transport_frame.serialize()[:-1] == bytes.fromhex("FE  03  60 00  01  CD AB")
+
+
+def test_command_replace_normal():
+    command1 = c.SYS.NVWrite.Req(
+        SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
+    )
+
+    command2 = c.SYS.NVWrite.Req(
+        SysId=0x13, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoos"
+    )
+
+    assert command1.replace() == command1
+    assert command1.replace(SysId=0x13, Value=b"asdfoos") == command2
+
+
+def test_command_replace_partial():
+    command1 = c.SYS.NVWrite.Req(partial=True, SysId=0x12)
+
+    command2 = c.SYS.NVWrite.Req(partial=True, SysId=0x13)
+
+    assert command1.replace() == command1
+    assert command1.replace(SysId=0x13) == command2

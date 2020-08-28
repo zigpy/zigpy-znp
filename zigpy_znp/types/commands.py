@@ -458,6 +458,16 @@ class CommandBase:
 
         return True
 
+    def replace(self, **kwargs) -> "CommandBase":
+        """
+        Returns a copy of the current command with replaced parameters.
+        """
+
+        params = {key: value for key, (param, value) in self._bound_params.items()}
+        params.update(kwargs)
+
+        return type(self)(partial=self._partial, **params)
+
     def __eq__(self, other):
         return type(self) is type(other) and self._bound_params == other._bound_params
 
