@@ -2,9 +2,10 @@ import attr
 import typing
 import asyncio
 import logging
+import itertools
 import async_timeout
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -253,8 +254,18 @@ class ZNP:
                 LOGGER.debug("Cleaning up empty listener list for header %s", header)
                 del self._response_listeners[header]
 
-        total_listeners = sum(map(len, self._response_listeners.values()))
-        LOGGER.debug("There are %d listeners remaining", total_listeners)
+        counts = Counter()
+
+        for l in itertools.chain.from_iterable(self._response_listeners.values()):
+            counts[type(l)] += 1
+
+        LOGGER.debug(
+            "There are %d callbacks and %d one-shot listeners remaining",
+            counts[CallbackResponseListener],
+            counts[OneShotResponseListener],
+        )
+
+        LOGGER.debug("%r", self._response_listeners)
 
     def frame_received(self, frame: GeneralFrame) -> None:
         """
@@ -417,6 +428,11 @@ class ZNP:
     async def nvram_write(
         self, nv_id: nvids.BaseNvIds, value, *, offset: t.uint8_t = 0
     ):
+        """
+        Convenience function for writing a value to NVRAM. Serializes all serializable
+        values and passes bytes directly.
+        """
+
         if not isinstance(nv_id, nvids.BaseNvIds):
             raise ValueError(
                 "The nv_id param must be an instance of BaseNvIds. "
