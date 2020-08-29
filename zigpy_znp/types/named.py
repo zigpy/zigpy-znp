@@ -1,8 +1,8 @@
 import sys
 import typing
 import logging
+import dataclasses
 
-import attr
 from zigpy.types import EUI64, NWK, ExtendedPanId, PanId, ClusterId
 
 from . import basic, struct
@@ -68,53 +68,51 @@ class AddrMode(basic.enum_uint8):
     Broadcast = 0x0F
 
 
-@attr.s
 class AddrModeAddress(struct.Struct):
-    mode: AddrMode = attr.ib(converter=struct.Struct.converter(AddrMode))
-    address: typing.Union[EUI64, NWK] = attr.ib()
+    mode: AddrMode
+    address: typing.Union[NWK, EUI64] = struct.StructField(
+        dynamic_type=lambda s: {
+            AddrMode.NWK: NWK,
+            AddrMode.Group: NWK,
+            AddrMode.Broadcast: NWK,
+            AddrMode.IEEE: EUI64,
+        }[s.mode]
+    )
 
     @classmethod
-    def deserialize(cls, data: bytes):
-        """Deserialize data."""
-        mode, data = AddrMode.deserialize(data)
-        if mode in (AddrMode.NWK, AddrMode.Group, AddrMode.Broadcast):
-            # a value of 2 indicates 2-byte (16-bit) address mode,
-            # using only the 2 LSB's of the DstAddr field to form
-            # a 2-byte short address.
-            addr64, data = basic.uint64_t.deserialize(data)
-            addr = NWK(addr64 & 0xFFFF)
-        elif mode == AddrMode.IEEE:
-            addr, data = EUI64.deserialize(data)
-        else:
-            raise ValueError(f"Unknown address mode: {mode}")
+    def deserialize(cls, data: bytes) -> "AddrModeAddress":
+        addr, data = super().deserialize(data)
 
-        return cls(mode=mode, address=addr), data
+        if isinstance(addr.address, NWK):
+            # The address is padded
+            data = data[6:]
 
-    def serialize(self):
-        if self.mode in (AddrMode.NWK, AddrMode.Group, AddrMode.Broadcast):
-            return self.mode.serialize() + basic.uint64_t(self.address).serialize()
-        elif self.mode == AddrMode.IEEE:
-            return self.mode.serialize() + self.address.serialize()
-        else:
-            raise ValueError(f"Unknown address mode: {self.mode}")  # pragma: no cover
+        return addr, data
+
+    def serialize(self) -> bytes:
+        data = super().serialize()
+
+        if isinstance(self.address, NWK):
+            data += b"\x00\x00\x00\x00\x00\x00"
+
+        return data
 
 
-@attr.s
 class Beacon(struct.Struct):
     """Beacon message."""
 
-    Src = attr.ib(type=NWK, converter=NWK)
-    PanId = attr.ib(type=PanId, converter=PanId)
-    Channel = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    PermitJoining = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    RouterCapacity = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    DeviceCapacity = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    ProtocolVersion = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    StackProfile = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    LQI = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    Depth = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    UpdateId = attr.ib(type=basic.uint8_t, converter=basic.uint8_t)
-    ExtendedPanId = attr.ib(type=ExtendedPanId, converter=ExtendedPanId)
+    Src: NWK
+    PanId: PanId
+    Channel: basic.uint8_t
+    PermitJoining: basic.uint8_t
+    RouterCapacity: basic.uint8_t
+    DeviceCapacity: basic.uint8_t
+    ProtocolVersion: basic.uint8_t
+    StackProfile: basic.uint8_t
+    LQI: basic.uint8_t
+    Depth: basic.uint8_t
+    UpdateId: basic.uint8_t
+    ExtendedPanId: ExtendedPanId
 
 
 class GroupId(basic.uint16_t, hex_repr=True):
@@ -130,14 +128,14 @@ class ScanType(basic.enum_uint8):
     Orphan = 0x03
 
 
-@attr.s(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class Param:
-    """Parameter."""
+    """Schema parameter"""
 
-    name: str = attr.ib(converter=str)
-    type = attr.ib()
-    description: str = attr.ib(default="")
-    optional: bool = attr.ib(default=False)
+    name: str
+    type: typing.Any = None
+    description: str = ""
+    optional: bool = False
 
 
 class MissingEnumMixin:

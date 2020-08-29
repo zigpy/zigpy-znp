@@ -59,17 +59,17 @@ def test_empty():
 
 
 def test_nib_classes():
-    old_nib_nwk_state = next(a for a in OldNIB.__attrs_attrs__ if a.type == NwkState8)
+    old_nib_nwk_state = next(a for a in OldNIB.fields() if a.type == NwkState8)
 
     # The old NIB should be the new NIB, without padding and with a shorter struct
     # integer type.
     fixed_new_nib = [
         a if a.type != NwkState16 else old_nib_nwk_state
-        for a in NIB.__attrs_attrs__
+        for a in NIB.fields()
         if a.type is not PaddingByte
     ]
 
-    assert fixed_new_nib == list(OldNIB.__attrs_attrs__)
+    assert fixed_new_nib == list(OldNIB.fields())
 
 
 def test_nib_detection():

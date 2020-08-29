@@ -1,4 +1,3 @@
-import attr
 import typing
 
 import zigpy_znp.types as t
@@ -65,13 +64,11 @@ class Empty(t.Bytes):
         return cls(), data
 
 
-@attr.s(frozen=True, auto_attribs=True)
 class NwkKeyDesc(t.Struct):
     keySeqNum: t.uint8_t
     key: t.KeyData
 
 
-@attr.s(auto_attribs=True)
 class NIB(t.Struct):
     SequenceNum: t.uint8_t
     PassiveAckTimeout: t.uint8_t
@@ -148,12 +145,10 @@ class NIB(t.Struct):
     PaddingByte4: PaddingByte
 
 
-@attr.s(auto_attribs=True)
 class OldNIB(t.Struct):
     """
-    attrs does not play well with inheritance and field ordering so this is
-    unfortunately a duplicate of the above `NIB` structure, with the following
-    differences:
+    Struct doesn't allow field re-ordering so this is unfortunately a duplicate of the
+    above `NIB` structure, with the following differences:
 
      1. There are no padding bytes.
      2. The `NwkState` enum is a `uint8_t` instead of a `uint16_t`

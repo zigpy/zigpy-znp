@@ -1,8 +1,8 @@
 import enum
 import typing
 import logging
+import dataclasses
 
-import attr
 import zigpy.zdo.types
 import zigpy_znp.types as t
 
@@ -10,17 +10,13 @@ import zigpy_znp.types as t
 LOGGER = logging.getLogger(__name__)
 
 
-@attr.s
 class BindEntry(t.Struct):
     """Bind table entry."""
 
-    Src = attr.ib(type=t.EUI64, converter=t.Struct.converter(t.EUI64))
-    SrcEp = attr.ib(type=t.uint8_t, converter=t.uint8_t)
-    ClusterId = attr.ib(type=t.ClusterId, converter=t.ClusterId)
-    DstAddr = attr.ib(
-        type=zigpy.zdo.types.MultiAddress,
-        converter=t.Struct.converter(zigpy.zdo.types.MultiAddress),
-    )
+    Src: t.EUI64
+    SrcEp: t.uint8_t
+    ClusterId: t.ClusterId
+    DstAddr: zigpy.zdo.types.MultiAddress
 
 
 class CommandType(t.enum_uint8):
@@ -160,16 +156,12 @@ class CommandHeader(t.uint16_t):
     __repr__ = __str__
 
 
-@attr.s
+@dataclasses.dataclass(frozen=True)
 class CommandDef:
-    command_type: CommandType = attr.ib()
-    command_id: int = attr.ib()
-    req_schema: typing.Optional[tuple] = attr.ib(
-        factory=lambda *v: None if not v else tuple(*v)
-    )
-    rsp_schema: typing.Optional[tuple] = attr.ib(
-        factory=lambda *v: None if not v else tuple(*v)
-    )
+    command_type: CommandType
+    command_id: t.uint8_t
+    req_schema: typing.Optional[tuple] = None
+    rsp_schema: typing.Optional[tuple] = None
 
 
 class CommandsMeta(type):
@@ -427,14 +419,15 @@ class CommandBase:
                 break
 
         if data:
+            msg = (
+                f"Unparsed data remains at the end of the frame while parsing {cls}"
+                f" (parsed {params}): {data!r}"
+            )
+
             if ignore_unparsed:
-                LOGGER.warning(
-                    f"Unparsed data remains in {cls} at the end of the frame: {data!r}"
-                )
+                LOGGER.warning(msg)
             else:
-                raise ValueError(
-                    f"Unparsed data remains in {cls} at the end of the frame: {data!r}"
-                )
+                raise ValueError(msg)
 
         return cls(**params)
 
@@ -538,13 +531,12 @@ class MTCapabilities(t.enum_flag_uint16):
     CAP_UNK16 = 1 << 15
 
 
-@attr.s
 class Network(t.Struct):
-    PanId = attr.ib(type=t.PanId, converter=t.Struct.converter(t.PanId))
-    Channel = attr.ib(type=t.uint8_t, converter=t.uint8_t)
-    StackProfileVersion = attr.ib(type=t.uint8_t, converter=t.uint8_t)
-    BeaconOrderSuperframe = attr.ib(type=t.uint8_t, converter=t.uint8_t)
-    PermitJoining = attr.ib(type=t.uint8_t, converter=t.uint8_t)
+    PanId = t.PanId
+    Channel = t.uint8_t
+    StackProfileVersion = t.uint8_t
+    BeaconOrderSuperframe = t.uint8_t
+    PermitJoining = t.uint8_t
 
 
 STATUS_SCHEMA = (
