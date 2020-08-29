@@ -265,8 +265,6 @@ class ZNP:
             counts[OneShotResponseListener],
         )
 
-        LOGGER.debug("%r", self._listeners)
-
     def frame_received(self, frame: GeneralFrame) -> None:
         """
         Called when a frame has been received.
