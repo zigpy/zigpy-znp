@@ -12,6 +12,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 
 from zigpy_znp.types import nvids
+from zigpy_znp.logger import TRACE
 
 from zigpy_znp import uart
 from zigpy_znp.frames import GeneralFrame
@@ -245,13 +246,15 @@ class ZNP:
         if not self._listeners:
             return
 
-        LOGGER.debug("Removing listener %s", listener)
+        LOGGER.log(TRACE, "Removing listener %s", listener)
 
         for header in listener.matching_headers():
             self._listeners[header].remove(listener)
 
             if not self._listeners[header]:
-                LOGGER.debug("Cleaning up empty listener list for header %s", header)
+                LOGGER.log(
+                    TRACE, "Cleaning up empty listener list for header %s", header
+                )
                 del self._listeners[header]
 
         counts = Counter()
@@ -281,11 +284,11 @@ class ZNP:
 
         for listener in self._listeners[command.header]:
             if not listener.resolve(command):
-                LOGGER.debug("%s does not match %s", command, listener)
+                LOGGER.log(TRACE, "%s does not match %s", command, listener)
                 continue
 
             matched = True
-            LOGGER.debug("%s matches %s", command, listener)
+            LOGGER.log(TRACE, "%s matches %s", command, listener)
 
         if not matched:
             LOGGER.warning("Received an unhandled command: %s", command)
@@ -300,7 +303,7 @@ class ZNP:
 
         listener = CallbackResponseListener(responses, callback=callback)
 
-        LOGGER.debug("Creating callback %s", listener)
+        LOGGER.log(TRACE, "Creating callback %s", listener)
 
         for header in listener.matching_headers():
             self._listeners[header].append(listener)
@@ -319,7 +322,7 @@ class ZNP:
 
         listener = OneShotResponseListener(responses)
 
-        LOGGER.debug("Creating one-shot listener %s", listener)
+        LOGGER.log(TRACE, "Creating one-shot listener %s", listener)
 
         for header in listener.matching_headers():
             self._listeners[header].append(listener)
