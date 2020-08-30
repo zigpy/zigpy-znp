@@ -6,6 +6,8 @@ import warnings
 import serial
 import serial.tools
 
+from collections import defaultdict
+
 from serial.tools.list_ports import comports as list_com_ports
 
 import zigpy_znp.config as conf
@@ -146,30 +148,61 @@ class ZnpMtProtocol(asyncio.Protocol):
         return f"<{type(self).__name__} for {self._api}>"
 
 
-def guess_port() -> str:
-    """Picks the first USB port with a Texas Instruments vendor ID."""
-    candidates = []
+def find_ti_ports() -> typing.Iterable[
+    typing.Tuple[str, serial.tools.list_ports_common.ListPortInfo]
+]:
+    """
+    Finds all TI serial ports and yields an iterable of tuples, where the first element
+    is the serial number of the device.
+    """
 
-    for port in list_com_ports(include_links=True):
-        # Add only TI devices
-        if port.vid == 0x0451:
-            candidates.append(port)
+    # Each dev kit has two serial ports, one of which is a debugger
+    found_ports = defaultdict(list)
+
+    for port in list_com_ports():
+        if (port.vid, port.pid) == (0x0451, 0x16A8):
+            # CC2531
+            found_ports[port.serial_number].append(port)
+        elif (port.vid, port.pid) == (0x0451, 0xBEF3):
+            # LAUNCHXL-CC26X2R1
+            found_ports[port.serial_number].append(port)
+        elif (port.vid, port.pid) == (0x1A86, 0x7523):
+            # ZZH (CH340, no way to distinguish it from any other CH340 device)
+            found_ports["CH340"].append(port)
+
+    # Python guarantees insertion order for dictionaries
+    for serial_number, ports in found_ports.items():
+        first_port = sorted(ports, key=lambda p: p.device)[0]
+
+        yield serial_number, first_port
+
+
+def guess_port() -> str:
+    """
+    Autodetects the best TI radio.
+
+    The CH340 used by the ZZH adapter has no distinguishing information so it is not
+    possible to tell whether or not a port belongs to a cheap Arduino clone or the ZZH.
+    Known TI serial ports are picked over the CH340, which may belong to a cheap Arduino
+    clone instead of the ZZH.
+    """
+
+    # Move CH340 ports to the bottom of the list but keep the order of the rest
+    # because Python's sort is stable
+    candidates = sorted(find_ti_ports(), key=lambda p: p[0] == "CH340")
 
     if not candidates:
-        raise RuntimeError("Could not auto detect any TI ports")
+        raise RuntimeError("Failed to detect any TI ports")
 
-    # Is there no better heuristic than picking the first TI device?
-    candidates.sort(key=lambda p: p.location)
-    device = candidates[0].device
+    _, port = candidates[0]
 
     if len(candidates) > 1:
         LOGGER.warning(
-            "Found multiple Texas Instruments devices: %s",
-            [c.__dict__ for c in candidates],
+            "Found multiple possible Texas Instruments devices: %s", candidates,
         )
-        LOGGER.warning("Picking the first one: %s", device)
+        LOGGER.warning("Picking the first one: %s", port)
 
-    return device
+    return port.device
 
 
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
