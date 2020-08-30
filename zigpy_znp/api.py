@@ -132,8 +132,8 @@ class CallbackResponseListener(BaseResponseListener):
                 "Caught an exception while executing callback", exc_info=True
             )
 
-        # Returning False could cause our callback to be called multiple times in a row
-        return True
+        # A callback is never resolved
+        return False
 
     def cancel(self):
         # You can't cancel a callback
