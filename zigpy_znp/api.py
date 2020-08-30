@@ -22,12 +22,19 @@ from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 LOGGER = logging.getLogger(__name__)
 
 
-def _deduplicate_commands(commands):
-    # Command matching as a relation forms a partially ordered set.
-    # To avoid triggering our callbacks multiple times per packet, we
-    # should remove redundant partial commands.
+def _deduplicate_commands(
+    commands: typing.Iterable[t.CommandBase],
+) -> typing.Tuple[t.CommandBase]:
+    """
+    Deduplicates an iterable of commands by folding more-specific commands into less-
+    specific commands. Used to avoid triggering callbacks multiple times per packet.
+    """
+
+    # We essentially need to find the "maximal" commands, if you treat the relationship
+    # between two commands as a partial order.
     maximal_commands = []
 
+    # Command matching as a relation forms a partially ordered set.
     for command in commands:
         for index, other_command in enumerate(maximal_commands):
             if other_command.matches(command):
@@ -39,7 +46,7 @@ def _deduplicate_commands(commands):
                 break
             else:
                 # Otherwise, we keep looking
-                pass  # pragma: no cover
+                continue  # pragma: no cover
         else:
             # If we matched nothing and nothing matched us, we extend the list
             maximal_commands.append(command)
@@ -61,17 +68,23 @@ class BaseResponseListener:
         # We're frozen so __setattr__ is disallowed
         object.__setattr__(self, "matching_commands", commands)
 
-    def matching_headers(self):
+    def matching_headers(self) -> typing.Set[t.CommandHeader]:
+        """
+        Returns the set of Z-Stack MT command headers for all the matching commands.
+        """
+
         return {response.header for response in self.matching_commands}
 
     def resolve(self, response: t.CommandBase) -> bool:
+        """
+        Attempts to resolve the listener with a given response. Can be called with any
+        command as an argument, including ones we don't match.
+        """
+
         if not any(c.matches(response) for c in self.matching_commands):
             return False
 
-        if not self._resolve(response):
-            return False
-
-        return True
+        return self._resolve(response)
 
     def _resolve(self, response: t.CommandBase) -> bool:
         """
@@ -80,6 +93,7 @@ class BaseResponseListener:
         Return value indicates whether or not the listener has actually resolved,
         which can sometimes be unavoidable.
         """
+
         raise NotImplementedError()  # pragma: no cover
 
     def cancel(self):
@@ -88,11 +102,16 @@ class BaseResponseListener:
 
         Return value indicates whether or not the listener is cancelable.
         """
+
         raise NotImplementedError()  # pragma: no cover
 
 
 @dataclasses.dataclass(frozen=True)
 class OneShotResponseListener(BaseResponseListener):
+    """
+    A response listener that resolves a single future exactly once.
+    """
+
     future: asyncio.Future = dataclasses.field(
         default_factory=lambda: asyncio.get_running_loop().create_future()
     )
@@ -118,6 +137,10 @@ class OneShotResponseListener(BaseResponseListener):
 
 @dataclasses.dataclass(frozen=True)
 class CallbackResponseListener(BaseResponseListener):
+    """
+    A response listener with a sync or async callback that is never resolved.
+    """
+
     callback: typing.Callable[[t.CommandBase], typing.Any]
 
     def _resolve(self, response: t.CommandBase) -> bool:
@@ -203,7 +226,7 @@ class ZNP:
     def connection_lost(self, exc) -> None:
         """
         Called by the UART object to indicate that the port was closed. Propagates up
-        to the ControllerApplication that owns this ZNP instance.
+        to the `ControllerApplication` that owns this ZNP instance.
         """
 
         LOGGER.debug("We were disconnected from %s: %s", self._port_path, exc)
@@ -235,16 +258,15 @@ class ZNP:
 
         self._app = None
 
-    def _remove_listener(self, listener: BaseResponseListener) -> None:
+    def remove_listener(self, listener: BaseResponseListener) -> None:
         """
-        Internal method that unbinds a listener from ZNP.
+        Unbinds a listener from ZNP.
 
         Used by `wait_for_responses` to remove listeners for completed futures,
         regardless of their completion reason.
         """
 
-        # If ZNP is closed while it's still running, `self._listeners`
-        # will be empty.
+        # If ZNP is closed while it's still running, `self._listeners` will be empty.
         if not self._listeners:
             return
 
@@ -330,7 +352,7 @@ class ZNP:
             self._listeners[header].append(listener)
 
         # Remove the listener when the future is done, not only when it gets a result
-        listener.future.add_done_callback(lambda _: self._remove_listener(listener))
+        listener.future.add_done_callback(lambda _: self.remove_listener(listener))
 
         return listener.future
 
@@ -347,9 +369,11 @@ class ZNP:
         of the SRSP's parameters don't match `response_params`.
         """
 
+        # Common mistake is to do `znp.request(c.SYS.Ping())`
         if type(request) is not request.Req:
             raise ValueError(f"Cannot send a command that isn't a request: {request!r}")
 
+        # Construct a partial response out of the `Rsp*` kwargs if one is provded
         if request.Rsp:
             renamed_response_params = {}
 
@@ -455,6 +479,12 @@ class ZNP:
     async def nvram_read(
         self, nv_id: nvids.BaseNvIds, *, offset: t.uint8_t = 0
     ) -> bytes:
+        """
+        Reads a value from NVRAM.
+
+        Raises an `InvalidCommandResponse` error if the NVID doesn't exist.
+        """
+
         response = await self.request(
             c.SYS.OSALNVRead.Req(Id=nv_id, Offset=offset), RspStatus=t.Status.SUCCESS,
         )
