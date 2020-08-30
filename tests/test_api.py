@@ -311,7 +311,18 @@ async def test_znp_response_callback_simple(znp, event_loop):
     sync_callback.assert_called_once_with(good_response)
 
 
-def test_command_deduplication():
+def test_command_deduplication_simple():
+    c1 = c.SYS.Ping.Rsp(partial=True)
+    c2 = c.Util.TimeAlive.Rsp(Seconds=12)
+
+    assert _deduplicate_commands([]) == ()
+    assert _deduplicate_commands([c1]) == (c1,)
+    assert _deduplicate_commands([c1, c1]) == (c1,)
+    assert _deduplicate_commands([c1, c2]) == (c1, c2)
+    assert _deduplicate_commands([c2, c1, c2]) == (c2, c1)
+
+
+def test_command_deduplication_complex():
     result = _deduplicate_commands(
         [
             c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),

@@ -1,15 +1,28 @@
-import attr
 import typing
 import functools
+import dataclasses
 
 import zigpy_znp.types as t
 from zigpy_znp.exceptions import InvalidFrame
 
 
-@attr.s
+@dataclasses.dataclass(frozen=True)
 class GeneralFrame:
-    header: t.CommandHeader = attr.ib(converter=t.CommandHeader)
-    data: t.Bytes = attr.ib(factory=t.Bytes, converter=t.Bytes)
+    header: t.CommandHeader
+    data: t.Bytes
+
+    def __post_init__(self):
+        # We're frozen so `self.header = ...` is disallowed
+        if not isinstance(self.header, t.CommandHeader):
+            object.__setattr__(self, "header", t.CommandHeader(self.header))
+
+        if not isinstance(self.data, t.Bytes):
+            object.__setattr__(self, "data", t.Bytes(self.data))
+
+        if self.length > 250:
+            raise InvalidFrame(
+                f"Frame length cannot exceed 250 bytes. Got: {self.length}"
+            )
 
     @property
     def length(self) -> t.uint8_t:
@@ -31,28 +44,20 @@ class GeneralFrame:
         payload, data = data[:length], data[length:]
         return cls(header, payload), data
 
-    @data.validator
-    def data_validator(self, attribute, value):
-        """Len of data should not exceed 250 bytes."""
-        if len(value) > 250:
-            raise ValueError(f"data length: {len(value)} exceeds max 250")
-
     def serialize(self) -> bytes:
-        """Serialize Frame."""
         return self.length.serialize() + self.header.serialize() + self.data.serialize()
 
 
-@attr.s
+@dataclasses.dataclass
 class TransportFrame:
     """Transport frame."""
 
-    SOF = t.uint8_t(0xFE)
+    SOF = t.uint8_t(0xFE)  # Start of frame marker
 
-    payload: GeneralFrame = attr.ib()
+    payload: GeneralFrame
 
     @classmethod
     def deserialize(cls, data: bytes) -> typing.Tuple["TransportFrame", bytes]:
-        """Deserialize frame."""
         sof, data = t.uint8_t.deserialize(data)
 
         if sof != cls.SOF:
@@ -74,12 +79,14 @@ class TransportFrame:
         return frame, data
 
     def checksum(self) -> t.uint8_t:
-        """Calculate FCS on the payload."""
+        """
+        Calculates the FCS of the payload.
+        """
+
         checksum = functools.reduce(lambda a, b: a ^ b, self.payload.serialize())
         return t.uint8_t(checksum)
 
     def serialize(self) -> bytes:
-        """Serialize data."""
         return (
             self.SOF.serialize()
             + self.payload.serialize()

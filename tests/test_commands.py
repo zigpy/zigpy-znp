@@ -1,6 +1,7 @@
 import pytest
 import logging
 import keyword
+import dataclasses
 
 import zigpy.types as zigpy_t
 import zigpy.zdo.types
@@ -483,8 +484,8 @@ def test_command_deserialization(caplog):
 
     # Deserialization fails if there is unparsed data at the end of the frame
     with pytest.raises(ValueError):
-        bad_frame = command.to_frame()
-        bad_frame.data += b"\x00"
+        frame = command.to_frame()
+        bad_frame = dataclasses.replace(frame, data=frame.data + b"\x00")
 
         type(command).from_frame(bad_frame)
 

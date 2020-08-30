@@ -1,8 +1,8 @@
-import attr
 import typing
 import asyncio
 import logging
 import itertools
+import dataclasses
 import async_timeout
 
 from collections import Counter, defaultdict
@@ -48,16 +48,18 @@ def _deduplicate_commands(commands):
     return tuple(maximal_commands)
 
 
-@attr.s(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class BaseResponseListener:
-    matching_commands: typing.Tuple[t.CommandBase] = attr.ib(
-        converter=_deduplicate_commands
-    )
+    matching_commands: typing.Tuple[t.CommandBase]
 
-    @matching_commands.validator
-    def check(self, attribute, commands):
+    def __post_init__(self):
+        commands = _deduplicate_commands(self.matching_commands)
+
         if not commands:
-            raise ValueError("Listener must have at least one command")
+            raise ValueError("Cannot create a listener without any matching commands")
+
+        # We're frozen so __setattr__ is disallowed
+        object.__setattr__(self, "matching_commands", commands)
 
     def matching_headers(self):
         return {response.header for response in self.matching_commands}
@@ -89,10 +91,10 @@ class BaseResponseListener:
         raise NotImplementedError()  # pragma: no cover
 
 
-@attr.s(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class OneShotResponseListener(BaseResponseListener):
-    future: asyncio.Future = attr.ib(
-        default=attr.Factory(lambda: asyncio.get_running_loop().create_future())
+    future: asyncio.Future = dataclasses.field(
+        default_factory=lambda: asyncio.get_running_loop().create_future()
     )
 
     def _resolve(self, response: t.CommandBase) -> bool:
@@ -114,9 +116,9 @@ class OneShotResponseListener(BaseResponseListener):
         return True
 
 
-@attr.s(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CallbackResponseListener(BaseResponseListener):
-    callback: typing.Callable[[t.CommandBase], typing.Any] = attr.ib()
+    callback: typing.Callable[[t.CommandBase], typing.Any]
 
     def _resolve(self, response: t.CommandBase) -> bool:
         try:
