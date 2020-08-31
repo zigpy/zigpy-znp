@@ -155,8 +155,8 @@ class CallbackResponseListener(BaseResponseListener):
                 "Caught an exception while executing callback", exc_info=True
             )
 
-        # A callback is never resolved
-        return False
+        # Callbacks are always resolved
+        return True
 
     def cancel(self):
         # You can't cancel a callback

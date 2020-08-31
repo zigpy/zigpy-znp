@@ -703,9 +703,9 @@ async def test_listeners_resolve(event_loop):
     match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     no_match = c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
-    assert not callback_listener.resolve(match)
+    assert callback_listener.resolve(match)
     assert not callback_listener.resolve(no_match)
-    assert not callback_listener.resolve(match)
+    assert callback_listener.resolve(match)
     assert not callback_listener.resolve(no_match)
 
     assert one_shot_listener.resolve(match)
@@ -752,7 +752,7 @@ async def test_listeners_cancel(event_loop):
     match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
     no_match = c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
-    assert not callback_listener.resolve(match)
+    assert callback_listener.resolve(match)
     assert not callback_listener.resolve(no_match)
 
     assert one_shot_listener.resolve(match)
