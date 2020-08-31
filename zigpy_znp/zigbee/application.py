@@ -96,6 +96,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     def channel(self):
         # This value is accessible only from the NIB struct. There does not appear to be
         # a MT command to read it.
+
+        if self._nib is None:
+            return None
+
         return self._nib.nwkLogicalChannel
 
     @classmethod
@@ -130,7 +134,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self._znp is not None:
             self._znp.close()
 
-    async def startup(self, auto_form=False, write_nvram=True):
+    async def startup(self, auto_form=False):
         """
         Performs application startup.
 
@@ -146,6 +150,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._znp = znp
         self._bind_callbacks()
 
+        # Issue a reset first to make sure we aren't permitting joins
+        await self._reset()
+
         # XXX: To make sure we don't switch to the wrong device upon reconnect,
         #      update our config to point to the last-detected port.
         if self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == "auto":
@@ -153,25 +160,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 conf.CONF_DEVICE_PATH
             ] = self._znp._uart.transport.serial.name
 
-        # Only modify the NVRAM if we allow it
-        if write_nvram:
-            any_changed = await self._write_nvram_items(
-                {
-                    # It's better to be explicit these than rely on the NVRAM defaults
-                    NwkNvIds.CONCENTRATOR_ENABLE: t.Bool(True),
-                    NwkNvIds.CONCENTRATOR_DISCOVERY: t.uint8_t(120),
-                    NwkNvIds.CONCENTRATOR_RC: t.Bool(True),
-                    NwkNvIds.SRC_RTG_EXPIRY_TIME: t.uint8_t(255),
-                    NwkNvIds.NWK_CHILD_AGE_ENABLE: t.Bool(False),
-                    # XXX: the undocumented `znpBasicCfg` request can do this
-                    NwkNvIds.LOGICAL_TYPE: t.DeviceLogicalType.Coordinator,
-                }
-            )
-
-            if any_changed:
-                # Reset to make the above NVRAM writes take effect.
-                await self._reset()
-
+        # Next, read out the NVRAM item that Zigbee2MQTT writes when it has configured
+        # a device to make sure that our network settings will not be reset.
         try:
             is_configured = (
                 await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
@@ -180,12 +170,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             assert e.response.Status == t.Status.INVALID_PARAMETER
             is_configured = False
 
-        if not is_configured and not auto_form:
-            raise RuntimeError("Cannot start application, network is not formed")
-        elif auto_form and is_configured:
-            LOGGER.info("ZNP is already configured, no need to form a network.")
-        elif auto_form and not is_configured:
+        if not is_configured:
+            if not auto_form:
+                raise RuntimeError("Cannot start application, network is not formed")
+
+            LOGGER.info("ZNP is not configured, forming a new network")
+
+            # Network formation requires multiple resets so it will write the NVRAM
+            # settings itself
             await self.form_network()
+        else:
+            LOGGER.info("ZNP is already configured, not forming a new network")
+            await self._write_stack_settings(reset_if_changed=True)
+
+        # At this point the device state should the same, regardless of whether we just
+        # formed a new network or are restoring one
 
         if self.znp_config[conf.CONF_TX_POWER] is not None:
             dbm = self.znp_config[conf.CONF_TX_POWER]
@@ -209,36 +208,33 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._ieee = device_info.IEEE
         self._nwk = 0x0000
 
-        # Add the coordinator as a zigpy device
+        # Add the coordinator as a zigpy device. We do this up here because
+        # `self._register_endpoint()` adds endpoints to this device object.
         self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
 
-        if device_info.DeviceState != t.DeviceState.StartedAsCoordinator:
-            # Start the application and wait until it's ready
-            await self._znp.request_callback_rsp(
-                request=c.ZDO.StartupFromApp.Req(StartDelay=100),
-                RspState=c.zdo.StartupState.RestoredNetworkState,
-                callback=c.ZDO.StateChangeInd.Callback(
-                    State=t.DeviceState.StartedAsCoordinator
-                ),
-            )
+        # Start the application and wait until it's ready
+        await self._znp.request_callback_rsp(
+            request=c.ZDO.StartupFromApp.Req(StartDelay=100),
+            RspState=c.zdo.StartupState.RestoredNetworkState,
+            callback=c.ZDO.StateChangeInd.Callback(
+                State=t.DeviceState.StartedAsCoordinator
+            ),
+        )
 
-        # At this point Z-Stack is ready. Make sure that we aren't permitting joins.
-        await self.permit_ncp(0)
-
-        # Get our active endpoints
+        # Get the currently active endpoints
         endpoints = await self._znp.request_callback_rsp(
             request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
             RspStatus=t.Status.SUCCESS,
             callback=c.ZDO.ActiveEpRsp.Callback(partial=True),
         )
 
-        # Clear out the list of active endpoints
+        # Clear them out
         for endpoint in endpoints.ActiveEndpoints:
             await self._znp.request(
                 c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.SUCCESS
             )
 
-        # And finally register our own
+        # And register our own
         await self._register_endpoint(
             endpoint=1,
             profile_id=zigpy.profiles.zha.PROFILE_ID,
@@ -255,7 +251,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             profile_id=zigpy.profiles.zll.PROFILE_ID,
             device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
         )
-
         await self._load_device_info()
 
         # Now that we know what device we are, set the max concurrent requests
@@ -346,46 +341,65 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         PAN ID, and extended PAN ID.
         """
 
-        # These options are read only on startup so we perform a soft reset right after
-        # XXX: do we also need ` | t.StartupOptions.ClearConfig`?
-        await self._znp.nvram_write(
-            NwkNvIds.STARTUP_OPTION, t.StartupOptions.ClearState
+        # Delete any existing HAS_CONFIGURED_ZSTACK3 NV item. This may fail.
+        await self._znp.request(
+            c.SYS.OSALNVDelete.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1)
         )
 
+        # Instruct Z-Stack to reset everything on the next boot
+        await self._znp.nvram_write(
+            NwkNvIds.STARTUP_OPTION,
+            t.StartupOptions.ClearState | t.StartupOptions.ClearConfig,
+        )
+
+        # And reset to clear everything
+        await self._reset()
+
+        # Now that we've cleared everything, write back our Z-Stack settings
+        await self._write_stack_settings(reset_if_changed=False)
+
         pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID]
+
+        if pan_id is None:
+            # Let Z-Stack pick one at random, hopefully not conflicting with others
+            pan_id = t.uint16_t(0xFFFF)
+
         extended_pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID]
 
+        if extended_pan_id is None:
+            # It's not documented whether or not Z-Stack will pick this randomly as well
+            # if a value of 00:00:00:00:00:00:00:00 is provided but the chances of a
+            # collision using `os.urandom` are astronomically small
+            extended_pan_id = ExtendedPanId(os.urandom(8))
+
+        # Update the network settings.
+        # Not resetting before we form the network is important!
         await self.update_network(
+            # We don't set the channel in here because it will have no effect
             channels=self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNELS],
-            pan_id=0xFFFF if pan_id is None else pan_id,
-            extended_pan_id=ExtendedPanId(os.urandom(8))
-            if extended_pan_id is None
-            else extended_pan_id,
+            pan_id=pan_id,
+            extended_pan_id=extended_pan_id,
             network_key=t.KeyData(os.urandom(16)),
             reset=False,
         )
 
-        # We want to receive all ZDO callbacks to proxy them back to zipgy
-        await self._znp.nvram_write(NwkNvIds.ZDO_DIRECT_CB, t.Bool(True))
-
-        # Reset now so that the changes take effect
-        await self._reset()
-
-        await self._znp.request(
-            c.AppConfig.BDBStartCommissioning.Req(
+        # Finally, form the network
+        commissioning_rsp = await self._znp.request_callback_rsp(
+            request=c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NwkFormation
             ),
             RspStatus=t.Status.SUCCESS,
+            callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
+            ),
         )
 
-        # This may take a while because of some sort of background scanning.
-        # This can probably be disabled.
-        await self._znp.wait_for_response(
-            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
-        )
+        if commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
+            raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
 
         # Create the NV item that keeps track of whether or not we're configured.
-        # This is the NV item used by Zigbee2MQTT, pulled in from zigbee-shepherd.
+        # This is the NV item used by Zigbee2MQTT, pulled in from zigbee-shepherd, and
+        # allows for this device to be used with Zigbee2MQTT as well.
         osal_create_rsp = await self._znp.request(
             c.SYS.OSALNVItemInit.Req(
                 Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1, Value=b"\x55"
@@ -394,20 +408,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if osal_create_rsp.Status not in (t.Status.SUCCESS, t.Status.NV_ITEM_UNINIT):
             raise RuntimeError(
-                "Could not create HAS_CONFIGURED_ZSTACK3 NV item"
+                f"Network formation failed: could not create"
+                f" HAS_CONFIGURED_ZSTACK3 NV item: {osal_create_rsp}"
             )  # pragma: no cover
 
-        # Initializing the item won't guarantee that it holds this exact value
+        # Initializing the item doesn't guarantee that it holds this exact value
         await self._znp.nvram_write(NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55")
 
-        # Finally, reload the NIB after our changes
-        await self._load_device_info()
+        # Finally, reset once more to reset the device back to a "normal" state so that
+        # we can continue the normal application startup sequence.
+        await self._reset()
 
     def get_dst_address(self, cluster):
         """
         Helper to get a dst address for bind/unbind operations.
 
-        Allows radios to provide correct information especially for radios which listen
+        Allows radios to provide correct information, especially for radios which listen
         on specific endpoints only.
         """
 
@@ -701,17 +717,28 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return self.config[conf.CONF_ZNP_CONFIG]
 
-    async def _write_nvram_items(
-        self, items: typing.Dict[NwkNvIds, typing.Any]
-    ) -> bool:
+    async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
         """
-        Writes a dictionary of key, value pairs to NVRAM and returns whether or not any
-        values were actually changed.
+        Writes network-independent Z-Stack settings to NVRAM.
+        If no settings actually change, no reset will be performed.
         """
+
+        # It's better to be explicit than rely on the NVRAM defaults
+        settings = {
+            NwkNvIds.LOGICAL_TYPE: t.DeviceLogicalType.Coordinator,
+            # Source routing
+            NwkNvIds.CONCENTRATOR_ENABLE: t.Bool(True),
+            NwkNvIds.CONCENTRATOR_DISCOVERY: t.uint8_t(120),
+            NwkNvIds.CONCENTRATOR_RC: t.Bool(True),
+            NwkNvIds.SRC_RTG_EXPIRY_TIME: t.uint8_t(255),
+            NwkNvIds.NWK_CHILD_AGE_ENABLE: t.Bool(False),
+            # We want to receive all ZDO callbacks to proxy them back to zigpy
+            NwkNvIds.ZDO_DIRECT_CB: t.Bool(True),
+        }
 
         any_changed = False
 
-        for nvid, value in items.items():
+        for nvid, value in settings.items():
             try:
                 current_value = await self._znp.nvram_read(nvid)
             except InvalidCommandResponse:
@@ -722,7 +749,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 await self._znp.nvram_write(nvid, value)
                 any_changed = True
 
-        return any_changed
+        if reset_if_changed and any_changed:
+            # Reset to make the above NVRAM writes take effect
+            await self._reset()
 
     @contextlib.asynccontextmanager
     async def _limit_concurrency(self):

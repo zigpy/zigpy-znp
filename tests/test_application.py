@@ -367,6 +367,9 @@ async def test_application_startup_skip_bootloader(application, mocker):
 async def test_application_startup_nib_cc26x2(application):
     app, znp_server = application()
 
+    # This doesn't raise an error even if our NIB is empty
+    assert app.channel is None
+
     await app.startup(auto_form=False)
 
     assert app.channel == 25
@@ -426,30 +429,13 @@ async def test_application_startup_failure(application):
 
 
 @pytest_mark_asyncio_timeout()
-async def test_application_startup_prevent_unintended_joins(application, mocker):
-    app, znp_server = application()
-
-    joins_were_disabled = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, TCSignificance=1,
-        ),
-        responses=[],
-    )
-
-    await app.startup()
-
-    # Make sure joins were disabled during startup
-    await joins_were_disabled
-
-
-@pytest_mark_asyncio_timeout()
-async def test_application_startup_fast(application, mocker):
+async def test_application_startup_reset(application, mocker):
     app, znp_server = application()
 
     mocker.spy(app, "_reset")
     await app.startup()
 
-    assert app._reset.call_count == 0
+    assert app._reset.call_count >= 1
 
 
 @pytest_mark_asyncio_timeout()
@@ -461,7 +447,7 @@ async def test_application_startup_slow(application, mocker):
     mocker.spy(app, "_reset")
     await app.startup()
 
-    assert app._reset.call_count == 1
+    assert app._reset.call_count >= 1
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
@@ -1117,6 +1103,11 @@ async def test_auto_form_necessary(application, mocker):
     mocker.spy(app, "_reset")
 
     znp_server.reply_to(
+        request=c.SYS.OSALNVDelete.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1),
+        responses=[c.SYS.OSALNVDelete.Rsp(Status=t.Status.NV_ITEM_UNINIT)],
+    )
+
+    znp_server.reply_to(
         request=c.AppConfig.BDBStartCommissioning.Req(
             Mode=c.app_config.BDBCommissioningMode.NwkFormation
         ),
@@ -1138,7 +1129,10 @@ async def test_auto_form_necessary(application, mocker):
     assert app.update_network.call_count == 1
 
     assert nvram[NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
-    assert nvram[NwkNvIds.STARTUP_OPTION] == t.StartupOptions.ClearState.serialize()
+    assert (
+        nvram[NwkNvIds.STARTUP_OPTION]
+        == (t.StartupOptions.ClearState | t.StartupOptions.ClearConfig).serialize()
+    )
     assert nvram[NwkNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
     assert nvram[NwkNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
 
