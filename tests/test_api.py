@@ -160,6 +160,44 @@ async def test_znp_responses(znp):
 
 
 @pytest_mark_asyncio_timeout()
+async def test_znp_responses_iterator(znp):
+    responses = [
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_MAC),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_NWK),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_AF),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_ZDO),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_GP),
+    ]
+
+    async def sender():
+        await asyncio.sleep(0.1)
+
+        for response in responses:
+            znp.frame_received(response.to_frame())
+
+    # We can't use `zip` for this
+    count = 0
+    responses_iter = iter(responses)
+    assert not znp._listeners
+
+    # Send them in the background
+    asyncio.create_task(sender())
+
+    async for frame in znp.iterator_for_responses([c.SYS.Ping.Rsp(partial=True)]):
+        assert frame == next(responses_iter)
+        count += 1
+
+        if count == len(responses):
+            break
+
+    # Once we stop iterating, the callback should be cleaned up eventually
+    await asyncio.sleep(0.1)
+    assert not znp._listeners
+
+
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_timeouts(znp):
     response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
 

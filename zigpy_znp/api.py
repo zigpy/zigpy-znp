@@ -317,7 +317,21 @@ class ZNP:
         if not matched:
             LOGGER.warning("Received an unhandled command: %s", command)
 
-    def callback_for_responses(self, responses, callback) -> None:
+    async def iterator_for_responses(self, responses):
+        """
+        Yields all matching responses as long as the async iterator is active.
+        """
+
+        queue = asyncio.Queue()
+        listener = self.callback_for_responses(responses, queue.put_nowait)
+
+        try:
+            while True:
+                yield await queue.get()
+        finally:
+            self.remove_listener(listener)
+
+    def callback_for_responses(self, responses, callback) -> CallbackResponseListener:
         """
         Creates a callback listener that matches any of the provided responses.
 
@@ -332,7 +346,11 @@ class ZNP:
         for header in listener.matching_headers():
             self._listeners[header].append(listener)
 
-    def callback_for_response(self, response: t.CommandBase, callback) -> None:
+        return listener
+
+    def callback_for_response(
+        self, response: t.CommandBase, callback
+    ) -> CallbackResponseListener:
         """
         Creates a callback listener for a single response.
         """
@@ -469,7 +487,10 @@ class ZNP:
         if hasattr(value, "serialize"):
             value = value.serialize()
         elif not isinstance(value, (bytes, bytearray)):
-            raise TypeError("Only bytes or serializable types can be written to NVRAM")
+            raise TypeError(
+                f"Only bytes or serializable types can be written to NVRAM."
+                f" Got {nv_id!r}={value!r} (type {type(value)})"
+            )
 
         return await self.request(
             c.SYS.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)),
