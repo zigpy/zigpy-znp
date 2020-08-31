@@ -20,19 +20,14 @@ def channels_from_channel_mask(channels: t.Channels):
             yield channel
 
 
-async def perform_energy_scan(radio_path, num_scans=None, auto_form=False):
+async def perform_energy_scan(radio_path, num_scans=None):
     LOGGER.info("Starting up zigpy-znp")
 
     app = ControllerApplication(
         ControllerApplication.SCHEMA({"device": {"path": radio_path}})
     )
 
-    try:
-        await app.startup(auto_form=auto_form, write_nvram=auto_form)
-    except RuntimeError:
-        LOGGER.error("The hardware needs to be configured before this tool can work.")
-        LOGGER.error("Re-run this command with -f (--form).")
-        return
+    await app.startup()
 
     LOGGER.info("Running scan...")
 
@@ -98,14 +93,6 @@ async def main(argv):
         default=None,
         help="Number of scans to perform before exiting",
     )
-    parser.add_argument(
-        "-f",
-        "--form",
-        dest="form",
-        action="store_true",
-        default=False,
-        help="Initializes the hardware by writing to NVRAM",
-    )
 
     args = parser.parse_args(argv)
 
@@ -116,9 +103,7 @@ async def main(argv):
     # We just want to make sure it exists
     args.serial.close()
 
-    await perform_energy_scan(
-        args.serial.name, auto_form=args.form, num_scans=args.num_scans
-    )
+    await perform_energy_scan(args.serial.name, num_scans=args.num_scans)
 
 
 if __name__ == "__main__":
