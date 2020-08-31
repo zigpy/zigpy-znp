@@ -737,11 +737,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         was_locked = self._concurrent_requests_semaphore.locked()
 
         if was_locked:
-            LOGGER.warning("Max concurrency reached, delaying requests")
+            LOGGER.debug("Max concurrency reached, delaying requests")
 
         async with self._concurrent_requests_semaphore:
             if was_locked:
-                LOGGER.warning(
+                LOGGER.debug(
                     "Previously delayed request is now running, "
                     "delayed by %0.2f seconds",
                     time.time() - start_time,
