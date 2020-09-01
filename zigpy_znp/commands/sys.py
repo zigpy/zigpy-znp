@@ -205,6 +205,25 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         rsp_schema=(t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),),
     )
 
+    SetJammerParameters = t.CommandDef(
+        t.CommandType.SREQ,
+        0x15,
+        req_schema=(
+            t.Param(
+                "ContinuousEvents",
+                t.uint16_t,
+                "Number of continuous events needed to detect Jamming",
+            ),
+            t.Param("HighNoiseLevel", t.uint8_t, "Noise Level needed to be a Jam"),
+            t.Param(
+                "DetectPeriodTime",
+                t.uint32_t,
+                "The time between each noise level reading",
+            ),
+        ),
+        rsp_schema=t.STATUS_SCHEMA,
+    )
+
     # start a timer event. The event will expired after the indicated amount of time
     # and a notification will be sent back to the tester
     OSALStartTimer = t.CommandDef(
@@ -497,4 +516,16 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.AREQ,
         0x81,
         rsp_schema=(t.Param("Id", t.uint8_t, "The Id of the timer event (0-3)"),),
+    )
+
+    JammerInd = t.CommandDef(
+        t.CommandType.AREQ,
+        0x82,
+        rsp_schema=(
+            t.Param(
+                "JammerInd",
+                t.Bool,
+                "TRUE if jammer detected, " "FALSE if changed to undetected",
+            ),
+        ),
     )
