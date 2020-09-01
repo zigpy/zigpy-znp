@@ -225,9 +225,15 @@ def make_application(znp_server, config=None):
         ),
         responses=[
             c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
             c.AppConfig.BDBCommissioningNotification.Callback(
-                Status=c.app_config.BDBCommissioningStatus.Success,
-                Mode=c.app_config.BDBCommissioningMode.NwkSteering,
+                Status=c.app_config.BDBCommissioningStatus.NetworkRestored,
+                Mode=c.app_config.BDBCommissioningMode.NONE,
+                RemainingModes=c.app_config.BDBCommissioningMode.NwkFormation,
+            ),
+            c.AppConfig.BDBCommissioningNotification.Callback(
+                Status=c.app_config.BDBCommissioningStatus.FormationFailure,
+                Mode=c.app_config.BDBCommissioningMode.NwkFormation,
                 RemainingModes=c.app_config.BDBCommissioningMode.NONE,
             ),
         ],
@@ -307,14 +313,6 @@ def make_application(znp_server, config=None):
                 DeviceState=t.DeviceState.InitializedNotStarted,
                 AssociatedDevices=[],
             )
-        ],
-    )
-
-    znp_server.reply_to(
-        request=c.ZDO.StartupFromApp.Req(partial=True),
-        responses=[
-            c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.RestoredNetworkState),
-            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
         ],
     )
 
@@ -1107,23 +1105,43 @@ async def test_auto_form_necessary(application, mocker):
         responses=[c.SYS.OSALNVDelete.Rsp(Status=t.Status.NV_ITEM_UNINIT)],
     )
 
-    znp_server.reply_to(
+    # Remove the existing listener that simulates the normal startup sequence
+    hdr = c.AppConfig.BDBStartCommissioning.Req(partial=True).header
+    orig_commissioning_listeners = znp_server._listeners[hdr].copy()
+    znp_server._listeners[hdr].clear()
+
+    did_normal_startup = znp_server.reply_once_to(
         request=c.AppConfig.BDBStartCommissioning.Req(
             Mode=c.app_config.BDBCommissioningMode.NwkFormation
         ),
         responses=[
             c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartingAsCoordinator),
+            c.AppConfig.BDBCommissioningNotification.Callback(
+                Status=c.app_config.BDBCommissioningStatus.InProgress,
+                Mode=c.app_config.BDBCommissioningMode.NwkSteering,
+                RemainingModes=c.app_config.BDBCommissioningMode.NwkFormation,
+            ),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartingAsCoordinator),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartingAsCoordinator),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartingAsCoordinator),
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartingAsCoordinator),
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+            c.AppConfig.BDBCommissioningNotification.Callback(
+                Status=c.app_config.BDBCommissioningStatus.Success,
+                Mode=c.app_config.BDBCommissioningMode.NwkSteering,
+                RemainingModes=c.app_config.BDBCommissioningMode.NONE,
+            ),
         ],
     )
 
-    znp_server.reply_to(
-        request=c.AppConfig.BDBStartCommissioning.Req(
-            Mode=c.app_config.BDBCommissioningMode.NwkSteering
-        ),
-        responses=[c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS)],
-    )
+    # And reset it immediately after we form the network
+    def reset_commissioning_listeners(_):
+        znp_server._listeners[hdr] = orig_commissioning_listeners
 
+    did_normal_startup.add_done_callback(reset_commissioning_listeners)
+
+    # Finally test startup with auto forming
     await app.startup(auto_form=True)
 
     assert app.update_network.call_count == 1
