@@ -213,13 +213,34 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
 
         # Start the application and wait until it's ready
+        started_as_coordinator = self._znp.wait_for_response(
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
+        )
+
+        bdb_commissioning_done = self._znp.wait_for_response(
+            c.AppConfig.BDBCommissioningNotification.Callback(
+                partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
+            )
+        )
+
         await self._znp.request_callback_rsp(
-            request=c.ZDO.StartupFromApp.Req(StartDelay=100),
-            RspState=c.zdo.StartupState.RestoredNetworkState,
-            callback=c.ZDO.StateChangeInd.Callback(
-                State=t.DeviceState.StartedAsCoordinator
+            request=c.AppConfig.BDBStartCommissioning.Req(
+                Mode=c.app_config.BDBCommissioningMode.NwkFormation
+            ),
+            RspStatus=t.Status.SUCCESS,
+            callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                partial=True, Status=c.app_config.BDBCommissioningStatus.NetworkRestored
             ),
         )
+
+        # The total startup time should not take forever
+        async with async_timeout.timeout(20):
+            # This often arrives before the `BDBCommissioningNotification`
+            await started_as_coordinator
+
+            # At this point the BDB state machine is ready to go
+            # XXX: why is it FormationFailure with BDBCommissioningMode.NwkSteering?
+            await bdb_commissioning_done
 
         # Get the currently active endpoints
         endpoints = await self._znp.request_callback_rsp(
@@ -384,7 +405,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # Finally, form the network
-        commissioning_rsp = await self._znp.request_callback_rsp(
+        bdb_commissioning_rsp = await self._znp.request_callback_rsp(
             request=c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NwkFormation
             ),
@@ -394,8 +415,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
         )
 
-        if commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
-            raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
+        if bdb_commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
+            raise RuntimeError(f"Network formation failed: {bdb_commissioning_rsp}")
 
         # Create the NV item that keeps track of whether or not we're configured.
         # This is the NV item used by Zigbee2MQTT, pulled in from zigbee-shepherd, and

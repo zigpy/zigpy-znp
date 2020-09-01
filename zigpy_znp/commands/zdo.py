@@ -533,6 +533,8 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     )
 
     # starts the device in the network
+    # XXX: This actually just calls `bdb_StartCommissioning()` and returns `ZSuccess`.
+    #      It just happens that ZSuccess == StartupState.RestoredNetworkState == 0
     StartupFromApp = t.CommandDef(
         t.CommandType.SREQ,
         0x40,
