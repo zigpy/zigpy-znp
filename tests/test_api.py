@@ -1,3 +1,4 @@
+import copy
 import pytest
 import asyncio
 import warnings
@@ -911,3 +912,42 @@ async def test_request_callback_rsp(pingable_serial_port, event_loop):
     assert response == c.AF.DataConfirm.Callback(
         Endpoint=56, TSN=1, Status=t.Status.SUCCESS
     )
+
+
+@pytest_mark_asyncio_timeout()
+async def test_request_callback_rsp_timeouts(pingable_serial_port, event_loop):
+    config = copy.deepcopy(TEST_APP_CONFIG)
+    config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
+    config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
+
+    api = ZNP(config)
+    await api.connect()
+
+    # Missing callbacks should not lock anything up
+    with pytest.raises(asyncio.TimeoutError):
+        await api.request_callback_rsp(
+            request=c.SYS.Ping.Req(), callback=c.SYS.ResetInd.Callback(partial=True),
+        )
+
+    # But they should still work normally
+    rsp = api.request_callback_rsp(
+        request=c.SYS.Ping.Req(), callback=c.SYS.ResetInd.Callback(partial=True),
+    )
+
+    async def responder():
+        api.frame_received(
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS).to_frame()
+        )
+        api.frame_received(
+            c.SYS.ResetInd.Callback(
+                Reason=t.ResetReason.PowerUp,
+                TransportRev=0x00,
+                ProductId=0x12,
+                MajorRel=0x01,
+                MinorRel=0x02,
+                MaintRel=0x03,
+            ).to_frame()
+        )
+
+    asyncio.create_task(responder())
+    await rsp

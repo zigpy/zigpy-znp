@@ -53,6 +53,7 @@ CONF_TX_POWER = "tx_power"
 CONF_LED_MODE = "led_mode"
 CONF_SKIP_BOOTLOADER = "skip_bootloader"
 CONF_SREQ_TIMEOUT = "sync_request_timeout"
+CONF_ARSP_TIMEOUT = "async_response_timeout"
 CONF_AUTO_RECONNECT_RETRY_DELAY = "auto_reconnect_retry_delay"
 CONF_MAX_CONCURRENT_REQUESTS = "max_concurrent_requests"
 
@@ -65,6 +66,7 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     None, vol.All(int, vol.Range(min=-22, max=19))
                 ),
                 vol.Optional(CONF_SREQ_TIMEOUT, default=5): VolPositiveNumber,
+                vol.Optional(CONF_ARSP_TIMEOUT, default=5): VolPositiveNumber,
                 vol.Optional(
                     CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
                 ): VolPositiveNumber,

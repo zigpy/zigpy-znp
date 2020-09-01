@@ -468,7 +468,11 @@ class ZNP:
         response = self.request(request, **response_params)
 
         await response
-        return await callback_response
+
+        async with async_timeout.timeout(
+            self._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT]
+        ):
+            return await callback_response
 
     async def nvram_write(
         self, nv_id: nvids.BaseNvIds, value, *, offset: t.uint8_t = 0
