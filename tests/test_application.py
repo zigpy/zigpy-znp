@@ -21,6 +21,7 @@ from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import connect as uart_connect
+from zigpy_znp.znp.nib import NIB
 from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -1106,10 +1107,11 @@ async def test_auto_form_necessary(application, mocker):
     )
 
     # Remove the existing listener that simulates the normal startup sequence
-    hdr = c.AppConfig.BDBStartCommissioning.Req(partial=True).header
-    orig_commissioning_listeners = znp_server._listeners[hdr].copy()
-    znp_server._listeners[hdr].clear()
+    bdb_hdr = c.AppConfig.BDBStartCommissioning.Req(partial=True).header
+    orig_commissioning_listeners = znp_server._listeners[bdb_hdr].copy()
+    znp_server._listeners[bdb_hdr].clear()
 
+    # And copy what the device actually sends
     did_normal_startup = znp_server.reply_once_to(
         request=c.AppConfig.BDBStartCommissioning.Req(
             Mode=c.app_config.BDBCommissioningMode.NwkFormation
@@ -1135,11 +1137,30 @@ async def test_auto_form_necessary(application, mocker):
         ],
     )
 
-    # And reset it immediately after we form the network
+    # And reset it back to normal immediately after we form the network
     def reset_commissioning_listeners(_):
-        znp_server._listeners[hdr] = orig_commissioning_listeners
+        znp_server._listeners[bdb_hdr] = orig_commissioning_listeners
 
     did_normal_startup.add_done_callback(reset_commissioning_listeners)
+
+    # The NIB contains an invalid logical channel at first
+    orig_nib, _ = NIB.deserialize(nvram[NwkNvIds.NIB])
+    assert nvram[NwkNvIds.NIB] == orig_nib.serialize()
+    nvram[NwkNvIds.NIB] = orig_nib.replace(nwkLogicalChannel=0).serialize()
+
+    nib_read_count = 0
+
+    def reset_nib(_):
+        nonlocal nib_read_count
+        nib_read_count += 1
+
+        # Let it be invalid for a few reads
+        if nib_read_count == 2:
+            nvram[NwkNvIds.NIB] = orig_nib.serialize()
+
+    znp_server.reply_to(
+        request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.NIB, Offset=0), responses=[reset_nib]
+    )
 
     # Finally test startup with auto forming
     await app.startup(auto_form=True)

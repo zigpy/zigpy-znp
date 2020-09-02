@@ -489,20 +489,41 @@ class CommandBase:
     __str__ = __repr__
 
 
-class DeviceState(t.MissingEnumMixin, t.enum_uint8):
+class DeviceState(t.enum_uint8):
     """Indicated device state."""
 
+    # Initialized - not started automatically
     InitializedNotStarted = 0x00
+    # Initialized - not connected to anything
     InitializedNotConnected = 0x01
+    # Discovering PAN's to join
     DiscoveringPANs = 0x02
+    # Joining a PAN
     Joining = 0x03
-    ReJoining = 0x04
+    # ReJoining a PAN in secure mode scanning in current channel, only for end devices
+    ReJoiningSecureScanningCurrentChannel = 0x04
+    # Joined but not yet authenticated by trust center
     JoinedNotAuthenticated = 0x05
+    # Started as device after authentication
     JoinedAsEndDevice = 0x06
+    # Device joined, authenticated and is a router
     JoinedAsRouter = 0x07
+    # Started as Zigbee Coordinator
     StartingAsCoordinator = 0x08
+    # Started as Zigbee Coordinator
     StartedAsCoordinator = 0x09
+    # Device has lost information about its parent
     LostParent = 0x0A
+    # Device is sending KeepAlive message to its parent
+    SendingKeepAliveToParent = 0x0B
+    # Device is waiting before trying to rejoin
+    BackoffBeforeRejoin = 0x0C
+    # ReJoining a PAN in secure mode scanning in all channels, only for end devices
+    RejoinSecureScanningAllChannels = 0x0D
+    # ReJoining a PAN in unsecure mode scanning in current channel, only for end devices
+    RejoinInsecureScanningCurrentChannel = 0x0E
+    # ReJoining a PAN in unsecure mode scanning in all channels, only for end devices
+    RejoinInsecureScanningAllChannels = 0x0F
 
 
 class InterPanCommand(t.enum_uint8):

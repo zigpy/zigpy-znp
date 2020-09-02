@@ -223,6 +223,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
         )
 
+        # The AUTOSTART startup NV item doesn't do anything
+        # According to the forums, this is the correct startup sequence, including
+        # the formation failure error
         await self._znp.request_callback_rsp(
             request=c.AppConfig.BDBStartCommissioning.Req(
                 Mode=c.app_config.BDBCommissioningMode.NwkFormation
@@ -233,14 +236,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
         )
 
-        # The total startup time should not take forever
+        # The startup sequence should not take forever
         async with async_timeout.timeout(20):
-            # This often arrives before the `BDBCommissioningNotification`
-            await started_as_coordinator
-
-            # At this point the BDB state machine is ready to go
-            # XXX: why is it FormationFailure with BDBCommissioningMode.NwkSteering?
-            await bdb_commissioning_done
+            # These often arrive in random order
+            await asyncio.gather(started_as_coordinator, bdb_commissioning_done)
 
         # Get the currently active endpoints
         endpoints = await self._znp.request_callback_rsp(
@@ -272,7 +271,17 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             profile_id=zigpy.profiles.zll.PROFILE_ID,
             device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
         )
-        await self._load_device_info()
+
+        # Even though the device is "ready" at this point, for some reason it takes
+        # a few more seconds for the NIB to update with our correct logical channel
+        while True:
+            await self._load_device_info()
+
+            # Usually this works after the first attempt
+            if self.channel:
+                break
+
+            await asyncio.sleep(1)
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
@@ -334,8 +343,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
         if channel is not None:
-            # XXX: We modify the logical channel value directly in the NIB
-            # Might be better to send a ZDO request to ourself
+            # XXX: We modify the logical channel value directly in the NIB.
+            #      Is there no better way?
             nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
             nib.nwkLogicalChannel = channel
             await self._znp.nvram_write(NwkNvIds.NIB, nib.serialize())
