@@ -166,6 +166,12 @@ def find_ti_ports() -> typing.Iterable[
         elif (port.vid, port.pid) == (0x0451, 0xBEF3):
             # LAUNCHXL-CC26X2R1
             found_ports[port.serial_number].append(port)
+        elif (port.vid, port.pid) == (0x10C4, 0xEA60):
+            # slae.sh CC2652RB stick
+            if "slae.sh cc2652rb stick" in (port.product or ""):
+                found_ports[port.serial_number].append(port)
+            else:
+                found_ports["CP210x"].append(port)
         elif (port.vid, port.pid) == (0x1A86, 0x7523):
             # ZZH (CH340, no way to distinguish it from any other CH340 device)
             found_ports["CH340"].append(port)
@@ -187,9 +193,9 @@ def guess_port() -> str:
     clone instead of the ZZH.
     """
 
-    # Move CH340 ports to the bottom of the list but keep the order of the rest
-    # because Python's sort is stable
-    candidates = sorted(find_ti_ports(), key=lambda p: p[0] == "CH340")
+    # Move generic serial adapters to the bottom of the list but keep the order of the
+    # rest because Python's sort is stable.
+    candidates = sorted(find_ti_ports(), key=lambda p: p[0] in ("CH340", "CP210x"))
 
     if not candidates:
         raise RuntimeError("Failed to detect any TI ports")

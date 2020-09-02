@@ -25,60 +25,6 @@ COMMON_LINUX = [
         "subsystem": "usb-serial",
         "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.1",  # noqa: E501
     },
-    # HUSBZB-1's Zigbee serial
-    {
-        "device": "/dev/ttyUSB0",
-        "name": "ttyUSB0",
-        "description": "HubZ Smart Home Controller",
-        "hwid": "USB VID:PID=10C4:8A2A SER=C0F0034E LOCATION=3-1.2.3:1.0",
-        "vid": 4292,
-        "pid": 35370,
-        "serial_number": "C0F0034E",
-        "location": "3-1.2.3:1.0",
-        "manufacturer": "Silicon Labs",
-        "product": "HubZ Smart Home Controller",
-        "interface": None,
-        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3",  # noqa: E501
-        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0/ttyUSB0",  # noqa: E501
-        "subsystem": "usb-serial",
-        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0",  # noqa: E501
-    },
-    # Symlink to HUSBZB-1's Z-Wave serial
-    {
-        "device": "/dev/zwave",
-        "name": "ttyUSB0",
-        "description": "HubZ Smart Home Controller",
-        "hwid": "USB VID:PID=10C4:8A2A SER=C0F0034E LOCATION=3-1.2.3:1.0 LINK=/dev/ttyUSB0",  # noqa: E501
-        "vid": 4292,
-        "pid": 35370,
-        "serial_number": "C0F0034E",
-        "location": "3-1.2.3:1.0",
-        "manufacturer": "Silicon Labs",
-        "product": "HubZ Smart Home Controller",
-        "interface": None,
-        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3",  # noqa: E501
-        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0/ttyUSB0",  # noqa: E501
-        "subsystem": "usb-serial",
-        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.0",  # noqa: E501
-    },
-    # Symlink to HUSBZB-1's Zigbee serial
-    {
-        "device": "/dev/zigbee",
-        "name": "ttyUSB1",
-        "description": "HubZ Smart Home Controller",
-        "hwid": "USB VID:PID=10C4:8A2A SER=C0F0034E LOCATION=3-1.2.3:1.1 LINK=/dev/ttyUSB1",  # noqa: E501
-        "vid": 4292,
-        "pid": 35370,
-        "serial_number": "C0F0034E",
-        "location": "3-1.2.3:1.1",
-        "manufacturer": "Silicon Labs",
-        "product": "HubZ Smart Home Controller",
-        "interface": None,
-        "usb_device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3",  # noqa: E501
-        "device_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.1/ttyUSB1",  # noqa: E501
-        "subsystem": "usb-serial",
-        "usb_interface_path": "/sys/devices/platform/soc/soc:usb3-0/12000000.dwc3/xhci-hcd.3.auto/usb3/3-1/3-1.2/3-1.2.3/3-1.2.3:1.1",  # noqa: E501
-    },
 ]
 
 LAUNCHXL_LINUX_PATH = "/dev/ttyACM0"
@@ -165,6 +111,28 @@ CC2531_LINUX = [
     }
 ]
 
+SLAESH_CC25RB_LINUX_PATH = "/dev/ttyUSB3"
+SLAESH_CC25RB_LINUX = [
+    # slae.sh cc2652rb stick
+    {
+        "device": "/dev/ttyUSB3",
+        "name": "ttyUSB3",
+        "description": "slae.sh cc2652rb stick - slaesh's iot stuff",
+        "hwid": "USB VID:PID=10C4:EA60 SER=00_12_4B_00_21_CB_F0_61 LOCATION=1-3",
+        "vid": 4292,
+        "pid": 60000,
+        "serial_number": "00_12_4B_00_21_CB_F0_61",
+        "location": "1-3",
+        "manufacturer": "Silicon Labs",
+        "product": "slae.sh cc2652rb stick - slaesh's iot stuff",
+        "interface": None,
+        "usb_device_path": "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3",
+        "device_path": "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3:1.0/ttyUSB3",
+        "subsystem": "usb-serial",
+        "usb_interface_path": "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3:1.0",
+    },
+]
+
 
 @pytest.fixture
 def mock_ports(mocker):
@@ -240,3 +208,24 @@ def test_guess_port_all(mock_ports):
 
     with mock_ports(COMMON_LINUX + LAUNCHXL_LINUX + CC2531_LINUX + ZZH_LINUX):
         assert znp_uart.guess_port() == LAUNCHXL_LINUX_PATH
+
+    with mock_ports(COMMON_LINUX + SLAESH_CC25RB_LINUX + CC2531_LINUX + ZZH_LINUX):
+        assert znp_uart.guess_port() == SLAESH_CC25RB_LINUX_PATH
+
+
+def test_guess_port_cp210x(mock_ports):
+    # Bare CP210x should be treated like the CH340
+    no_product_slasesh = SLAESH_CC25RB_LINUX[0].copy()
+    no_product_slasesh["product"] = ""
+
+    with mock_ports(COMMON_LINUX + ZZH_LINUX + [no_product_slasesh]):
+        assert znp_uart.guess_port() == ZZH_LINUX_PATH
+
+    with mock_ports(COMMON_LINUX + [no_product_slasesh] + ZZH_LINUX):
+        assert znp_uart.guess_port() == SLAESH_CC25RB_LINUX_PATH
+
+    with mock_ports(COMMON_LINUX + ZZH_LINUX + [no_product_slasesh] + CC2531_LINUX):
+        assert znp_uart.guess_port() == CC2531_LINUX_PATH
+
+    with mock_ports(COMMON_LINUX + [no_product_slasesh] + CC2531_LINUX + ZZH_LINUX):
+        assert znp_uart.guess_port() == CC2531_LINUX_PATH
