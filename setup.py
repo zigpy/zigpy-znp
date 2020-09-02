@@ -18,7 +18,7 @@ setup(
     packages=find_packages(exclude=["*.tests"]),
     install_requires=[
         "pyserial-asyncio",
-        "zigpy>=0.22.1",
+        "zigpy>=0.23.0",
         "async_timeout",
         "voluptuous",
         "coloredlogs",

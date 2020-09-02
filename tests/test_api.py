@@ -1,4 +1,3 @@
-import copy
 import pytest
 import asyncio
 import warnings
@@ -916,7 +915,7 @@ async def test_request_callback_rsp(pingable_serial_port, event_loop):
 
 @pytest_mark_asyncio_timeout()
 async def test_request_callback_rsp_timeouts(pingable_serial_port, event_loop):
-    config = copy.deepcopy(TEST_APP_CONFIG)
+    config = conf.CONFIG_SCHEMA(TEST_APP_CONFIG)
     config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
     config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
 
