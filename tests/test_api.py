@@ -198,6 +198,28 @@ async def test_znp_responses_iterator(znp):
 
 
 @pytest_mark_asyncio_timeout()
+async def test_znp_responses_multiple(znp):
+    assert not znp._listeners
+
+    future1 = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
+    future2 = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
+    future3 = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
+
+    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    znp.frame_received(response.to_frame())
+
+    await future1
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert not future2.done()
+    assert not future3.done()
+
+    assert znp._listeners
+
+
+@pytest_mark_asyncio_timeout()
 async def test_znp_response_timeouts(znp):
     response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
 
@@ -480,10 +502,12 @@ async def test_znp_wait_for_responses(znp, event_loop):
     # We shouldn't see any effects from receiving a frame early
     znp.frame_received(response1.to_frame())
 
+    # Will match the first response1 and detach
     future1 = znp.wait_for_responses(
         [c.SYS.Ping.Rsp(partial=True), c.SYS.Ping.Rsp(partial=True)]
     )
 
+    # Will match the first response3 and detach
     future2 = znp.wait_for_responses(
         [
             c.Util.TimeAlive.Rsp(Seconds=12),
@@ -491,13 +515,12 @@ async def test_znp_wait_for_responses(znp, event_loop):
         ]
     )
 
+    # Will not match anything
     future3 = znp.wait_for_responses([c.Util.TimeAlive.Rsp(Seconds=10)])
 
+    # Will match response1 the second time around
     future4 = znp.wait_for_responses(
         [
-            # Duplicating matching responses shouldn't do anything
-            c.SYS.Ping.Rsp(partial=True),
-            c.SYS.Ping.Rsp(partial=True),
             # Matching against different response types should also work
             c.Util.TimeAlive.Rsp(Seconds=12),
             c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
@@ -511,6 +534,14 @@ async def test_znp_wait_for_responses(znp, event_loop):
     znp.frame_received(response3.to_frame())
     znp.frame_received(response4.to_frame())
     znp.frame_received(response5.to_frame())
+
+    assert future1.done()
+    assert future2.done()
+    assert not future3.done()
+    assert not future4.done()
+
+    await asyncio.sleep(0)
+
     znp.frame_received(response1.to_frame())
     znp.frame_received(response2.to_frame())
     znp.frame_received(response3.to_frame())
@@ -525,6 +556,8 @@ async def test_znp_wait_for_responses(znp, event_loop):
     assert (await future1) == response1
     assert (await future2) == response3
     assert (await future4) == response1
+
+    await asyncio.sleep(0)
 
     znp.frame_received(c.Util.TimeAlive.Rsp(Seconds=10).to_frame())
     assert future3.done()

@@ -305,14 +305,24 @@ class ZNP:
         LOGGER.debug("Received command: %s", command)
 
         matched = False
+        one_shot_matched = False
 
         for listener in self._listeners[command.header]:
+            # XXX: A single response should *not* resolve multiple one-shot listeners!
+            #      `future.add_done_callback` doesn't remove our listeners synchronously
+            #      so doesn't prevent this from happening.
+            if one_shot_matched and isinstance(listener, OneShotResponseListener):
+                continue
+
             if not listener.resolve(command):
                 LOGGER.log(TRACE, "%s does not match %s", command, listener)
                 continue
 
             matched = True
             LOGGER.log(TRACE, "%s matches %s", command, listener)
+
+            if isinstance(listener, OneShotResponseListener):
+                one_shot_matched = True
 
         if not matched:
             LOGGER.warning("Received an unhandled command: %s", command)
