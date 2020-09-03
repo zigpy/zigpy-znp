@@ -5,22 +5,18 @@
 
 **[zigpy-znp](https://github.com/zha-ng/zigpy-zhp/)** is a Python library that adds support for common [Texas Instruments ZNP (Zigbee Network Processors)](http://dev.ti.com/tirex/content/simplelink_zigbee_sdk_plugin_2_20_00_06/docs/zigbee_user_guide/html/zigbee/introduction.html) [Zigbee](https://www.zigbee.org) radio modules to [zigpy](https://github.com/zigpy/), a Python Zigbee stack project.
 
-Together with zigpy and compatible home automation software (namely Home Assistant's [ZHA (Zigbee Home Automation) integration component](https://www.home-assistant.io/integrations/zha/)), you can directly control most Zigbee devices such as Philips Hue, GE, OSRAM LIGHTIFY, Xiaomi/Aqara, IKEA Tradfri, Samsung SmartThings, and many more.
+Together with zigpy and compatible home automation software (namely Home Assistant's [ZHA (Zigbee Home Automation) integration component](https://www.home-assistant.io/integrations/zha/)), you can directly control Zigbee devices such as Philips Hue, GE, OSRAM LIGHTIFY, Xiaomi/Aqara, IKEA Tradfri, Samsung SmartThings, and many more.
 
 # Installation
 
 ## Python module
 Install the Python module within your virtual environment:
 
-```shell
-(venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/
-```
-
-Or the latest stable release from the PyPI:
-```shell
-(venv) $ pip install zigpy-znp
-```
-
+```console
+       $ virtualenv -p python3.8 venv                          # if you don't already have one
+       $ source venv/bin/activate
+(venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/  # latest commit from Git
+(venv) $ pip install zigpy-znp                                 # or, latest stable from PyPI
 
 ## Home Assistant
 If you are using Home Assistant, copy [`custom_components/zha_custom_radios.py`](https://github.com/zha-ng/zigpy-znp/blob/dev/custom_components/zha_custom_radios.py) into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
@@ -32,13 +28,13 @@ zha_custom_radios:
    description: TI CC13x2, CC26x2, ZZH, and CC2531
 ```
 
-If you have already setup Home Assistant's ZHA component with a TI radio, ZHA will already be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. To switch ZHA over to zigpy-znp, navigate to the folder containing your `configuration.yaml` file and edit the `.storage/core.config_entries`, changing `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
+If you have already setup Home Assistant's ZHA component with a TI radio, ZHA will be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. Navigate to the folder containing your `configuration.yaml` file and edit the `.storage/core.config_entries`, changing `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
 
 ## Firmware
 
-CC2531 users will need to upgrade their firmware to Z-Stack 3.0.1. This is quick and simple if you are already running a build of Z-Stack from the Zigbee2MQTT project. Make sure to plug your CC2531 in and run the below commands within 60s:
+CC2531 users will need to upgrade their firmware to Z-Stack 3.0.1. This is quick and simple if you are already running a build of Z-Stack. Make sure to plug your CC2531 in and run the below commands within 60s:
 
-```shell
+```console
 (venv) $ curl -L -o CC2531_20190425.zip https://github.com/Koenkk/Z-Stack-firmware/raw/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip
 (venv) $ unzip CC2531_20190425.zip
 (venv) $ python -m zigpy_znp.tools.flash_write -i CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531
@@ -48,6 +44,7 @@ CC2531 users will need to upgrade their firmware to Z-Stack 3.0.1. This is quick
 2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.08%
 2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.11%
 ...
+(venv) $ python -m zigpy_znp.tools.nvram_reset /dev/serial/by-id/YOUR-CC2531  # note: this will clear your network settings!
 ```
 
 # Configuration
@@ -64,9 +61,9 @@ zha:
 ```
 
 # Backup and restore
-A complete NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else is untested.
+A complete NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else likely will not work.
 
-```shell
+```console
 (venv) $ python -m zigpy_znp.tools.nvram_read /dev/serial/by-id/old_radio -o backup.json
 (venv) $ python -m zigpy_znp.tools.nvram_write /dev/serial/by-id/new_radio -i backup.json
 ```
@@ -81,11 +78,6 @@ Perform an energy scan to find a quiet Zigbee channel:
 
 ```
 $ python -m zigpy_znp.tools.energy_scan /dev/cu.usbmodem14101
-2020-08-15 14:24:09 computer __main__[12018] INFO Starting up zigpy-znp
-2020-08-15 14:24:12 computer zigpy_znp.api[12018] WARNING Received an unhandled command: AppConfig.BDBCommissioningNotification.Callback(Status=<BDBCommissioningStatus.NetworkRestored: 13>, Mode=<BDBCommissioningMode.NONE: 0>, RemainingModes=<BDBCommissioningMode.NwkFormation: 4>)
-2020-08-15 14:24:13 computer zigpy_znp.zigbee.application[12018] INFO Using channel mask Channels.CHANNEL_15, currently on channel 15
-2020-08-15 14:24:13 computer __main__[12018] INFO Running scan...
-2020-08-15 14:24:13 computer zigpy_znp.api[12018] WARNING Received an unhandled command: AppConfig.BDBCommissioningNotification.Callback(Status=<BDBCommissioningStatus.FormationFailure: 8>, Mode=<BDBCommissioningMode.NwkSteering: 2>, RemainingModes=<BDBCommissioningMode.NONE: 0>)
 Channel energy (1 / 5):
  - 11:   0.00%
  - 12:   0.39%
@@ -110,7 +102,7 @@ USB-adapters, GPIO-modules, and development-boards running recent TI Z-Stack rel
 
  - (**STABLE**) [TI LAUNCHXL-CC26X2R1](https://www.ti.com/tool/LAUNCHXL-CC26X2R1) running [Z-Stack 3.30.00.03](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC26X2R1_20191106.hex` using [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH).
  - (**STABLE**) [Electrolama's zig-a-zig-ah!](https://electrolama.com/projects/zig-a-zig-ah/) running [Z-Stack 4.10.00.78](https://github.com/Koenkk/Z-Stack-firmware/tree/develop/coordinator/Z-Stack_3.x.0/bin). You can flash `CC26X2R1_20200417.hex` using [cc2538-bsl](https://github.com/JelmerT/cc2538-bsl).
- - (**ALPHA**) CC2531 running [Z-Stack 3.0.1](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip). You can flash `CC2531ZNP-without-SBL.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531`.
+ - (**BETA**) CC2531 running [Z-Stack 3.0.1](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip). You can flash `CC2531ZNP-without-SBL.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531`.
 
 Older versions of Z-Stack are not currently supported. Z-Stack versions 3.x and above are currently required and all communication with the radio module is done over the the Z-Stack Monitor and Test (MT) interface via a serial port.
 
