@@ -4,6 +4,12 @@ import random
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
+try:
+    # Python 3.8 already has this
+    from mock import AsyncMock as CoroutineMock
+except ImportError:
+    from asynctest import CoroutineMock
+
 from zigpy_znp.tools.flash_read import main as flash_read
 from zigpy_znp.tools.flash_write import get_firmware_crcs, main as flash_write
 
@@ -88,7 +94,9 @@ async def test_flash_backup_write(
     firmware_file = tmp_path / "firmware.bin"
     firmware_file.write_bytes(FAKE_FLASH)
 
-    reset_func = mocker.patch("zigpy_znp.tools.flash_write.nvram_reset")
+    reset_func = mocker.patch(
+        "zigpy_znp.tools.flash_write.nvram_reset", new=CoroutineMock()
+    )
     args = [openable_serial_znp_server._port_path, "-i", str(firmware_file)]
 
     if reset:
