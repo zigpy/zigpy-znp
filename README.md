@@ -13,10 +13,11 @@ Together with zigpy and compatible home automation software (namely Home Assista
 Install the Python module within your virtual environment:
 
 ```console
-       $ virtualenv -p python3.8 venv                          # if you don't already have one
-       $ source venv/bin/activate
+$ virtualenv -p python3.8 venv                                 # if you don't already have one
+$ source venv/bin/activate
 (venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/  # latest commit from Git
 (venv) $ pip install zigpy-znp                                 # or, latest stable from PyPI
+```
 
 ## Home Assistant
 If you are using Home Assistant, copy [`custom_components/zha_custom_radios.py`](https://github.com/zha-ng/zigpy-znp/blob/dev/custom_components/zha_custom_radios.py) into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
