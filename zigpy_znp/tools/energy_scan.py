@@ -23,11 +23,9 @@ def channels_from_channel_mask(channels: t.Channels):
 async def perform_energy_scan(radio_path, num_scans=None):
     LOGGER.info("Starting up zigpy-znp")
 
-    app = ControllerApplication(
-        ControllerApplication.SCHEMA({"device": {"path": radio_path}})
+    app = await ControllerApplication.new(
+        ControllerApplication.SCHEMA({"device": {"path": radio_path}}), auto_form=True
     )
-
-    await app.startup()
 
     LOGGER.info("Running scan...")
 

@@ -66,7 +66,7 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     None, vol.All(int, vol.Range(min=-22, max=19))
                 ),
                 vol.Optional(CONF_SREQ_TIMEOUT, default=5): VolPositiveNumber,
-                vol.Optional(CONF_ARSP_TIMEOUT, default=5): VolPositiveNumber,
+                vol.Optional(CONF_ARSP_TIMEOUT, default=10): VolPositiveNumber,
                 vol.Optional(
                     CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
                 ): VolPositiveNumber,

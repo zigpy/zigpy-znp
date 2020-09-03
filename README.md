@@ -77,7 +77,7 @@ Tested migrations:
 # Energy scan
 Perform an energy scan to find a quiet Zigbee channel:
 
-```
+```console
 $ python -m zigpy_znp.tools.energy_scan /dev/cu.usbmodem14101
 Channel energy (1 / 5):
  - 11:   0.00%
