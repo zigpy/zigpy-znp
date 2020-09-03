@@ -57,13 +57,21 @@ async def perform_energy_scan(radio_path, num_scans=None):
 
         total = 0xFF * len(energies)
 
-        print(f"Channel energy ({len(energies)} / {energies.maxlen}):")
+        print(f"Channel energy (mean of {len(energies)} / {energies.maxlen}):")
+        print("------------------------------------------------")
+        print(" + Lower energy is better")
+        print(" + Active Zigbee networks on a channel may still cause congestion")
+        print(" + Using 26 in the USA may have lower TX power due to FCC regulations")
+        print(" + Zigbee channels 15, 20, 25 fall between WiFi channels 1, 6, 11")
+        print(" + Some Zigbee devices only join networks on channels 15, 20, and 25")
+        print("------------------------------------------------")
 
         for channel, energies in channel_energies.items():
             count = sum(energies)
+            asterisk = "*" if channel == 26 else " "
 
             print(
-                f" - {channel:>02}: {count / total:>7.2%}  "
+                f" - {channel:>02}{asterisk}  {count / total:>7.2%}  "
                 + "#" * int(100 * count / total)
             )
 
