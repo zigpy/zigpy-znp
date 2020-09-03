@@ -25,9 +25,8 @@ class OsalExNvIds(BaseNvIds):
 
 
 class NwkNvIds(BaseNvIds):
-    # XXX: These are not documented or found in the code but seem to work?
-    #      No others exist. Every one of the 2^16 possible NVIDs is in this enum.
-    # HAS_CONFIGURED_ZSTACK1 = 0x0F00
+    # Introduced by zigbeer/zigbee-shepherd and now used by Zigbee2MQTT
+    HAS_CONFIGURED_ZSTACK1 = 0x0F00
     HAS_CONFIGURED_ZSTACK3 = 0x0060
 
     # OSAL NV item IDs

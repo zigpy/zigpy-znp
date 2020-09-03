@@ -5,9 +5,8 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.tools.energy_scan import channels_from_channel_mask, main as energy_scan
 
-from test_api import pytest_mark_asyncio_timeout  # noqa: F401
-from test_application import make_application, znp_server  # noqa: F401
-from test_tools_nvram import openable_serial_znp_server  # noqa: F401
+from ..test_api import pytest_mark_asyncio_timeout  # noqa: F401
+from ..test_application import make_application, znp_server  # noqa: F401
 
 
 def test_channels_from_channel_mask():
@@ -21,7 +20,7 @@ def test_channels_from_channel_mask():
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_energy_scan(openable_serial_znp_server, capsys):  # noqa: F811
+async def test_energy_scan(openable_serial_znp_server, capsys, mocker):  # noqa: F811
     app, openable_serial_znp_server = make_application(openable_serial_znp_server)
 
     def fake_scanner(request):

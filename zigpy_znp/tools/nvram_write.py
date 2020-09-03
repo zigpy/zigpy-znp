@@ -11,6 +11,7 @@ from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
+from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,35 +56,14 @@ async def restore(radio_path, backup):
 
 
 async def main(argv):
-    import coloredlogs
-
-    parser = argparse.ArgumentParser(
-        description="Restore a radio's NVRAM from a previous backup"
-    )
-    parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
+    parser = setup_parser("Restore a radio's NVRAM from a previous backup")
     parser.add_argument(
         "--input", "-i", type=argparse.FileType("r"), help="Input file", required=True
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        action="count",
-        default=0,
-        help="increases verbosity",
-    )
 
     args = parser.parse_args(argv)
-
-    log_level = [logging.INFO, logging.DEBUG][min(max(0, args.verbose), 1)]
-    logging.getLogger("zigpy_znp").setLevel(log_level)
-    coloredlogs.install(level=log_level)
-
-    # We just want to make sure it exists
-    args.serial.close()
-
     backup = json.load(args.input)
-    await restore(args.serial.name, backup)
+    await restore(args.serial, backup)
 
 
 if __name__ == "__main__":

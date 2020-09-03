@@ -7,9 +7,7 @@ import zigpy_znp.commands as c
 from zigpy_znp.tools.flash_read import main as flash_read
 from zigpy_znp.tools.flash_write import get_firmware_crcs, main as flash_write
 
-from test_api import pytest_mark_asyncio_timeout  # noqa: F401
-from test_application import znp_server  # noqa: F401
-from test_tools_nvram import openable_serial_znp_server  # noqa: F401
+from ..test_api import pytest_mark_asyncio_timeout  # noqa: F401
 
 
 random.seed(12345)
@@ -24,8 +22,9 @@ random.seed()
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
+@pytest.mark.parametrize("reset", [False, True])
 async def test_flash_backup_write(
-    openable_serial_znp_server, tmp_path, mocker  # noqa: F811
+    openable_serial_znp_server, tmp_path, mocker, reset  # noqa: F811
 ):
     # It takes too long otherwise
     mocker.patch("zigpy_znp.commands.ubl.IMAGE_SIZE", FAKE_IMAGE_SIZE)
@@ -88,7 +87,19 @@ async def test_flash_backup_write(
     # First we write the flash
     firmware_file = tmp_path / "firmware.bin"
     firmware_file.write_bytes(FAKE_FLASH)
-    await flash_write([openable_serial_znp_server._port_path, "-i", str(firmware_file)])
+
+    reset_func = mocker.patch("zigpy_znp.tools.flash_write.nvram_reset")
+    args = [openable_serial_znp_server._port_path, "-i", str(firmware_file)]
+
+    if reset:
+        args.append("--reset")
+
+    await flash_write(args)
+
+    if reset:
+        assert reset_func.call_count == 1
+    else:
+        assert reset_func.call_count == 0
 
     # And then make a backup
     backup_file = tmp_path / "backup.bin"

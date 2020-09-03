@@ -11,7 +11,7 @@ from zigpy_znp.frames import TransportFrame
 
 from serial_asyncio import SerialTransport
 
-from test_api import pytest_mark_asyncio_timeout
+from .test_api import pytest_mark_asyncio_timeout
 
 
 def test_uart_rx_basic():

@@ -1,7 +1,6 @@
 import sys
 import asyncio
 import logging
-import argparse
 import itertools
 
 from collections import defaultdict, deque
@@ -9,6 +8,7 @@ from collections import defaultdict, deque
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
+from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
@@ -73,18 +73,7 @@ async def perform_energy_scan(radio_path, num_scans=None):
 
 
 async def main(argv):
-    import coloredlogs
-
-    parser = argparse.ArgumentParser(description="Perform an energy scan")
-    parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        action="count",
-        default=0,
-        help="Increases verbosity",
-    )
+    parser = setup_parser("Perform an energy scan")
     parser.add_argument(
         "-n",
         "--num-scans",
@@ -96,14 +85,7 @@ async def main(argv):
 
     args = parser.parse_args(argv)
 
-    log_level = [logging.INFO, logging.DEBUG][min(max(0, args.verbose), 1)]
-    logging.getLogger("zigpy_znp").setLevel(log_level)
-    coloredlogs.install(level=log_level)
-
-    # We just want to make sure it exists
-    args.serial.close()
-
-    await perform_energy_scan(args.serial.name, num_scans=args.num_scans)
+    await perform_energy_scan(args.serial, num_scans=args.num_scans)
 
 
 if __name__ == "__main__":

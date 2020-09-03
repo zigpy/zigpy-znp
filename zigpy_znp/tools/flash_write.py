@@ -10,6 +10,8 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
+from zigpy_znp.tools.common import setup_parser
+from zigpy_znp.tools.nvram_reset import nvram_reset
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ def get_firmware_crcs(firmware: bytes) -> typing.Tuple[int, int]:
     return real_crc, compute_crc16(firmware_without_crcs)
 
 
-async def write_firmware(firmware: bytes, radio_path: str):
+async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
     if len(firmware) != c.ubl.IMAGE_SIZE:
         raise ValueError(
             f"Firmware is the wrong size."
@@ -133,12 +135,14 @@ async def write_firmware(firmware: bytes, radio_path: str):
 
     assert enable_rsp.Status == c.ubl.BootloaderStatus.SUCCESS
 
+    if reset_nvram:
+        await nvram_reset(znp)
+    else:
+        LOGGER.info("Unplug your adapter to leave bootloader mode!")
+
 
 async def main(argv):
-    import coloredlogs
-
-    parser = argparse.ArgumentParser(description="Write firmware to a radio")
-    parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
+    parser = setup_parser("Write firmware to a radio")
     parser.add_argument(
         "--input",
         "-i",
@@ -147,26 +151,16 @@ async def main(argv):
         required=True,
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        action="count",
-        default=0,
-        help="increases verbosity",
+        "--reset",
+        "-r",
+        action="store_true",
+        help="Resets the device's NVRAM after upgrade",
+        default=False,
     )
 
     args = parser.parse_args(argv)
 
-    log_level = [logging.INFO, logging.DEBUG][min(max(0, args.verbose), 1)]
-    logging.getLogger("zigpy_znp").setLevel(log_level)
-    coloredlogs.install(level=log_level)
-
-    # We just want to make sure it exists
-    args.serial.close()
-
-    await write_firmware(args.input.read(), args.serial.name)
-
-    LOGGER.info("Unplug your adapter to leave bootloader mode!")
+    await write_firmware(args.input.read(), args.serial, args.reset)
 
 
 if __name__ == "__main__":

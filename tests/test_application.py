@@ -26,7 +26,7 @@ from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.zigbee.application import ControllerApplication
 
 
-from test_api import (  # noqa: F401
+from .test_api import (  # noqa: F401
     pytest_mark_asyncio_timeout,
     config_for_port_path,
     pingable_serial_port,

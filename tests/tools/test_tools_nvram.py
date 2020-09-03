@@ -1,6 +1,5 @@
 import copy
 import json
-
 import pytest
 
 import zigpy_znp.types as t
@@ -10,11 +9,9 @@ from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
 
 from zigpy_znp.tools.nvram_read import main as nvram_read
 from zigpy_znp.tools.nvram_write import main as nvram_write
+from zigpy_znp.tools.nvram_reset import main as nvram_reset
 
-
-from test_api import pytest_mark_asyncio_timeout  # noqa: F401
-
-from test_application import znp_server  # noqa: F401
+from ..test_api import pytest_mark_asyncio_timeout  # noqa: F401
 
 
 # We use an existing backup as an NVRAM model
@@ -104,36 +101,6 @@ REAL_BACKUP = {
 }
 
 
-@pytest.fixture
-def openable_serial_znp_server(mocker, znp_server):  # noqa: F811
-    # The fake serial port is "opened" by argparse, which we have to allow
-    def fixed_open(
-        file,
-        mode="r",
-        buffering=-1,
-        encoding=None,
-        errors=None,
-        newline=None,
-        closefd=True,
-        opener=None,
-    ):
-        if file == znp_server._port_path:
-
-            class FakeFile:
-                name = file
-
-                def close(self):
-                    pass
-
-            return FakeFile()
-
-        return open(file, mode, buffering, encoding, errors, newline, closefd, opener)
-
-    mocker.patch("argparse.open", new=fixed_open)
-
-    return znp_server
-
-
 def osal_nv_read(req):
     nvid = NwkNvIds(req.Id).name
 
@@ -172,7 +139,7 @@ def not_recognized(req):
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_nvram_read(openable_serial_znp_server, tmp_path):
+async def test_nvram_read(openable_serial_znp_server, tmp_path, mocker):
     openable_serial_znp_server.reply_to(
         request=c.SYS.OSALNVRead.Req(partial=True), responses=[osal_nv_read],
     )
@@ -194,7 +161,7 @@ async def test_nvram_read(openable_serial_znp_server, tmp_path):
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_nvram_read_old_zstack(openable_serial_znp_server, tmp_path):
+async def test_nvram_read_old_zstack(openable_serial_znp_server, tmp_path, mocker):
     openable_serial_znp_server.reply_to(
         request=c.SYS.OSALNVRead.Req(partial=True), responses=[osal_nv_read],
     )
@@ -222,7 +189,7 @@ async def test_nvram_read_old_zstack(openable_serial_znp_server, tmp_path):
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_nvram_write(openable_serial_znp_server, tmp_path):
+async def test_nvram_write(openable_serial_znp_server, tmp_path, mocker):
     simulated_nvram = {"osal": {}, "nwk": {}}
 
     def osal_nv_item_init(req):
@@ -311,3 +278,55 @@ async def test_nvram_write(openable_serial_znp_server, tmp_path):
 
     # The backup JSON written to disk should be an exact copy of our original fake NVRAM
     assert simulated_nvram_hex == REAL_BACKUP
+
+
+@pytest_mark_asyncio_timeout(seconds=5)
+@pytest.mark.parametrize(
+    "delete_rsp",
+    [
+        c.SYS.OSALNVDelete.Rsp(Status=t.Status.SUCCESS),
+        c.SYS.OSALNVDelete.Rsp(Status=t.Status.NV_ITEM_UNINIT),
+    ],
+)
+async def test_nvram_reset(openable_serial_znp_server, delete_rsp):
+    did_write_reset = openable_serial_znp_server.reply_once_to(
+        request=c.SYS.OSALNVWrite.Req(
+            Id=NwkNvIds.STARTUP_OPTION,
+            Offset=0,
+            Value=(
+                t.StartupOptions.ClearConfig | t.StartupOptions.ClearState
+            ).serialize(),
+        ),
+        responses=[c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    did_delete_zstack1_configured = openable_serial_znp_server.reply_once_to(
+        request=c.SYS.OSALNVDelete.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK1, ItemLen=1),
+        responses=[delete_rsp],
+    )
+
+    did_delete_zstack3_configured = openable_serial_znp_server.reply_once_to(
+        request=c.SYS.OSALNVDelete.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1),
+        responses=[delete_rsp],
+    )
+
+    did_reset = openable_serial_znp_server.reply_once_to(
+        request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
+        responses=[
+            c.SYS.ResetInd.Callback(
+                Reason=t.ResetReason.PowerUp,
+                TransportRev=2,
+                ProductId=2,
+                MajorRel=2,
+                MinorRel=7,
+                MaintRel=2,
+            )
+        ],
+    )
+
+    await nvram_reset([openable_serial_znp_server._port_path])
+
+    await did_write_reset
+    await did_delete_zstack1_configured
+    await did_delete_zstack3_configured
+    await did_reset

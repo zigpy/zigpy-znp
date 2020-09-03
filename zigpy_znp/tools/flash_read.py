@@ -8,6 +8,7 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
+from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,10 +64,7 @@ async def read_firmware(radio_path: str) -> bytearray:
 
 
 async def main(argv):
-    import coloredlogs
-
-    parser = argparse.ArgumentParser(description="Backup a radio's firmware")
-    parser.add_argument("serial", type=argparse.FileType("rb"), help="Serial port path")
+    parser = setup_parser("Backup a radio's firmware")
     parser.add_argument(
         "--output",
         "-o",
@@ -74,25 +72,9 @@ async def main(argv):
         help="Output .bin file",
         required=True,
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        action="count",
-        default=0,
-        help="increases verbosity",
-    )
 
     args = parser.parse_args(argv)
-
-    log_level = [logging.INFO, logging.DEBUG][min(max(0, args.verbose), 1)]
-    logging.getLogger("zigpy_znp").setLevel(log_level)
-    coloredlogs.install(level=log_level)
-
-    # We just want to make sure it exists
-    args.serial.close()
-
-    data = await read_firmware(args.serial.name)
+    data = await read_firmware(args.serial)
     args.output.write(data)
 
     LOGGER.info("Unplug your adapter to leave bootloader mode!")
