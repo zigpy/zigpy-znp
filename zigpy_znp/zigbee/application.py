@@ -150,9 +150,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._znp = znp
         self._bind_callbacks()
 
-        # Issue a reset first to make sure we aren't permitting joins
-        await self._reset()
-
         # XXX: To make sure we don't switch to the wrong device upon reconnect,
         #      update our config to point to the last-detected port.
         if self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == "auto":
@@ -180,12 +177,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # settings itself
             await self.form_network()
         else:
+            # Issue a reset first to make sure we aren't permitting joins
+            await self._reset()
+
             LOGGER.info("ZNP is already configured, not forming a new network")
             await self._write_stack_settings(reset_if_changed=True)
 
         # At this point the device state should the same, regardless of whether we just
         # formed a new network or are restoring one
-
         if self.znp_config[conf.CONF_TX_POWER] is not None:
             dbm = self.znp_config[conf.CONF_TX_POWER]
 
@@ -223,7 +222,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
         )
 
-        # The AUTOSTART startup NV item doesn't do anything
+        # The AUTOSTART startup NV item doesn't do anything.
         # According to the forums, this is the correct startup sequence, including
         # the formation failure error
         await self._znp.request_callback_rsp(
@@ -272,16 +271,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
         )
 
-        # Even though the device is "ready" at this point, for some reason it takes
-        # a few more seconds for the NIB to update with our correct logical channel
-        while True:
-            await self._load_device_info()
-
-            # Usually this works after the first attempt
-            if self.channel:
-                break
-
-            await asyncio.sleep(1)
+        await self._load_device_info()
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
@@ -426,6 +416,28 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if bdb_commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
             raise RuntimeError(f"Network formation failed: {bdb_commissioning_rsp}")
+
+        # Even though the device is "ready" at this point, for some reason it takes
+        # a few more seconds for the NIB to update with our correct logical channel
+        while True:
+            nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+
+            # Usually this works after the first attempt
+            if nib.nwkLogicalChannel:
+                break
+
+            await asyncio.sleep(1)
+
+        # Only at this point can we update our logical channel
+        channel = self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL]
+
+        if channel != nib.nwkLogicalChannel:
+            LOGGER.debug(
+                "Z-Stack started with channel %d. Updating to %d.",
+                nib.nwkLogicalChannel,
+                channel,
+            )
+            await self.update_network(channel=channel)
 
         # Create the NV item that keeps track of whether or not we're configured.
         # This is the NV item used by Zigbee2MQTT, pulled in from zigbee-shepherd, and

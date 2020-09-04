@@ -1092,8 +1092,12 @@ async def test_auto_form_unnecessary(application, mocker):
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
-async def test_auto_form_necessary(application, mocker):
-    app, znp_server = application()
+@pytest.mark.parametrize("channel", [15, 20])
+async def test_auto_form_necessary(channel, application, mocker):
+    config = config_for_port_path("/dev/ttyFAKE0")
+    config[conf.CONF_NWK][conf.CONF_CHANNEL] = channel
+
+    app, znp_server = application(config)
     nvram = znp_server._nvram_state
 
     nvram.pop(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
@@ -1165,7 +1169,11 @@ async def test_auto_form_necessary(application, mocker):
     # Finally test startup with auto forming
     await app.startup(auto_form=True)
 
-    assert app.update_network.call_count == 1
+    if channel == 15:
+        assert app.update_network.call_count == 1
+    else:
+        # A second network update is performed to switch the channel over
+        assert app.update_network.call_count == 2
 
     assert nvram[NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
     assert (
