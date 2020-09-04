@@ -431,7 +431,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Only at this point can we update our logical channel
         channel = self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL]
 
-        if channel != nib.nwkLogicalChannel:
+        if channel is not None and channel != nib.nwkLogicalChannel:
             LOGGER.debug(
                 "Z-Stack started with channel %d. Updating to %d.",
                 nib.nwkLogicalChannel,
