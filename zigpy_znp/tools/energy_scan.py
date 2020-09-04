@@ -61,7 +61,7 @@ async def perform_energy_scan(radio_path, num_scans=None):
         print("------------------------------------------------")
         print(" + Lower energy is better")
         print(" + Active Zigbee networks on a channel may still cause congestion")
-        print(" + Using 26 in the USA may have lower TX power due to FCC regulations")
+        print(" + TX on 26 in North America may be with lower power due to regulations")
         print(" + Zigbee channels 15, 20, 25 fall between WiFi channels 1, 6, 11")
         print(" + Some Zigbee devices only join networks on channels 15, 20, and 25")
         print("------------------------------------------------")
