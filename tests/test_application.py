@@ -21,7 +21,7 @@ from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import connect as uart_connect
-from zigpy_znp.znp.nib import NIB
+from zigpy_znp.znp.nib import NIB, NwkState16, NwkKeyDesc
 from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -243,16 +243,62 @@ def make_application(znp_server, config=None):
     # Simulate a bit of NVRAM
     nvram = {
         NwkNvIds.HAS_CONFIGURED_ZSTACK3: b"\x55",
-        NwkNvIds.NIB: (
-            b"\xCB\x05\x02\x33\x14\x33\x00\x1E\x00\x00\x00\x01\x05\x01\x8F"
-            b"\x00\x07\x00\x02\x05\x1E\x00\x00\x00\x19\x00\x00\x00\x00\x00"
-            b"\x00\x00\x00\x00\x00\x00\x95\x86\x08\x00\x00\x80\x10\x02\x0F"
-            b"\x0F\x04\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00\xA8\x60\xCA"
-            b"\x53\xDB\x3B\xC0\xA8\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x0F\x03\x00"
-            b"\x01\x78\x0A\x01\x00\x00\x00\xB7\x15\x00\x00"
-        ),
+        NwkNvIds.NIB: NIB(
+            SequenceNum=203,
+            PassiveAckTimeout=5,
+            MaxBroadcastRetries=2,
+            MaxChildren=51,
+            MaxDepth=20,
+            MaxRouters=51,
+            dummyNeighborTable=0,
+            BroadcastDeliveryTime=30,
+            ReportConstantCost=0,
+            RouteDiscRetries=0,
+            dummyRoutingTable=0,
+            SecureAllFrames=1,
+            SecurityLevel=5,
+            SymLink=1,
+            CapabilityFlags=143,
+            PaddingByte0=b"\x00",
+            TransactionPersistenceTime=7,
+            nwkProtocolVersion=2,
+            RouteDiscoveryTime=5,
+            RouteExpiryTime=30,
+            PaddingByte1=b"\x00",
+            nwkDevAddress=0x0000,
+            nwkLogicalChannel=25,
+            PaddingByte2=b"\x00",
+            nwkCoordAddress=0x0000,
+            nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+            nwkPanId=34453,
+            nwkState=NwkState16.NWK_ROUTER,
+            channelList=t.Channels.from_channel_list([15, 20, 25]),
+            beaconOrder=15,
+            superFrameOrder=15,
+            scanDuration=4,
+            battLifeExt=0,
+            allocatedRouterAddresses=1,
+            allocatedEndDeviceAddresses=1,
+            nodeDepth=0,
+            extendedPANID=t.EUI64.convert("a8:c0:3b:db:53:ca:60:a8"),
+            nwkKeyLoaded=t.Bool.true,
+            spare1=NwkKeyDesc(keySeqNum=0, key=[0] * 16),
+            spare2=NwkKeyDesc(keySeqNum=0, key=[0] * 16),
+            spare3=0,
+            spare4=0,
+            nwkLinkStatusPeriod=15,
+            nwkRouterAgeLimit=3,
+            nwkUseMultiCast=t.Bool.false,
+            nwkIsConcentrator=t.Bool.true,
+            nwkConcentratorDiscoveryTime=120,
+            nwkConcentratorRadius=10,
+            nwkAllFresh=1,
+            PaddingByte3=b"\x00",
+            nwkManagerAddr=0x0000,
+            nwkTotalTransmissions=5559,
+            nwkUpdateId=0,
+            PaddingByte4=b"\x00",
+        ).serialize(),
         NwkNvIds.EXTENDED_PAN_ID: b"\xA8\x60\xCA\x53\xDB\x3B\xC0\xA8",
         NwkNvIds.EXTADDR: b"\x5C\xAC\xAA\x1C\x00\x4B\x12\x00",
         NwkNvIds.CHANLIST: b"\x00\x80\x10\x02",
@@ -1092,10 +1138,10 @@ async def test_auto_form_unnecessary(application, mocker):
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
-@pytest.mark.parametrize("channel", [15, 20])
+@pytest.mark.parametrize("channel", [15, 20, 25])
 async def test_auto_form_necessary(channel, application, mocker):
     config = config_for_port_path("/dev/ttyFAKE0")
-    config[conf.CONF_NWK][conf.CONF_CHANNEL] = channel
+    config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL] = channel
 
     app, znp_server = application(config)
     nvram = znp_server._nvram_state
@@ -1169,7 +1215,7 @@ async def test_auto_form_necessary(channel, application, mocker):
     # Finally test startup with auto forming
     await app.startup(auto_form=True)
 
-    if channel == 15:
+    if channel == 25:
         assert app.update_network.call_count == 1
     else:
         # A second network update is performed to switch the channel over
