@@ -2,6 +2,7 @@ import typing
 import asyncio
 import logging
 import itertools
+import contextlib
 import dataclasses
 import async_timeout
 
@@ -327,17 +328,28 @@ class ZNP:
         if not matched:
             LOGGER.warning("Received an unhandled command: %s", command)
 
-    async def iterator_for_responses(self, responses):
+    async def iterator_for_responses(
+        self, responses
+    ) -> typing.AsyncGenerator[t.CommandBase, None]:
         """
         Yields all matching responses as long as the async iterator is active.
+        """
+
+        async with self.capture_responses(responses) as queue:
+            while True:
+                yield await queue.get()
+
+    @contextlib.asynccontextmanager
+    async def capture_responses(self, responses):
+        """
+        Captures all matched responses in a queue within the context manager.
         """
 
         queue = asyncio.Queue()
         listener = self.callback_for_responses(responses, queue.put_nowait)
 
         try:
-            while True:
-                yield await queue.get()
+            yield queue
         finally:
             self.remove_listener(listener)
 

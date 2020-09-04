@@ -392,6 +392,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # collision using `os.urandom` are astronomically small
             extended_pan_id = ExtendedPanId(os.urandom(8))
 
+        LOGGER.debug("Updating network settings")
+
         # Update the network settings.
         # Not resetting before we form the network is important!
         await self.update_network(
@@ -404,18 +406,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # Finally, form the network
-        bdb_commissioning_rsp = await self._znp.request_callback_rsp(
-            request=c.AppConfig.BDBStartCommissioning.Req(
-                Mode=c.app_config.BDBCommissioningMode.NwkFormation
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
-            ),
-        )
+        LOGGER.debug("Forming the network")
+
+        # Form the network and capture expected progress messages so they don't appear
+        # as warnings within logs
+        async with self._znp.capture_responses(
+            [
+                c.ZDO.StateChangeInd.Callback(
+                    State=t.DeviceState.StartingAsCoordinator
+                ),
+                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+                c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
+                ),
+            ]
+        ):
+            bdb_commissioning_rsp = await self._znp.request_callback_rsp(
+                request=c.AppConfig.BDBStartCommissioning.Req(
+                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
+                ),
+            )
 
         if bdb_commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
             raise RuntimeError(f"Network formation failed: {bdb_commissioning_rsp}")
+
+        LOGGER.debug("Waiting for the network NIB to be populated")
 
         # Even though the device is "ready" at this point, for some reason it takes
         # a few more seconds for the NIB to update with our correct logical channel

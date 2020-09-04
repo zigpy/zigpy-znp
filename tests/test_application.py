@@ -1128,18 +1128,23 @@ async def test_force_remove(application, mocker):
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
-async def test_auto_form_unnecessary(application, mocker):
+async def test_auto_form_unnecessary(application, mocker, caplog):
     app, znp_server = application()
 
     mocker.patch.object(app, "form_network", new=CoroutineMock())
 
-    await app.startup(auto_form=True)
+    with caplog.at_level(logging.WARNING):
+        await app.startup(auto_form=True)
+
+    # We should receive no warnings or errors
+    assert not caplog.records
+
     assert app.form_network.call_count == 0
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
 @pytest.mark.parametrize("channel", [None, 15, 20, 25])
-async def test_auto_form_necessary(channel, application, mocker):
+async def test_auto_form_necessary(channel, application, mocker, caplog):
     app, znp_server = application()
     app._config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL] = channel
     nvram = znp_server._nvram_state
@@ -1210,8 +1215,12 @@ async def test_auto_form_necessary(channel, application, mocker):
         request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.NIB, Offset=0), responses=[reset_nib]
     )
 
-    # Finally test startup with auto forming
-    await app.startup(auto_form=True)
+    with caplog.at_level(logging.WARNING):
+        # Finally test startup with auto forming
+        await app.startup(auto_form=True)
+
+    # We should receive no warnings or errors
+    assert not caplog.records
 
     if channel in (25, None):
         assert app.update_network.call_count == 1
