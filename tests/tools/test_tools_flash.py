@@ -102,6 +102,9 @@ async def test_flash_backup_write(
     if reset:
         args.append("--reset")
 
+        # Prevent the 5 second delay from causing the unit test to fail
+        mocker.patch("zigpy_znp.tools.flash_write.asyncio.sleep", new=CoroutineMock())
+
     await flash_write(args)
 
     if reset:

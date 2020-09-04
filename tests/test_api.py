@@ -1,4 +1,5 @@
 import pytest
+import logging
 import asyncio
 import warnings
 import functools
@@ -117,7 +118,10 @@ async def test_znp_connect_without_test(mocker, event_loop, pingable_serial_port
 
 
 @pytest_mark_asyncio_timeout()
-async def test_znp_connect_old_version(mocker, event_loop, pingable_serial_port):
+@pytest.mark.parametrize("check_version", [True, False])
+async def test_znp_connect_old_version(
+    check_version, caplog, mocker, event_loop, pingable_serial_port
+):
     old_write = serial_asyncio.create_serial_connection.mock_transport.write
 
     def ping_responder(data):
@@ -137,8 +141,14 @@ async def test_znp_connect_old_version(mocker, event_loop, pingable_serial_port)
 
     api = ZNP(TEST_APP_CONFIG)
 
-    with pytest.raises(RuntimeError):
-        await api.connect()
+    if check_version:
+        with pytest.raises(RuntimeError):
+            await api.connect(check_version=True)
+    else:
+        with caplog.at_level(logging.WARNING):
+            await api.connect(check_version=False)
+
+        assert "old version" in caplog.text
 
 
 @pytest_mark_asyncio_timeout()

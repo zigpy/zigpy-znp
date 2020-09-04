@@ -136,6 +136,8 @@ async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
     assert enable_rsp.Status == c.ubl.BootloaderStatus.SUCCESS
 
     if reset_nvram:
+        LOGGER.info("Success! Waiting for a few seconds to leave the bootloader...")
+        await asyncio.sleep(5)
         await nvram_reset(znp)
     else:
         LOGGER.info("Unplug your adapter to leave bootloader mode!")

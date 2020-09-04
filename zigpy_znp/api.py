@@ -181,7 +181,7 @@ class ZNP:
     def _port_path(self) -> str:
         return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
-    async def connect(self, *, test_port=True) -> None:
+    async def connect(self, *, test_port=True, check_version=True) -> None:
         """
         Connects to the device specified by the "device" section of the config dict.
 
@@ -199,7 +199,7 @@ class ZNP:
                 LOGGER.debug("Sending special byte to skip the bootloader")
                 self._uart._transport_write(bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
 
-            # We have to disable this all non-bootloader commands to enter the
+            # We have to disable all non-bootloader commands to enter the
             # bootloader upon connecting to the UART.
             if test_port:
                 LOGGER.debug(
@@ -210,10 +210,15 @@ class ZNP:
                 ping_rsp = await self.request(c.SYS.Ping.Req())
 
                 if not ping_rsp.Capabilities & t.MTCapabilities.CAP_APP_CNF:
-                    raise RuntimeError(
-                        "Your device appears to be running an old version of Z-Stack. "
+                    old_version_msg = (
+                        "Your device appears to be running an old version of Z-Stack."
                         " The earliest supported release is Z-Stack 3.0.1."
                     )
+
+                    if check_version:
+                        raise RuntimeError(old_version_msg)
+                    else:
+                        LOGGER.warning(old_version_msg)
         except Exception:
             self._uart = None
             raise
