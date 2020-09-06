@@ -137,11 +137,16 @@ async def znp_server(mocker):
     config = config_for_port_path(device)
 
     server_znp = ServerZNP(config)
-    server_znp._uart = ZnpMtProtocol(server_znp)
+    server_znp._uart = None
+
+    server_znp_proto = ZnpMtProtocol(server_znp)
 
     def passthrough_serial_conn(loop, protocol_factory, url, *args, **kwargs):
         fut = loop.create_future()
         assert url == device
+
+        if server_znp._uart is None:
+            server_znp._uart = server_znp_proto
 
         client_protocol = protocol_factory()
 
@@ -754,11 +759,18 @@ async def test_probe_multiple(pingable_serial_port):  # noqa: F811
 @pytest_mark_asyncio_timeout(seconds=5)
 async def test_reconnect(event_loop, application):
     app, znp_server = application()
+
+    # Make auto-reconnection happen really fast
     app._config[conf.CONF_ZNP_CONFIG][conf.CONF_AUTO_RECONNECT_RETRY_DELAY] = 0.01
 
-    await app.startup(auto_form=False)
+    # Don't clean up our server's listeners when it gets disconnected
+    znp_server.close = lambda self: None
 
-    # Don't reply to the ping request this time
+    # Start up the server
+    await app.startup(auto_form=False)
+    assert app._znp is not None
+
+    # Don't reply to the ping request after this
     old_ping_replier = znp_server.ping_replier
     znp_server.ping_replier = lambda request: None
 
@@ -766,23 +778,21 @@ async def test_reconnect(event_loop, application):
     SREQ_TIMEOUT = 0.2
     app._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = SREQ_TIMEOUT
     app._znp._uart.connection_lost(RuntimeError("Uh oh"))
-    app.connection_lost(RuntimeError("Uh oh"))
 
+    # ZNP should be closed
     assert app._znp is None
 
-    # Wait for the SREQ_TIMEOUT to pass, we should fail to reconnect
+    # Wait for the SREQ_TIMEOUT to pass, we should still fail to reconnect
     await asyncio.sleep(SREQ_TIMEOUT + 0.1)
     assert app._znp is None
 
-    # Respond to the ping appropriately
+    # Start responding to pings after this
     znp_server.ping_replier = old_ping_replier
 
-    # Our reconnect task should complete after we send the ping reply
-    reconnect_fut = event_loop.create_future()
-    app._reconnect_task.add_done_callback(lambda _: reconnect_fut.set_result(None))
+    # Our reconnect task should complete a moment after we send the ping reply
+    while app._znp is None:
+        await asyncio.sleep(0.01)
 
-    # We should be reconnected soon and the app should have been restarted
-    await reconnect_fut
     assert app._znp is not None
     assert app._znp._uart is not None
 
