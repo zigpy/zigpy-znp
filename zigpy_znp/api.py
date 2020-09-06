@@ -220,7 +220,7 @@ class ZNP:
                     else:
                         LOGGER.warning(old_version_msg)
         except Exception:
-            self._uart = None
+            self.close()
             raise
 
         LOGGER.debug(

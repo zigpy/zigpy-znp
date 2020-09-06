@@ -114,14 +114,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         try:
             await znp.connect()
-            return True
+            result = True
         except Exception as e:
+            result = False
             LOGGER.warning(
                 "Failed to probe ZNP radio with config %s", device_config, exc_info=e
             )
-            return False
-        finally:
-            znp.close()
+
+        znp.close()
+
+        return result
 
     async def shutdown(self):
         """

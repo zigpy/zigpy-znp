@@ -726,16 +726,29 @@ async def test_on_af_message_callback(application, mocker):
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
-async def test_probe(pingable_serial_port):  # noqa: F811
+async def test_probe_unsuccessful(pingable_serial_port):  # noqa: F811
     assert not (
         await ControllerApplication.probe(
             conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "/dev/null"})
         )
     )
 
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_probe_successful(pingable_serial_port):  # noqa: F811
     assert await ControllerApplication.probe(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port})
     )
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
+async def test_probe_multiple(pingable_serial_port):  # noqa: F811
+    config = conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port})
+
+    assert await ControllerApplication.probe(config)
+    assert await ControllerApplication.probe(config)
+    assert await ControllerApplication.probe(config)
+    assert await ControllerApplication.probe(config)
 
 
 @pytest_mark_asyncio_timeout(seconds=5)

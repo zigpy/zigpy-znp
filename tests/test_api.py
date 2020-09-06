@@ -71,6 +71,9 @@ def pingable_serial_port(mocker):
     port_name = "/dev/ttyWorkingUSB1"
     old_serial_connect = serial_asyncio.create_serial_connection
 
+    def dummy_serial_close():
+        dummy_serial_conn.mock_transport._connected = False
+
     def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
         # Only our virtual port is handled differently
         if url != port_name:
@@ -84,6 +87,9 @@ def pingable_serial_port(mocker):
 
         fut.set_result((dummy_serial_conn.mock_transport, dummy_serial_conn.protocol))
 
+        assert not dummy_serial_conn.mock_transport._connected
+        dummy_serial_conn.mock_transport._connected = True
+
         return fut
 
     def ping_responder(data):
@@ -93,7 +99,9 @@ def pingable_serial_port(mocker):
             dummy_serial_conn.protocol.data_received(b"\xFE\x02\x61\x01\x59\x06\x3D")
 
     dummy_serial_conn.mock_transport = mocker.Mock()
+    dummy_serial_conn.mock_transport._connected = False
     dummy_serial_conn.mock_transport.write = mocker.Mock(side_effect=ping_responder)
+    dummy_serial_conn.mock_transport.close = mocker.Mock(side_effect=dummy_serial_close)
 
     mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
 
