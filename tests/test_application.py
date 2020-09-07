@@ -1242,8 +1242,8 @@ async def test_auto_form_necessary(channel, application, mocker, caplog):
         # Finally test startup with auto forming
         await app.startup(auto_form=True)
 
-    # We should receive no warnings or errors
-    assert not caplog.records
+    # We should receive no application warnings or errors
+    assert not [r for r in caplog.records if "Task was destroyed" not in r.getMessage()]
 
     if channel in (25, None):
         assert app.update_network.call_count == 1
