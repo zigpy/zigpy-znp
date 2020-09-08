@@ -1116,7 +1116,7 @@ async def test_update_network_extensive(mocker, caplog, application):
 
 
 @pytest_mark_asyncio_timeout(seconds=5)
-async def test_update_network_bad_channel(mocker, caplog, application):
+async def test_update_network_bad_channel(mocker, application):
     app, znp_server = application()
 
     with pytest.raises(ValueError):
@@ -1165,23 +1165,18 @@ async def test_force_remove(application, mocker):
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
-async def test_auto_form_unnecessary(application, mocker, caplog):
+async def test_auto_form_unnecessary(application, mocker):
     app, znp_server = application()
-
     mocker.patch.object(app, "form_network", new=CoroutineMock())
 
-    with caplog.at_level(logging.WARNING):
-        await app.startup(auto_form=True)
-
-    # We should receive no warnings or errors
-    assert not caplog.records
+    await app.startup(auto_form=True)
 
     assert app.form_network.call_count == 0
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
 @pytest.mark.parametrize("channel", [None, 15, 20, 25])
-async def test_auto_form_necessary(channel, application, mocker, caplog):
+async def test_auto_form_necessary(channel, application, mocker):
     app, znp_server = application()
     app._config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL] = channel
     nvram = znp_server._nvram_state
@@ -1252,12 +1247,8 @@ async def test_auto_form_necessary(channel, application, mocker, caplog):
         request=c.SYS.OSALNVRead.Req(Id=NwkNvIds.NIB, Offset=0), responses=[reset_nib]
     )
 
-    with caplog.at_level(logging.WARNING):
-        # Finally test startup with auto forming
-        await app.startup(auto_form=True)
-
-    # We should receive no application warnings or errors
-    assert not [r for r in caplog.records if "Task was destroyed" not in r.getMessage()]
+    # Finally test startup with auto forming
+    await app.startup(auto_form=True)
 
     if channel in (25, None):
         assert app.update_network.call_count == 1
