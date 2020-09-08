@@ -741,6 +741,8 @@ async def test_probe_unsuccessful(pingable_serial_port):  # noqa: F811
 
 @pytest_mark_asyncio_timeout(seconds=3)
 async def test_probe_unsuccessful_slow(pingable_serial_port, mocker):  # noqa: F811
+    mocker.patch("zigpy_znp.zigbee.application.PROBE_TIMEOUT", new=0.1)
+
     # Make the serial port unresponsive
     import serial_asyncio
 

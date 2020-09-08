@@ -48,7 +48,7 @@ with warnings.catch_warnings():
 
 
 ZDO_ENDPOINT = 0
-PROBE_TIMEOUT = 2  # seconds
+PROBE_TIMEOUT = 5  # seconds
 ZDO_REQUEST_TIMEOUT = 10  # seconds
 DATA_CONFIRM_TIMEOUT = 5  # seconds
 LOGGER = logging.getLogger(__name__)
