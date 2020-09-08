@@ -48,6 +48,7 @@ with warnings.catch_warnings():
 
 
 ZDO_ENDPOINT = 0
+PROBE_TIMEOUT = 2  # seconds
 ZDO_REQUEST_TIMEOUT = 10  # seconds
 DATA_CONFIRM_TIMEOUT = 5  # seconds
 LOGGER = logging.getLogger(__name__)
@@ -113,7 +114,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.debug("Probing %s", znp._port_path)
 
         try:
-            await znp.connect()
+            async with async_timeout.timeout(PROBE_TIMEOUT):
+                await znp.connect()
+
             result = True
         except Exception as e:
             result = False

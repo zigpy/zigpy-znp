@@ -740,6 +740,20 @@ async def test_probe_unsuccessful(pingable_serial_port):  # noqa: F811
 
 
 @pytest_mark_asyncio_timeout(seconds=3)
+async def test_probe_unsuccessful_slow(pingable_serial_port, mocker):  # noqa: F811
+    # Make the serial port unresponsive
+    import serial_asyncio
+
+    serial_asyncio.create_serial_connection.mock_transport.write = mocker.Mock()
+
+    assert not (
+        await ControllerApplication.probe(
+            conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port})
+        )
+    )
+
+
+@pytest_mark_asyncio_timeout(seconds=3)
 async def test_probe_successful(pingable_serial_port):  # noqa: F811
     assert await ControllerApplication.probe(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: pingable_serial_port})
