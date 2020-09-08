@@ -196,8 +196,13 @@ class ZNP:
             self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
 
             if self._config[conf.CONF_ZNP_CONFIG][conf.CONF_SKIP_BOOTLOADER]:
-                LOGGER.debug("Sending special byte to skip the bootloader")
-                self._uart._transport_write(bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
+                LOGGER.debug("Sending bootloader skip byte")
+
+                # XXX: Z-Stack locks up if other radios try probing it first.
+                #      Writing the bootloader skip byte a bunch of times (at least 167)
+                #      appears to reset it.
+                skip = bytes([c.ubl.BootloaderRunMode.FORCE_RUN])
+                self._uart._transport_write(skip * 256)
 
             # We have to disable all non-bootloader commands to enter the
             # bootloader upon connecting to the UART.
