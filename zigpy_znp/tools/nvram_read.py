@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 async def backup(radio_path):
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
 
-    await znp.connect()
+    await znp.connect(check_version=False)
 
     data = {
         "osal": {},
