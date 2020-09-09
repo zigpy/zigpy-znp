@@ -103,6 +103,30 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return self._nib.nwkLogicalChannel
 
+    @property
+    def channels(self):
+        # This value is accessible only from the NIB struct. There does not appear to be
+        # a MT command to read it.
+
+        if self._nib is None:
+            return None
+
+        return self._nib.channelList
+
+    @property
+    def pan_id(self):
+        if self._nib is None:
+            return None
+
+        return self._nib.nwkPanId
+
+    @property
+    def ext_pan_id(self):
+        if self._nib is None:
+            return None
+
+        return self._nib.extendedPANID
+
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
         """
@@ -964,17 +988,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Parsing the NIB struct gives us access to low-level info, like the channel
         self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
         LOGGER.debug("Parsed NIB: %s", self._nib)
-
-        # Util.GetNvInfo reads all of these but it has an endianness bug with CHANLIST
-        self._pan_id, _ = t.PanId.deserialize(
-            await self._znp.nvram_read(NwkNvIds.PANID)
-        )
-        self._channels, _ = t.Channels.deserialize(
-            await self._znp.nvram_read(NwkNvIds.CHANLIST)
-        )
-        self._ext_pan_id, _ = t.EUI64.deserialize(
-            await self._znp.nvram_read(NwkNvIds.EXTENDED_PAN_ID)
-        )
 
     async def _reset(self):
         """
