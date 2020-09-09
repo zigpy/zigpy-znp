@@ -31,7 +31,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp.nib import parse_nib, OldNIB
+from zigpy_znp.znp.nib import parse_nib, NIB, CC2531NIB
 from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
@@ -67,7 +67,7 @@ class ZNPCoordinator(zigpy.device.Device):
     def model(self):
         # There is no way to query the Z-Stack version or even the hardware at runtime.
         # Instead we have to rely on these sorts of "hints"
-        if isinstance(self.application._nib, OldNIB):
+        if isinstance(self.application._nib, CC2531NIB):
             return "CC2531"
         else:
             return "CC13X2/CC26X2"
@@ -86,7 +86,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._reconnect_task = asyncio.Future()
         self._reconnect_task.cancel()
 
-        self._nib = None
+        self._nib = NIB()
         self._concurrent_requests_semaphore = None
 
     ##################################################################
@@ -97,34 +97,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     def channel(self):
         # This value is accessible only from the NIB struct. There does not appear to be
         # a MT command to read it.
-
-        if self._nib is None:
-            return None
-
         return self._nib.nwkLogicalChannel
 
     @property
     def channels(self):
-        # This value is accessible only from the NIB struct. There does not appear to be
-        # a MT command to read it.
-
-        if self._nib is None:
-            return None
-
         return self._nib.channelList
 
     @property
     def pan_id(self):
-        if self._nib is None:
-            return None
-
         return self._nib.nwkPanId
 
     @property
     def ext_pan_id(self):
-        if self._nib is None:
-            return None
-
         return self._nib.extendedPANID
 
     @classmethod
@@ -304,7 +288,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
-            max_concurrent_requests = 2 if self.is_cc2531 else 16
+            max_concurrent_requests = 2 if isinstance(self._nib, CC2531NIB) else 16
         else:
             max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
@@ -790,14 +774,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         return self.devices[self.ieee]
-
-    @property
-    def is_cc2531(self) -> bool:
-        """
-        There really are only two ZNP radios: the cheap CC2531 and the high-power ones.
-        """
-
-        return isinstance(self._nib, OldNIB)
 
     @property
     def znp_config(self) -> conf.ConfigType:

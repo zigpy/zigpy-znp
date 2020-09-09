@@ -4,7 +4,7 @@ import zigpy_znp.types as t
 
 from zigpy_znp.znp.nib import (
     NIB,
-    OldNIB,
+    CC2531NIB,
     parse_nib,
     NwkState8,
     NwkState16,
@@ -59,7 +59,7 @@ def test_empty():
 
 
 def test_nib_classes():
-    old_nib_nwk_state = next(a for a in OldNIB.fields() if a.type == NwkState8)
+    old_nib_nwk_state = next(a for a in CC2531NIB.fields() if a.type == NwkState8)
 
     # The old NIB should be the new NIB, without padding and with a shorter struct
     # integer type.
@@ -69,12 +69,12 @@ def test_nib_classes():
         if a.type is not PaddingByte
     ]
 
-    assert fixed_new_nib == list(OldNIB.fields())
+    assert fixed_new_nib == list(CC2531NIB.fields())
 
 
 def test_nib_detection():
     assert isinstance(parse_nib(NEW_NIB), NIB)
-    assert isinstance(parse_nib(OLD_NIB), OldNIB)
+    assert isinstance(parse_nib(OLD_NIB), CC2531NIB)
 
     with pytest.raises(ValueError):
         parse_nib(NEW_NIB + b"\x00")
@@ -87,7 +87,7 @@ def test_nib_parsing():
     new_nib, remaining = NIB.deserialize(NEW_NIB)
     assert not remaining
 
-    old_nib, remaining = OldNIB.deserialize(OLD_NIB)
+    old_nib, remaining = CC2531NIB.deserialize(OLD_NIB)
     assert not remaining
 
     assert new_nib.serialize() == NEW_NIB

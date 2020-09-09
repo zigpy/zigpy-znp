@@ -145,7 +145,7 @@ class NIB(t.Struct):
     PaddingByte4: PaddingByte
 
 
-class OldNIB(t.Struct):
+class CC2531NIB(t.Struct):
     """
     Struct doesn't allow field re-ordering so this is unfortunately a duplicate of the
     above `NIB` structure, with the following differences:
@@ -222,11 +222,11 @@ class OldNIB(t.Struct):
     nwkUpdateId: t.uint8_t
 
 
-def parse_nib(data: bytes) -> typing.Union[NIB, OldNIB]:
+def parse_nib(data: bytes) -> typing.Union[NIB, CC2531NIB]:
     if len(data) == 116:
         nib, remaining = NIB.deserialize(data)
     elif len(data) == 110:
-        nib, remaining = OldNIB.deserialize(data)
+        nib, remaining = CC2531NIB.deserialize(data)
     else:
         raise ValueError(f"Unknown NIB format: {data!r}")
 
