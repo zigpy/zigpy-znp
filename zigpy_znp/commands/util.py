@@ -12,21 +12,23 @@ class BindEntry(t.Struct):
     clusterIdList: t.ClusterIdList
 
 
+class AgingEndDevice(t.Struct):
+    endDevCfg: t.uint8_t
+    deviceTimeout: t.uint32_t
+
+
+class LinkInfo(t.Struct):
+    txCounter: t.uint8_t  # Counter of transmission success/failures
+    txCost: t.uint8_t  # Average of sending rssi values if link staus is enabled
+    #   i.e. NWK_LINK_STATUS_PERIOD is defined as non zero
+    rxLqi: t.uint8_t  # average of received rssi values
+    # needs to be converted to link cost (1-7) before used
+    inKeySeqNum: t.uint8_t  # security key sequence number
+    inFrmCntr: t.uint32_t  # security frame counter..
+    txFailure: t.uint16_t  # higher values indicate more failures
+
+
 class Device(t.Struct):
-    class AgingEndDevice(t.Struct):
-        endDevCfg: t.uint8_t
-        deviceTimeout: t.uint32_t
-
-    class LinkInfo(t.Struct):
-        txCounter: t.uint8_t  # Counter of transmission success/failures
-        txCost: t.uint8_t  # Average of sending rssi values if link staus is enabled
-        #   i.e. NWK_LINK_STATUS_PERIOD is defined as non zero
-        rxLqi: t.uint8_t  # average of received rssi values
-        # needs to be converted to link cost (1-7) before used
-        inKeySeqNum: t.uint8_t  # security key sequence number
-        inFrmCntr: t.uint32_t  # security frame counter..
-        txFailure: t.uint16_t  # higher values indicate more failures
-
     shortAddr: t.NWK
     addrIdx: t.uint16_t
     nodeRelation: t.uint8_t

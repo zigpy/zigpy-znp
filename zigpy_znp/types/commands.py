@@ -553,11 +553,11 @@ class MTCapabilities(t.enum_flag_uint16):
 
 
 class Network(t.Struct):
-    PanId = t.PanId
-    Channel = t.uint8_t
-    StackProfileVersion = t.uint8_t
-    BeaconOrderSuperframe = t.uint8_t
-    PermitJoining = t.uint8_t
+    PanId: t.PanId
+    Channel: t.uint8_t
+    StackProfileVersion: t.uint8_t
+    BeaconOrderSuperframe: t.uint8_t
+    PermitJoining: t.uint8_t
 
 
 STATUS_SCHEMA = (
