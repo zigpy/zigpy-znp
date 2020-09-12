@@ -272,6 +272,11 @@ class StartupOptions(basic.enum_flag_uint8):
     ClearState = 1 << 1
     AutoStart = 1 << 2
 
+    # FrameCounter should persist across factory resets.
+    # This should not be used as part of FN reset procedure.
+    # Set to reset the FrameCounter of all Nwk Security Material
+    ClearNwkFrameCounter = 1 << 7
+
 
 class DeviceLogicalType(basic.enum_uint8):
     Coordinator = 0
