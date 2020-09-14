@@ -25,7 +25,7 @@ setup(
     ],
     extras_require={
         "testing": [
-            "asynctest",
+            'asynctest; python_version < "3.8.0"',
             "pytest>=5.4.5",
             "pytest-asyncio>=0.12.0",
             "pytest-mock",
