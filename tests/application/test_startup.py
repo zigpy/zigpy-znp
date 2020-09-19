@@ -11,6 +11,8 @@ from ..conftest import (
     CoroutineMock,
     FormedLaunchpadCC26X2R1,
     FormedZStack3CC2531,
+    FormedZStack1CC2531,
+    BaseZStack3Device,
     EMPTY_DEVICES,
     FORMED_DEVICES,
     ALL_DEVICES,
@@ -26,7 +28,7 @@ pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
         # zigpy-znp
         (
             FormedLaunchpadCC26X2R1,
-            "CC13X2/CC26X2",
+            "CC13X2/CC26X2, Z-Stack 3.30.00/3.40.00/4.10.00",
             15,
             t.Channels.from_channel_list([15, 20, 25]),
             0x1C0E,
@@ -35,13 +37,22 @@ pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
         # Z2M/zigpy-cc
         (
             FormedZStack3CC2531,
-            "CC2531",
+            "CC2531, Z-Stack 3.0.1/3.0.2",
             11,
             t.Channels.from_channel_list([11]),
             0x1A62,
             # Even though Z2M uses "dd:dd:dd:dd:dd:dd:dd:dd", Wireshark confirms the NIB
-            # is correct. The CC2531 does not appear to have a configurable PAN_ID?
+            # is correct.
             "00:12:4b:00:0f:ea:8e:05",
+        ),
+        # Z2M/zigpy-cc
+        (
+            FormedZStack1CC2531,
+            "CC2531, Z-Stack Home 1.2",
+            11,
+            t.Channels.from_channel_list([11]),
+            0x1A62,
+            "dd:dd:dd:dd:dd:dd:dd:dd",
         ),
     ],
 )
@@ -103,6 +114,7 @@ async def test_bad_nvram_value(device, make_application):
 
     # An invalid value is still bad
     znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
+    znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
 
     with pytest.raises(RuntimeError):
         await app.startup(auto_form=False)
@@ -201,7 +213,11 @@ async def test_auto_form_necessary(device, make_application, mocker):
     assert app.channel is not None
     assert app.channels is not None
 
-    assert znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
+    if issubclass(device, BaseZStack3Device):
+        assert znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
+    else:
+        assert znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK1] == b"\x55"
+
     assert (
         znp_server.nvram["nwk"][NwkNvIds.LOGICAL_TYPE]
         == t.DeviceLogicalType.Coordinator.serialize()

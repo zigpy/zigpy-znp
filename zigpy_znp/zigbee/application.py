@@ -49,8 +49,18 @@ with warnings.catch_warnings():
 
 ZDO_ENDPOINT = 0
 PROBE_TIMEOUT = 5  # seconds
+STARTUP_TIMEOUT = 5  # seconds
 ZDO_REQUEST_TIMEOUT = 10  # seconds
 DATA_CONFIRM_TIMEOUT = 5  # seconds
+
+DEFAULT_TC_LINK_KEY = t.TCLinkKey(
+    ExtAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),  # global
+    Key=t.KeyData(b"ZigBeeAlliance09"),
+    TxFrameCounter=0,
+    RxFrameCounter=0,
+)
+ZSTACK_CONFIGURE_SUCCESS = b"\x55"
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -68,9 +78,17 @@ class ZNPCoordinator(zigpy.device.Device):
         # There is no way to query the Z-Stack version or even the hardware at runtime.
         # Instead we have to rely on these sorts of "hints"
         if isinstance(self.application._nib, CC2531NIB):
-            return "CC2531"
+            model = "CC2531"
+
+            if self.application.is_zstack_home_12:
+                version = "Home 1.2"
+            else:
+                version = "3.0.1/3.0.2"
         else:
-            return "CC13X2/CC26X2"
+            model = "CC13X2/CC26X2"
+            version = "3.30.00/3.40.00/4.10.00"
+
+        return f"{model}, Z-Stack {version}"
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
@@ -105,6 +123,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     @property
     def pan_id(self):
+        # Z-Stack 1.2 never updates the PANID NV item from `\xFF\xFF`
         return self._nib.nwkPanId
 
     @property
@@ -183,10 +202,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Next, read out the NVRAM item that Zigbee2MQTT writes when it has configured
         # a device to make sure that our network settings will not be reset.
+        if self.is_zstack_home_12:
+            configured_nv_item = NwkNvIds.HAS_CONFIGURED_ZSTACK1
+        else:
+            configured_nv_item = NwkNvIds.HAS_CONFIGURED_ZSTACK3
+
         try:
-            is_configured = (
-                await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
-            ) == b"\x55"
+            configured_value = await self._znp.nvram_read(configured_nv_item)
+            is_configured = configured_value == ZSTACK_CONFIGURE_SUCCESS
         except KeyError:
             is_configured = False
 
@@ -234,34 +257,44 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # `self._register_endpoint()` adds endpoints to this device object.
         self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
 
-        # Start the application and wait until it's ready
+        # Both versions of Z-Stack use this callback
         started_as_coordinator = self._znp.wait_for_response(
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
         )
 
-        bdb_commissioning_done = self._znp.wait_for_response(
-            c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
-            )
-        )
-
         # The AUTOSTART startup NV item doesn't do anything.
-        # According to the forums, this is the correct startup sequence, including
-        # the formation failure error
-        await self._znp.request_callback_rsp(
-            request=c.AppConfig.BDBStartCommissioning.Req(
-                Mode=c.app_config.BDBCommissioningMode.NwkFormation
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True, Status=c.app_config.BDBCommissioningStatus.NetworkRestored
-            ),
-        )
+        if self.is_zstack_home_12:
+            # Z-Stack Home 1.2 has a simple startup sequence
+            await self._znp.request(
+                c.ZDO.StartupFromApp.Req(StartDelay=100),
+                RspState=c.zdo.StartupState.RestoredNetworkState,
+            )
+        else:
+            # Z-Stack 3 uses the BDB subsystem
+            bdb_commissioning_done = self._znp.wait_for_response(
+                c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
+                )
+            )
+
+            # According to the forums, this is the correct startup sequence, including
+            # the formation failure error
+            await self._znp.request_callback_rsp(
+                request=c.AppConfig.BDBStartCommissioning.Req(
+                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True,
+                    Status=c.app_config.BDBCommissioningStatus.NetworkRestored,
+                ),
+            )
+
+            await bdb_commissioning_done
 
         # The startup sequence should not take forever
-        async with async_timeout.timeout(20):
-            # These often arrive in random order
-            await asyncio.gather(started_as_coordinator, bdb_commissioning_done)
+        async with async_timeout.timeout(STARTUP_TIMEOUT):
+            await started_as_coordinator
 
         # Get the currently active endpoints
         endpoints = await self._znp.request_callback_rsp(
@@ -344,18 +377,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if channels is not None:
             await self._znp.nvram_write(NwkNvIds.CHANLIST, channels)
-            await self._znp.request(
-                c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-                RspStatus=t.Status.SUCCESS,
-            )
-            await self._znp.request(
-                c.AppConfig.BDBSetChannel.Req(
-                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
 
             nib_updates["channelList"] = channels
+
+            # Z-Stack Home 1.2 doesn't have the BDB subsystem
+            if not self.is_zstack_home_12:
+                await self._znp.request(
+                    c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
+                    RspStatus=t.Status.SUCCESS,
+                )
+                await self._znp.request(
+                    c.AppConfig.BDBSetChannel.Req(
+                        IsPrimary=False, Channel=t.Channels.NO_CHANNELS
+                    ),
+                    RspStatus=t.Status.SUCCESS,
+                )
 
         if channel is not None:
             # XXX: We modify the logical channel value directly in the NIB.
@@ -371,8 +407,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             nib_updates["extendedPANID"] = extended_pan_id
 
         if network_key is not None:
-            await self._znp.nvram_write(NwkNvIds.PRECFGKEY, network_key)
-            await self._znp.nvram_write(NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True))
+            await self._znp.nvram_write(NwkNvIds.PRECFGKEY, network_key, create=True)
+            await self._znp.nvram_write(
+                NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True), create=True
+            )
 
         # Quickly update the NIB, if necessary
         if nib_updates:
@@ -398,10 +436,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         PAN ID, and extended PAN ID.
         """
 
-        # Delete any existing HAS_CONFIGURED_ZSTACK3 NV item. This may fail.
-        await self._znp.request(
-            c.SYS.OSALNVDelete.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1)
-        )
+        # Delete any existing HAS_CONFIGURED_ZSTACK* NV items. One (or both) may fail.
+        await self._znp.nvram_delete(NwkNvIds.HAS_CONFIGURED_ZSTACK1)
+        await self._znp.nvram_delete(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
 
         # Instruct Z-Stack to reset everything on the next boot
         await self._znp.nvram_write(
@@ -446,32 +483,56 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Finally, form the network
         LOGGER.debug("Forming the network")
 
-        # Form the network and capture expected progress messages so they don't appear
-        # as warnings within logs
+        started_as_coordinator = self._znp.wait_for_response(
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
+        )
+
+        # Handle the startup progress messages
         async with self._znp.capture_responses(
             [
                 c.ZDO.StateChangeInd.Callback(
                     State=t.DeviceState.StartingAsCoordinator
                 ),
-                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
                 c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
+                    partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress,
                 ),
             ]
         ):
-            bdb_commissioning_rsp = await self._znp.request_callback_rsp(
-                request=c.AppConfig.BDBStartCommissioning.Req(
-                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
-                ),
-                timeout=30,
-            )
+            if not self.is_zstack_home_12:
+                # Z-Stack 3 uses the BDB subsystem
 
-        if bdb_commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
-            raise RuntimeError(f"Network formation failed: {bdb_commissioning_rsp}")
+                # Form the network and capture expected progress messages so they don't
+                # appear as warnings within logs
+                commissioning_rsp = await self._znp.request_callback_rsp(
+                    request=c.AppConfig.BDBStartCommissioning.Req(
+                        Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                    ),
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                        partial=True,
+                        RemainingModes=c.app_config.BDBCommissioningMode.NONE,
+                    ),
+                    timeout=30,
+                )
+
+                if (
+                    commissioning_rsp.Status
+                    != c.app_config.BDBCommissioningStatus.Success
+                ):
+                    raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
+            else:
+                await self._znp.nvram_write(
+                    NwkNvIds.TCLK_SEED, value=DEFAULT_TC_LINK_KEY, create=True,
+                )
+
+                # In Z-Stack 1.2.2, StartupFromApp actually does what it says
+                await self._znp.request(
+                    c.ZDO.StartupFromApp.Req(StartDelay=100),
+                    RspState=c.zdo.StartupState.NewNetworkState,
+                )
+
+        # Both versions still end with this callback
+        await started_as_coordinator
 
         LOGGER.debug("Waiting for the NIB to be populated")
 
@@ -481,8 +542,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             try:
                 nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
 
+                LOGGER.debug("Current NIB is %s", nib)
+
                 # Usually this works after the first attempt
-                if nib.nwkLogicalChannel:
+                if nib.nwkLogicalChannel != 0 and nib.nwkPanId != 0xFFFE:
                     break
             except KeyError:
                 pass
@@ -492,15 +555,17 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Only at this point can we reliably update our network settings.
         await self.update_network(
             channel=self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL],
-            pan_id=pan_id,
             extended_pan_id=extended_pan_id,
         )
 
-        # Create the NV item that keeps track of whether or not we're configured.
-        # This is the NV item used by Zigbee2MQTT, pulled in from zigbee-shepherd, and
-        # allows for this device to be used with Zigbee2MQTT as well.
+        # Create the NV item that keeps track of whether or not we're fully configured.
+        if self.is_zstack_home_12:
+            configured_nv_item = NwkNvIds.HAS_CONFIGURED_ZSTACK1
+        else:
+            configured_nv_item = NwkNvIds.HAS_CONFIGURED_ZSTACK3
+
         await self._znp.nvram_write(
-            NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55", create=True
+            configured_nv_item, ZSTACK_CONFIGURE_SUCCESS, create=True
         )
 
         # Finally, reset once more to reset the device back to a "normal" state so that
@@ -787,6 +852,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         return self.devices[self.ieee]
+
+    @property
+    def is_zstack_home_12(self) -> bool:
+        return self._znp._version.MinorRel == 6
 
     @property
     def znp_config(self) -> conf.ConfigType:

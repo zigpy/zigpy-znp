@@ -1,5 +1,4 @@
 import pytest
-import logging
 import asyncio
 
 from zigpy_znp.api import ZNP
@@ -8,7 +7,6 @@ from ..conftest import (
     FAKE_SERIAL_PORT,
     config_for_port_path,
     BaseServerZNP,
-    BlankZStack1CC2531,
 )
 
 
@@ -32,24 +30,6 @@ async def test_connect_skip_bootloader(make_znp_server, mocker):
     data_written = b"".join(c[-2][0] for c in znp_server._uart.data_received.mock_calls)
     assert set(data_written) == {0xEF}
     assert len(data_written) >= 167
-
-    znp.close()
-
-
-@pytest.mark.parametrize("device", [BlankZStack1CC2531])
-@pytest.mark.parametrize("check_version", [True, False])
-async def test_connect_old_version(device, check_version, make_znp_server, caplog):
-    _ = make_znp_server(server_cls=device)
-    znp = ZNP(config_for_port_path(FAKE_SERIAL_PORT))
-
-    if check_version:
-        with pytest.raises(RuntimeError):
-            await znp.connect(check_version=True)
-    else:
-        with caplog.at_level(logging.WARNING):
-            await znp.connect(check_version=False)
-
-        assert "old version" in caplog.text
 
     znp.close()
 

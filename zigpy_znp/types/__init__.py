@@ -7,7 +7,6 @@ from zigpy.types import (  # noqa: F401
     ExtendedPanId,
     PanId,
     Channels,
-    KeyData,
 )
 
 from zigpy.zdo.types import Status as ZDOStatus  # noqa: F401

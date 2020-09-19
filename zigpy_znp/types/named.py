@@ -3,7 +3,7 @@ import typing
 import logging
 import dataclasses
 
-from zigpy.types import EUI64, NWK, ExtendedPanId, PanId, ClusterId
+from zigpy.types import KeyData, EUI64, NWK, ExtendedPanId, PanId, ClusterId
 
 from . import basic, struct
 
@@ -296,3 +296,10 @@ class ClusterIdList(basic.LVList, item_type=ClusterId, length_type=basic.uint8_t
 
 class NWKList(basic.LVList, item_type=NWK, length_type=basic.uint8_t):
     pass
+
+
+class TCLinkKey(struct.Struct):
+    ExtAddr: EUI64
+    Key: KeyData
+    TxFrameCounter: basic.uint32_t
+    RxFrameCounter: basic.uint32_t

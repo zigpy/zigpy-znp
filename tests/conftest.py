@@ -283,6 +283,8 @@ class BaseZStackDevice(BaseServerZNP):
         self.nib = None
         self.nvram = {}
 
+        self.device_state = t.DeviceState.InitializedNotStarted
+
         # Handle the decorators
         for name in dir(self):
             func = getattr(self, name)
@@ -430,6 +432,30 @@ class BaseZStackDevice(BaseServerZNP):
 
         return parse_nib(self.nvram["nwk"][NwkNvIds.NIB])
 
+    @reply_to(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
+    def reset_req(self, request):
+        version = self.version_replier(None)
+
+        return c.SYS.ResetInd.Callback(
+            Reason=t.ResetReason.PowerUp,
+            TransportRev=version.TransportRev,
+            ProductId=version.ProductId,
+            MajorRel=version.MajorRel,
+            MinorRel=version.MinorRel,
+            MaintRel=version.MaintRel,
+        )
+
+    @reply_to(c.Util.GetDeviceInfo.Req())
+    def util_device_info(self, request):
+        return c.Util.GetDeviceInfo.Rsp(
+            Status=t.Status.SUCCESS,
+            IEEE=t.EUI64.deserialize(self.nvram["nwk"][NwkNvIds.EXTADDR])[0],
+            NWK=t.NWK(0xFFFE),  # ???
+            DeviceType=t.DeviceTypeCapabilities(7),  # fixed
+            DeviceState=self.device_state,  # dynamic!!!
+            AssociatedDevices=[],
+        )
+
 
 class BaseZStack1CC2531(BaseZStackDevice):
     @reply_to(c.SYS.Ping.Req())
@@ -463,12 +489,43 @@ class BaseZStack1CC2531(BaseZStackDevice):
             load_nvram_json("CC2531-ZStack1.reset.json")["nwk"][NwkNvIds.NIB]
         )[0]
 
+    @reply_to(c.ZDO.StartupFromApp.Req(partial=True))
+    def startup_from_app(self, req):
+        if self.nib.nwkState == NwkState8.NWK_ROUTER:
+            return [
+                c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.RestoredNetworkState),
+                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+            ]
+        else:
+
+            def update_logical_channel(req):
+                self.nib.nwkState = NwkState8.NWK_ROUTER
+                self.nib.channelList, _ = t.Channels.deserialize(
+                    self.nvram["nwk"][NwkNvIds.CHANLIST]
+                )
+                self.nib.nwkLogicalChannel = 15
+
+                return []
+
+            return [
+                c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.NewNetworkState),
+                c.ZDO.StateChangeInd.Callback(
+                    State=t.DeviceState.StartingAsCoordinator
+                ),
+                c.ZDO.StateChangeInd.Callback(
+                    State=t.DeviceState.StartingAsCoordinator
+                ),
+                c.ZDO.StateChangeInd.Callback(
+                    State=t.DeviceState.StartingAsCoordinator
+                ),
+                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+                update_logical_channel,
+            ]
+
 
 class BaseZStack3Device(BaseZStackDevice):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.device_state = t.DeviceState.InitializedNotStarted
-
         self._new_channel = None
 
     @reply_to(
@@ -493,29 +550,6 @@ class BaseZStack3Device(BaseZStackDevice):
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ]
-
-    # XXX: check DeviceType and DeviceState
-    @reply_to(c.Util.GetDeviceInfo.Req())
-    def util_device_info(self, request):
-        return c.Util.GetDeviceInfo.Rsp(
-            Status=t.Status.SUCCESS,
-            IEEE=t.EUI64.deserialize(self.nvram["nwk"][NwkNvIds.EXTADDR])[0],
-            NWK=t.NWK(0xFFFE),  # ???
-            DeviceType=t.DeviceTypeCapabilities(7),  # fixed
-            DeviceState=self.device_state,  # dynamic!!!
-            AssociatedDevices=[],
-        )
-
-    @reply_to(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
-    def reset_req(self, request):
-        return c.SYS.ResetInd.Callback(
-            Reason=t.ResetReason.PowerUp,
-            TransportRev=2,
-            ProductId=1,
-            MajorRel=2,
-            MinorRel=7,
-            MaintRel=1,
-        )
 
     def update_device_state(self, state):
         self.device_state = state
@@ -775,7 +809,7 @@ class BlankZStack1CC2531(BaseZStack1CC2531):
         super().__init__(*args, **kwargs)
 
         self.nvram = load_nvram_json("CC2531-ZStack1.blank.json")
-        self.nib = None
+        self.nib, _ = CC2531NIB.deserialize(self.nvram["nwk"][NwkNvIds.NIB])
 
 
 class FormedZStack1CC2531(BaseZStack1CC2531):
@@ -783,6 +817,7 @@ class FormedZStack1CC2531(BaseZStack1CC2531):
         super().__init__(*args, **kwargs)
 
         self.nvram = load_nvram_json("CC2531-ZStack1.formed.json")
+        self.nib, _ = CC2531NIB.deserialize(self.nvram["nwk"][NwkNvIds.NIB])
 
 
 class ResetZStack1CC2531(BaseZStack1CC2531):
@@ -790,7 +825,7 @@ class ResetZStack1CC2531(BaseZStack1CC2531):
         super().__init__(*args, **kwargs)
 
         self.nvram = load_nvram_json("CC2531-ZStack1.reset.json")
-        self.nib = None
+        self.nib, _ = CC2531NIB.deserialize(self.nvram["nwk"][NwkNvIds.NIB])
 
 
 EMPTY_DEVICES = [
@@ -798,9 +833,14 @@ EMPTY_DEVICES = [
     ResetLaunchpadCC26X2R1,
     BlankZStack3CC2531,
     ResetZStack3CC2531,
-]  # + [BlankZStack1CC2531, ResetZStack1CC2531]
+    BlankZStack1CC2531,
+    ResetZStack1CC2531,
+]
+
 FORMED_DEVICES = [
     FormedLaunchpadCC26X2R1,
     FormedZStack3CC2531,
-]  # + [FormedZStack1CC2531]
+    FormedZStack1CC2531,
+]
+
 ALL_DEVICES = EMPTY_DEVICES + FORMED_DEVICES

@@ -212,18 +212,15 @@ class ZNP:
 
                 # Make sure that our port works
                 version = await self.request(c.SYS.Version.Req())
-                ping_rsp = await self.request(c.SYS.Ping.Req())
 
-                if not ping_rsp.Capabilities & t.MTCapabilities.CAP_APP_CNF:
-                    old_version_msg = (
-                        "Your device appears to be running an old version of Z-Stack."
-                        " The earliest supported release is Z-Stack 3.0.1."
+                if (version.TransportRev, version.MajorRel, version.MinorRel,) not in {
+                    (2, 2, 6),
+                    (2, 2, 7),
+                }:
+                    raise RuntimeError(
+                        f"Your device is running an unsupported"
+                        f" release of Z-Stack: {version}"
                     )
-
-                    if check_version:
-                        raise RuntimeError(old_version_msg)
-                    else:
-                        LOGGER.warning(old_version_msg)
 
                 self._version = version
         except Exception:
@@ -529,6 +526,23 @@ class ZNP:
 
             async with async_timeout.timeout(timeout):
                 return await callback_rsp
+
+    async def nvram_delete(self, nv_id: nvids.BaseNvIds) -> bool:
+        """
+        Deletes an item from NVRAM. Returns whether or not the item existed.
+        """
+
+        length = (await self.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
+
+        if length == 0:
+            return False
+
+        await self.request(
+            c.SYS.OSALNVDelete.Req(Id=nv_id, ItemLen=length),
+            RspStatus=t.Status.SUCCESS,
+        )
+
+        return True
 
     async def nvram_write(self, nv_id: nvids.BaseNvIds, value, *, create: bool = False):
         """

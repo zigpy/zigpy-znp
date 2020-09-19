@@ -10,7 +10,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
 
-from ..conftest import swap_attribute, CoroutineMock, FORMED_DEVICES
+from ..conftest import swap_attribute, CoroutineMock, BaseZStack3Device, FORMED_DEVICES
 
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
@@ -230,17 +230,18 @@ async def test_update_network_extensive(device, make_application, mocker, caplog
     channels = t.Channels.from_channel_list([11, 15, 20])
     network_key = t.KeyData(range(16))
 
-    bdb_set_primary_channel = znp_server.reply_once_to(
-        request=c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-        responses=[],
-    )
+    if isinstance(device, BaseZStack3Device):
+        bdb_set_primary_channel = znp_server.reply_once_to(
+            request=c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
+            responses=[],
+        )
 
-    bdb_set_secondary_channel = znp_server.reply_once_to(
-        request=c.AppConfig.BDBSetChannel.Req(
-            IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-        ),
-        responses=[],
-    )
+        bdb_set_secondary_channel = znp_server.reply_once_to(
+            request=c.AppConfig.BDBSetChannel.Req(
+                IsPrimary=False, Channel=t.Channels.NO_CHANNELS
+            ),
+            responses=[],
+        )
 
     # Make sure we actually change things
     assert app.channel != channel
@@ -263,8 +264,9 @@ async def test_update_network_extensive(device, make_application, mocker, caplog
     # We should receive a few warnings for `tc_` stuff
     assert len(caplog.records) >= 2
 
-    await bdb_set_primary_channel
-    await bdb_set_secondary_channel
+    if isinstance(device, BaseZStack3Device):
+        await bdb_set_primary_channel
+        await bdb_set_secondary_channel
 
     # The network updates don't take effect without this
     app._reset.assert_called_once_with()
