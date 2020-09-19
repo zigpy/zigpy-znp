@@ -25,20 +25,21 @@ async def restore(radio_path, backup):
         nvid = NwkNvIds[nwk_nvid]
         value = bytes.fromhex(value)
 
-        # XXX: are any NVIDs not filled all the way?
-        try:
-            await znp.request(
-                c.SYS.OSALNVItemInit.Req(Id=nvid, ItemLen=len(value), Value=value),
-                RspStatus=t.Status.SUCCESS,
-            )
-
-            await znp.nvram_write(nvid, value)
-        except InvalidCommandResponse:
-            LOGGER.warning("Write failed for %s = %s", nvid, value)
+        await znp.nvram_write(nvid, value, create=True)
 
     for osal_nvid, value in backup["osal"].items():
         nvid = OsalExNvIds[osal_nvid]
         value = bytes.fromhex(value)
+
+        length = (
+            await znp.request(c.SYS.NVLength.Req(SysId=1, ItemId=nvid, SubId=0))
+        ).Length
+
+        if length == 0:
+            await znp.request(
+                c.SYS.NVCreate.Req(SysId=1, ItemId=nvid, SubId=0, Length=len(value)),
+                RspStatus=t.Status.SUCCESS,
+            )
 
         try:
             await znp.request(

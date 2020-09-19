@@ -77,6 +77,8 @@ async def perform_energy_scan(radio_path, num_scans=None):
 
         print()
 
+    await app.shutdown()
+
 
 async def main(argv):
     parser = setup_parser("Perform an energy scan")

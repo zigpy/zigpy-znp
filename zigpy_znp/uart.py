@@ -10,11 +10,11 @@ from collections import defaultdict
 
 from serial.tools.list_ports import comports as list_com_ports
 
+import zigpy_znp.logger as log
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 
 from zigpy_znp.types import Bytes
-from zigpy_znp.logger import TRACE
 from zigpy_znp.exceptions import InvalidFrame
 
 with warnings.catch_warnings():
@@ -40,29 +40,24 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._transport = None
         self._connected_event = asyncio.Event()
 
-    @property
-    def transport(self) -> typing.Optional[serial_asyncio.SerialTransport]:
-        """Return current transport."""
-        return self._transport
-
     def close(self) -> None:
         """Closes the port."""
         self._buffer.clear()
-        self.transport.close()
+
+        if self._transport is not None:
+            self._transport.close()
+            self._transport = None
 
     def connection_lost(self, exc: typing.Optional[Exception]) -> None:
         """Connection lost."""
 
-        self._buffer.clear()
-
         if exc is not None:
-            LOGGER.warning(
-                "Lost connection to %s", self._transport.serial.name, exc_info=exc
-            )
+            LOGGER.warning("Lost connection", exc_info=exc)
 
+        LOGGER.debug("Closing serial port")
+
+        self.close()
         self._api.connection_lost(exc)
-
-        LOGGER.debug("Closing %s serial port", self._transport.serial.name)
 
     def connection_made(self, transport: serial_asyncio.SerialTransport) -> None:
         """Opened serial port."""
@@ -75,10 +70,10 @@ class ZnpMtProtocol(asyncio.Protocol):
         """Callback when data is received."""
         self._buffer += data
 
-        LOGGER.log(TRACE, "Received data: %s", Bytes.__repr__(data))
+        LOGGER.log(log.TRACE, "Received data: %s", Bytes.__repr__(data))
 
         for frame in self._extract_frames():
-            LOGGER.log(TRACE, "Parsed frame: %s", frame)
+            LOGGER.log(log.TRACE, "Parsed frame: %s", frame)
 
             try:
                 self._api.frame_received(frame.payload)
@@ -92,8 +87,8 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._transport_write(frames.TransportFrame(payload).serialize())
 
     def _transport_write(self, data: bytes) -> None:
-        LOGGER.log(TRACE, "Sending data: %s", Bytes.__repr__(data))
-        self.transport.write(data)
+        LOGGER.log(log.TRACE, "Sending data: %s", Bytes.__repr__(data))
+        self._transport.write(data)
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""

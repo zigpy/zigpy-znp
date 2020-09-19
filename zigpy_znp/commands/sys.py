@@ -360,7 +360,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     # Counter) the clearNV flag shall be set to TRUE
     ZDiagsClearStats = t.CommandDef(
         t.CommandType.SREQ,
-        0x018,
+        0x18,
         req_schema=(
             t.Param("ClearNV", t.Bool, "True -- clear statistics in NV memory"),
         ),
@@ -389,6 +389,40 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         0x1B,
         req_schema=(),
         rsp_schema=(t.Param("SycClock", t.uint32_t, "Milliseconds since last reset"),),
+    )
+
+    # Same as OSALNVRead but with a 16-bit offset
+    OSALNVReadExt = t.CommandDef(
+        t.CommandType.SREQ,
+        0x1C,
+        req_schema=(
+            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param(
+                "Offset",
+                t.uint16_t,
+                "Number of bytes offset from the beginning of the NV value",
+            ),
+        ),
+        rsp_schema=(
+            t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
+            t.Param("Value", t.ShortBytes, "The value of the NV item"),
+        ),
+    )
+
+    # Same as OSALNVWrite but with a 16-bit offset
+    OSALNVWriteExt = t.CommandDef(
+        t.CommandType.SREQ,
+        0x1D,
+        req_schema=(
+            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param(
+                "Offset",
+                t.uint16_t,  # XXX: don't trust the documentation! This *not* 8 bits.
+                "Number of bytes offset from the beginning of the NV value",
+            ),
+            t.Param("Value", t.LongBytes, "The value of the NV item"),
+        ),
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # attempt to create an item in non-volatile memory

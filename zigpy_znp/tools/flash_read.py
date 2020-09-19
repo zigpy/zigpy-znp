@@ -60,6 +60,8 @@ async def read_firmware(radio_path: str) -> bytearray:
 
         data.extend(read_rsp.Data)
 
+    znp.close()
+
     return data
 
 

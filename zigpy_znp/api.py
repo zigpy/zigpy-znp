@@ -9,11 +9,11 @@ import async_timeout
 from collections import Counter, defaultdict
 
 import zigpy_znp.types as t
+import zigpy_znp.logger as log
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 
 from zigpy_znp.types import nvids
-from zigpy_znp.logger import TRACE
 
 from zigpy_znp import uart
 from zigpy_znp.frames import GeneralFrame
@@ -169,6 +169,7 @@ class ZNP:
         self._uart = None
         self._app = None
         self._config = config
+        self._version = None
 
         self._listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
@@ -207,11 +208,10 @@ class ZNP:
             # We have to disable all non-bootloader commands to enter the
             # bootloader upon connecting to the UART.
             if test_port:
-                LOGGER.debug(
-                    "Testing connection to %s", self._uart.transport.serial.name
-                )
+                LOGGER.debug("Testing connection to %s", self._port_path)
 
                 # Make sure that our port works
+                version = await self.request(c.SYS.Version.Req())
                 ping_rsp = await self.request(c.SYS.Ping.Req())
 
                 if not ping_rsp.Capabilities & t.MTCapabilities.CAP_APP_CNF:
@@ -224,14 +224,17 @@ class ZNP:
                         raise RuntimeError(old_version_msg)
                     else:
                         LOGGER.warning(old_version_msg)
+
+                self._version = version
         except Exception:
+            LOGGER.debug("Connection to %s failed, cleaning up", self._port_path)
             self.close()
             raise
 
         LOGGER.debug(
             "Connected to %s at %s baud",
-            self._uart.transport.serial.name,
-            self._uart.transport.serial.baudrate,
+            self._uart._transport.serial.name,
+            self._uart._transport.serial.baudrate,
         )
 
     def connection_lost(self, exc) -> None:
@@ -242,13 +245,13 @@ class ZNP:
 
         LOGGER.debug("We were disconnected from %s: %s", self._port_path, exc)
 
-        # The UART is already closed, there is no point in closing it again
+        # The UART is already closed by the time it notifies us
         self._uart = None
+
+        self.close()
 
         if self._app is not None:
             self._app.connection_lost(exc)
-
-        self.close()
 
     def close(self) -> None:
         """
@@ -262,12 +265,11 @@ class ZNP:
                 listener.cancel()
 
         self._listeners.clear()
+        self._version = None
 
         if self._uart is not None:
             self._uart.close()
             self._uart = None
-
-        self._app = None
 
     def remove_listener(self, listener: BaseResponseListener) -> None:
         """
@@ -281,14 +283,17 @@ class ZNP:
         if not self._listeners:
             return
 
-        LOGGER.log(TRACE, "Removing listener %s", listener)
+        LOGGER.log(log.TRACE, "Removing listener %s", listener)
 
         for header in listener.matching_headers():
-            self._listeners[header].remove(listener)
+            try:
+                self._listeners[header].remove(listener)
+            except ValueError:
+                pass
 
             if not self._listeners[header]:
                 LOGGER.log(
-                    TRACE, "Cleaning up empty listener list for header %s", header
+                    log.TRACE, "Cleaning up empty listener list for header %s", header
                 )
                 del self._listeners[header]
 
@@ -297,15 +302,17 @@ class ZNP:
         for listener in itertools.chain.from_iterable(self._listeners.values()):
             counts[type(listener)] += 1
 
-        LOGGER.debug(
+        LOGGER.log(
+            log.TRACE,
             "There are %d callbacks and %d one-shot listeners remaining",
             counts[CallbackResponseListener],
             counts[OneShotResponseListener],
         )
 
-    def frame_received(self, frame: GeneralFrame) -> None:
+    def frame_received(self, frame: GeneralFrame) -> bool:
         """
-        Called when a frame has been received.
+        Called when a frame has been received. Returns whether or not the frame was
+        handled by any listener.
 
         XXX: Can be called multiple times in a single event loop step!
         """
@@ -326,28 +333,26 @@ class ZNP:
                 continue
 
             if not listener.resolve(command):
-                LOGGER.log(TRACE, "%s does not match %s", command, listener)
+                LOGGER.log(log.TRACE, "%s does not match %s", command, listener)
                 continue
 
             matched = True
-            LOGGER.log(TRACE, "%s matches %s", command, listener)
+            LOGGER.log(log.TRACE, "%s matches %s", command, listener)
 
             if isinstance(listener, OneShotResponseListener):
                 one_shot_matched = True
 
         if not matched:
-            LOGGER.warning("Received an unhandled command: %s", command)
+            self._unhandled_command(command)
 
-    async def iterator_for_responses(
-        self, responses
-    ) -> typing.AsyncGenerator[t.CommandBase, None]:
+        return matched
+
+    def _unhandled_command(self, command: t.CommandBase):
         """
-        Yields all matching responses as long as the async iterator is active.
+        Called when a command that is not handled by any listener is received.
         """
 
-        async with self.capture_responses(responses) as queue:
-            while True:
-                yield await queue.get()
+        LOGGER.warning("Received an unhandled command: %s", command)
 
     @contextlib.asynccontextmanager
     async def capture_responses(self, responses):
@@ -363,6 +368,19 @@ class ZNP:
         finally:
             self.remove_listener(listener)
 
+    @contextlib.asynccontextmanager
+    async def capture_responses_once(self, responses):
+        """
+        Captures all matched responses in a queue within the context manager.
+        """
+
+        future, listener = self.wait_for_responses(responses, context=True)
+
+        try:
+            yield future
+        finally:
+            self.remove_listener(listener)
+
     def callback_for_responses(self, responses, callback) -> CallbackResponseListener:
         """
         Creates a callback listener that matches any of the provided responses.
@@ -373,7 +391,7 @@ class ZNP:
 
         listener = CallbackResponseListener(responses, callback=callback)
 
-        LOGGER.log(TRACE, "Creating callback %s", listener)
+        LOGGER.log(log.TRACE, "Creating callback %s", listener)
 
         for header in listener.matching_headers():
             self._listeners[header].append(listener)
@@ -389,14 +407,14 @@ class ZNP:
 
         return self.callback_for_responses([response], callback)
 
-    def wait_for_responses(self, responses) -> asyncio.Future:
+    def wait_for_responses(self, responses, *, context=False) -> asyncio.Future:
         """
         Creates a one-shot listener that matches any *one* of the given responses.
         """
 
         listener = OneShotResponseListener(responses)
 
-        LOGGER.log(TRACE, "Creating one-shot listener %s", listener)
+        LOGGER.log(log.TRACE, "Creating one-shot listener %s", listener)
 
         for header in listener.matching_headers():
             self._listeners[header].append(listener)
@@ -404,7 +422,10 @@ class ZNP:
         # Remove the listener when the future is done, not only when it gets a result
         listener.future.add_done_callback(lambda _: self.remove_listener(listener))
 
-        return listener.future
+        if context:
+            return listener.future, listener
+        else:
+            return listener.future
 
     def wait_for_response(self, response: t.CommandBase) -> asyncio.Future:
         """
@@ -462,6 +483,7 @@ class ZNP:
                     ),
                 ]
             )
+
             self._uart.send(request.to_frame())
 
             # We should get a SRSP in a reasonable amount of time
@@ -484,7 +506,9 @@ class ZNP:
 
         return response
 
-    async def request_callback_rsp(self, *, request, callback, **response_params):
+    async def request_callback_rsp(
+        self, *, request, callback, timeout=None, **response_params
+    ):
         """
         Sends an SREQ, gets its SRSP confirmation, and waits for its real AREQ response.
         A bug-free version of:
@@ -496,29 +520,23 @@ class ZNP:
         from the UART and be handled in the same event loop step by ZNP.
         """
 
-        callback_response = self.wait_for_response(callback)
-        response = self.request(request, **response_params)
+        if timeout is None:
+            timeout = self._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT]
 
-        await response
+        # The async context manager allows us to clean up resources upon cancellation
+        async with self.capture_responses_once([callback]) as callback_rsp:
+            await self.request(request, **response_params)
 
-        async with async_timeout.timeout(
-            self._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT]
-        ):
-            return await callback_response
+            async with async_timeout.timeout(timeout):
+                return await callback_rsp
 
-    async def nvram_write(
-        self, nv_id: nvids.BaseNvIds, value, *, offset: t.uint8_t = 0
-    ):
+    async def nvram_write(self, nv_id: nvids.BaseNvIds, value, *, create: bool = False):
         """
-        Convenience function for writing a value to NVRAM. Serializes all serializable
-        values and passes bytes directly.
-        """
+        Writes a complete value to NVRAM, optionally resizing and creating the item if
+        necessary.
 
-        if not isinstance(nv_id, nvids.BaseNvIds):
-            raise ValueError(
-                "The nv_id param must be an instance of BaseNvIds. "
-                "Extend one of the tables in zigpy_znp.types.nvids."
-            )
+        Serializes all serializable values and passes bytes directly.
+        """
 
         if hasattr(value, "serialize"):
             value = value.serialize()
@@ -528,22 +546,77 @@ class ZNP:
                 f" Got {nv_id!r}={value!r} (type {type(value)})"
             )
 
-        return await self.request(
-            c.SYS.OSALNVWrite.Req(Id=nv_id, Offset=offset, Value=t.ShortBytes(value)),
-            RspStatus=t.Status.SUCCESS,
-        )
+        if not value:
+            raise ValueError(f"NV item {nv_id} cannot be empty")
 
-    async def nvram_read(
-        self, nv_id: nvids.BaseNvIds, *, offset: t.uint8_t = 0
-    ) -> bytes:
+        length = (await self.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
+
+        # Recreate the item if the length is not correct
+
+        # XXX: Some NVIDs don't really exist and Z-Stack doesn't behave consistently
+        #      when operations are performed on them.
+        if length != len(value) and nv_id != t.nvids.NwkNvIds.POLL_RATE_OLD16:
+            if not create:
+                if length == 0:
+                    raise KeyError(f"NV item does not exist: {nv_id}")
+                else:
+                    raise ValueError(
+                        f"Stored length and actual length differ:"
+                        f" {length} != {len(value)}"
+                    )
+
+            if length != 0:
+                await self.request(
+                    c.SYS.OSALNVDelete.Req(Id=nv_id, ItemLen=length),
+                    RspStatus=t.Status.SUCCESS,
+                )
+
+            await self.request(
+                c.SYS.OSALNVItemInit.Req(Id=nv_id, ItemLen=len(value), Value=b"",),
+                RspStatus=t.Status.NV_ITEM_UNINIT,
+            )
+
+        for offset in range(0, len(value), 244):
+            await self.request(
+                c.SYS.OSALNVWriteExt.Req(
+                    Id=nv_id,
+                    Offset=offset,
+                    Value=t.ShortBytes(value[offset : offset + 244]),
+                ),
+                RspStatus=t.Status.SUCCESS,
+            )
+
+    async def nvram_read(self, nv_id: nvids.BaseNvIds) -> bytes:
         """
-        Reads a value from NVRAM.
+        Reads a complete value from NVRAM.
 
         Raises an `InvalidCommandResponse` error if the NVID doesn't exist.
         """
 
-        response = await self.request(
-            c.SYS.OSALNVRead.Req(Id=nv_id, Offset=offset), RspStatus=t.Status.SUCCESS,
-        )
+        # XXX: Some NVIDs don't really exist and Z-Stack behaves strangely with them
+        if nv_id == t.nvids.NwkNvIds.POLL_RATE_OLD16:
+            read_rsp = await self.request(
+                c.SYS.OSALNVRead.Req(Id=nv_id, Offset=0), RspStatus=t.Status.SUCCESS,
+            )
 
-        return response.Value
+            return read_rsp.Value
+
+        # Every item has a length, even missing ones
+        length = (await self.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
+
+        if length == 0:
+            raise KeyError(f"NV item does not exist: {nv_id}")
+
+        data = b""
+
+        while len(data) < length:
+            read_rsp = await self.request(
+                c.SYS.OSALNVReadExt.Req(Id=nv_id, Offset=len(data)),
+                RspStatus=t.Status.SUCCESS,
+            )
+
+            data += read_rsp.Value
+
+        assert len(data) == length
+
+        return data

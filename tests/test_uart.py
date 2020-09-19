@@ -1,25 +1,27 @@
 import pytest
 
-from unittest import mock
-
 import zigpy_znp.types as t
-import zigpy_znp.commands as c
 import zigpy_znp.config as conf
+import zigpy_znp.commands as c
 
 from zigpy_znp import uart as znp_uart
 from zigpy_znp.frames import TransportFrame
 
 from serial_asyncio import SerialTransport
 
-from .test_api import pytest_mark_asyncio_timeout
+
+@pytest.fixture
+def connected_uart(mocker):
+    znp = mocker.Mock()
+
+    uart = znp_uart.ZnpMtProtocol(znp)
+    uart.connection_made(mocker.Mock())
+
+    yield znp, uart
 
 
-def test_uart_rx_basic():
-    api = mock.Mock()
-    transport = mock.Mock()
-
-    uart = znp_uart.ZnpMtProtocol(api)
-    uart.connection_made(transport)
+def test_uart_rx_basic(connected_uart):
+    znp, uart = connected_uart
 
     test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -34,21 +36,18 @@ def test_uart_rx_basic():
 
     uart.data_received(test_frame_bytes)
 
-    api.frame_received.assert_called_once_with(test_frame)
+    znp.frame_received.assert_called_once_with(test_frame)
 
 
-def test_uart_str_repr():
-    uart = znp_uart.ZnpMtProtocol(mock.Mock())
+def test_uart_str_repr(connected_uart):
+    znp, uart = connected_uart
+
     str(uart)
     repr(uart)
 
 
-def test_uart_rx_byte_by_byte():
-    api = mock.Mock()
-    transport = mock.Mock()
-
-    uart = znp_uart.ZnpMtProtocol(api)
-    uart.connection_made(transport)
+def test_uart_rx_byte_by_byte(connected_uart):
+    znp, uart = connected_uart
 
     test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -64,15 +63,11 @@ def test_uart_rx_byte_by_byte():
     for byte in test_frame_bytes:
         uart.data_received(bytes([byte]))
 
-    api.frame_received.assert_called_once_with(test_frame)
+    znp.frame_received.assert_called_once_with(test_frame)
 
 
-def test_uart_rx_byte_by_byte_garbage():
-    api = mock.Mock()
-    transport = mock.Mock()
-
-    uart = znp_uart.ZnpMtProtocol(api)
-    uart.connection_made(transport)
+def test_uart_rx_byte_by_byte_garbage(connected_uart):
+    znp, uart = connected_uart
 
     test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -98,15 +93,11 @@ def test_uart_rx_byte_by_byte_garbage():
     for byte in data:
         uart.data_received(bytes([byte]))
 
-    api.frame_received.assert_called_once_with(test_frame)
+    znp.frame_received.assert_called_once_with(test_frame)
 
 
-def test_uart_rx_big_garbage():
-    api = mock.Mock()
-    transport = mock.Mock()
-
-    uart = znp_uart.ZnpMtProtocol(api)
-    uart.connection_made(transport)
+def test_uart_rx_big_garbage(connected_uart):
+    znp, uart = connected_uart
 
     test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -131,15 +122,11 @@ def test_uart_rx_big_garbage():
     # The frame should be parsed identically regardless of framing
     uart.data_received(data)
 
-    api.frame_received.assert_called_once_with(test_frame)
+    znp.frame_received.assert_called_once_with(test_frame)
 
 
-def test_uart_rx_corrupted_fcs():
-    api = mock.Mock()
-    transport = mock.Mock()
-
-    uart = znp_uart.ZnpMtProtocol(api)
-    uart.connection_made(transport)
+def test_uart_rx_corrupted_fcs(connected_uart):
+    znp, uart = connected_uart
 
     test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -156,15 +143,11 @@ def test_uart_rx_corrupted_fcs():
     uart.data_received(test_frame_bytes[:-1])
     uart.data_received(b"\x00")
 
-    assert not api.frame_received.called
+    assert not znp.frame_received.called
 
 
-def test_uart_rx_sof_stress():
-    api = mock.Mock()
-    transport = mock.Mock()
-
-    uart = znp_uart.ZnpMtProtocol(api)
-    uart.connection_made(transport)
+def test_uart_rx_sof_stress(connected_uart):
+    znp, uart = connected_uart
 
     test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -183,20 +166,12 @@ def test_uart_rx_sof_stress():
     uart.data_received(b"\xFE" + b"\xFE" + b"\xFE" + test_frame_bytes + b"\x00\x00")
 
     # We should see the valid frame exactly once
-    api.frame_received.assert_called_once_with(test_frame)
+    znp.frame_received.assert_called_once_with(test_frame)
 
 
-def test_uart_frame_received_error():
-    transport = mock.Mock()
-
-    api = mock.Mock()
-    api.frame_received = mock.Mock(side_effect=RuntimeError("An error"))
-
-    with pytest.raises(RuntimeError):
-        api.frame_received(None)
-
-    uart = znp_uart.ZnpMtProtocol(api)
-    uart.connection_made(transport)
+def test_uart_frame_received_error(connected_uart, mocker):
+    znp, uart = connected_uart
+    znp.frame_received = mocker.Mock(side_effect=RuntimeError("An error"))
 
     test_command = c.SYS.ResetInd.Callback(
         Reason=t.ResetReason.PowerUp,
@@ -209,14 +184,15 @@ def test_uart_frame_received_error():
     test_frame = test_command.to_frame()
     test_frame_bytes = TransportFrame(test_frame).serialize()
 
-    # Errors thrown by api.frame_received should not impact how many frames are handled
+    # Errors thrown by znp.frame_received should not impact how many frames are handled
     uart.data_received(test_frame_bytes * 3)
 
     # We should have received all three frames
-    api.frame_received.call_count == 3
+    znp.frame_received.call_count == 3
 
 
-@pytest_mark_asyncio_timeout()
+@pytest.mark.timeout(1)
+@pytest.mark.asyncio
 async def test_connect_auto(mocker):
     device = "/dev/ttyACM0"
 
@@ -224,7 +200,7 @@ async def test_connect_auto(mocker):
         fut = loop.create_future()
         assert url == device
 
-        transport = mock.Mock()
+        transport = mocker.Mock()
         protocol = protocol_factory()
         protocol.connection_made(transport)
 
@@ -235,14 +211,15 @@ async def test_connect_auto(mocker):
     mocker.patch("zigpy_znp.uart.guess_port", return_value=device)
     mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
 
-    api = mock.Mock()
-    await znp_uart.connect(conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "auto"}), api=api)
+    znp = mocker.Mock()
+    await znp_uart.connect(conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "auto"}), api=znp)
 
 
-@pytest_mark_asyncio_timeout()
+@pytest.mark.timeout(1)
+@pytest.mark.asyncio
 async def test_connection_lost(mocker, event_loop):
     device = "/dev/ttyACM0"
-    serial_interface = mock.Mock()
+    serial_interface = mocker.Mock()
 
     def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
         fut = loop.create_future()
@@ -266,26 +243,26 @@ async def test_connection_lost(mocker, event_loop):
 
     mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
 
-    api = mock.Mock()
+    znp = mocker.Mock()
     conn_lost_fut = event_loop.create_future()
-    api.connection_lost = conn_lost_fut.set_result
+    znp.connection_lost = conn_lost_fut.set_result
 
     protocol = await znp_uart.connect(
-        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=api
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp
     )
 
     exception = RuntimeError("Uh oh, something broke")
     protocol.connection_lost(exception)
 
-    # Losing a connection propagates up to the api
+    # Losing a connection propagates up to the znp
     assert (await conn_lost_fut) == exception
 
-    api.reset_mock()
+    znp.reset_mock()
     conn_closed_fut = event_loop.create_future()
-    api.connection_lost = conn_closed_fut.set_result
+    znp.connection_lost = conn_closed_fut.set_result
 
     protocol = await znp_uart.connect(
-        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=api
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp
     )
     protocol.close()
 

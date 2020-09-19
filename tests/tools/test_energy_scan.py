@@ -1,3 +1,4 @@
+import pytest
 import asyncio
 
 import zigpy_znp.types as t
@@ -5,8 +6,7 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.tools.energy_scan import channels_from_channel_mask, main as energy_scan
 
-from ..test_api import pytest_mark_asyncio_timeout  # noqa: F401
-from ..test_application import make_application, znp_server  # noqa: F401
+from ..conftest import FORMED_DEVICES
 
 
 def test_channels_from_channel_mask():
@@ -19,15 +19,15 @@ def test_channels_from_channel_mask():
     assert channel_list(t.Channels.CHANNEL_15) == [15]
 
 
-@pytest_mark_asyncio_timeout(seconds=5)
-async def test_energy_scan(openable_serial_znp_server, capsys, mocker):  # noqa: F811
-    app, openable_serial_znp_server = make_application(openable_serial_znp_server)
+@pytest.mark.timeout(1)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_energy_scan(device, make_znp_server, capsys):
+    znp_server = make_znp_server(server_cls=device)
 
     def fake_scanner(request):
         async def response(request):
-            openable_serial_znp_server.send(
-                c.ZDO.MgmtNWKUpdateReq.Rsp(Status=t.Status.SUCCESS)
-            )
+            znp_server.send(c.ZDO.MgmtNWKUpdateReq.Rsp(Status=t.Status.SUCCESS))
 
             delay = 2 ** request.ScanDuration
             num_channels = len(list(channels_from_channel_mask(request.Channels)))
@@ -35,7 +35,7 @@ async def test_energy_scan(openable_serial_znp_server, capsys, mocker):  # noqa:
             for i in range(request.ScanCount):
                 await asyncio.sleep(delay / 100)
 
-                openable_serial_znp_server.send(
+                znp_server.send(
                     c.ZDO.MgmtNWKUpdateNotify.Callback(
                         Src=0x0000,
                         Status=t.ZDOStatus.SUCCESS,
@@ -48,14 +48,14 @@ async def test_energy_scan(openable_serial_znp_server, capsys, mocker):  # noqa:
 
         asyncio.create_task(response(request))
 
-    openable_serial_znp_server.callback_for_response(
+    znp_server.callback_for_response(
         c.ZDO.MgmtNWKUpdateReq.Req(
             Dst=0x0000, DstAddrMode=t.AddrMode.NWK, NwkManagerAddr=0x0000, partial=True,
         ),
         fake_scanner,
     )
 
-    await energy_scan(["-n", "1", openable_serial_znp_server._port_path, "-v", "-v"])
+    await energy_scan(["-n", "1", znp_server._port_path, "-v", "-v"])
 
     captured = capsys.readouterr()
 

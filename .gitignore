@@ -76,3 +76,5 @@ ENV/
 .mypy_cache/
 
 TI Z-Stack/
+
+zigpy-znp-*.*.*/

@@ -9,7 +9,7 @@ import zigpy_znp.commands as c
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.exceptions import InvalidCommandResponse, CommandNotRecognized
+from zigpy_znp.exceptions import CommandNotRecognized
 from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
 from zigpy_znp.tools.common import setup_parser
 
@@ -32,7 +32,7 @@ async def backup(radio_path):
             LOGGER.info("%s = %s", nwk_nvid, value)
 
             data["nwk"][nwk_nvid.name] = value.hex()
-        except InvalidCommandResponse:
+        except KeyError:
             LOGGER.warning("Read failed for %s", nwk_nvid)
             continue
 

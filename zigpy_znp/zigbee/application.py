@@ -146,6 +146,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if self._znp is not None:
             self._znp.close()
+            self._znp = None
 
     async def startup(self, auto_form=False):
         """
@@ -155,12 +156,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         forming a network, and configuring our settings.
         """
 
+        try:
+            return await self._startup(auto_form=auto_form)
+        except Exception:
+            await self.shutdown()
+            raise
+
+    async def _startup(self, auto_form=False):
+        assert self._znp is None
+
         znp = ZNP(self.config)
-        znp.set_application(self)
         await znp.connect()
 
         # We only assign `self._znp` after it has successfully connected
         self._znp = znp
+        self._znp.set_application(self)
+
         self._bind_callbacks()
 
         # XXX: To make sure we don't switch to the wrong device upon reconnect,
@@ -168,7 +179,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == "auto":
             self._config[conf.CONF_DEVICE][
                 conf.CONF_DEVICE_PATH
-            ] = self._znp._uart.transport.serial.name
+            ] = self._znp._uart._transport.serial.name
 
         # Next, read out the NVRAM item that Zigbee2MQTT writes when it has configured
         # a device to make sure that our network settings will not be reset.
@@ -176,8 +187,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             is_configured = (
                 await self._znp.nvram_read(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
             ) == b"\x55"
-        except InvalidCommandResponse as e:
-            assert e.response.Status == t.Status.INVALID_PARAMETER
+        except KeyError:
             is_configured = False
 
         if not is_configured:
@@ -295,9 +305,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
 
         LOGGER.info(
-            "Using channel mask %s, currently on channel %d."
-            " Limiting concurrent requests to %d",
-            self.channels,
+            "Currently on channel %d. Limiting concurrent requests to %d",
             self.channel,
             max_concurrent_requests,
         )
@@ -332,6 +340,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if tc_address is not None:
             LOGGER.warning("Trust center address in config is not yet supported")
 
+        nib_updates = {}
+
         if channels is not None:
             await self._znp.nvram_write(NwkNvIds.CHANLIST, channels)
             await self._znp.request(
@@ -345,23 +355,37 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 RspStatus=t.Status.SUCCESS,
             )
 
+            nib_updates["channelList"] = channels
+
         if channel is not None:
             # XXX: We modify the logical channel value directly in the NIB.
             #      Is there no better way?
-            nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
-            nib.nwkLogicalChannel = channel
-            await self._znp.nvram_write(NwkNvIds.NIB, nib.serialize())
+            nib_updates["nwkLogicalChannel"] = channel
 
         if pan_id is not None:
             await self._znp.nvram_write(NwkNvIds.PANID, pan_id)
+            nib_updates["nwkPanId"] = pan_id
 
         if extended_pan_id is not None:
-            # There is no Util request to do this
             await self._znp.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
+            nib_updates["extendedPANID"] = extended_pan_id
 
         if network_key is not None:
             await self._znp.nvram_write(NwkNvIds.PRECFGKEY, network_key)
             await self._znp.nvram_write(NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True))
+
+        # Quickly update the NIB, if necessary
+        if nib_updates:
+            try:
+                nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+            except KeyError:
+                LOGGER.warning("NIB is not ready to be written yet")
+            else:
+                for name, value in nib_updates.items():
+                    assert hasattr(nib, name)
+                    setattr(nib, name, value)
+
+                await self._znp.nvram_write(NwkNvIds.NIB, nib)
 
         if reset:
             # We have to reset afterwards
@@ -410,7 +434,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Update the network settings.
         # Not resetting before we form the network is important!
         await self.update_network(
-            # We don't set the channel in here because it will have no effect
+            # We don't set this value in here because it won't have an effect
+            channel=None,
             channels=self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNELS],
             pan_id=pan_id,
             extended_pan_id=extended_pan_id,
@@ -442,52 +467,41 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 callback=c.AppConfig.BDBCommissioningNotification.Callback(
                     partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
                 ),
+                timeout=30,
             )
 
         if bdb_commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
             raise RuntimeError(f"Network formation failed: {bdb_commissioning_rsp}")
 
-        LOGGER.debug("Waiting for the network NIB to be populated")
+        LOGGER.debug("Waiting for the NIB to be populated")
 
         # Even though the device is "ready" at this point, for some reason it takes
         # a few more seconds for the NIB to update with our correct logical channel
         while True:
-            nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+            try:
+                nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
 
-            # Usually this works after the first attempt
-            if nib.nwkLogicalChannel:
-                break
+                # Usually this works after the first attempt
+                if nib.nwkLogicalChannel:
+                    break
+            except KeyError:
+                pass
 
             await asyncio.sleep(1)
 
-        # Only at this point can we update our logical channel
-        channel = self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL]
-
-        if channel is not None and channel != nib.nwkLogicalChannel:
-            LOGGER.debug(
-                "Z-Stack started with channel %d. Updating to %d.",
-                nib.nwkLogicalChannel,
-                channel,
-            )
-            await self.update_network(channel=channel)
+        # Only at this point can we reliably update our network settings.
+        await self.update_network(
+            channel=self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL],
+            pan_id=pan_id,
+            extended_pan_id=extended_pan_id,
+        )
 
         # Create the NV item that keeps track of whether or not we're configured.
         # This is the NV item used by Zigbee2MQTT, pulled in from zigbee-shepherd, and
         # allows for this device to be used with Zigbee2MQTT as well.
-        osal_create_rsp = await self._znp.request(
-            c.SYS.OSALNVItemInit.Req(
-                Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1, Value=b"\x55"
-            )
+        await self._znp.nvram_write(
+            NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55", create=True
         )
-
-        if osal_create_rsp.Status not in (t.Status.SUCCESS, t.Status.NV_ITEM_UNINIT):
-            raise RuntimeError(
-                f"Network formation failed: could not create"
-                f" HAS_CONFIGURED_ZSTACK3 NV item: {osal_create_rsp}"
-            )  # pragma: no cover
-
-        # Initializing the item doesn't guarantee that it holds this exact value
-        await self._znp.nvram_write(NwkNvIds.HAS_CONFIGURED_ZSTACK3, b"\x55")
 
         # Finally, reset once more to reset the device back to a "normal" state so that
         # we can continue the normal application startup sequence.
@@ -644,7 +658,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     def connection_lost(self, exc):
         """
-        Propagated up from lower layers (UART and ZNP) when the connection is lost.
+        Propagated up from UART through ZNP when the connection is lost.
         Spawns the auto-reconnect task.
         """
 
@@ -656,10 +670,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return
 
         # Reconnect in the background using our previously-detected port.
-        LOGGER.debug("Starting background reconnection task")
-
-        self._reconnect_task.cancel()
-        self._reconnect_task = asyncio.create_task(self._reconnect())
+        if self._reconnect_task.done():
+            LOGGER.debug("Restarting background reconnection task")
+            self._reconnect_task = asyncio.create_task(self._reconnect())
 
     #####################################################
     # Z-Stack message callbacks attached during startup #
@@ -798,6 +811,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             NwkNvIds.CONCENTRATOR_RC: t.Bool(True),
             NwkNvIds.SRC_RTG_EXPIRY_TIME: t.uint8_t(255),
             NwkNvIds.NWK_CHILD_AGE_ENABLE: t.Bool(False),
+            # Default is 20 in Z-Stack 3.0.1, 30 in Z-Stack 3/4
+            NwkNvIds.BCAST_DELIVERY_TIME: t.uint8_t(30),
             # We want to receive all ZDO callbacks to proxy them back to zigpy
             NwkNvIds.ZDO_DIRECT_CB: t.Bool(True),
         }
@@ -906,8 +921,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
             try:
-                await self.startup()
-
+                await self._startup()
                 return
             except Exception as e:
                 LOGGER.error("Failed to reconnect", exc_info=e)

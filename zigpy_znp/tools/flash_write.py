@@ -142,6 +142,8 @@ async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
     else:
         LOGGER.info("Unplug your adapter to leave bootloader mode!")
 
+    znp.close()
+
 
 async def main(argv):
     parser = setup_parser("Write firmware to a radio")
