@@ -203,6 +203,8 @@ class ZNP:
                 # XXX: Z-Stack locks up if other radios try probing it first.
                 #      Writing the bootloader skip byte a bunch of times (at least 167)
                 #      appears to reset it.
+                LOGGER.debug("Waiting 1s before the skip bytes are sent")
+                await asyncio.sleep(1)
                 skip = bytes([c.ubl.BootloaderRunMode.FORCE_RUN])
                 self._uart._transport_write(skip * 256)
 
