@@ -79,6 +79,7 @@ async def make_znp_server(mocker):
     transports = []
     double_connect = False
 
+    mocker.patch("zigpy_znp.api.AFTER_CONNECT_DELAY", 0.001)
     mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0.001)
     mocker.patch("zigpy_znp.uart.RTS_TOGGLE_DELAY", 0)
 
