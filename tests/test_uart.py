@@ -20,6 +20,38 @@ def connected_uart(mocker):
     yield znp, uart
 
 
+@pytest.fixture
+def dummy_serial_conn(event_loop, mocker):
+    device = "/dev/ttyACM0"
+
+    serial_interface = mocker.Mock()
+    serial_interface.name = device
+
+    def create_serial_conn(loop, protocol_factory, url, *args, **kwargs):
+        fut = event_loop.create_future()
+        assert url == device
+
+        protocol = protocol_factory()
+
+        # Our event loop doesn't really do anything
+        event_loop.add_writer = lambda *args, **kwargs: None
+        event_loop.add_reader = lambda *args, **kwargs: None
+        event_loop.remove_writer = lambda *args, **kwargs: None
+        event_loop.remove_reader = lambda *args, **kwargs: None
+
+        transport = SerialTransport(event_loop, protocol, serial_interface)
+
+        protocol.connection_made(transport)
+
+        fut.set_result((transport, protocol))
+
+        return fut
+
+    mocker.patch("serial_asyncio.create_serial_connection", new=create_serial_conn)
+
+    return device, serial_interface
+
+
 def test_uart_rx_basic(connected_uart):
     znp, uart = connected_uart
 
@@ -193,62 +225,28 @@ def test_uart_frame_received_error(connected_uart, mocker):
 
 @pytest.mark.timeout(1)
 @pytest.mark.asyncio
-async def test_connect_auto(mocker):
-    device = "/dev/ttyACM0"
-
-    def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
-        fut = loop.create_future()
-        assert url == device
-
-        transport = mocker.Mock()
-        protocol = protocol_factory()
-        protocol.connection_made(transport)
-
-        fut.set_result((transport, protocol))
-
-        return fut
+async def test_connect_auto(dummy_serial_conn, mocker):
+    device, _ = dummy_serial_conn
 
     mocker.patch("zigpy_znp.uart.guess_port", return_value=device)
-    mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
 
     znp = mocker.Mock()
-    await znp_uart.connect(conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "auto"}), api=znp)
+    await znp_uart.connect(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "auto"}), api=znp, toggle_rts=False
+    )
 
 
 @pytest.mark.timeout(1)
 @pytest.mark.asyncio
-async def test_connection_lost(mocker, event_loop):
-    device = "/dev/ttyACM0"
-    serial_interface = mocker.Mock()
-
-    def dummy_serial_conn(loop, protocol_factory, url, *args, **kwargs):
-        fut = loop.create_future()
-        assert url == device
-
-        protocol = protocol_factory()
-
-        # Our event loop doesn't really do anything
-        event_loop.add_writer = lambda *args, **kwargs: None
-        event_loop.add_reader = lambda *args, **kwargs: None
-        event_loop.remove_writer = lambda *args, **kwargs: None
-        event_loop.remove_reader = lambda *args, **kwargs: None
-
-        transport = SerialTransport(event_loop, protocol, serial_interface)
-
-        protocol.connection_made(transport)
-
-        fut.set_result((transport, protocol))
-
-        return fut
-
-    mocker.patch("serial_asyncio.create_serial_connection", new=dummy_serial_conn)
+async def test_connection_lost(dummy_serial_conn, mocker, event_loop):
+    device, _ = dummy_serial_conn
 
     znp = mocker.Mock()
     conn_lost_fut = event_loop.create_future()
     znp.connection_lost = conn_lost_fut.set_result
 
     protocol = await znp_uart.connect(
-        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp, toggle_rts=False
     )
 
     exception = RuntimeError("Uh oh, something broke")
@@ -262,7 +260,7 @@ async def test_connection_lost(mocker, event_loop):
     znp.connection_lost = conn_closed_fut.set_result
 
     protocol = await znp_uart.connect(
-        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp, toggle_rts=False
     )
     protocol.close()
 
@@ -270,6 +268,58 @@ async def test_connection_lost(mocker, event_loop):
     assert (await conn_closed_fut) is None
 
 
-def test_connection_made(connected_uart):
-    znp, uart = connected_uart
+@pytest.mark.timeout(1)
+@pytest.mark.asyncio
+async def test_connection_made(dummy_serial_conn, mocker):
+    device, _ = dummy_serial_conn
+    znp = mocker.Mock()
+
+    await znp_uart.connect(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp, toggle_rts=False
+    )
+
     znp.connection_made.assert_called_once_with()
+
+
+@pytest.mark.timeout(1)
+@pytest.mark.asyncio
+async def test_no_toggle_rts(dummy_serial_conn, mocker):
+    device, serial = dummy_serial_conn
+
+    type(serial).dsrdtr = dsrdtr = mocker.PropertyMock()
+    type(serial).rtscts = rtscts = mocker.PropertyMock()
+
+    znp = mocker.Mock()
+
+    await znp_uart.connect(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp, toggle_rts=False
+    )
+
+    assert dsrdtr.mock_calls == []
+    assert rtscts.mock_calls == []
+
+
+@pytest.mark.timeout(1)
+@pytest.mark.asyncio
+async def test_toggle_rts(dummy_serial_conn, mocker):
+    device, serial = dummy_serial_conn
+
+    type(serial).dsrdtr = dsrdtr = mocker.PropertyMock()
+    type(serial).rtscts = rtscts = mocker.PropertyMock()
+
+    znp = mocker.Mock()
+
+    await znp_uart.connect(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp, toggle_rts=True
+    )
+
+    assert dsrdtr.mock_calls == [
+        mocker.call(False),
+        mocker.call(False),
+        mocker.call(False),
+    ]
+    assert rtscts.mock_calls == [
+        mocker.call(False),
+        mocker.call(True),
+        mocker.call(False),
+    ]

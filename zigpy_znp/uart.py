@@ -26,7 +26,9 @@ with warnings.catch_warnings():
     )
     import serial_asyncio  # noqa: E402
 
+
 LOGGER = logging.getLogger(__name__)
+RTS_TOGGLE_DELAY = 0.15  # seconds
 
 
 class BufferTooShort(Exception):
@@ -208,7 +210,7 @@ def guess_port() -> str:
     return port.device
 
 
-async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
+async def connect(config: conf.ConfigType, api, *, toggle_rts=True) -> ZnpMtProtocol:
     loop = asyncio.get_running_loop()
 
     port = config[conf.CONF_DEVICE_PATH]
@@ -218,26 +220,38 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     if port == "auto":
         port = guess_port()
 
-    xonxoff, rtscts = {
-        None: (False, False),
-        "hardware": (False, True),
-        "software": (True, False),
-    }[flow_control]
-
     LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
 
     transport, protocol = await serial_asyncio.create_serial_connection(
-        loop,
-        lambda: ZnpMtProtocol(api),
+        loop=loop,
+        protocol_factory=lambda: ZnpMtProtocol(api),
         url=port,
         baudrate=baudrate,
         parity=serial.PARITY_NONE,
         stopbits=serial.STOPBITS_ONE,
-        xonxoff=xonxoff,
-        rtscts=rtscts,
+        xonxoff=(flow_control == "software"),
+        rtscts=(flow_control == "hardware"),
     )
 
     await protocol._connected_event.wait()
+
+    # Skips the bootloader on slaesh's CC2652R USB stick
+    if toggle_rts:
+        LOGGER.debug("Toggling RTS/CTS to skip CC2652R bootloader")
+        transport.dsrdtr = False
+        transport.rtscts = False
+
+        await asyncio.sleep(RTS_TOGGLE_DELAY)
+
+        transport.dsrdtr = False
+        transport.rtscts = True
+
+        await asyncio.sleep(RTS_TOGGLE_DELAY)
+
+        transport.dsrdtr = False
+        transport.rtscts = False
+
+        await asyncio.sleep(RTS_TOGGLE_DELAY)
 
     LOGGER.debug("Connected to %s at %s baud", port, baudrate)
 
