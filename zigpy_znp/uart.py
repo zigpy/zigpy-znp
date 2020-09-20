@@ -238,18 +238,18 @@ async def connect(config: conf.ConfigType, api, *, toggle_rts=True) -> ZnpMtProt
     # Skips the bootloader on slaesh's CC2652R USB stick
     if toggle_rts:
         LOGGER.debug("Toggling RTS/CTS to skip CC2652R bootloader")
-        transport.dsrdtr = False
-        transport.rtscts = False
+        transport.serial.dsrdtr = False
+        transport.serial.rtscts = False
 
         await asyncio.sleep(RTS_TOGGLE_DELAY)
 
-        transport.dsrdtr = False
-        transport.rtscts = True
+        transport.serial.dsrdtr = False
+        transport.serial.rtscts = True
 
         await asyncio.sleep(RTS_TOGGLE_DELAY)
 
-        transport.dsrdtr = False
-        transport.rtscts = False
+        transport.serial.dsrdtr = False
+        transport.serial.rtscts = False
 
         await asyncio.sleep(RTS_TOGGLE_DELAY)
 
