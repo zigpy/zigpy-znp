@@ -66,6 +66,8 @@ class ZnpMtProtocol(asyncio.Protocol):
 
         self._connected_event.set()
 
+        self._api.connection_made()
+
     def data_received(self, data: bytes) -> None:
         """Callback when data is received."""
         self._buffer += data

@@ -21,6 +21,7 @@ from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 
 LOGGER = logging.getLogger(__name__)
+STARTUP_DELAY = 1  # seconds
 
 
 def _deduplicate_commands(
@@ -205,9 +206,24 @@ class ZNP:
                 skip = bytes([c.ubl.BootloaderRunMode.FORCE_RUN])
                 self._uart._transport_write(skip * 256)
 
-            # We have to disable all non-bootloader commands to enter the
+            # We have to disable all non-bootloader commands to enter the serial
             # bootloader upon connecting to the UART.
             if test_port:
+                # Some Z-Stack 3 devices don't like you sending data immediately after
+                # opening the serial port. A small delay helps, but they also sometimes
+                # send a reset indication message when they're ready.
+                LOGGER.debug(
+                    "Waiting %ss or until a reset indication is received", STARTUP_DELAY
+                )
+
+                try:
+                    async with async_timeout.timeout(STARTUP_DELAY):
+                        await self.wait_for_response(
+                            c.SYS.ResetInd.Callback(partial=True)
+                        )
+                except asyncio.TimeoutError:
+                    pass
+
                 LOGGER.debug("Testing connection to %s", self._port_path)
 
                 # Make sure that our port works
@@ -233,6 +249,12 @@ class ZNP:
             self._uart._transport.serial.name,
             self._uart._transport.serial.baudrate,
         )
+
+    def connection_made(self) -> None:
+        """
+        Called by the UART object when a connection has been made.
+        """
+        pass
 
     def connection_lost(self, exc) -> None:
         """

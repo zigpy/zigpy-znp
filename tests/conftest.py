@@ -79,6 +79,8 @@ async def make_znp_server(mocker):
     transports = []
     double_connect = False
 
+    mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0.001)
+
     def inner(server_cls, config=None):
         if config is None:
             config = config_for_port_path(FAKE_SERIAL_PORT)
@@ -526,7 +528,9 @@ class BaseZStack1CC2531(BaseZStackDevice):
 class BaseZStack3Device(BaseZStackDevice):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self._new_channel = None
+        self._first_connection = True
 
     @reply_to(
         c.AppConfig.BDBSetChannel.Req(IsPrimary=False, Channel=t.Channels.NO_CHANNELS)
@@ -625,6 +629,17 @@ class BaseZStack3Device(BaseZStackDevice):
                 | t.MTCapabilities.CAP_SYS
             )
         )
+
+    def connection_made(self):
+        super().connection_made()
+
+        if not self._first_connection:
+            return
+
+        self._first_connection = False
+
+        # Z-Stack 3 devices send a callback when they're first used
+        asyncio.get_running_loop().call_soon(self.send, self.reset_req(None))
 
 
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):

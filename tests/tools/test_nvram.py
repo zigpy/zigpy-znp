@@ -14,7 +14,7 @@ from zigpy_znp.tools.nvram_reset import main as nvram_reset
 from ..conftest import ALL_DEVICES
 
 
-pytestmark = [pytest.mark.timeout(2), pytest.mark.asyncio]
+pytestmark = [pytest.mark.timeout(3), pytest.mark.asyncio]
 
 
 def not_recognized(req):

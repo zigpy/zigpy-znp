@@ -268,3 +268,8 @@ async def test_connection_lost(mocker, event_loop):
 
     # Closing a connection does as well
     assert (await conn_closed_fut) is None
+
+
+def test_connection_made(connected_uart):
+    znp, uart = connected_uart
+    znp.connection_made.assert_called_once_with()
