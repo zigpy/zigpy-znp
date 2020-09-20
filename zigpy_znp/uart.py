@@ -255,4 +255,7 @@ async def connect(config: conf.ConfigType, api, *, toggle_rts=True) -> ZnpMtProt
 
     LOGGER.debug("Connected to %s at %s baud", port, baudrate)
 
+    LOGGER.debug("Waiting 1s after estabilishing connection")
+    await asyncio.sleep(1)
+
     return protocol
