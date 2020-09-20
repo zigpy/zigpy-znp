@@ -116,10 +116,7 @@ def test_zdo_nullable_node_descriptor():
     desc1, data = c.zdo.NullableNodeDescriptor.deserialize(b"\x00")
 
     # Old-style zigpy structs
-    if hasattr(desc1, "_fields"):
-        assert all(getattr(desc1, f) is None for f, _ in desc1._fields)
-    else:
-        assert all(value is None for field, value in desc1.assigned_fields())
+    assert all(value is None for field, value in desc1.assigned_fields())
 
     assert not data
     assert desc1.serialize() == b"\x00"

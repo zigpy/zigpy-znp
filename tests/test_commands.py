@@ -332,11 +332,7 @@ def test_command_optional_params_failures():
 
 
 def test_simple_descriptor():
-    # Support both old and new zigpy types
-    try:
-        lvlist16_type = zigpy_t.LVList(t.uint16_t)
-    except TypeError:
-        lvlist16_type = zigpy_t.LVList[t.uint16_t]
+    lvlist16_type = zigpy_t.LVList[t.uint16_t]
 
     simple_descriptor = zigpy.zdo.types.SimpleDescriptor()
     simple_descriptor.endpoint = zigpy_t.uint8_t(1)
