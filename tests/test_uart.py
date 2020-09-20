@@ -286,8 +286,8 @@ async def test_connection_made(dummy_serial_conn, mocker):
 async def test_no_toggle_rts(dummy_serial_conn, mocker):
     device, serial = dummy_serial_conn
 
-    type(serial).dsrdtr = dsrdtr = mocker.PropertyMock()
-    type(serial).rtscts = rtscts = mocker.PropertyMock()
+    type(serial).dtr = dtr = mocker.PropertyMock()
+    type(serial).rts = rts = mocker.PropertyMock()
 
     znp = mocker.Mock()
 
@@ -295,8 +295,8 @@ async def test_no_toggle_rts(dummy_serial_conn, mocker):
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp, toggle_rts=False
     )
 
-    assert dsrdtr.mock_calls == []
-    assert rtscts.mock_calls == []
+    assert dtr.mock_calls == []
+    assert rts.mock_calls == []
 
 
 @pytest.mark.timeout(1)
@@ -304,8 +304,8 @@ async def test_no_toggle_rts(dummy_serial_conn, mocker):
 async def test_toggle_rts(dummy_serial_conn, mocker):
     device, serial = dummy_serial_conn
 
-    type(serial).dsrdtr = dsrdtr = mocker.PropertyMock()
-    type(serial).rtscts = rtscts = mocker.PropertyMock()
+    type(serial).dtr = dtr = mocker.PropertyMock()
+    type(serial).rts = rts = mocker.PropertyMock()
 
     znp = mocker.Mock()
 
@@ -313,12 +313,12 @@ async def test_toggle_rts(dummy_serial_conn, mocker):
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp, toggle_rts=True
     )
 
-    assert dsrdtr.mock_calls == [
+    assert dtr.mock_calls == [
         mocker.call(False),
         mocker.call(False),
         mocker.call(False),
     ]
-    assert rtscts.mock_calls == [
+    assert rts.mock_calls == [
         mocker.call(False),
         mocker.call(True),
         mocker.call(False),

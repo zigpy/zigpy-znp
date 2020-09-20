@@ -21,6 +21,7 @@ from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 
 LOGGER = logging.getLogger(__name__)
+AFTER_CONNECT_DELAY = 1  # seconds
 STARTUP_DELAY = 1  # seconds
 
 
@@ -196,6 +197,9 @@ class ZNP:
 
         try:
             self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
+
+            LOGGER.debug("Waiting %ss before sending anything", AFTER_CONNECT_DELAY)
+            await asyncio.sleep(AFTER_CONNECT_DELAY)
 
             if self._config[conf.CONF_ZNP_CONFIG][conf.CONF_SKIP_BOOTLOADER]:
                 LOGGER.debug("Sending bootloader skip byte")
