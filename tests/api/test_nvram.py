@@ -109,7 +109,7 @@ async def test_write_wrong_length(connected_znp, nvid, value):
     )
 
     init_rsp = znp_server.reply_once_to(
-        request=c.SYS.OSALNVItemInit.Req(Id=nvid, ItemLen=len(value), Value=b""),
+        request=c.SYS.OSALNVItemInit.Req(Id=nvid, ItemLen=len(value), Value=value),
         responses=[c.SYS.OSALNVItemInit.Rsp(Status=t.Status.NV_ITEM_UNINIT)],
     )
 

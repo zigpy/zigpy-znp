@@ -586,10 +586,13 @@ class ZNP:
                 )
 
             await self.request(
-                c.SYS.OSALNVItemInit.Req(Id=nv_id, ItemLen=len(value), Value=b"",),
+                c.SYS.OSALNVItemInit.Req(
+                    Id=nv_id, ItemLen=len(value), Value=t.ShortBytes(value[:244]),
+                ),
                 RspStatus=t.Status.NV_ITEM_UNINIT,
             )
 
+        # 244 bytes is the most you can fit in a single `SYS.OSALNVWriteExt` command
         for offset in range(0, len(value), 244):
             await self.request(
                 c.SYS.OSALNVWriteExt.Req(
