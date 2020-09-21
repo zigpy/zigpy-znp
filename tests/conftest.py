@@ -508,6 +508,9 @@ class BaseZStack1CC2531(BaseZStackDevice):
                     self.nvram["nwk"][NwkNvIds.CHANLIST]
                 )
                 self.nib.nwkLogicalChannel = 15
+                self.nib.nwkPanId, _ = t.NWK.deserialize(
+                    self.nvram["nwk"][NwkNvIds.PANID]
+                )
 
                 return []
 

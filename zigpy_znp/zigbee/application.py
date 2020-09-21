@@ -51,6 +51,7 @@ PROBE_TIMEOUT = 5  # seconds
 STARTUP_TIMEOUT = 5  # seconds
 ZDO_REQUEST_TIMEOUT = 10  # seconds
 DATA_CONFIRM_TIMEOUT = 5  # seconds
+NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 
 DEFAULT_TC_LINK_KEY = t.TCLinkKey(
     ExtAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),  # global
@@ -76,7 +77,7 @@ class ZNPCoordinator(zigpy.device.Device):
     def model(self):
         # There is no way to query the Z-Stack version or even the hardware at runtime.
         # Instead we have to rely on these sorts of "hints"
-        if isinstance(self.application._nib, CC2531NIB):
+        if self.application.is_cc2531:
             model = "CC2531"
 
             if self.application.is_zstack_home_12:
@@ -112,8 +113,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     @property
     def channel(self):
-        # This value is accessible only from the NIB struct. There does not appear to be
-        # a MT command to read it.
         return self._nib.nwkLogicalChannel
 
     @property
@@ -122,7 +121,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     @property
     def pan_id(self):
-        # Z-Stack 1.2 never updates the PANID NV item from `\xFF\xFF`
         return self._nib.nwkPanId
 
     @property
@@ -342,98 +340,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             max_concurrent_requests,
         )
 
-    async def update_network(
-        self,
-        *,
-        channel: typing.Optional[t.uint8_t] = None,
-        channels: typing.Optional[t.Channels] = None,
-        extended_pan_id: typing.Optional[t.ExtendedPanId] = None,
-        network_key: typing.Optional[t.KeyData] = None,
-        pan_id: typing.Optional[t.PanId] = None,
-        tc_address: typing.Optional[t.EUI64] = None,
-        tc_link_key: typing.Optional[t.KeyData] = None,
-        update_id: int = 0,
-        reset: bool = True,
-    ):
-        """
-        Updates network settings at runtime, after the application has started.
-        """
-
-        if (
-            channel is not None
-            and channels is not None
-            and not t.Channels.from_channel_list([channel]) & channels
-        ):
-            raise ValueError("Channel does not overlap with channel mask")
-
-        if tc_link_key is not None:
-            LOGGER.warning("Trust center link key in config is not yet supported")
-
-        if tc_address is not None:
-            LOGGER.warning("Trust center address in config is not yet supported")
-
-        nib_updates = {}
-
-        if channels is not None:
-            await self._znp.nvram_write(NwkNvIds.CHANLIST, channels)
-
-            nib_updates["channelList"] = channels
-
-            # Z-Stack Home 1.2 doesn't have the BDB subsystem
-            if not self.is_zstack_home_12:
-                await self._znp.request(
-                    c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-                    RspStatus=t.Status.SUCCESS,
-                )
-                await self._znp.request(
-                    c.AppConfig.BDBSetChannel.Req(
-                        IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-                    ),
-                    RspStatus=t.Status.SUCCESS,
-                )
-
-        if channel is not None:
-            # XXX: We modify the logical channel value directly in the NIB.
-            #      Is there no better way?
-            nib_updates["nwkLogicalChannel"] = channel
-
-        if pan_id is not None:
-            await self._znp.nvram_write(NwkNvIds.PANID, pan_id)
-            nib_updates["nwkPanId"] = pan_id
-
-        if extended_pan_id is not None:
-            await self._znp.nvram_write(NwkNvIds.EXTENDED_PAN_ID, extended_pan_id)
-            nib_updates["extendedPANID"] = extended_pan_id
-
-        if network_key is not None:
-            await self._znp.nvram_write(NwkNvIds.PRECFGKEY, network_key, create=True)
-            await self._znp.nvram_write(
-                NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True), create=True
-            )
-
-        # Quickly update the NIB, if necessary
-        if nib_updates:
-            try:
-                nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
-            except KeyError:
-                LOGGER.warning("NIB is not ready to be written yet")
-            else:
-                for name, value in nib_updates.items():
-                    assert hasattr(nib, name)
-                    setattr(nib, name, value)
-
-                await self._znp.nvram_write(NwkNvIds.NIB, nib)
-
-        if reset:
-            # We have to reset afterwards
-            await self._reset()
-            await self._load_device_info()
-
     async def form_network(self):
         """
         Clears the current config and forms a new network with a random network key,
         PAN ID, and extended PAN ID.
         """
+
+        # First, make the settings consistent and randomly generate missing values
+        channel = self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL]
+        channels = self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNELS]
+        pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID]
+        extended_pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID]
+        network_key = self.config[conf.CONF_NWK][conf.CONF_NWK_KEY]
+
+        if pan_id is None:
+            # Let Z-Stack pick one at random, hopefully not conflicting with others
+            pan_id = t.uint16_t(0xFFFF)
+
+        if extended_pan_id is None:
+            # It's not documented whether or not Z-Stack will pick this randomly as well
+            # if a value of 00:00:00:00:00:00:00:00 is provided but the chances of a
+            # collision using `os.urandom` are astronomically small
+            extended_pan_id = ExtendedPanId(os.urandom(8))
+
+        if network_key is None:
+            network_key = t.KeyData(os.urandom(16))
+
+        # Override `channels` with a single channel if one is explicitly set
+        if channel is not None:
+            channels = t.Channels.from_channel_list([channel])
 
         # Delete any existing HAS_CONFIGURED_ZSTACK* NV items. One (or both) may fail.
         await self._znp.nvram_delete(NwkNvIds.HAS_CONFIGURED_ZSTACK1)
@@ -449,35 +384,31 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._reset()
 
         # Now that we've cleared everything, write back our Z-Stack settings
-        await self._write_stack_settings(reset_if_changed=False)
-
-        pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID]
-
-        if pan_id is None:
-            # Let Z-Stack pick one at random, hopefully not conflicting with others
-            pan_id = t.uint16_t(0xFFFF)
-
-        extended_pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID]
-
-        if extended_pan_id is None:
-            # It's not documented whether or not Z-Stack will pick this randomly as well
-            # if a value of 00:00:00:00:00:00:00:00 is provided but the chances of a
-            # collision using `os.urandom` are astronomically small
-            extended_pan_id = ExtendedPanId(os.urandom(8))
-
         LOGGER.debug("Updating network settings")
 
-        # Update the network settings.
-        # Not resetting before we form the network is important!
-        await self.update_network(
-            # We don't set this value in here because it won't have an effect
-            channel=None,
-            channels=self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNELS],
-            pan_id=pan_id,
-            extended_pan_id=extended_pan_id,
-            network_key=t.KeyData(os.urandom(16)),
-            reset=False,
+        await self._write_stack_settings(reset_if_changed=False)
+        await self._znp.nvram_write(NwkNvIds.PANID, pan_id, create=True)
+        await self._znp.nvram_write(
+            NwkNvIds.APS_USE_EXT_PANID, extended_pan_id, create=True
         )
+        await self._znp.nvram_write(NwkNvIds.PRECFGKEY, network_key, create=True)
+        await self._znp.nvram_write(
+            NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True), create=True
+        )
+        await self._znp.nvram_write(NwkNvIds.CHANLIST, channels, create=True)
+
+        # Z-Stack Home 1.2 doesn't have the BDB subsystem
+        if not self.is_zstack_home_12:
+            await self._znp.request(
+                c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
+                RspStatus=t.Status.SUCCESS,
+            )
+            await self._znp.request(
+                c.AppConfig.BDBSetChannel.Req(
+                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
+                ),
+                RspStatus=t.Status.SUCCESS,
+            )
 
         # Finally, form the network
         LOGGER.debug("Forming the network")
@@ -499,9 +430,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ):
             if not self.is_zstack_home_12:
                 # Z-Stack 3 uses the BDB subsystem
-
-                # Form the network and capture expected progress messages so they don't
-                # appear as warnings within logs
                 commissioning_rsp = await self._znp.request_callback_rsp(
                     request=c.AppConfig.BDBStartCommissioning.Req(
                         Mode=c.app_config.BDBCommissioningMode.NwkFormation
@@ -511,7 +439,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         partial=True,
                         RemainingModes=c.app_config.BDBCommissioningMode.NONE,
                     ),
-                    timeout=30,
+                    timeout=NETWORK_COMMISSIONING_TIMEOUT,
                 )
 
                 if (
@@ -530,13 +458,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     RspState=c.zdo.StartupState.NewNetworkState,
                 )
 
-        # Both versions still end with this callback
-        await started_as_coordinator
+            # Both versions still end with this callback
+            await started_as_coordinator
 
         LOGGER.debug("Waiting for the NIB to be populated")
 
-        # Even though the device is "ready" at this point, for some reason it takes
-        # a few more seconds for the NIB to update with our correct logical channel
+        # Even though the device says it is "ready" at this point, it takes a few more
+        # seconds for `_NIB.nwkState` to switch from `NwkState.NWK_INIT`. There does
+        # not appear to be any user-facing MT command to read this information.
         while True:
             try:
                 nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
@@ -550,12 +479,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 pass
 
             await asyncio.sleep(1)
-
-        # Only at this point can we reliably update our network settings.
-        await self.update_network(
-            channel=self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL],
-            extended_pan_id=extended_pan_id,
-        )
 
         # Create the NV item that keeps track of whether or not we're fully configured.
         if self.is_zstack_home_12:
@@ -855,6 +778,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     @property
     def is_zstack_home_12(self) -> bool:
         return self._znp._version.MinorRel == 6
+
+    @property
+    def is_cc2531(self) -> bool:
+        return isinstance(self._nib, CC2531NIB)
 
     @property
     def znp_config(self) -> conf.ConfigType:

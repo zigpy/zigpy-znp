@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 import pytest
 
@@ -10,7 +9,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
 
-from ..conftest import swap_attribute, CoroutineMock, BaseZStack3Device, FORMED_DEVICES
+from ..conftest import CoroutineMock, FORMED_DEVICES
 
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
@@ -195,101 +194,6 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
     assert app._send_request.call_count == 1
     assert app._send_request.mock_calls[0][2]["dst_addr"] == addr
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_update_network_noop(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
-
-    await app.startup(auto_form=False)
-    mocker.spy(app, "_reset")
-
-    # Nothing should be done with an empty update_network
-    with swap_attribute(app, "_znp", mocker.NonCallableMock()):
-        await app.update_network(reset=False)
-
-    assert app._reset.call_count == 0
-    await app.update_network(reset=True)
-    assert app._reset.call_count == 1
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_update_network_extensive(device, make_application, mocker, caplog):
-    app, znp_server = make_application(server_cls=device)
-
-    await app.startup(auto_form=False)
-    mocker.spy(app, "_reset")
-
-    channel = t.uint8_t(20)
-    pan_id = t.PanId(0x1234)
-    extended_pan_id = t.ExtendedPanId(range(8))
-    channels = t.Channels.from_channel_list([11, 15, 20])
-    network_key = t.KeyData(range(16))
-
-    if isinstance(device, BaseZStack3Device):
-        bdb_set_primary_channel = znp_server.reply_once_to(
-            request=c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-            responses=[],
-        )
-
-        bdb_set_secondary_channel = znp_server.reply_once_to(
-            request=c.AppConfig.BDBSetChannel.Req(
-                IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-            ),
-            responses=[],
-        )
-
-    # Make sure we actually change things
-    assert app.channel != channel
-    assert app.pan_id != pan_id
-    assert app.ext_pan_id != extended_pan_id
-
-    with caplog.at_level(logging.WARNING):
-        await app.update_network(
-            channel=channel,
-            channels=channels,
-            extended_pan_id=extended_pan_id,
-            network_key=network_key,
-            pan_id=pan_id,
-            tc_address=t.EUI64(range(8)),
-            tc_link_key=t.KeyData(range(8)),
-            update_id=0,
-            reset=True,
-        )
-
-    # We should receive a few warnings for `tc_` stuff
-    assert len(caplog.records) >= 2
-
-    if isinstance(device, BaseZStack3Device):
-        await bdb_set_primary_channel
-        await bdb_set_secondary_channel
-
-    # The network updates don't take effect without this
-    app._reset.assert_called_once_with()
-
-    # Ensure we set everything we could
-    assert app.nwk_update_id is None  # We can't use it
-    assert app.channel == channel
-    assert app.channels == channels
-    assert app.pan_id == pan_id
-    assert app.ext_pan_id == extended_pan_id
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_update_network_bad_channel(device, make_application):
-    app, znp_server = make_application(server_cls=device)
-
-    with pytest.raises(ValueError):
-        # 12 is not in the mask
-        await app.update_network(
-            channel=t.uint8_t(12), channels=t.Channels.from_channel_list([11, 15, 20]),
-        )
 
     await app.shutdown()
 
