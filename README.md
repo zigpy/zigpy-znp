@@ -20,37 +20,29 @@ $ source venv/bin/activate
 ```
 
 ## Home Assistant
-If you are using Home Assistant, copy [`custom_components/zha_custom_radios.py`](https://github.com/zha-ng/zigpy-znp/blob/dev/custom_components/zha_custom_radios.py) into your `custom_components` folder and create a new entry in your `configuration.yaml` file:
+Stable releases of zigpy-znp are pre-installed by Home Assistant and are used for all new networks for TI radios running Z-Stack 3 or above. If you have already setup Home Assistant's ZHA component with a TI radio, ZHA may be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. Navigate to the folder containing your `configuration.yaml` file, edit `.storage/core.config_entries`, and change `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
 
-```yaml
-zha_custom_radios:
- znp:
-   module: zigpy_znp.zigbee.application
-   description: TI CC13x2, CC26x2, ZZH, and CC2531
-```
+### Testing `dev` with Home Assistant Core
 
-If you have already setup Home Assistant's ZHA component with a TI radio, ZHA will be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. Navigate to the folder containing your `configuration.yaml` file and edit the `.storage/core.config_entries`, changing `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
-
-## Firmware
-
-CC2531 users will need to upgrade their firmware to Z-Stack 3.0.1. This is quick and simple if you are already running a build of Z-Stack. Make sure to plug your CC2531 in and run the below commands within 60s:
+Upgrade the package within your virtual environment (requires `git`):
 
 ```console
-(venv) $ curl -L -o CC2531_20190425.zip https://github.com/Koenkk/Z-Stack-firmware/raw/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip
-(venv) $ unzip CC2531_20190425.zip
-(venv) $ python -m zigpy_znp.tools.flash_write -i CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531
-2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.00%
-2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.03%
-2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.05%
-2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.08%
-2020-08-22 16:37:30 computer __main__[54567] INFO Write progress: 0.11%
-...
-(venv) $ python -m zigpy_znp.tools.nvram_reset /dev/serial/by-id/YOUR-CC2531  # note: this will clear your network settings!
+(venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/
 ```
 
-# Configuration
+### Testing `dev` with Home Assistant Supervised
 
-Below are the defaults with the top-level Home Assistant `zha:` key:
+ - Add https://github.com/home-assistant/hassio-addons-development as an addon repository.
+ - Install the "Custom deps deployment" addon.
+ - Add the following to your `configuration.yaml` file:
+	```yaml
+	pypi:
+	  - git+https://github.com/zha-ng/zigpy-znp/
+	```
+
+# Configuration
+Below are the defaults with the top-level Home Assistant `zha:` key.
+You probably do not need to change these options, they are provided only for reference:
 
 ```yaml
 zha:
@@ -58,11 +50,11 @@ zha:
     znp_config:
       tx_power:                # if set, must be between -22 (low) and 19 (high)
       led_mode:                # if set, must be one of: off, on, blink, flash, toggle
-      skip_bootloader: True    # skips the 60s bootloader delay on some CC2531 sticks
+      skip_bootloader: True    # skips the 60s bootloader delay on CC2531 sticks
 ```
 
 # Backup and restore
-A complete NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else likely will not work.
+A complete NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else will not work.
 
 ```console
 (venv) $ python -m zigpy_znp.tools.nvram_read /dev/serial/by-id/old_radio -o backup.json
@@ -72,7 +64,6 @@ A complete NVRAM backup can be performed to migrate between different radios **b
 Tested migrations:
 
  - LAUNCHXL-CC26X2R1 running 3.30.00.03 to and from the zig-a-zig-ah! running 4.10.00.78.
-
 
 # Energy scan
 Perform an energy scan to find a quiet Zigbee channel:
@@ -106,13 +97,12 @@ Channel energy (mean of 1 / 5):
 ```
 
 # Hardware requirements
-USB-adapters, GPIO-modules, and development-boards running recent TI Z-Stack releases (above version 3.0.0) are supported. Reference hardware for this project includes:
+USB-adapters, GPIO-modules, and development-boards running TI's Z-Stack are supported. Reference hardware for this project includes:
 
  - (**STABLE**) [TI LAUNCHXL-CC26X2R1](https://www.ti.com/tool/LAUNCHXL-CC26X2R1) running [Z-Stack 3.30.00.03](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC26X2R1_20191106.hex` using [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH).
  - (**STABLE**) [Electrolama's zig-a-zig-ah!](https://electrolama.com/projects/zig-a-zig-ah/) running [Z-Stack 4.10.00.78](https://github.com/Koenkk/Z-Stack-firmware/tree/develop/coordinator/Z-Stack_3.x.0/bin). You can flash `CC26X2R1_20200417.hex` using [cc2538-bsl](https://github.com/JelmerT/cc2538-bsl).
  - (**BETA**) CC2531 running [Z-Stack 3.0.1](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip). You can flash `CC2531ZNP-without-SBL.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531`.
-
-Older versions of Z-Stack are not currently supported. Z-Stack versions 3.x and above are currently required and all communication with the radio module is done over the the Z-Stack Monitor and Test (MT) interface via a serial port.
+ - (**ALPHA**) CC2531 running [Z-Stack Home 1.2](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_Home_1.2/bin/default/CC2531_DEFAULT_20190608.zip). You can flash `CC2531ZNP-Prod.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-Prod.bin /dev/serial/by-id/YOUR-CC2531`.
 
 ## Texas Instruments Chip Part Numbers
 Texas Instruments (TI) has quite a few different wireless MCU chips and they are all used/mentioned in open-source Zigbee world which can be daunting if you are just starting out. Here is a quick summary of part numbers and key features.
@@ -120,16 +110,16 @@ Texas Instruments (TI) has quite a few different wireless MCU chips and they are
 ### Supported newer generation TI chips
 
 #### 2.4GHz frequency only chips
-- CC2652R = 2.4GHz only wireless MCU for IEEE 802.15.4 multi-protocol (Zigbee, Bluetooth, Thread, IEEE 802.15.4g IPv6-enabled smart objects like 6LoWPAN, and proprietary systems). Cortex-M0 core for radio stack and Cortex-M4F core for application use, plenty of RAM. Free compiler option from TI.
-- CC2652RB = Pin compatible "Crystal-less" CC2652R (so you could use it if you were to build your own zzh and omit the crystal) but not firmware compatible.
-- CC2652P = CC2652R with a built-in RF PA. Not pin or firmware compatible with CC2652R/CC2652RB. 
+- CC2652R: 2.4GHz only wireless MCU for IEEE 802.15.4 multi-protocol (Zigbee, Bluetooth, Thread, IEEE 802.15.4g IPv6-enabled smart objects like 6LoWPAN, and proprietary systems). Cortex-M0 core for radio stack and Cortex-M4F core for application use, plenty of RAM. Free compiler option from TI.
+- CC2652RB: Pin compatible "Crystal-less" CC2652R (so you could use it if you were to build your own zzh and omit the crystal) but not firmware compatible.
+- CC2652P: CC2652R with a built-in RF PA. Not pin or firmware compatible with CC2652R/CC2652RB. 
 
 #### Multi frequency chips
-- CC1352R = Sub 1 GHz & 2.4 GHz wireless MCU. Essentially CC2652R with an extra sub-1GHz radio.
-- CC1352P = CC1352R with a built in RF PA.
+- CC1352R: Sub 1 GHz & 2.4 GHz wireless MCU. Essentially CC2652R with an extra sub-1GHz radio.
+- CC1352P: CC1352R with a built in RF PA.
 
 ### Auxiliary TI chips
-- CC2591 and CC2592 = 2.4 GHz range extenders. These are not wireless MCUs, just auxillary PA (Power Amplifier) and LNA (Low Noise Amplifier) in the same package to improve RF (Radio Frequency) range of any 2.4 GHz radio chip.
+- CC2591 and CC2592: 2.4 GHz range extenders. These are not wireless MCUs, just auxillary PA (Power Amplifier) and LNA (Low Noise Amplifier) in the same package to improve RF (Radio Frequency) range of any 2.4 GHz radio chip.
 
 # Releases via PyPI
 
