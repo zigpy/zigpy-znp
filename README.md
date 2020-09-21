@@ -48,12 +48,34 @@ You probably do not need to change these options, they are provided only for ref
 zha:
   zigpy_config:
     znp_config:
-      tx_power:                # if set, must be between -22 (low) and 19 (high)
-      led_mode:                # if set, must be one of: off, on, blink, flash, toggle
-      skip_bootloader: True    # skips the 60s bootloader delay on CC2531 sticks
+      # "auto" picks the largest value that keeps the device's transmit buffer from getting full
+      max_concurrent_requests: auto
+
+      # Only if your stick has a built-in power amplifier (i.e. CC1352P and CC2592)
+      # If set, must be between -22 (low) and 19 (high)
+      tx_power:  
+
+      # Only if your stick has a controllable LED (the CC2531)
+      # If set, must be one of: off, on, blink, flash, toggle
+      led_mode:
+
+
+      ### Internal configuration, there's no reason to touch these values
+
+      # Skips the 60s bootloader delay on CC2531 sticks
+      skip_bootloader: True
+
+      # Timeout for synchronous requests' responses
+      sreq_timeout: 15
+
+      # Timeout for asynchronous requests' callback responses
+      arsp_timeout: 30
+
+      # Delay between auto-reconnect attempts in case the device gets disconnected
+      auto_reconnect_retry_delay: 5
 ```
 
-# Backup and restore
+# NVRAM Backup and restore
 A complete NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else will not work.
 
 ```console
