@@ -85,7 +85,7 @@ Channel energy (mean of 1 / 5):
  + Active Zigbee networks on a channel may still cause congestion
  + Using 26 in the USA may have lower TX power due to FCC regulations
  + Zigbee channels 15, 20, 25 fall between WiFi channels 1, 6, 11
- + Some Zigbee devices only join networks on channels 15, 20, and 25
+ + Some Zigbee devices only join networks on channels 11, 13, 15, 20, or 25
 ------------------------------------------------
  - 11    61.57%  #############################################################
  - 12    60.78%  ############################################################
