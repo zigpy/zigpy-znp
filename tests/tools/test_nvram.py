@@ -102,21 +102,45 @@ async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
 
 
 @pytest.mark.parametrize("device", ALL_DEVICES)
-async def test_nvram_reset(device, make_znp_server, mocker):
+async def test_nvram_reset_normal(device, make_znp_server, mocker):
     znp_server = make_znp_server(server_cls=device)
 
     # So we know when it has been changed
     znp_server.nvram["nwk"][NwkNvIds.STARTUP_OPTION] = b"\xFF"
+    znp_server.nvram["nwk"][0xFFFF] = b"test"
 
     await nvram_reset([znp_server._port_path])
 
     # We've instructed Z-Stack to reset on next boot
-    znp_server.nvram["nwk"][NwkNvIds.STARTUP_OPTION] = (
-        t.StartupOptions.ClearConfig | t.StartupOptions.ClearState
-    ).serialize()
+    assert (
+        znp_server.nvram["nwk"][NwkNvIds.STARTUP_OPTION]
+        == (t.StartupOptions.ClearConfig | t.StartupOptions.ClearState).serialize()
+    )
 
     # And none of the "CONFIGURED" values exist
     assert NwkNvIds.HAS_CONFIGURED_ZSTACK1 not in znp_server.nvram["nwk"]
     assert NwkNvIds.HAS_CONFIGURED_ZSTACK3 not in znp_server.nvram["nwk"]
+
+    # But our custom value has not been touched
+    assert znp_server.nvram["nwk"][0xFFFF] == b"test"
+
+    znp_server.close()
+
+
+@pytest.mark.parametrize("device", ALL_DEVICES)
+async def test_nvram_reset_everything(device, make_znp_server, mocker):
+    znp_server = make_znp_server(server_cls=device)
+
+    await nvram_reset(["-c", znp_server._port_path])
+
+    # Nothing exists but STARTUP_OPTION and the synthetic POLL_RATE_OLD16
+    assert NwkNvIds.POLL_RATE_OLD16 in znp_server.nvram["nwk"]
+    assert len(znp_server.nvram["nwk"].keys()) == 2
+
+    # We've instructed Z-Stack to reset on next boot
+    assert (
+        znp_server.nvram["nwk"][NwkNvIds.STARTUP_OPTION]
+        == (t.StartupOptions.ClearConfig | t.StartupOptions.ClearState).serialize()
+    )
 
     znp_server.close()

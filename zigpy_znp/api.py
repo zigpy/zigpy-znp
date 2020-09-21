@@ -563,12 +563,11 @@ class ZNP:
         if length == 0:
             return False
 
-        await self.request(
-            c.SYS.OSALNVDelete.Req(Id=nv_id, ItemLen=length),
-            RspStatus=t.Status.SUCCESS,
+        delete_rsp = await self.request(
+            c.SYS.OSALNVDelete.Req(Id=nv_id, ItemLen=length)
         )
 
-        return True
+        return delete_rsp.Status == t.Status.SUCCESS
 
     async def nvram_write(self, nv_id: nvids.BaseNvIds, value, *, create: bool = False):
         """

@@ -13,34 +13,24 @@ from zigpy_znp.tools.common import setup_parser
 LOGGER = logging.getLogger(__name__)
 
 
-async def nvram_reset(znp: ZNP) -> None:
+async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
+    if clear:
+        nvids = NwkNvIds
+    else:
+        nvids = [NwkNvIds.HAS_CONFIGURED_ZSTACK1, NwkNvIds.HAS_CONFIGURED_ZSTACK3]
+
+    for nvid in nvids:
+        if await znp.nvram_delete(nvid):
+            LOGGER.info("Cleared %s", nvid)
+        else:
+            LOGGER.warning("Failed to clear %s", nvid)
+
     LOGGER.info("Clearing config and state on next start")
     await znp.nvram_write(
         NwkNvIds.STARTUP_OPTION,
         t.StartupOptions.ClearConfig | t.StartupOptions.ClearState,
+        create=True,
     )
-
-    delete_rsp1 = await znp.request(
-        c.SYS.OSALNVDelete.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK1, ItemLen=1)
-    )
-
-    if delete_rsp1.Status != t.Status.SUCCESS:
-        LOGGER.warning(
-            "Failed to clear %s: %s",
-            NwkNvIds.HAS_CONFIGURED_ZSTACK1,
-            delete_rsp1.Status,
-        )
-
-    delete_rsp2 = await znp.request(
-        c.SYS.OSALNVDelete.Req(Id=NwkNvIds.HAS_CONFIGURED_ZSTACK3, ItemLen=1)
-    )
-
-    if delete_rsp2.Status != t.Status.SUCCESS:
-        LOGGER.warning(
-            "Failed to clear %s: %s",
-            NwkNvIds.HAS_CONFIGURED_ZSTACK3,
-            delete_rsp2.Status,
-        )
 
     LOGGER.info("Resetting...")
     await znp.request_callback_rsp(
@@ -51,13 +41,20 @@ async def nvram_reset(znp: ZNP) -> None:
 
 async def main(argv):
     parser = setup_parser("Reset a radio's state")
+    parser.add_argument(
+        "-c",
+        "--clear",
+        action="store_true",
+        default=False,
+        help="Tries to delete every NVRAM value.",
+    )
 
     args = parser.parse_args(argv)
 
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
 
     await znp.connect(check_version=False)
-    await nvram_reset(znp)
+    await nvram_reset(znp, clear=args.clear)
 
 
 if __name__ == "__main__":
