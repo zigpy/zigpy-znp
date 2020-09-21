@@ -460,6 +460,23 @@ class BaseZStackDevice(BaseServerZNP):
             AssociatedDevices=[],
         )
 
+    @reply_to(
+        c.ZDO.MgmtNWKUpdateReq.Req(Dst=0x0000, DstAddrMode=t.AddrMode.NWK, partial=True)
+    )
+    def nwk_update_req(self, request):
+        valid_channels = [t.Channels.from_channel_list([i]) for i in range(11, 26 + 1)]
+
+        if request.ScanDuration == 0xFE:
+            assert request.Channels in valid_channels
+
+            def update_channel():
+                self.nib.nwkLogicalChannel = 11 + valid_channels.index(request.Channels)
+                self.nib.nwkUpdateId += 1
+
+            asyncio.get_running_loop().call_later(0.1, update_channel)
+
+            return c.ZDO.MgmtNWKUpdateReq.Rsp(Status=t.Status.SUCCESS)
+
 
 class BaseZStack1CC2531(BaseZStackDevice):
     @reply_to(c.SYS.Ping.Req())

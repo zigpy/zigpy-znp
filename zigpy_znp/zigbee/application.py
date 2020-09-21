@@ -340,6 +340,34 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             max_concurrent_requests,
         )
 
+    async def update_network_channel(self, channel: t.uint8_t):
+        """
+        Changes the network channel, increments the beacon update ID, and waits until
+        the changes take effect.
+
+        Does nothing if the new channel is the same as the old.
+        """
+
+        if self.channel == channel:
+            return
+
+        await self._znp.request(
+            request=c.ZDO.MgmtNWKUpdateReq.Req(
+                Dst=0x0000,
+                DstAddrMode=t.AddrMode.NWK,
+                Channels=t.Channels.from_channel_list([channel]),
+                ScanDuration=0xFE,  # switch channels
+                ScanCount=0,
+                NwkManagerAddr=0x0000,
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
+
+        # The above command takes a few seconds to work
+        while self.channel != channel:
+            await self._load_device_info()
+            await asyncio.sleep(1)
+
     async def form_network(self):
         """
         Clears the current config and forms a new network with a random network key,
