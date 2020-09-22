@@ -82,6 +82,9 @@ async def test_info(
     assert app.zigpy_device.manufacturer == "Texas Instruments"
     assert app.zigpy_device.model == model
 
+    # Anything to make sure it's set
+    assert app.zigpy_device.node_desc.maximum_outgoing_transfer_size == 160
+
     await app.shutdown()
 
 

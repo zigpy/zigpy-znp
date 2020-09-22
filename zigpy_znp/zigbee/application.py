@@ -249,17 +249,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 RspStatus=t.Status.SUCCESS,
             )
 
-        device_info = await self._znp.request(
-            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
-        )
-
-        self._ieee = device_info.IEEE
-        self._nwk = 0x0000
-
-        # Add the coordinator as a zigpy device. We do this up here because
-        # `self._register_endpoint()` adds endpoints to this device object.
-        self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
-
         # Both versions of Z-Stack use this callback
         started_as_coordinator = self._znp.wait_for_response(
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
@@ -298,6 +287,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # The startup sequence should not take forever
         async with async_timeout.timeout(STARTUP_TIMEOUT):
             await started_as_coordinator
+
+        device_info = await self._znp.request(
+            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
+        )
+
+        self._ieee = device_info.IEEE
+        self._nwk = 0x0000
+
+        # Add the coordinator as a zigpy device. We do this up here because
+        # `self._register_endpoint()` adds endpoints to this device object.
+        self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
+
+        # Give our Zigpy device a valid node descriptor
+        node_descriptor_rsp = await self._znp.request_callback_rsp(
+            request=c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
+            RspStatus=t.Status.SUCCESS,
+            callback=c.ZDO.NodeDescRsp.Callback(Src=0x0000, NWK=0x0000, partial=True),
+        )
+        self.zigpy_device.node_desc = node_descriptor_rsp.NodeDescriptor
 
         # Get the currently active endpoints
         endpoints = await self._znp.request_callback_rsp(

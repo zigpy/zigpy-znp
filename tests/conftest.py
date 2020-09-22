@@ -568,6 +568,28 @@ class BaseZStack1CC2531(BaseZStackDevice):
                 update_logical_channel,
             ]
 
+    @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
+    def node_desc_responder(self, req):
+        return [
+            c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.NodeDescRsp.Callback(
+                Src=0x0000,
+                Status=t.ZDOStatus.SUCCESS,
+                NWK=0x0000,
+                NodeDescriptor=c.zdo.NullableNodeDescriptor(
+                    byte1=0,
+                    byte2=64,
+                    mac_capability_flags=143,
+                    manufacturer_code=0,
+                    maximum_buffer_size=80,
+                    maximum_incoming_transfer_size=160,
+                    server_mask=1,  # this differs
+                    maximum_outgoing_transfer_size=160,
+                    descriptor_capability_field=0,
+                ),
+            ),
+        ]
+
 
 class BaseZStack3Device(BaseZStackDevice):
     def __init__(self, *args, **kwargs):
@@ -742,6 +764,28 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             load_nvram_json("CC2652R-ZStack4.reset.json")["nwk"][NwkNvIds.NIB]
         )[0]
 
+    @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
+    def node_desc_responder(self, req):
+        return [
+            c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.NodeDescRsp.Callback(
+                Src=0x0000,
+                Status=t.ZDOStatus.SUCCESS,
+                NWK=0x0000,
+                NodeDescriptor=c.zdo.NullableNodeDescriptor(
+                    byte1=0,
+                    byte2=64,
+                    mac_capability_flags=143,
+                    manufacturer_code=0,
+                    maximum_buffer_size=80,
+                    maximum_incoming_transfer_size=160,
+                    server_mask=11265,
+                    maximum_outgoing_transfer_size=160,
+                    descriptor_capability_field=0,
+                ),
+            ),
+        ]
+
 
 class BaseZStack3CC2531(BaseZStack3Device):
     @reply_to(c.SYS.Version.Req())
@@ -813,6 +857,8 @@ class BaseZStack3CC2531(BaseZStack3Device):
             nwkTotalTransmissions=0,
             nwkUpdateId=0,
         )
+
+    node_desc_responder = BaseZStack1CC2531.node_desc_responder
 
 
 class BlankLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
