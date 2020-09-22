@@ -215,3 +215,32 @@ class NwkNvIds(BaseNvIds):
     LEGACY_SINK_TABLE_END = 0x032F
 
     INVALID_INDEX = 0xFFFF
+
+
+def is_secure_nvid(nvid: NwkNvIds) -> bool:
+    """
+    Returns whether or not an nvid may be prevented from being read from NVRAM.
+    """
+
+    if nvid in (
+        NwkNvIds.IMPLICIT_CERTIFICATE,
+        NwkNvIds.CA_PUBLIC_KEY,
+        NwkNvIds.DEVICE_PRIVATE_KEY,
+        NwkNvIds.NWK_ACTIVE_KEY_INFO,
+        NwkNvIds.NWK_ALTERN_KEY_INFO,
+        NwkNvIds.PRECFGKEY,
+        NwkNvIds.TCLK_SEED,
+    ):
+        return True
+
+    if NwkNvIds.LEGACY_TCLK_TABLE_START <= nvid <= NwkNvIds.LEGACY_TCLK_TABLE_END:
+        return True
+
+    if (
+        NwkNvIds.LEGACY_APS_LINK_KEY_DATA_START
+        <= nvid
+        <= NwkNvIds.LEGACY_APS_LINK_KEY_DATA_END
+    ):
+        return True
+
+    return False

@@ -17,7 +17,11 @@ from zigpy_znp.types import nvids
 
 from zigpy_znp import uart
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.exceptions import (
+    CommandNotRecognized,
+    InvalidCommandResponse,
+    SecurityError,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -172,6 +176,7 @@ class ZNP:
         self._app = None
         self._config = config
         self._version = None
+        self._capabilities = t.MTCapabilities(0)
 
         self._listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
@@ -233,7 +238,7 @@ class ZNP:
                 # Make sure that our port works
                 version = await self.request(c.SYS.Version.Req())
 
-                if (version.TransportRev, version.MajorRel, version.MinorRel,) not in {
+                if (version.TransportRev, version.MajorRel, version.MinorRel) not in {
                     (2, 2, 6),
                     (2, 2, 7),
                 }:
@@ -243,6 +248,7 @@ class ZNP:
                     )
 
                 self._version = version
+                self._capabilities = (await self.request(c.SYS.Ping.Req())).Capabilities
         except Exception:
             LOGGER.debug("Connection to %s failed, cleaning up", self._port_path)
             self.close()
@@ -586,7 +592,7 @@ class ZNP:
             )
 
         if not value:
-            raise ValueError(f"NV item {nv_id} cannot be empty")
+            raise ValueError(f"NV item {nv_id!r} cannot be empty")
 
         length = (await self.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
 
@@ -597,7 +603,7 @@ class ZNP:
         if length != len(value) and nv_id != t.nvids.NwkNvIds.POLL_RATE_OLD16:
             if not create:
                 if length == 0:
-                    raise KeyError(f"NV item does not exist: {nv_id}")
+                    raise KeyError(f"NV item does not exist: {nv_id!r}")
                 else:
                     raise ValueError(
                         f"Stored length and actual length differ:"
@@ -647,17 +653,41 @@ class ZNP:
         length = (await self.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
 
         if length == 0:
-            raise KeyError(f"NV item does not exist: {nv_id}")
+            raise KeyError(f"NV item does not exist: {nv_id!r}")
 
         data = b""
 
-        while len(data) < length:
+        # Not all items can be read out due to security policies, though this can easily
+        # be bypassed for most
+        if (
+            nvids.is_secure_nvid(nv_id)
+            and self._capabilities & t.MTCapabilities.CAP_SAPI
+        ):
+            # The SAPI "ConfigId" is only 8 bits, which means some nvids are not
+            # able to read this way
+            if nv_id > 0xFF:
+                raise SecurityError(
+                    f"NV item cannot be read due to security constraints: {nv_id!r}"
+                )
+
+            # It is impossible to read an item that will not fit in a single response
+            assert length <= 247
+
             read_rsp = await self.request(
-                c.SYS.OSALNVReadExt.Req(Id=nv_id, Offset=len(data)),
+                c.SAPI.ZBReadConfiguration.Req(ConfigId=nv_id),
                 RspStatus=t.Status.SUCCESS,
+                RspConfigId=nv_id,
             )
 
-            data += read_rsp.Value
+            data = read_rsp.Value
+        else:
+            while len(data) < length:
+                read_rsp = await self.request(
+                    c.SYS.OSALNVReadExt.Req(Id=nv_id, Offset=len(data)),
+                    RspStatus=t.Status.SUCCESS,
+                )
+
+                data += read_rsp.Value
 
         assert len(data) == length
 

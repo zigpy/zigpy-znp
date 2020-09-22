@@ -20,7 +20,7 @@ from zigpy_znp.uart import ZnpMtProtocol
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.znp.nib import parse_nib, NIB, CC2531NIB, NwkState8, NwkKeyDesc
-from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds, is_secure_nvid
 from zigpy_znp.zigbee.application import ControllerApplication
 
 
@@ -479,6 +479,28 @@ class BaseZStackDevice(BaseServerZNP):
 
 
 class BaseZStack1CC2531(BaseZStackDevice):
+    @reply_to(c.SYS.OSALNVRead.Req(partial=True))
+    @reply_to(c.SYS.OSALNVReadExt.Req(partial=True))
+    def osal_nvram_read(self, request):
+        if is_secure_nvid(request.Id):
+            # Reading out key material from the device is not allowed
+            return request.Rsp(
+                Status=t.Status.INVALID_PARAMETER, Value=t.ShortBytes(b"")
+            )
+
+        return super().osal_nvram_read(request)
+
+    @reply_to(c.SAPI.ZBReadConfiguration.Req(partial=True))
+    def sapi_zb_read_conf(self, request):
+        # But you can still read key material with this command
+        read_rsp = super().osal_nvram_read(
+            c.SYS.OSALNVRead.Req(Id=NwkNvIds(request.ConfigId), Offset=0)
+        )
+
+        return request.Rsp(
+            Status=read_rsp.Status, ConfigId=request.ConfigId, Value=read_rsp.Value
+        )
+
     @reply_to(c.SYS.Ping.Req())
     def ping_replier(self, request):
         return c.SYS.Ping.Rsp(

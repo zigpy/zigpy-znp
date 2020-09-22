@@ -2,6 +2,10 @@ class InvalidFrame(ValueError):
     pass
 
 
+class SecurityError(Exception):
+    pass
+
+
 class CommandError(Exception):
     pass
 
