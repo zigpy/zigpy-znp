@@ -23,7 +23,7 @@ pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 
 
 @pytest.mark.parametrize(
-    "device,model,channel,channels,pan_id,ext_pan_id",
+    "device,model,channel,channels,pan_id,ext_pan_id,network_key",
     [
         # zigpy-znp
         (
@@ -33,6 +33,7 @@ pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
             t.Channels.from_channel_list([15, 20, 25]),
             0x1C0E,
             "ca:4e:c6:ac:c3:c8:63:01",
+            t.KeyData.deserialize(bytes.fromhex("0a0a73b4990dc6e2f46a511986528b66"))[0],
         ),
         # Z2M/zigpy-cc
         (
@@ -44,6 +45,7 @@ pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
             # Even though Z2M uses "dd:dd:dd:dd:dd:dd:dd:dd", Wireshark confirms the NIB
             # is correct.
             "00:12:4b:00:0f:ea:8e:05",
+            t.KeyData.deserialize(bytes.fromhex("01030507090b0d0f00020406080a0c0d"))[0],
         ),
         # Z2M/zigpy-cc
         (
@@ -53,11 +55,12 @@ pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
             t.Channels.from_channel_list([11]),
             0x1A62,
             "dd:dd:dd:dd:dd:dd:dd:dd",
+            t.KeyData.deserialize(bytes.fromhex("01030507090b0d0f00020406080a0c0d"))[0],
         ),
     ],
 )
 async def test_info(
-    device, model, channel, channels, pan_id, ext_pan_id, make_application
+    device, model, channel, channels, pan_id, ext_pan_id, network_key, make_application
 ):
     app, znp_server = make_application(server_cls=device)
 
@@ -66,15 +69,15 @@ async def test_info(
     assert app.ext_pan_id is None
     assert app.channel is None
     assert app.channels is None
+    assert app.network_key is None
 
     await app.startup(auto_form=False)
 
     assert app.pan_id == pan_id
     assert app.ext_pan_id == t.EUI64.convert(ext_pan_id)
     assert app.channel == channel
-
-    # XXX: CC2531's channel mask in the NIB is never correct???
     assert app.channels == channels
+    assert app.network_key == network_key
 
     assert app.zigpy_device.manufacturer == "Texas Instruments"
     assert app.zigpy_device.model == model

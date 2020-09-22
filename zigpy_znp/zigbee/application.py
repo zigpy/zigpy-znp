@@ -105,6 +105,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._reconnect_task.cancel()
 
         self._nib = NIB()
+        self._network_key = None
         self._concurrent_requests_semaphore = None
 
     ##################################################################
@@ -112,20 +113,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ##################################################################
 
     @property
-    def channel(self):
+    def channel(self) -> typing.Optional[int]:
         return self._nib.nwkLogicalChannel
 
     @property
-    def channels(self):
+    def channels(self) -> typing.Optional[t.Channels]:
         return self._nib.channelList
 
     @property
-    def pan_id(self):
+    def pan_id(self) -> typing.Optional[t.NWK]:
         return self._nib.nwkPanId
 
     @property
-    def ext_pan_id(self):
+    def ext_pan_id(self) -> typing.Optional[t.EUI64]:
         return self._nib.extendedPANID
+
+    @property
+    def network_key(self) -> typing.Optional[t.KeyData]:
+        # This is not a standard Zigpy property
+        return self._network_key
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
@@ -985,6 +991,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def _load_device_info(self):
         # Parsing the NIB struct gives us access to low-level info, like the channel
         self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+        self._network_key, _ = t.KeyData.deserialize(
+            await self._znp.nvram_read(NwkNvIds.PRECFGKEY)
+        )
+
         LOGGER.debug("Parsed NIB: %s", self._nib)
 
     async def _reset(self):
