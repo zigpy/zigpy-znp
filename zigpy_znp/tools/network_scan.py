@@ -42,37 +42,43 @@ async def scan_once(znp: ZNP, channels: t.Channels, duration_exp: int):
 async def network_scan(
     znp: ZNP, channels: t.Channels, num_scans: int, duration_exp: int
 ) -> None:
+    previous_channels = await znp.nvram_read(NwkNvIds.CHANLIST)
+
     await znp.nvram_write(NwkNvIds.CHANLIST, t.Channels.ALL_CHANNELS)
-    await znp.request_callback_rsp(
-        request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
-        callback=c.SYS.ResetInd.Callback(partial=True),
-    )
 
-    seen_beacons = set()
+    try:
+        await znp.request_callback_rsp(
+            request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
+            callback=c.SYS.ResetInd.Callback(partial=True),
+        )
 
-    for i in itertools.count(start=1):
-        if num_scans is not None and i > num_scans:
-            break
+        seen_beacons = set()
 
-        async for beacon in scan_once(znp, channels, duration_exp):
-            key = beacon.replace(Depth=0).serialize()
+        for i in itertools.count(start=1):
+            if num_scans is not None and i > num_scans:
+                break
 
-            if key in seen_beacons:
-                continue
+            async for beacon in scan_once(znp, channels, duration_exp):
+                key = beacon.replace(Depth=0, LQI=0).serialize()
 
-            seen_beacons.add(key)
+                if key in seen_beacons:
+                    continue
 
-            print(
-                f"{time.time():0.2f} [{beacon.ExtendedPanId}, {beacon.PanId},"
-                f" from: {beacon.Src}]: Channel={beacon.Channel:2>}"
-                f" PermitJoining={beacon.PermitJoining}"
-                f" RouterCapacity={beacon.RouterCapacity}"
-                f" DeviceCapacity={beacon.DeviceCapacity}"
-                f" ProtocolVersion={beacon.ProtocolVersion}"
-                f" StackProfile={beacon.StackProfile}"
-                f" Depth={beacon.Depth:>3}"
-                f" UpdateId={beacon.UpdateId:>2}"
-            )
+                seen_beacons.add(key)
+
+                print(
+                    f"{time.time():0.2f} [{beacon.ExtendedPanId}, {beacon.PanId},"
+                    f" from: {beacon.Src}]: Channel={beacon.Channel:2>}"
+                    f" PermitJoining={beacon.PermitJoining}"
+                    f" RouterCapacity={beacon.RouterCapacity}"
+                    f" DeviceCapacity={beacon.DeviceCapacity}"
+                    f" ProtocolVersion={beacon.ProtocolVersion}"
+                    f" StackProfile={beacon.StackProfile}"
+                    f" Depth={beacon.Depth:>3}"
+                    f" UpdateId={beacon.UpdateId:>2}"
+                )
+    finally:
+        await znp.nvram_write(NwkNvIds.CHANLIST, previous_channels)
 
 
 async def main(argv):
