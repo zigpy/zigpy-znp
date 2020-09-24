@@ -289,7 +289,8 @@ class BaseZStackDevice(BaseServerZNP):
 
             for req in getattr(func, "_reply_to", []):
                 self.reply_to(
-                    request=req, responses=[func],
+                    request=req,
+                    responses=[func],
                 )
 
     def _unhandled_command(self, command):

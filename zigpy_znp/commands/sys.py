@@ -306,7 +306,9 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         0x10,
         req_schema=(
             t.Param(
-                "UTCTime", t.uint32_t, "Number of seconds since 00:00:00 on Jan 2000",
+                "UTCTime",
+                t.uint32_t,
+                "Number of seconds since 00:00:00 on Jan 2000",
             ),
             t.Param("Hour", t.uint8_t, "Hour of the day (0 -- 23)"),
             t.Param("Minute", t.uint8_t, "Minute of the hour (0 -- 59)"),
@@ -326,7 +328,9 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         req_schema=(),
         rsp_schema=(
             t.Param(
-                "UTCTime", t.uint32_t, "Number of seconds since 00:00:00 on Jan 2000",
+                "UTCTime",
+                t.uint32_t,
+                "Number of seconds since 00:00:00 on Jan 2000",
             ),
             t.Param("Hour", t.uint8_t, "Hour of the day (0 -- 23)"),
             t.Param("Minute", t.uint8_t, "Minute of the hour (0 -- 59)"),

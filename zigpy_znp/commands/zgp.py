@@ -44,7 +44,9 @@ class ZGP(t.CommandsBase, subsystem=t.Subsystem.ZGP):
         0x02,
         req_schema=(
             t.Param(
-                "Status", t.uint8_t, "The status code as returned by the GP endpoint",
+                "Status",
+                t.uint8_t,
+                "The status code as returned by the GP endpoint",
             ),
             t.Param("Handle", t.uint8_t, "GPEP handle to match req to confirmation"),
             t.Param(
@@ -84,7 +86,9 @@ class ZGP(t.CommandsBase, subsystem=t.Subsystem.ZGP):
         0x05,
         req_schema=(
             t.Param(
-                "Status", t.uint8_t, "The status code as returned by the GP endpoint",
+                "Status",
+                t.uint8_t,
+                "The status code as returned by the GP endpoint",
             ),
             t.Param("Handle", t.uint8_t, "handle to match req to confirmation"),
         ),

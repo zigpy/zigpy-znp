@@ -10,7 +10,9 @@ class App(t.CommandsBase, subsystem=t.Subsystem.APP):
         0x00,
         req_schema=(
             t.Param(
-                "Endpoint", t.uint8_t, "Application endpoint of the outgoing message",
+                "Endpoint",
+                t.uint8_t,
+                "Application endpoint of the outgoing message",
             ),
             t.Param("DstAddr", t.NWK, "Destination address of the outgoing message"),
             t.Param(
@@ -31,7 +33,9 @@ class App(t.CommandsBase, subsystem=t.Subsystem.APP):
         0x01,
         req_schema=(
             t.Param(
-                "SrcEndpoint", t.uint8_t, "Source Endpoint of the user-defined command",
+                "SrcEndpoint",
+                t.uint8_t,
+                "Source Endpoint of the user-defined command",
             ),
             t.Param("CommandId", t.uint16_t, "Command Id of the user-defined command"),
             t.Param("Parameter1", t.uint16_t, "Parameter #1 of the command"),

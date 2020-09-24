@@ -50,7 +50,10 @@ async def test_energy_scan(device, make_znp_server, capsys):
 
     znp_server.callback_for_response(
         c.ZDO.MgmtNWKUpdateReq.Req(
-            Dst=0x0000, DstAddrMode=t.AddrMode.NWK, NwkManagerAddr=0x0000, partial=True,
+            Dst=0x0000,
+            DstAddrMode=t.AddrMode.NWK,
+            NwkManagerAddr=0x0000,
+            partial=True,
         ),
         fake_scanner,
     )

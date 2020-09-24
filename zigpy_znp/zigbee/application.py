@@ -460,7 +460,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     State=t.DeviceState.StartingAsCoordinator
                 ),
                 c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress,
+                    partial=True,
+                    Status=c.app_config.BDBCommissioningStatus.InProgress,
                 ),
             ]
         ):
@@ -485,7 +486,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
             else:
                 await self._znp.nvram_write(
-                    NwkNvIds.TCLK_SEED, value=DEFAULT_TC_LINK_KEY, create=True,
+                    NwkNvIds.TCLK_SEED,
+                    value=DEFAULT_TC_LINK_KEY,
+                    create=True,
                 )
 
                 # In Z-Stack 1.2.2, StartupFromApp actually does what it says
@@ -756,11 +759,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # ZDO requests need to be handled explicitly, one by one
         self._znp.callback_for_response(
-            c.ZDO.EndDeviceAnnceInd.Callback(partial=True), self.on_zdo_device_announce,
+            c.ZDO.EndDeviceAnnceInd.Callback(partial=True),
+            self.on_zdo_device_announce,
         )
 
         self._znp.callback_for_response(
-            c.ZDO.TCDevInd.Callback.Callback(partial=True), self.on_zdo_tc_device_join,
+            c.ZDO.TCDevInd.Callback.Callback(partial=True),
+            self.on_zdo_tc_device_join,
         )
 
         self._znp.callback_for_response(

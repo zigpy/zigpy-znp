@@ -92,7 +92,11 @@ async def test_zigpy_request(device, make_application):
         ),
         responses=[
             c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=1, TSN=TSN,),
+            c.AF.DataConfirm.Callback(
+                Status=t.Status.SUCCESS,
+                Endpoint=1,
+                TSN=TSN,
+            ),
             c.ZDO.SrcRtgInd.Callback(DstAddr=device.nwk, Relays=[]),
             c.AF.IncomingMsg.Callback(
                 GroupId=0x0000,
@@ -149,7 +153,11 @@ async def test_zigpy_request_failure(device, make_application, mocker):
         ),
         responses=[
             c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(Status=t.Status.FAILURE, Endpoint=1, TSN=TSN,),
+            c.AF.DataConfirm.Callback(
+                Status=t.Status.FAILURE,
+                Endpoint=1,
+                TSN=TSN,
+            ),
         ],
     )
 
