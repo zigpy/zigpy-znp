@@ -8,7 +8,7 @@ import pytest
 
 try:
     # Python 3.8 already has this
-    from mock import AsyncMock as CoroutineMock  # noqa: F401
+    from unittest.mock import AsyncMock as CoroutineMock  # noqa: F401
 except ImportError:
     from asynctest import CoroutineMock  # noqa: F401
 
