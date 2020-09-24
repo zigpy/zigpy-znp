@@ -135,10 +135,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x02,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the inquiry",
             ),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -150,10 +154,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x03,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the inquiry",
             ),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -165,10 +173,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x04,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the inquiry",
             ),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
             t.Param("Endpoint", t.uint8_t, "application endpoint the data is from"),
         ),
@@ -181,10 +193,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x05,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the inquiry",
             ),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -196,10 +212,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x06,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the inquiry",
             ),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
             t.Param("ProfileId", t.uint16_t, "profile id of the device"),
             t.Param("InputClusters", t.ClusterIdList, "Input cluster id list"),
@@ -214,10 +234,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x07,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the inquiry",
             ),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -229,10 +253,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x08,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the inquiry",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the inquiry",
             ),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -294,7 +322,9 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x20,
         req_schema=(
             t.Param(
-                "DstAddr", t.NWK, "Short address of the device generating the request",
+                "DstAddr",
+                t.NWK,
+                "Short address of the device generating the request",
             ),
             t.Param(
                 "LocalCoordinator",
@@ -833,10 +863,14 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         req_schema=(
             t.Param("NWK", t.NWK, "Short address of the destination"),
             t.Param(
-                "NWKAddrOfInterest", t.NWK, "Short address of the device being queried",
+                "NWKAddrOfInterest",
+                t.NWK,
+                "Short address of the device being queried",
             ),
             t.Param(
-                "Cmd", t.uint8_t, "A valid Cluser ID command as specified by profile",
+                "Cmd",
+                t.uint8_t,
+                "A valid Cluser ID command as specified by profile",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -1265,7 +1299,9 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 "NWK", t.NWK, "Short address of the source of the leave indication"
             ),
             t.Param(
-                "IEEE", t.EUI64, "IEEE address of the source of the leave indication",
+                "IEEE",
+                t.EUI64,
+                "IEEE address of the source of the leave indication",
             ),
             t.Param("Request", t.Bool, "True -- request, False -- indication"),
             t.Param("Remove", t.Bool, "True -- Remove children"),
@@ -1281,7 +1317,9 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=(
             t.Param("Src", t.NWK, "Source address of the ZDO message"),
             t.Param(
-                "IsBroadcast", t.Bool, "Indicates whether the message was a broadcast",
+                "IsBroadcast",
+                t.Bool,
+                "Indicates whether the message was a broadcast",
             ),
             t.Param("ClusterId", t.ClusterId, "Cluster Id of this ZDO message"),
             t.Param("SecurityUse", t.uint8_t, "Not used"),

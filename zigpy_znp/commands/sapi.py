@@ -72,7 +72,9 @@ class SAPI(t.CommandsBase, subsystem=t.Subsystem.SAPI):
             t.Param("Destination", t.NWK, "Short address of the destination"),
             t.Param("CommandId", t.uint16_t, "The command id to send with the message"),
             t.Param(
-                "Handle", t.uint8_t, "A handle used to Identify the send data request",
+                "Handle",
+                t.uint8_t,
+                "A handle used to Identify the send data request",
             ),
             t.Param("Ack", t.Bool, "True if requesting ACK from the destination"),
             t.Param(
@@ -163,7 +165,9 @@ class SAPI(t.CommandsBase, subsystem=t.Subsystem.SAPI):
         0x83,
         rsp_schema=(
             t.Param(
-                "Handle", t.uint8_t, "A handle used to Identify the send data request",
+                "Handle",
+                t.uint8_t,
+                "A handle used to Identify the send data request",
             ),
             t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
         ),

@@ -12,7 +12,9 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
         0x01,
         req_schema=(
             t.Param(
-                "SetDefault", t.Bool, "TRUE - Set the MAC pib values to default values",
+                "SetDefault",
+                t.Bool,
+                "TRUE - Set the MAC pib values to default values",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -70,7 +72,9 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
             t.Param("RealignKeySource", t.KeySource, "Key Source of this data frame"),
             # ToDo: Enum for for RealignSecurityLevel
             t.Param(
-                "RealignSecurityLevel", t.uint8_t, "Security level of this data frame",
+                "RealignSecurityLevel",
+                t.uint8_t,
+                "Security level of this data frame",
             ),
             # ToDo: Make this an enum
             t.Param("RealignKeyIdMode", t.uint8_t, "Key Id Mode of this frame"),
@@ -78,7 +82,9 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
             t.Param("BeaconKeySource", t.KeySource, "Key source of this data frame"),
             # ToDo: Make this an enum
             t.Param(
-                "BeaconSecurityLevel", t.uint8_t, "Security Level of this data frame",
+                "BeaconSecurityLevel",
+                t.uint8_t,
+                "Security Level of this data frame",
             ),
             t.Param("BeaconKeyIdMode", t.uint8_t, "Key Id Mode of this data frame"),
             t.Param("BeaconKeyIndex", t.uint8_t, "Key index of this data frame"),
@@ -270,7 +276,9 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
             ),
             t.Param("NWK", t.NWK, "Short address of the associated device"),
             t.Param(
-                "AssociatedMember", t.Bool, "True is the orphan is a associated member",
+                "AssociatedMember",
+                t.Bool,
+                "True is the orphan is a associated member",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -323,7 +331,9 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
         rsp_schema=(
             t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
             t.Param(
-                "PanId", t.PanId, "The PAN Id to use. This parameter is ignored if Pan",
+                "PanId",
+                t.PanId,
+                "The PAN Id to use. This parameter is ignored if Pan",
             ),
             t.Param("LogicalChannel", t.uint8_t, "The logical channel to use"),
             t.Param("ChannelPage", t.uint8_t, "The channel page to use"),
@@ -381,7 +391,9 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
                 "Extended address of coordinator",
             ),
             t.Param(
-                "PanId", t.PanId, "The PAN Id to use. This parameter is ignored if Pan",
+                "PanId",
+                t.PanId,
+                "The PAN Id to use. This parameter is ignored if Pan",
             ),
             t.Param("Superframe", t.uint16_t, "Superframe specification"),
             t.Param("LogicalChannel", t.uint8_t, "The logical channel to use"),
@@ -396,7 +408,9 @@ class MAC(t.CommandsBase, subsystem=t.Subsystem.MAC):
             t.Param("KeyIndex", t.uint8_t, "Key index of this frame"),
             t.Param("PendingAddrSpec", t.uint8_t, "Pending address spec"),
             t.Param(
-                "AddressList", t.uint8_t, "List of address associate with the device",
+                "AddressList",
+                t.uint8_t,
+                "List of address associate with the device",
             ),
             t.Param("NSDU", t.ShortBytes, "Beacon payload"),
         ),

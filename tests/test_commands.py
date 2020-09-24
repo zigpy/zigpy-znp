@@ -242,7 +242,11 @@ def test_command_param_binding():
 def test_command_optional_params():
     # Optional params values don't need a value
     short_version_rsp = c.SYS.Version.Rsp(
-        TransportRev=0, ProductId=1, MajorRel=2, MinorRel=3, MaintRel=4,
+        TransportRev=0,
+        ProductId=1,
+        MajorRel=2,
+        MinorRel=3,
+        MaintRel=4,
     )
 
     # Some can still be passed

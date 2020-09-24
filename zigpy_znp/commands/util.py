@@ -95,7 +95,9 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
                 "Channels to be scanned when starting the device. Big endian!",
             ),
             t.Param(
-                "PanId", t.PanId, "The PAN Id to use. This parameter is ignored if Pan",
+                "PanId",
+                t.PanId,
+                "The PAN Id to use. This parameter is ignored if Pan",
             ),
             # ToDo: Make this an enum
             t.Param("SecurityLevel", t.uint8_t, "Security level of this data frame"),
@@ -233,7 +235,9 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         req_schema=(
             t.Param("AddrModeAddress", t.AddrModeAddress, "Address mode and address"),
             t.Param(
-                "PanId", t.PanId, "PAN Id of the device. Only use with a short address",
+                "PanId",
+                t.PanId,
+                "PAN Id of the device. Only use with a short address",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -246,7 +250,9 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         req_schema=(
             t.Param("AddrModeAddress", t.AddrModeAddress, "Address mode and address"),
             t.Param(
-                "PanId", t.PanId, "PAN Id of the device. Only use with a short address",
+                "PanId",
+                t.PanId,
+                "PAN Id of the device. Only use with a short address",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -259,7 +265,9 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         req_schema=(
             t.Param("AddrModeAddress", t.AddrModeAddress, "Address mode and address"),
             t.Param(
-                "PanId", t.PanId, "PAN Id of the device. Only use with a short address",
+                "PanId",
+                t.PanId,
+                "PAN Id of the device. Only use with a short address",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,

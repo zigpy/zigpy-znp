@@ -200,7 +200,8 @@ def guess_port() -> str:
 
     if len(candidates) > 1:
         LOGGER.warning(
-            "Found multiple possible Texas Instruments devices: %s", candidates,
+            "Found multiple possible Texas Instruments devices: %s",
+            candidates,
         )
         LOGGER.warning("Picking the first one: %s", port)
 

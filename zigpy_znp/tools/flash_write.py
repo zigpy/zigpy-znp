@@ -120,7 +120,9 @@ async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
         )
 
         read_rsp = await znp.request_callback_rsp(
-            request=c.UBL.ReadReq.Req(FlashWordAddr=address,),
+            request=c.UBL.ReadReq.Req(
+                FlashWordAddr=address,
+            ),
             callback=c.UBL.ReadRsp.Callback(partial=True),
         )
 
@@ -130,7 +132,8 @@ async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
 
     # This seems to cause the bootloader to compute and verify the CRC
     enable_rsp = await znp.request_callback_rsp(
-        request=c.UBL.EnableReq.Req(), callback=c.UBL.EnableRsp.Callback(partial=True),
+        request=c.UBL.EnableReq.Req(),
+        callback=c.UBL.EnableRsp.Callback(partial=True),
     )
 
     assert enable_rsp.Status == c.ubl.BootloaderStatus.SUCCESS

@@ -615,7 +615,9 @@ class ZNP:
 
             await self.request(
                 c.SYS.OSALNVItemInit.Req(
-                    Id=nv_id, ItemLen=len(value), Value=t.ShortBytes(value[:244]),
+                    Id=nv_id,
+                    ItemLen=len(value),
+                    Value=t.ShortBytes(value[:244]),
                 ),
                 RspStatus=t.Status.NV_ITEM_UNINIT,
             )
@@ -641,7 +643,8 @@ class ZNP:
         # XXX: Some NVIDs don't really exist and Z-Stack behaves strangely with them
         if nv_id == t.nvids.NwkNvIds.POLL_RATE_OLD16:
             read_rsp = await self.request(
-                c.SYS.OSALNVRead.Req(Id=nv_id, Offset=0), RspStatus=t.Status.SUCCESS,
+                c.SYS.OSALNVRead.Req(Id=nv_id, Offset=0),
+                RspStatus=t.Status.SUCCESS,
             )
 
             return read_rsp.Value

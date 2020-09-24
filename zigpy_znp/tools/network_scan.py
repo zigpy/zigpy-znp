@@ -23,7 +23,8 @@ async def scan_once(znp: ZNP, channels: t.Channels, duration_exp: int):
     ) as updates:
         await znp.request(
             c.ZDO.NetworkDiscoveryReq.Req(
-                Channels=channels, ScanDuration=duration_exp,
+                Channels=channels,
+                ScanDuration=duration_exp,
             ),
             RspStatus=t.Status.SUCCESS,
         )

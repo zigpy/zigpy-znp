@@ -27,7 +27,8 @@ class CustomArgumentParser(argparse.ArgumentParser):
         logging.getLogger().setLevel(log_level)
 
         coloredlogs.install(
-            level=log_level, level_styles=level_styles,
+            level=log_level,
+            level_styles=level_styles,
         )
 
         return args
