@@ -1,18 +1,15 @@
 import json
+
 import pytest
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
 from zigpy_znp.types.nvids import NwkNvIds
-
 from zigpy_znp.tools.nvram_read import main as nvram_read
-from zigpy_znp.tools.nvram_write import main as nvram_write
 from zigpy_znp.tools.nvram_reset import main as nvram_reset
-
+from zigpy_znp.tools.nvram_write import main as nvram_write
 
 from ..conftest import ALL_DEVICES
-
 
 pytestmark = [pytest.mark.timeout(3), pytest.mark.asyncio]
 

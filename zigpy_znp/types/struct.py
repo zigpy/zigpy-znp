@@ -1,6 +1,6 @@
-import dataclasses
-import inspect
 import typing
+import inspect
+import dataclasses
 
 NoneType = type(None)
 

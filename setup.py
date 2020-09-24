@@ -1,9 +1,10 @@
 """Setup module for zigpy-znp"""
 
 import pathlib
-import zigpy_znp
 
-from setuptools import find_packages, setup
+from setuptools import setup, find_packages
+
+import zigpy_znp
 
 setup(
     name="zigpy-znp",

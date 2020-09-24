@@ -2,12 +2,10 @@ import sys
 import asyncio
 import logging
 import itertools
-
-from collections import defaultdict, deque
+from collections import deque, defaultdict
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
 from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.zigbee.application import ControllerApplication
 

@@ -3,7 +3,7 @@ import logging
 import importlib
 
 from homeassistant.core import HomeAssistant
-from homeassistant.config import load_yaml_config_file, YAML_CONFIG_FILE
+from homeassistant.config import YAML_CONFIG_FILE, load_yaml_config_file
 from homeassistant.__main__ import get_arguments
 from homeassistant.util.package import install_package
 

@@ -1,16 +1,11 @@
-import pytest
 import asyncio
-
 from unittest.mock import call
+
+import pytest
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
-from zigpy_znp.api import (
-    OneShotResponseListener,
-    CallbackResponseListener,
-)
-
+from zigpy_znp.api import OneShotResponseListener, CallbackResponseListener
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

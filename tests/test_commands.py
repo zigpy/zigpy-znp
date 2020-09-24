@@ -1,15 +1,15 @@
-import pytest
-import logging
 import keyword
+import logging
 import dataclasses
+from collections import defaultdict
 
+import pytest
 import zigpy.types as zigpy_t
 import zigpy.zdo.types
-import zigpy_znp.commands as c
-import zigpy_znp.frames as frames
-from zigpy_znp import types as t
 
-from collections import defaultdict
+import zigpy_znp.frames as frames
+import zigpy_znp.commands as c
+from zigpy_znp import types as t
 
 
 def test_command_header():

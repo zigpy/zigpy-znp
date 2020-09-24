@@ -1,4 +1,5 @@
 import ast
+
 import pytest
 
 import zigpy_znp.types as t

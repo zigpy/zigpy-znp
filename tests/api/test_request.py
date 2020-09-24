@@ -1,13 +1,12 @@
-import pytest
 import asyncio
+
+import pytest
 import async_timeout
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-
-from zigpy_znp.exceptions import InvalidCommandResponse, CommandNotRecognized
-
+from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

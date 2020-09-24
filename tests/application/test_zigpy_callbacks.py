@@ -1,11 +1,10 @@
 import pytest
+from zigpy.zdo.types import ZDOCmd
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from zigpy.zdo.types import ZDOCmd
 from ..conftest import FORMED_DEVICES
-
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

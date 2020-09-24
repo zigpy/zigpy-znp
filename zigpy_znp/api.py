@@ -4,25 +4,22 @@ import logging
 import itertools
 import contextlib
 import dataclasses
-import async_timeout
-
 from collections import Counter, defaultdict
 
+import async_timeout
+
 import zigpy_znp.types as t
-import zigpy_znp.logger as log
 import zigpy_znp.config as conf
+import zigpy_znp.logger as log
 import zigpy_znp.commands as c
-
-from zigpy_znp.types import nvids
-
 from zigpy_znp import uart
+from zigpy_znp.types import nvids
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import (
+    SecurityError,
     CommandNotRecognized,
     InvalidCommandResponse,
-    SecurityError,
 )
-
 
 LOGGER = logging.getLogger(__name__)
 AFTER_CONNECT_DELAY = 1  # seconds

@@ -1,13 +1,11 @@
 import pytest
+from serial_asyncio import SerialTransport
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-
 from zigpy_znp import uart as znp_uart
 from zigpy_znp.frames import TransportFrame
-
-from serial_asyncio import SerialTransport
 
 
 @pytest.fixture

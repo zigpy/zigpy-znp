@@ -1,10 +1,10 @@
-import pytest
 import asyncio
+
+import pytest
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
-from zigpy_znp.tools.energy_scan import channels_from_channel_mask, main as energy_scan
+from zigpy_znp.tools.energy_scan import main as energy_scan, channels_from_channel_mask
 
 from ..conftest import FORMED_DEVICES
 

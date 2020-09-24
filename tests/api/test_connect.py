@@ -1,14 +1,10 @@
-import pytest
 import asyncio
+
+import pytest
 
 from zigpy_znp.api import ZNP
 
-from ..conftest import (
-    FAKE_SERIAL_PORT,
-    config_for_port_path,
-    BaseServerZNP,
-)
-
+from ..conftest import FAKE_SERIAL_PORT, BaseServerZNP, config_for_port_path
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

@@ -1,14 +1,13 @@
+import random
+
 import pytest
 
-import random
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
 from zigpy_znp.tools.flash_read import main as flash_read
-from zigpy_znp.tools.flash_write import get_firmware_crcs, main as flash_write
+from zigpy_znp.tools.flash_write import main as flash_write, get_firmware_crcs
 
-from ..conftest import CoroutineMock, BaseServerZNP
-
+from ..conftest import BaseServerZNP, CoroutineMock
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

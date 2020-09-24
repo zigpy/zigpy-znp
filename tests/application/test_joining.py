@@ -2,7 +2,6 @@ import asyncio
 import contextlib
 
 import pytest
-
 import zigpy.util
 import zigpy.types
 from zigpy.zdo.types import SizePrefixedSimpleDescriptor
@@ -11,9 +10,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.exceptions import InvalidCommandResponse
 
-
 from ..conftest import FORMED_DEVICES, FORMED_ZSTACK3_DEVICES
-
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

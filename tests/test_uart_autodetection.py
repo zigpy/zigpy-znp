@@ -1,10 +1,9 @@
-import pytest
-
 from contextlib import contextmanager
+
+import pytest
 from serial.tools.list_ports_common import ListPortInfo
 
 from zigpy_znp import uart as znp_uart
-
 
 COMMON_LINUX = [
     # HUSBZB-1's Z-Wave serial

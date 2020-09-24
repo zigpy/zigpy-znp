@@ -1,7 +1,7 @@
+from zigpy.zdo.types import ZDOCmd
+
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
-from zigpy.zdo.types import ZDOCmd
 
 """
 Zigpy expects to be able to directly send and receive ZDO commands.

@@ -2,10 +2,10 @@ import sys
 import asyncio
 import logging
 import argparse
+
 import async_timeout
 
 import zigpy_znp.commands as c
-
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.tools.common import setup_parser

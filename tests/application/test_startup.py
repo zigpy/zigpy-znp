@@ -1,23 +1,20 @@
 import pytest
 
 import zigpy_znp.types as t
-import zigpy_znp.commands as c
 import zigpy_znp.config as conf
-
+import zigpy_znp.commands as c
 from zigpy_znp.types.nvids import NwkNvIds
 
-
 from ..conftest import (
-    CoroutineMock,
-    FormedLaunchpadCC26X2R1,
-    FormedZStack3CC2531,
-    FormedZStack1CC2531,
-    BaseZStack3Device,
+    ALL_DEVICES,
     EMPTY_DEVICES,
     FORMED_DEVICES,
-    ALL_DEVICES,
+    CoroutineMock,
+    BaseZStack3Device,
+    FormedZStack1CC2531,
+    FormedZStack3CC2531,
+    FormedLaunchpadCC26X2R1,
 )
-
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

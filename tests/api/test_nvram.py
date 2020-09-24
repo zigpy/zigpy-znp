@@ -2,9 +2,7 @@ import pytest
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
 from zigpy_znp.types import nvids
-
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

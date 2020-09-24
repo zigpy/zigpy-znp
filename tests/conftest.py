@@ -1,7 +1,7 @@
 import json
 import asyncio
-import pathlib
 import logging
+import pathlib
 import contextlib
 
 import pytest
@@ -13,16 +13,13 @@ except ImportError:
     from asynctest import CoroutineMock  # noqa: F401
 
 import zigpy_znp.types as t
-import zigpy_znp.commands as c
 import zigpy_znp.config as conf
-
-from zigpy_znp.uart import ZnpMtProtocol
-
+import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp.nib import parse_nib, NIB, CC2531NIB, NwkState8, NwkKeyDesc
+from zigpy_znp.uart import ZnpMtProtocol
+from zigpy_znp.znp.nib import NIB, CC2531NIB, NwkState8, NwkKeyDesc, parse_nib
 from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds, is_secure_nvid
 from zigpy_znp.zigbee.application import ControllerApplication
-
 
 LOGGER = logging.getLogger(__name__)
 

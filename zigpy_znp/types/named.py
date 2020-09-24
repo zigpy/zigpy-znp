@@ -3,10 +3,9 @@ import typing
 import logging
 import dataclasses
 
-from zigpy.types import KeyData, EUI64, NWK, ExtendedPanId, PanId, ClusterId
+from zigpy.types import NWK, EUI64, PanId, KeyData, ClusterId, ExtendedPanId
 
 from . import basic, struct
-
 
 LOGGER = logging.getLogger(__name__)
 

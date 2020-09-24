@@ -1,7 +1,7 @@
 import pytest
 
-import zigpy_znp.commands as c
 import zigpy_znp.types as t
+import zigpy_znp.commands as c
 
 
 def test_status():

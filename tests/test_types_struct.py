@@ -2,6 +2,7 @@ import enum
 import typing
 
 import pytest
+
 import zigpy_znp.types as t
 
 

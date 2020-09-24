@@ -4,8 +4,8 @@ import logging
 import dataclasses
 
 import zigpy.zdo.types
-import zigpy_znp.types as t
 
+import zigpy_znp.types as t
 
 LOGGER = logging.getLogger(__name__)
 

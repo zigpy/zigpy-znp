@@ -5,7 +5,6 @@ import zigpy_znp.commands as c
 
 from ..conftest import FORMED_DEVICES, CoroutineMock
 
-
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 
 

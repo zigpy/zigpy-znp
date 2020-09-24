@@ -1,5 +1,6 @@
-import pytest
 import logging
+
+import pytest
 
 from zigpy_znp.logger import _find_trace_level
 

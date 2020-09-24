@@ -1,8 +1,9 @@
-import pytest
 import logging
 
-from zigpy_znp.tools.common import setup_parser
+import pytest
+
 from zigpy_znp.logger import _TRACE
+from zigpy_znp.tools.common import setup_parser
 
 
 @pytest.mark.parametrize(

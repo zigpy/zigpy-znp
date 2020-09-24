@@ -1,12 +1,11 @@
-import pytest
 import asyncio
+
+import pytest
 import async_timeout
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
 from zigpy_znp.api import _deduplicate_commands
-
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

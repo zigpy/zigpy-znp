@@ -9,6 +9,7 @@ the tester via a callback message interface"""
 import typing
 
 import zigpy.zdo.types
+
 import zigpy_znp.types as t
 
 

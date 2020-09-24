@@ -1,9 +1,9 @@
 import logging
 import argparse
+
 import coloredlogs
 
 import zigpy_znp.logger as log
-
 
 LOG_LEVELS = [logging.INFO, logging.DEBUG, log._TRACE]
 

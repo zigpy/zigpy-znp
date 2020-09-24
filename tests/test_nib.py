@@ -1,17 +1,15 @@
 import pytest
 
 import zigpy_znp.types as t
-
 from zigpy_znp.znp.nib import (
     NIB,
     CC2531NIB,
-    parse_nib,
+    Empty,
     NwkState8,
     NwkState16,
     PaddingByte,
-    Empty,
+    parse_nib,
 )
-
 
 NEW_NIB = bytes.fromhex(
     """

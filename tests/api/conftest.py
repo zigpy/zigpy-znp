@@ -1,6 +1,6 @@
 import pytest
-import zigpy_znp.config as conf
 
+import zigpy_znp.config as conf
 from zigpy_znp.api import ZNP
 
 from ..conftest import FAKE_SERIAL_PORT, BaseServerZNP

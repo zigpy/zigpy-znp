@@ -1,16 +1,12 @@
-import pytest
 import asyncio
-import zigpy_znp.config as conf
 
+import pytest
+
+import zigpy_znp.config as conf
 from zigpy_znp.uart import connect as uart_connect
 from zigpy_znp.zigbee.application import ControllerApplication
 
-
-from ..conftest import (
-    swap_attribute,
-    FormedLaunchpadCC26X2R1,
-    FORMED_DEVICES,
-)
+from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1, swap_attribute
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

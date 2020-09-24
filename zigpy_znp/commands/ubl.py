@@ -3,7 +3,6 @@
 
 import zigpy_znp.types as t
 
-
 # Size of internal flash less 4 pages for boot loader,
 # 6 pages for NV, & 1 page for lock bits.
 IMAGE_SIZE = 0x40000 - 0x2000 - 0x3000 - 0x0800

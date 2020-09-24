@@ -3,7 +3,6 @@ as reset, read/write memory, read/write extended address, etc.
 """
 
 import zigpy_znp.types as t
-
 from zigpy_znp.types import nvids
 
 

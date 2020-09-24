@@ -1,16 +1,14 @@
 import asyncio
 
 import pytest
-
 import zigpy.types
 from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
 
 import zigpy_znp.types as t
-import zigpy_znp.commands as c
 import zigpy_znp.config as conf
+import zigpy_znp.commands as c
 
-from ..conftest import CoroutineMock, FORMED_DEVICES
-
+from ..conftest import FORMED_DEVICES, CoroutineMock
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
 

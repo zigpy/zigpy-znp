@@ -2,18 +2,15 @@ import typing
 import asyncio
 import logging
 import warnings
+from collections import defaultdict
 
 import serial
 import serial.tools
-
-from collections import defaultdict
-
 from serial.tools.list_ports import comports as list_com_ports
 
-import zigpy_znp.logger as log
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
-
+import zigpy_znp.logger as log
 from zigpy_znp.types import Bytes
 from zigpy_znp.exceptions import InvalidFrame
 

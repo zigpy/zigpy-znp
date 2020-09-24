@@ -6,10 +6,9 @@ import argparse
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.exceptions import CommandNotRecognized, SecurityError
+from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
 from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
 from zigpy_znp.tools.common import setup_parser
 

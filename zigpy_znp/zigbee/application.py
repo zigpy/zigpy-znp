@@ -6,35 +6,29 @@ import logging
 import warnings
 import itertools
 import contextlib
-import async_timeout
 
 import zigpy.zdo
 import zigpy.util
 import zigpy.types
-import zigpy.device
 import zigpy.config
-import zigpy.profiles
+import zigpy.device
+import async_timeout
 import zigpy.endpoint
+import zigpy.profiles
 import zigpy.zcl.foundation
-
 from zigpy.zcl import clusters
-from zigpy.types import (
-    ExtendedPanId,
-    deserialize as list_deserialize,
-)
-from zigpy.zdo.types import MultiAddress, ZDOCmd, ZDOHeader, CLUSTERS as ZDO_CLUSTERS
+from zigpy.types import ExtendedPanId, deserialize as list_deserialize
+from zigpy.zdo.types import CLUSTERS as ZDO_CLUSTERS, ZDOCmd, ZDOHeader, MultiAddress
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp.nib import parse_nib, NIB, CC2531NIB
+from zigpy_znp.znp.nib import NIB, CC2531NIB, parse_nib
 from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
-
 
 with warnings.catch_warnings():
     warnings.filterwarnings(
