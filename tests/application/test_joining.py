@@ -1,14 +1,18 @@
 import asyncio
+import contextlib
+
 import pytest
 
+import zigpy.util
 import zigpy.types
 from zigpy.zdo.types import SizePrefixedSimpleDescriptor
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
+from zigpy_znp.exceptions import InvalidCommandResponse
 
 
-from ..conftest import FORMED_DEVICES
+from ..conftest import FORMED_DEVICES, FORMED_ZSTACK3_DEVICES
 
 
 pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
@@ -74,6 +78,77 @@ async def test_permit_join_failure(device, make_application):
 
     # Make sure both commands were received
     await asyncio.gather(data_req_sent, permit_join_sent)
+
+    await app.shutdown()
+
+
+@pytest.mark.timeout(2)
+@pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
+@pytest.mark.parametrize("status", [t.Status.SUCCESS, t.Status.MAC_MEM_ERROR])
+async def test_permit_join_with_key(device, status, make_application):
+    app, znp_server = make_application(server_cls=device)
+
+    # Consciot bulb
+    ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
+    code = bytes.fromhex("17D1856872570CEB7ACB53030C5D6DA368B1")
+
+    bdb_add_install_code = znp_server.reply_once_to(
+        c.AppConfig.BDBAddInstallCode.Req(
+            InstallCodeFormat=c.app_config.InstallCodeFormat.KeyDerivedFromInstallCode,
+            IEEE=ieee,
+            InstallCode=t.Bytes(zigpy.util.convert_install_code(code)),
+        ),
+        responses=[c.AppConfig.BDBAddInstallCode.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    join_enable_install_code = znp_server.reply_once_to(
+        c.AppConfig.BDBSetJoinUsesInstallCodeKey.Req(BdbJoinUsesInstallCodeKey=True),
+        responses=[
+            c.AppConfig.BDBSetJoinUsesInstallCodeKey.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
+    # Handle the ZDO broadcast sent by Zigpy (or fail)
+    data_req_sent = znp_server.reply_once_to(
+        request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=status),
+            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=0, TSN=1),
+        ],
+    )
+
+    # Handle the permit join request sent by us
+    permit_join_sent = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
+        ],
+    )
+
+    join_disable_install_code = znp_server.reply_once_to(
+        c.AppConfig.BDBSetJoinUsesInstallCodeKey.Req(BdbJoinUsesInstallCodeKey=False),
+        responses=[
+            c.AppConfig.BDBSetJoinUsesInstallCodeKey.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
+    await app.startup(auto_form=False)
+
+    with contextlib.nullcontext() if status == t.Status.SUCCESS else pytest.raises(
+        InvalidCommandResponse
+    ):
+        await app.permit_with_key(node=ieee, code=code, time_s=1)
+
+    await bdb_add_install_code
+    await join_enable_install_code
+    await data_req_sent
+
+    if status == t.Status.SUCCESS:
+        await permit_join_sent
+
+    # The install code policy is reset right after
+    await join_disable_install_code
 
     await app.shutdown()
 

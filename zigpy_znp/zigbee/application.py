@@ -685,6 +685,47 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if response.Status != t.Status.SUCCESS:
             raise RuntimeError(f"Permit join response failure: {response}")
 
+    async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
+        """
+        Permits a new device to join with the given IEEE and Install Code.
+        """
+
+        key = zigpy.util.convert_install_code(code)
+        install_code_format = c.app_config.InstallCodeFormat.KeyDerivedFromInstallCode
+
+        if key is None:
+            raise ValueError(f"Invalid install code: {code!r}")
+
+        await self._znp.request(
+            c.AppConfig.BDBAddInstallCode.Req(
+                InstallCodeFormat=install_code_format,
+                IEEE=node,
+                InstallCode=t.Bytes(key),
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
+
+        # Temporarily only allow joins that use an install code
+        await self._znp.request(
+            c.AppConfig.BDBSetJoinUsesInstallCodeKey.Req(
+                BdbJoinUsesInstallCodeKey=True
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
+
+        try:
+            await self.permit(time_s)
+            await asyncio.sleep(time_s)
+        finally:
+            # Revert back to normal. The BDB config is not persistent so if this request
+            # fails, we will be back to normal the next time Z-Stack resets.
+            await self._znp.request(
+                c.AppConfig.BDBSetJoinUsesInstallCodeKey.Req(
+                    BdbJoinUsesInstallCodeKey=False
+                ),
+                RspStatus=t.Status.SUCCESS,
+            )
+
     def connection_lost(self, exc):
         """
         Propagated up from UART through ZNP when the connection is lost.

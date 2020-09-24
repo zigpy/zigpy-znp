@@ -61,7 +61,7 @@ class BDBCommissioningMode(t.enum_flag_uint8):
 
 class InstallCodeFormat(t.enum_uint8):
     InstallCodeAndCRC = 0x01
-    KeyDeriveFromInstallCode = 0x02
+    KeyDerivedFromInstallCode = 0x02
 
 
 class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
