@@ -186,8 +186,6 @@ class Status(MissingEnumMixin, basic.enum_uint8):
 
     MALFORMED_CMD = 0x80
     UNSUP_CLUSTER_CMD = 0x81
-    # The requested optional feature is not supported on the target device.
-    NOT_SUPPORTED = 0x84
 
     OTA_ABORT = 0x95
     OTA_IMAGE_INVALID = 0x96
