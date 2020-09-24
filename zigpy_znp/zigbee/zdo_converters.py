@@ -116,22 +116,38 @@ ZDO_CONVERTERS = {
         (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr)),
         (lambda rsp: (ZDOCmd.Bind_rsp, {"Status": rsp.Status})),
     ),
-        ZDOCmd.Mgmt_Lqi_req: (
+    ZDOCmd.Mgmt_Lqi_req: (
         (
             lambda addr, StartIndex: (
-                c.ZDO.MgmtLqiReq.Req(Dst=addr, StartIndex=StartIndex,)
+                c.ZDO.MgmtLqiReq.Req(
+                    Dst=addr,
+                    StartIndex=StartIndex,
+                )
             )
         ),
         (lambda addr: c.ZDO.MgmtLqiRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Mgmt_Lqi_rsp, {"Status": rsp.Status})),
+        (
+            lambda rsp: (
+                ZDOCmd.Mgmt_Lqi_rsp,
+                {"Status": rsp.Status, "Neighbors": rsp.Neighbors},
+            )
+        ),
     ),
     ZDOCmd.Mgmt_Rtg_req: (
         (
             lambda addr, StartIndex: (
-                c.ZDO.MgmtLqiReq.Req(Dst=addr, StartIndex=StartIndex,)
+                c.ZDO.MgmtRtgReq.Req(
+                    Dst=addr,
+                    StartIndex=StartIndex,
+                )
             )
         ),
         (lambda addr: c.ZDO.MgmtRtgRsp.Callback(partial=True, Src=addr)),
-        (lambda rsp: (ZDOCmd.Mgmt_Rtg_rsp, {"Status": rsp.Status})),
+        (
+            lambda rsp: (
+                ZDOCmd.Mgmt_Rtg_rsp,
+                {"Status": rsp.Status, "Routes": rsp.Routes},
+            )
+        ),
     ),
 }
