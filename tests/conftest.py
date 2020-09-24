@@ -210,13 +210,11 @@ class BaseServerZNP(ZNP):
                 yield from self._flatten_responses(request, response)
 
     def reply_once_to(self, request, responses):
+        future = self.wait_for_response(request)
         called_future = asyncio.get_running_loop().create_future()
 
-        async def callback(request):
-            if callback.called:
-                return
-
-            callback.called = request
+        async def replier():
+            request = await future
 
             for response in self._flatten_responses(request, responses):
                 await asyncio.sleep(0.001)
@@ -225,8 +223,7 @@ class BaseServerZNP(ZNP):
 
             called_future.set_result(request)
 
-        callback.called = False
-        self.callback_for_response(request, lambda r: asyncio.create_task(callback(r)))
+        asyncio.create_task(replier())
 
         return called_future
 

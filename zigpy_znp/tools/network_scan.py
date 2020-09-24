@@ -78,6 +78,7 @@ async def network_scan(
                 )
     finally:
         await znp.nvram_write(NwkNvIds.CHANLIST, previous_channels)
+        znp.close()
 
 
 async def main(argv):
