@@ -26,10 +26,14 @@ setup(
     ],
     extras_require={
         "testing": [
-            'asynctest; python_version < "3.8.0"',
+            # XXX: The order of these deps seems to matter
             "pytest>=5.4.5",
             "pytest-asyncio>=0.12.0",
+            "pytest-timeout",
             "pytest-mock",
+            "pytest-cov",
+            "coveralls",
+            'asynctest; python_version < "3.8.0"',
         ]
     },
 )
