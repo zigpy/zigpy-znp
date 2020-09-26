@@ -531,3 +531,22 @@ def test_command_replace_partial():
 
     assert command1.replace() == command1
     assert command1.replace(SysId=0x13) == command2
+
+
+def test_command_possibly_empty_payload():
+    class TestSubsystem(t.CommandsBase, subsystem=t.Subsystem.SYS):
+        Test = t.CommandDef(
+            t.CommandType.AREQ,
+            0x00,
+            rsp_schema=(t.Param("Data", t.Bytes, "Can be any length"),),
+        )
+
+    Test = TestSubsystem.Test.Callback
+
+    assert Test.from_frame(
+        frames.GeneralFrame(header=Test.header, data=b"test")
+    ) == Test(Data=t.Bytes(b"test"))
+
+    assert Test.from_frame(frames.GeneralFrame(header=Test.header, data=b"")) == Test(
+        Data=t.Bytes(b"")
+    )

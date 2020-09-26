@@ -407,16 +407,21 @@ class CommandBase:
         params = {}
 
         for param in cls.schema:
-            if data:
+            try:
                 params[param.name], data = param.type.deserialize(data)
-            elif not param.optional:
-                # If we're out of data but the parameter is required, this is bad
-                raise ValueError(
-                    f"Data has been consumed but required parameters remain: {param}"
-                )
-            else:
-                # If we're out of data and the parameter is optional, we're done
-                break
+            except ValueError:
+                if not data and param.optional:
+                    # If we're out of data and the parameter is optional, we're done
+                    break
+                elif not data and not param.optional:
+                    # If we're out of data but the parameter is required, this is bad
+                    raise ValueError(
+                        f"Frame data is truncated (parsed {params}),"
+                        f" required parameter remains: {param}"
+                    )
+                else:
+                    # Otherwise, let the exception happen
+                    raise
 
         if data:
             msg = (
