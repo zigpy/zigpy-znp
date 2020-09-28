@@ -16,7 +16,7 @@ setup(
     author="Alexei Chetroi",
     author_email="alexei.chetroi@outlook.com",
     license="GPL-3.0",
-    packages=find_packages(exclude=["*.tests"]),
+    packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=[
         "pyserial-asyncio",
         "zigpy>=0.24.1",
