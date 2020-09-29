@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from zigpy.zdo.types import ZDOCmd
 
@@ -24,6 +26,20 @@ async def test_on_zdo_relays_message_callback(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_on_zdo_relays_message_callback_unknown(
+    device, make_application, mocker, caplog
+):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    caplog.set_level(logging.WARNING)
+    znp_server.send(c.ZDO.SrcRtgInd.Callback(DstAddr=0x1234, Relays=[0x5678, 0xABCD]))
+    assert "unknown device" in caplog.text
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_announce(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
@@ -42,6 +58,29 @@ async def test_on_zdo_device_announce(device, make_application, mocker):
     )
 
     app.handle_message.called_once_with(cluster=ZDOCmd.Device_annce)
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_on_zdo_device_announce_unknown(device, make_application, mocker, caplog):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "handle_message")
+
+    caplog.set_level(logging.WARNING)
+    znp_server.send(
+        c.ZDO.EndDeviceAnnceInd.Callback(
+            Src=0x0001,
+            NWK=0xFA9E,
+            IEEE=t.EUI64(range(8)),
+            Capabilities=c.zdo.MACCapabilities.Router,
+        )
+    )
+
+    assert app.handle_message.call_count == 0
+    assert "unknown device" in caplog.text
 
     await app.shutdown()
 

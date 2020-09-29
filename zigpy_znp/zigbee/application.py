@@ -782,7 +782,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         LOGGER.info("ZDO device relays: %s", msg)
-        device = self.get_device(nwk=msg.DstAddr)
+
+        try:
+            device = self.get_device(nwk=msg.DstAddr)
+        except KeyError:
+            LOGGER.warning(
+                "Received a ZDO message from an unknown device: 0x%04x", msg.DstAddr
+            )
+            return
+
+        # `relays` is a property with a setter that emits an event
         device.relays = msg.Relays
 
     def on_zdo_device_announce(self, msg: c.ZDO.EndDeviceAnnceInd.Callback) -> None:
@@ -792,11 +801,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         LOGGER.info("ZDO device announce: %s", msg)
 
+        try:
+            device = self.get_device(ieee=msg.IEEE)
+        except KeyError:
+            LOGGER.warning(
+                "Received a ZDO message from an unknown device: %s", msg.IEEE
+            )
+            return
+
         # We turn this back into a ZDO message and let zigpy handle it
         self._receive_zdo_message(
             cluster=ZDOCmd.Device_annce,
             tsn=0xFF,
-            sender=self.get_device(ieee=msg.IEEE),
+            sender=device,
             NWKAddr=msg.NWK,
             IEEEAddr=msg.IEEE,
             Capability=msg.Capabilities,
