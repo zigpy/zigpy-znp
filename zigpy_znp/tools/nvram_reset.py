@@ -22,7 +22,7 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
         if await znp.nvram_delete(nvid):
             LOGGER.info("Cleared %s", nvid)
         else:
-            LOGGER.warning("Failed to clear %s", nvid)
+            LOGGER.debug("Item does not exist: %s", nvid)
 
     LOGGER.info("Clearing config and state on next start")
     await znp.nvram_write(
