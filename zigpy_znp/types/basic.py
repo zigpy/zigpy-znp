@@ -228,23 +228,28 @@ class FixedList(list):
         return r, data
 
 
-class EnumIntFlagMixin:
+def enum_flag_factory(int_type: FixedIntType) -> enum.Flag:
     """
-    Enum does not allow multiple base classes. We turn enum.IntFlag into a mixin, since
-    it really doesn't depend on the base class specifically being `int`.
+    Mixins are broken by Python 3.8.6 so we must dynamically create the enum with the
+    appropriate methods but with only one non-Enum parent class.
     """
 
-    # Rebind classmethods to our own class
-    _missing_ = classmethod(enum.IntFlag._missing_.__func__)
-    _create_pseudo_member_ = classmethod(enum.IntFlag._create_pseudo_member_.__func__)
+    class _NewEnum(int_type, enum.Flag):
+        # Rebind classmethods to our own class
+        _missing_ = classmethod(enum.IntFlag._missing_.__func__)
+        _create_pseudo_member_ = classmethod(
+            enum.IntFlag._create_pseudo_member_.__func__
+        )
 
-    __or__ = enum.IntFlag.__or__
-    __and__ = enum.IntFlag.__and__
-    __xor__ = enum.IntFlag.__xor__
-    __ror__ = enum.IntFlag.__ror__
-    __rand__ = enum.IntFlag.__rand__
-    __rxor__ = enum.IntFlag.__rxor__
-    __invert__ = enum.IntFlag.__invert__
+        __or__ = enum.IntFlag.__or__
+        __and__ = enum.IntFlag.__and__
+        __xor__ = enum.IntFlag.__xor__
+        __ror__ = enum.IntFlag.__ror__
+        __rand__ = enum.IntFlag.__rand__
+        __rxor__ = enum.IntFlag.__rxor__
+        __invert__ = enum.IntFlag.__invert__
+
+    return _NewEnum
 
 
 class enum_uint8(uint8_t, enum.Enum):
@@ -279,33 +284,33 @@ class enum_uint64(uint64_t, enum.Enum):
     pass
 
 
-class enum_flag_uint8(EnumIntFlagMixin, uint8_t, enum.Flag):
+class enum_flag_uint8(enum_flag_factory(uint8_t)):
     pass
 
 
-class enum_flag_uint16(EnumIntFlagMixin, uint16_t, enum.Flag):
+class enum_flag_uint16(enum_flag_factory(uint16_t)):
     pass
 
 
-class enum_flag_uint24(EnumIntFlagMixin, uint24_t, enum.Flag):
+class enum_flag_uint24(enum_flag_factory(uint24_t)):
     pass
 
 
-class enum_flag_uint32(EnumIntFlagMixin, uint32_t, enum.Flag):
+class enum_flag_uint32(enum_flag_factory(uint32_t)):
     pass
 
 
-class enum_flag_uint40(EnumIntFlagMixin, uint40_t, enum.Flag):
+class enum_flag_uint40(enum_flag_factory(uint40_t)):
     pass
 
 
-class enum_flag_uint48(EnumIntFlagMixin, uint48_t, enum.Flag):
+class enum_flag_uint48(enum_flag_factory(uint48_t)):
     pass
 
 
-class enum_flag_uint56(EnumIntFlagMixin, uint56_t, enum.Flag):
+class enum_flag_uint56(enum_flag_factory(uint56_t)):
     pass
 
 
-class enum_flag_uint64(EnumIntFlagMixin, uint64_t, enum.Flag):
+class enum_flag_uint64(enum_flag_factory(uint64_t)):
     pass
