@@ -68,15 +68,17 @@ async def network_scan(
                     seen_beacons.add(key)
 
                 print(
-                    f"{time.time():0.2f} [{beacon.ExtendedPanId}, {beacon.PanId},"
+                    f"{time.time():0.2f}"
+                    f" [EPID: {beacon.ExtendedPanId}, PID: {beacon.PanId},"
                     f" from: {beacon.Src}]: Channel={beacon.Channel:2>}"
-                    f" PermitJoining={beacon.PermitJoining}"
-                    f" RouterCapacity={beacon.RouterCapacity}"
-                    f" DeviceCapacity={beacon.DeviceCapacity}"
-                    f" ProtocolVersion={beacon.ProtocolVersion}"
-                    f" StackProfile={beacon.StackProfile}"
+                    f" PermitJoins={beacon.PermitJoining}"
+                    f" RtrCapacity={beacon.RouterCapacity}"
+                    f" DevCapacity={beacon.DeviceCapacity}"
+                    f" ProtoVer={beacon.ProtocolVersion}"
+                    f" StackProf={beacon.StackProfile}"
                     f" Depth={beacon.Depth:>3}"
                     f" UpdateId={beacon.UpdateId:>2}"
+                    f" LQI={beacon.LQI:>3}"
                 )
     finally:
         await znp.nvram_write(NwkNvIds.CHANLIST, previous_channels)
