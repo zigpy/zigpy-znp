@@ -40,7 +40,7 @@ async def scan_once(znp: ZNP, channels: t.Channels, duration_exp: int):
 
 
 async def network_scan(
-    znp: ZNP, channels: t.Channels, num_scans: int, duration_exp: int
+    znp: ZNP, channels: t.Channels, num_scans: int, duration_exp: int, duplicates: bool
 ) -> None:
     previous_channels = await znp.nvram_read(NwkNvIds.CHANLIST)
 
@@ -59,12 +59,13 @@ async def network_scan(
                 break
 
             async for beacon in scan_once(znp, channels, duration_exp):
-                key = beacon.replace(Depth=0, LQI=0).serialize()
+                if not duplicates:
+                    key = beacon.replace(Depth=0, LQI=0).serialize()
 
-                if key in seen_beacons:
-                    continue
+                    if key in seen_beacons:
+                        continue
 
-                seen_beacons.add(key)
+                    seen_beacons.add(key)
 
                 print(
                     f"{time.time():0.2f} [{beacon.ExtendedPanId}, {beacon.PanId},"
@@ -112,12 +113,27 @@ async def main(argv):
         help="Scan duration exponent",
     )
 
+    parser.add_argument(
+        "-a",
+        "--allow-duplicates",
+        dest="allow_duplicates",
+        action="store_true",
+        default=False,
+        help="Allow duplicate beacons that differ only by LQI and depth",
+    )
+
     args = parser.parse_args(argv)
 
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
 
     await znp.connect()
-    await network_scan(znp, args.channels, args.num_scans, args.duration_exp)
+    await network_scan(
+        znp=znp,
+        channels=args.channels,
+        num_scans=args.num_scans,
+        duration_exp=args.duration_exp,
+        duplicates=args.allow_duplicates,
+    )
 
     znp.close()
 

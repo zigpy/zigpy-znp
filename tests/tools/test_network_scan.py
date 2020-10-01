@@ -261,7 +261,7 @@ async def test_network_scan(device, make_znp_server, capsys):
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_network_scan_failure(device, make_znp_server, capsys):
+async def test_network_scan_failure(device, make_znp_server):
     znp_server = make_znp_server(server_cls=device)
 
     original_channels = t.Channels.from_channel_list([15, 20, 25]).serialize()
@@ -277,3 +277,48 @@ async def test_network_scan_failure(device, make_znp_server, capsys):
 
     # The channels in NVRAM were restored even when we had a failure
     assert znp_server.nvram["nwk"][NwkNvIds.CHANLIST] == original_channels
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_network_scan_duplicates(device, make_znp_server, capsys):
+    znp_server = make_znp_server(server_cls=device)
+
+    beacon = t.Beacon(
+        Src=0x0000,
+        PanId=0x7ABE,
+        Channel=25,
+        PermitJoining=0,
+        RouterCapacity=1,
+        DeviceCapacity=1,
+        ProtocolVersion=2,
+        StackProfile=2,
+        LQI=39,
+        Depth=0,
+        UpdateId=0,
+        ExtendedPanId=t.EUI64.convert("92:6b:f8:1e:df:1b:e8:1c"),
+    )
+
+    znp_server.reply_once_to(
+        c.ZDO.NetworkDiscoveryReq.Req(Channels=t.Channels.ALL_CHANNELS, ScanDuration=2),
+        responses=[
+            c.ZDO.NetworkDiscoveryReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.BeaconNotifyInd.Callback(Beacons=[beacon, beacon]),
+            c.ZDO.NwkDiscoveryCnf.Callback(Status=t.ZDOStatus.SUCCESS),
+        ],
+    )
+
+    znp_server.reply_once_to(
+        c.ZDO.NetworkDiscoveryReq.Req(Channels=t.Channels.ALL_CHANNELS, ScanDuration=2),
+        responses=[
+            c.ZDO.NetworkDiscoveryReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.BeaconNotifyInd.Callback(Beacons=[beacon, beacon]),
+            c.ZDO.NwkDiscoveryCnf.Callback(Status=t.ZDOStatus.SUCCESS),
+        ],
+    )
+
+    await network_scan([znp_server._port_path, "-v", "-v", "-n", "2", "-a"])
+
+    captured = capsys.readouterr()
+
+    # No duplicates were filtered
+    assert captured.out.count(", from: ") == 4
