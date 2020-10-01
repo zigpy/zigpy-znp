@@ -40,7 +40,10 @@ def setup_parser(description: str) -> argparse.ArgumentParser:
     and a positional serial port argument.
     """
 
-    parser = CustomArgumentParser(description=description)
+    parser = CustomArgumentParser(
+        description=description,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument(
         "-v",
         "--verbose",
