@@ -33,7 +33,7 @@ async def read_firmware(radio_path: str) -> bytearray:
         raise RuntimeError(
             "Did not receive a bootloader handshake response!"
             " Make sure your adapter has just been plugged in and"
-            " nothing else has had a chance to communicate with it. Alternatively, "
+            " nothing else has had a chance to communicate with it. Alternatively,"
             " press the button furthest from the USB port. The LED should turn red."
         )
 

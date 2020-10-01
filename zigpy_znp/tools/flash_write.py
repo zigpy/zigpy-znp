@@ -65,8 +65,8 @@ async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
 
     if expected_crc != computed_crc:
         raise ValueError(
-            f"Firmware CRC is incorrect. "
-            f"Expected 0x{expected_crc:04X}, got 0x{computed_crc:04X}"
+            f"Firmware CRC is incorrect."
+            f" Expected 0x{expected_crc:04X}, got 0x{computed_crc:04X}"
         )
 
     znp = ZNP(
