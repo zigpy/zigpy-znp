@@ -11,7 +11,7 @@ class GeneralFrame:
     header: t.CommandHeader
     data: t.Bytes
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # We're frozen so `self.header = ...` is disallowed
         if not isinstance(self.header, t.CommandHeader):
             object.__setattr__(self, "header", t.CommandHeader(self.header))

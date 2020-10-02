@@ -18,7 +18,7 @@ class Struct:
         return next(c for c in cls.__mro__ if c.__name__ != "Optional")
 
     @classmethod
-    def _annotations(cls) -> typing.List[type]:
+    def _annotations(cls) -> typing.Dict[str, typing.Any]:
         # First get our proper subclasses
         subclasses = []
 
@@ -195,7 +195,7 @@ class Struct:
         )
 
     @classmethod
-    def deserialize(cls, data: bytes) -> "Struct":
+    def deserialize(cls, data: bytes) -> typing.Tuple["Struct", bytes]:
         instance = cls()
 
         for field in cls.fields():
@@ -239,7 +239,7 @@ class StructField:
     dynamic_type: typing.Optional[typing.Callable[[Struct], type]] = None
     requires: typing.Optional[typing.Callable[[Struct], bool]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Fail to initialize if the concrete type is invalid
         if self.dynamic_type is None:
             self.concrete_type

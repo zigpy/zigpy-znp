@@ -3,7 +3,7 @@ import logging
 _TRACE = 5
 
 
-def _find_trace_level():
+def _find_trace_level() -> int:
     if logging.getLevelName(_TRACE) != f"Level {_TRACE}":
         # If a level 5 exists, use it
         return _TRACE
