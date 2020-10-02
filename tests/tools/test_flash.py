@@ -9,7 +9,7 @@ from zigpy_znp.tools.flash_write import main as flash_write, get_firmware_crcs
 
 from ..conftest import BaseServerZNP, CoroutineMock
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 random.seed(12345)

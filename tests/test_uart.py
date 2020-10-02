@@ -221,7 +221,6 @@ def test_uart_frame_received_error(connected_uart, mocker):
     znp.frame_received.call_count == 3
 
 
-@pytest.mark.timeout(1)
 @pytest.mark.asyncio
 async def test_connect_auto(dummy_serial_conn, mocker):
     device, _ = dummy_serial_conn
@@ -234,7 +233,6 @@ async def test_connect_auto(dummy_serial_conn, mocker):
     )
 
 
-@pytest.mark.timeout(1)
 @pytest.mark.asyncio
 async def test_connection_lost(dummy_serial_conn, mocker, event_loop):
     device, _ = dummy_serial_conn
@@ -266,7 +264,6 @@ async def test_connection_lost(dummy_serial_conn, mocker, event_loop):
     assert (await conn_closed_fut) is None
 
 
-@pytest.mark.timeout(1)
 @pytest.mark.asyncio
 async def test_connection_made(dummy_serial_conn, mocker):
     device, _ = dummy_serial_conn
@@ -279,7 +276,6 @@ async def test_connection_made(dummy_serial_conn, mocker):
     znp.connection_made.assert_called_once_with()
 
 
-@pytest.mark.timeout(1)
 @pytest.mark.asyncio
 async def test_no_toggle_rts(dummy_serial_conn, mocker):
     device, serial = dummy_serial_conn
@@ -297,7 +293,6 @@ async def test_no_toggle_rts(dummy_serial_conn, mocker):
     assert rts.mock_calls == []
 
 
-@pytest.mark.timeout(1)
 @pytest.mark.asyncio
 async def test_toggle_rts(dummy_serial_conn, mocker):
     device, serial = dummy_serial_conn

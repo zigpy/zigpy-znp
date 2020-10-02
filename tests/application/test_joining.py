@@ -12,7 +12,7 @@ from zigpy_znp.exceptions import InvalidCommandResponse
 
 from ..conftest import FORMED_DEVICES, FORMED_ZSTACK3_DEVICES
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -79,7 +79,6 @@ async def test_permit_join_failure(device, make_application):
     await app.shutdown()
 
 
-@pytest.mark.timeout(2)
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 @pytest.mark.parametrize("status", [t.Status.SUCCESS, t.Status.MAC_MEM_ERROR])
 async def test_permit_join_with_key(device, status, make_application):

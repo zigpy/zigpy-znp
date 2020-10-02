@@ -10,7 +10,7 @@ import zigpy_znp.commands as c
 
 from ..conftest import FORMED_DEVICES, CoroutineMock
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -263,7 +263,6 @@ async def test_mrequest(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-@pytest.mark.timeout(10)
 async def test_request_concurrency(device, make_application, mocker):
     app, znp_server = make_application(
         server_cls=device, client_config={conf.CONF_MAX_CONCURRENT_REQUESTS: 2}

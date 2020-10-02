@@ -8,7 +8,7 @@ from zigpy_znp.zigbee.application import ControllerApplication
 
 from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1, swap_attribute
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 @pytest.mark.xfail(raises=AssertionError)
@@ -81,7 +81,6 @@ async def test_probe_multiple(device, make_znp_server):
     assert await ControllerApplication.probe(config)
 
 
-@pytest.mark.timeout(5)
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_reconnect(device, event_loop, make_application):
     app, znp_server = make_application(

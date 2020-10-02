@@ -5,7 +5,7 @@ import zigpy_znp.commands as c
 
 from ..conftest import FORMED_DEVICES, CoroutineMock
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)

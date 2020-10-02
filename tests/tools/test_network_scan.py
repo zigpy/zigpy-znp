@@ -8,7 +8,7 @@ from zigpy_znp.tools.network_scan import main as network_scan
 
 from ..conftest import FormedLaunchpadCC26X2R1
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])

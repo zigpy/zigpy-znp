@@ -19,7 +19,6 @@ def test_channels_from_channel_mask():
     assert channel_list(t.Channels.CHANNEL_15) == [15]
 
 
-@pytest.mark.timeout(1)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_energy_scan(device, make_znp_server, capsys):

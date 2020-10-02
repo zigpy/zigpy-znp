@@ -6,7 +6,7 @@ from zigpy_znp.api import ZNP
 
 from ..conftest import FAKE_SERIAL_PORT, BaseServerZNP, config_for_port_path
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 async def test_connect_no_communication(connected_znp):

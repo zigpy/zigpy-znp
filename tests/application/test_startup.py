@@ -16,7 +16,7 @@ from ..conftest import (
     FormedLaunchpadCC26X2R1,
 )
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 @pytest.mark.parametrize(

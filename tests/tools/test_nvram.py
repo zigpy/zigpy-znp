@@ -11,7 +11,7 @@ from zigpy_znp.tools.nvram_write import main as nvram_write
 
 from ..conftest import ALL_DEVICES
 
-pytestmark = [pytest.mark.timeout(3), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 def not_recognized(req):
@@ -54,7 +54,6 @@ async def test_nvram_read(device, make_znp_server, tmp_path, mocker):
     znp_server.close()
 
 
-@pytest.mark.timeout(5)
 @pytest.mark.parametrize("device", ALL_DEVICES)
 async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
     znp_server = make_znp_server(server_cls=device)

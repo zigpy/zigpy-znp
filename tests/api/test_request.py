@@ -8,7 +8,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 async def test_callback_rsp(connected_znp, event_loop):

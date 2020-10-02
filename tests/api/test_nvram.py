@@ -4,7 +4,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.types import nvids
 
-pytestmark = [pytest.mark.timeout(1), pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio]
 
 
 async def test_wrong_order(connected_znp, event_loop):
