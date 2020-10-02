@@ -42,8 +42,17 @@ async def scan_once(znp: ZNP, channels: t.Channels, duration_exp: int):
 async def network_scan(
     znp: ZNP, channels: t.Channels, num_scans: int, duration_exp: int, duplicates: bool
 ) -> None:
-    previous_channels = await znp.nvram_read(NwkNvIds.CHANLIST)
+    # Network scanning only works if our device is not joined to a network.
+    # If we don't start Z-Stack 3 it will always work but Z-Stack 1 keeps the device
+    # state in the NIB, which we have to temporarily delete in order for the scan to be
+    # possible.
+    if znp._version.MinorRel == 6:
+        previous_nib = await znp.nvram_read(NwkNvIds.NIB)
+        await znp.nvram_delete(NwkNvIds.NIB)
+    else:
+        previous_nib = None
 
+    previous_channels = await znp.nvram_read(NwkNvIds.CHANLIST)
     await znp.nvram_write(NwkNvIds.CHANLIST, t.Channels.ALL_CHANNELS)
 
     try:
@@ -81,6 +90,9 @@ async def network_scan(
                     f" LQI={beacon.LQI:>3}"
                 )
     finally:
+        if previous_nib is not None:
+            await znp.nvram_write(NwkNvIds.NIB, previous_nib, create=True)
+
         await znp.nvram_write(NwkNvIds.CHANLIST, previous_channels)
         znp.close()
 
