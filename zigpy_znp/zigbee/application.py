@@ -235,14 +235,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.SYS.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
             )
 
-        if self.znp_config[conf.CONF_LED_MODE] is not None:
-            led_mode = self.znp_config[conf.CONF_LED_MODE]
-
-            await self._znp.request(
-                c.Util.LEDControl.Req(LED=0xFF, Mode=led_mode),
-                RspStatus=t.Status.SUCCESS,
-            )
-
         # Both versions of Z-Stack use this callback
         started_as_coordinator = self._znp.wait_for_response(
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
@@ -281,6 +273,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # The startup sequence should not take forever
         async with async_timeout.timeout(STARTUP_TIMEOUT):
             await started_as_coordinator
+
+        # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
+        # before the coordinator has started.
+        if self.znp_config[conf.CONF_LED_MODE] is not None:
+            led_mode = self.znp_config[conf.CONF_LED_MODE]
+
+            await self._znp.request(
+                c.Util.LEDControl.Req(LED=0xFF, Mode=led_mode),
+                RspStatus=t.Status.SUCCESS,
+            )
 
         device_info = await self._znp.request(
             c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
