@@ -6,7 +6,7 @@ from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import NwkNvIds
 from zigpy_znp.tools.network_scan import main as network_scan
 
-from ..conftest import FormedLaunchpadCC26X2R1
+from ..conftest import FormedZStack1CC2531, FormedLaunchpadCC26X2R1
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -322,3 +322,57 @@ async def test_network_scan_duplicates(device, make_znp_server, capsys):
 
     # No duplicates were filtered
     assert captured.out.count(", from: ") == 4
+
+
+@pytest.mark.parametrize("device", [FormedZStack1CC2531, FormedLaunchpadCC26X2R1])
+async def test_network_scan_nib_clear(device, make_znp_server, capsys):
+    znp_server = make_znp_server(server_cls=device)
+    old_nib = znp_server.nib.serialize()
+
+    beacon = t.Beacon(
+        Src=0x0000,
+        PanId=0x7ABE,
+        Channel=25,
+        PermitJoining=0,
+        RouterCapacity=1,
+        DeviceCapacity=1,
+        ProtocolVersion=2,
+        StackProfile=2,
+        LQI=39,
+        Depth=0,
+        UpdateId=0,
+        ExtendedPanId=t.EUI64.convert("92:6b:f8:1e:df:1b:e8:1c"),
+    )
+
+    znp_server.reply_once_to(
+        c.ZDO.NetworkDiscoveryReq.Req(Channels=t.Channels.ALL_CHANNELS, ScanDuration=2),
+        responses=[
+            c.ZDO.NetworkDiscoveryReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.BeaconNotifyInd.Callback(Beacons=[beacon]),
+            c.ZDO.NwkDiscoveryCnf.Callback(Status=t.ZDOStatus.SUCCESS),
+        ],
+    )
+
+    nib_deleted = znp_server.reply_once_to(
+        c.SYS.OSALNVDelete.Req(Id=NwkNvIds.NIB, ItemLen=len(old_nib)),
+        responses=[],
+    )
+
+    nib_written = znp_server.reply_once_to(
+        c.SYS.OSALNVWriteExt.Req(Id=NwkNvIds.NIB, Offset=0, Value=old_nib),
+        responses=[],
+    )
+
+    await network_scan([znp_server._port_path, "-v", "-v", "-n", "1"])
+
+    captured = capsys.readouterr()
+
+    # No duplicates were filtered
+    assert captured.out.count(", from: ") == 1
+
+    if device is FormedZStack1CC2531:
+        await nib_deleted
+        await nib_written
+    else:
+        assert not nib_deleted.done()
+        assert not nib_written.done()
