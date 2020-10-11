@@ -58,7 +58,8 @@ zha:
       tx_power:  
 
       # Only if your stick has a controllable LED (the CC2531)
-      # If set, must be one of: off, on, blink, flash, toggle
+      # If set, must be one of: "off", "on", blink, flash, toggle
+      #                   Note: "off" and "on" must be quoted!
       led_mode:
 
 
