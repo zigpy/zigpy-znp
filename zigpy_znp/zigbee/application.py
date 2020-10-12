@@ -800,6 +800,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         LOGGER.info("ZDO device announce: %s", msg)
+        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE)
 
         try:
             device = self.get_device(ieee=msg.IEEE)
@@ -824,12 +825,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ZDO trust center device join callback
         """
 
-        LOGGER.info("TC device join: %s", msg)
-        # self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
-
-        asyncio.get_running_loop().call_later(
-            0.5, self.handle_join, msg.SrcNwk, msg.SrcIEEE, msg.ParentNwk
-        )
+        LOGGER.info("TC device join (ignored): %s", msg)
 
     def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
         LOGGER.info("ZDO device left: %s", msg)
