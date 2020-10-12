@@ -800,7 +800,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         LOGGER.info("ZDO device announce: %s", msg)
-        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE)
+        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=None)
 
         try:
             device = self.get_device(ieee=msg.IEEE)
