@@ -825,7 +825,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         LOGGER.info("TC device join: %s", msg)
-        self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
+        # self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
+
+        asyncio.get_running_loop().call_later(
+            0.5, self.handle_join, msg.SrcNwk, msg.SrcIEEE, msg.ParentNwk
+        )
 
     def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
         LOGGER.info("ZDO device left: %s", msg)
