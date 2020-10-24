@@ -490,16 +490,16 @@ class ZNP:
                 f"will have no effect"
             )
 
-        LOGGER.debug("Sending request: %s", request)
-
-        # If our request has no response, we cannot wait for one
-        if not request.Rsp:
-            LOGGER.debug("Request has no response, not waiting for one.")
-            self._uart.send(request.to_frame())
-            return
-
         # We should only be sending one SREQ at a time, according to the spec
         async with self._sync_request_lock:
+            LOGGER.debug("Sending request: %s", request)
+
+            # If our request has no response, we cannot wait for one
+            if not request.Rsp:
+                LOGGER.debug("Request has no response, not waiting for one.")
+                self._uart.send(request.to_frame())
+                return
+
             # We need to create the response listener before we send the request
             response_future = self.wait_for_responses(
                 [
