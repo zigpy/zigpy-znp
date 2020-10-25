@@ -20,7 +20,7 @@ $ source venv/bin/activate
 ```
 
 ## Home Assistant
-Stable releases of zigpy-znp are pre-installed by Home Assistant and are used for all new networks for TI radios running Z-Stack 3 or above. If you have already setup Home Assistant's ZHA component with a TI radio, ZHA may be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. Navigate to the folder containing your `configuration.yaml` file, edit `.storage/core.config_entries`, and change `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
+Stable releases of zigpy-znp are included with Home Assistant and zigpy-znp is currently used by all new ZHA integration setups. If you have previously setup Home Assistant's ZHA component with a TI radio, ZHA may be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. Navigate to the folder containing your `configuration.yaml` file, edit `.storage/core.config_entries`, and change `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
 
 ### Testing `dev` with Home Assistant Core
 
@@ -32,7 +32,7 @@ Upgrade the package within your virtual environment (requires `git`):
 
 Launch Home Assistant the `--skip-pip` command line option to prevent zigpy-znp from being downgraded. Running with this option may prevent newly added integrations from installing required packages.
 
-### Testing `dev` with Home Assistant Supervised
+### Testing `dev` with Home Assistant OS
 
  - Add https://github.com/home-assistant/hassio-addons-development as an addon repository.
  - Install the "Custom deps deployment" addon.
