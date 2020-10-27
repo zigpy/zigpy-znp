@@ -1103,7 +1103,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             candidates.append(endpoint.endpoint_id)
 
         if not candidates:
-            raise ValueError(
+            # Default to endpoint 1 if no compatible endpoint exists
+            candidates = [1]
+
+            LOGGER.warning(
                 f"Could not pick endpoint for dst_ep={dst_ep},"
                 f" profile={profile}, and cluster={cluster}"
             )
@@ -1243,11 +1246,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if response.Status != t.Status.SUCCESS:
             LOGGER.warning("Failed to send request %s: %s", request, response.Status)
 
-            if response.Status == t.Status.NWK_NO_ROUTE:
+            if (
+                response.Status == t.Status.NWK_NO_ROUTE
+                and dst_addr.mode == t.AddrMode.NWK
+            ):
                 asyncio.create_task(
                     self._znp.request(
                         c.ZDO.ExtRouteDisc.Req(
-                            Dst=dst_addr,
+                            Dst=dst_addr.address,
                             Options=c.zdo.RouteDiscoveryOptions.Force,
                             Radius=30,
                         )
