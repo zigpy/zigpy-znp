@@ -1242,6 +1242,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if response.Status != t.Status.SUCCESS:
             LOGGER.warning("Failed to send request %s: %s", request, response.Status)
+
+            if response.Status == t.Status.NWK_NO_ROUTE:
+                asyncio.create_task(
+                    self._znp.request(
+                        c.ZDO.ExtRouteDisc.Req(
+                            Dst=dst_addr,
+                            Options=c.zdo.RouteDiscoveryOptions.Force,
+                            Radius=30,
+                        )
+                    )
+                )
+
             return response.Status, "Invalid response status"
 
         return response.Status, "Request sent successfully"
