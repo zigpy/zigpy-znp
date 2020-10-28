@@ -1154,7 +1154,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.error(
                 "ZDO converter for cluster %s has not been implemented!"
                 " Please open a GitHub issue and attach a debug log:"
-                " https://github.com/zha-ng/zigpy-znp/issues/new",
+                " https://github.com/zigpy/zigpy-znp/issues/new",
                 cluster,
             )
             return t.Status.FAILURE, "No ZDO converter"
