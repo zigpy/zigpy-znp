@@ -319,3 +319,60 @@ async def test_request_concurrency(device, make_application, mocker):
     assert all(status == t.Status.SUCCESS for status, msg in responses)
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_nonstandard_profile(device, make_application):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
+    device.status = zigpy.device.Status.ENDPOINTS_INIT
+    device.initializing = False
+    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
+
+    ep = device.add_endpoint(2)
+    ep.profile_id = 0x9876  # non-standard profile
+    ep.add_input_cluster(0x0006)
+
+    # Respond to a light turn on request
+    data_req = znp_server.reply_once_to(
+        request=c.AF.DataRequestExt.Req(
+            DstAddrModeAddress=t.AddrModeAddress(
+                mode=t.AddrMode.NWK, address=device.nwk
+            ),
+            DstEndpoint=2,
+            SrcEndpoint=1,  # we default to endpoint 1 for unknown profiles
+            ClusterId=0x0006,
+            partial=True,
+        ),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            lambda req: c.AF.DataConfirm.Callback(
+                Status=t.Status.SUCCESS,
+                Endpoint=2,
+                TSN=req.TSN,
+            ),
+            lambda req: c.AF.IncomingMsg.Callback(
+                GroupId=0x0000,
+                ClusterId=0x0006,
+                SrcAddr=device.nwk,
+                SrcEndpoint=2,
+                DstEndpoint=1,
+                WasBroadcast=t.Bool(False),
+                LQI=63,
+                SecurityUse=t.Bool(False),
+                TimeStamp=12345678,
+                TSN=0,
+                Data=b"\x08" + bytes([req.TSN]) + b"\x0B\x00\x00",
+                MacSrcAddr=device.nwk,
+                MsgResultRadius=29,
+            ),
+        ],
+    )
+
+    await device.endpoints[2].on_off.off()
+
+    await data_req
+
+    await app.shutdown()

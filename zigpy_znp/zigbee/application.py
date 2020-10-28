@@ -1089,7 +1089,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if dst_ep == ZDO_ENDPOINT:
             return ZDO_ENDPOINT
 
-        candidates = []
+        # Always fall back to endpoint 1
+        candidates = [1]
 
         for ep_id, endpoint in self.zigpy_device.endpoints.items():
             if ep_id == ZDO_ENDPOINT:
@@ -1107,14 +1108,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # if we don't find anything better
             candidates.append(endpoint.endpoint_id)
 
-        if not candidates:
-            raise ValueError(
-                f"Could not pick endpoint for dst_ep={dst_ep},"
-                f" profile={profile}, and cluster={cluster}"
-            )
-
-        # XXX: pick the first one?
-        return candidates[0]
+        return candidates[-1]
 
     async def _send_zdo_request(
         self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
