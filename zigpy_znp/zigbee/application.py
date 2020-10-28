@@ -235,6 +235,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.SYS.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
             )
 
+        await self._znp.nvram_write(
+            NwkNvIds.APS_USE_INSECURE_JOIN,
+            t.Bool(self.znp_config[conf.CONF_APS_USE_INSECURE_JOIN]),
+        )
+
         # Both versions of Z-Stack use this callback
         started_as_coordinator = self._znp.wait_for_response(
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
