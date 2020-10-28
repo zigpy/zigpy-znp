@@ -71,10 +71,7 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
     SetNwkFrameCounter = t.CommandDef(
         t.CommandType.SREQ,
         0xFF,
-        req_schema=(
-            t.Param("FrameCounterValue", t.uint32_t, "network frame counter"),
-            # XXX: check source for actual size
-        ),
+        req_schema=(t.Param("FrameCounterValue", t.uint32_t, "network frame counter"),),
         rsp_schema=t.STATUS_SCHEMA,
     )
 

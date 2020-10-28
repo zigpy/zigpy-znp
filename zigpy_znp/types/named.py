@@ -48,12 +48,13 @@ class GpioOperation(basic.enum_uint8):
 class StackTuneOperation(basic.enum_uint8):
     """The tuning operation to be executed."""
 
-    PowerLevel = 0x00  # XXX: [Value] should correspond to the valid values
-    # specified by the ZMacTransmitPower_t
-    # enumeration (0xFD - 0x16)
+    # XXX: [Value] should correspond to the valid values specified by the
+    # ZMacTransmitPower_t enumeration (0xFD - 0x16)
+    PowerLevel = 0x00
 
-    SetRxOnWhenIdle = 0x01  # Set RxOnWhenIdle off/on if the value of Value is 0/1;
+    # Set RxOnWhenIdle off/on if the value of Value is 0/1;
     # otherwise return the 0x01 current setting of RxOnWhenIdle.
+    SetRxOnWhenIdle = 0x01
 
 
 class AddrMode(basic.enum_uint8):

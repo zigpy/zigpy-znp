@@ -497,8 +497,7 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
 
     # UTIL Callbacks
     # asynchronous request/response handshake
-    # XXX: This command is ambiguously defined.
-    #      We see an example of how it behaves.
+    # XXX: This command's request is completely identical to its response.
     # SyncReq = t.CommandDef(t.CommandType.AREQ, 0xE0)
 
     # RPC proxy indication for a ZCL_KEY_ESTABLISH_IND
