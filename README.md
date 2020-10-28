@@ -1,9 +1,9 @@
 # zigpy-znp
 
-[![Build Status](https://travis-ci.org/zha-ng/zigpy-znp.svg?branch=dev)](https://travis-ci.org/zha-ng/zigpy-znp)
-[![Coverage Status](https://coveralls.io/repos/github/zha-ng/zigpy-znp/badge.svg?branch=dev)](https://coveralls.io/github/zha-ng/zigpy-znp?branch=dev)
+[![Build Status](https://travis-ci.org/zigpy/zigpy-znp.svg?branch=dev)](https://travis-ci.org/zigpy/zigpy-znp)
+[![Coverage Status](https://coveralls.io/repos/github/zigpy/zigpy-znp/badge.svg?branch=dev)](https://coveralls.io/github/zigpy/zigpy-znp?branch=dev)
 
-**[zigpy-znp](https://github.com/zha-ng/zigpy-zhp/)** is a Python library that adds support for common [Texas Instruments ZNP (Zigbee Network Processors)](http://dev.ti.com/tirex/content/simplelink_zigbee_sdk_plugin_2_20_00_06/docs/zigbee_user_guide/html/zigbee/introduction.html) [Zigbee](https://www.zigbee.org) radio modules to [zigpy](https://github.com/zigpy/), a Python Zigbee stack project.
+**[zigpy-znp](https://github.com/zigpy/zigpy-znp/)** is a Python library that adds support for common [Texas Instruments ZNP (Zigbee Network Processors)](http://dev.ti.com/tirex/content/simplelink_zigbee_sdk_plugin_2_20_00_06/docs/zigbee_user_guide/html/zigbee/introduction.html) [Zigbee](https://www.zigbee.org) radio modules to [zigpy](https://github.com/zigpy/), a Python Zigbee stack project.
 
 Together with zigpy and compatible home automation software (namely Home Assistant's [ZHA (Zigbee Home Automation) integration component](https://www.home-assistant.io/integrations/zha/)), you can directly control Zigbee devices such as Philips Hue, GE, OSRAM LIGHTIFY, Xiaomi/Aqara, IKEA Tradfri, Samsung SmartThings, and many more.
 
@@ -15,7 +15,7 @@ Install the Python module within your virtual environment:
 ```console
 $ virtualenv -p python3.8 venv                                 # if you don't already have one
 $ source venv/bin/activate
-(venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/  # latest commit from Git
+(venv) $ pip install git+https://github.com/zigpy/zigpy-znp/  # latest commit from Git
 (venv) $ pip install zigpy-znp                                 # or, latest stable from PyPI
 ```
 
@@ -27,7 +27,7 @@ Stable releases of zigpy-znp are included with Home Assistant and zigpy-znp is c
 Upgrade the package within your virtual environment (requires `git`):
 
 ```console
-(venv) $ pip install git+https://github.com/zha-ng/zigpy-znp/
+(venv) $ pip install git+https://github.com/zigpy/zigpy-znp/
 ```
 
 Launch Home Assistant the `--skip-pip` command line option to prevent zigpy-znp from being downgraded. Running with this option may prevent newly added integrations from installing required packages.
@@ -39,7 +39,7 @@ Launch Home Assistant the `--skip-pip` command line option to prevent zigpy-znp 
  - Add the following to your `configuration.yaml` file:
 	```yaml
 	pypi:
-	  - git+https://github.com/zha-ng/zigpy-znp/
+	  - git+https://github.com/zigpy/zigpy-znp/
 	```
 
 # Configuration
