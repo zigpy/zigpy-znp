@@ -9,7 +9,7 @@ import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
-from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import NvSysIds, NwkNvIds, OsalExNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
@@ -41,14 +41,16 @@ async def backup(radio_path):
     try:
         # Old versions of Z-Stack do not have the OSAL NVIDs
         await znp.request(
-            c.SYS.NVLength.Req(SysId=1, ItemId=OsalExNvIds.DEVICE_LIST, SubId=0)
+            c.SYS.NVLength.Req(
+                SysId=NvSysIds.ZSTACK, ItemId=OsalExNvIds.DEVICE_LIST, SubId=0
+            )
         )
     except CommandNotRecognized:
         return data
 
     for osal_nvid in OsalExNvIds:
         length_rsp = await znp.request(
-            c.SYS.NVLength.Req(SysId=1, ItemId=osal_nvid, SubId=0)
+            c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, ItemId=osal_nvid, SubId=0)
         )
         length = length_rsp.Length
 
@@ -59,7 +61,11 @@ async def backup(radio_path):
         value = (
             await znp.request(
                 c.SYS.NVRead.Req(
-                    SysId=1, ItemId=osal_nvid, SubId=0, Offset=0, Length=length
+                    SysId=NvSysIds.ZSTACK,
+                    ItemId=osal_nvid,
+                    SubId=0,
+                    Offset=0,
+                    Length=length,
                 ),
                 RspStatus=t.Status.SUCCESS,
             )

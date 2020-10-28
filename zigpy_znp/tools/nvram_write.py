@@ -9,7 +9,7 @@ import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import InvalidCommandResponse
-from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import NvSysIds, NwkNvIds, OsalExNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
@@ -31,18 +31,24 @@ async def restore(radio_path, backup):
         value = bytes.fromhex(value)
 
         length = (
-            await znp.request(c.SYS.NVLength.Req(SysId=1, ItemId=nvid, SubId=0))
+            await znp.request(
+                c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, ItemId=nvid, SubId=0)
+            )
         ).Length
 
         if length == 0:
             await znp.request(
-                c.SYS.NVCreate.Req(SysId=1, ItemId=nvid, SubId=0, Length=len(value)),
+                c.SYS.NVCreate.Req(
+                    SysId=NvSysIds.ZSTACK, ItemId=nvid, SubId=0, Length=len(value)
+                ),
                 RspStatus=t.Status.SUCCESS,
             )
 
         try:
             await znp.request(
-                c.SYS.NVWrite.Req(SysId=1, ItemId=nvid, SubId=0, Offset=0, Value=value),
+                c.SYS.NVWrite.Req(
+                    SysId=NvSysIds.ZSTACK, ItemId=nvid, SubId=0, Offset=0, Value=value
+                ),
                 RspStatus=t.Status.SUCCESS,
             )
         except InvalidCommandResponse:

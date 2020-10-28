@@ -18,7 +18,7 @@ import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import ZnpMtProtocol
 from zigpy_znp.znp.nib import NIB, CC2531NIB, NwkState8, NwkKeyDesc, parse_nib
-from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds, is_secure_nvid
+from zigpy_znp.types.nvids import NvSysIds, NwkNvIds, OsalExNvIds, is_secure_nvid
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
@@ -704,13 +704,13 @@ class BaseZStack3Device(BaseZStackDevice):
 
 
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):
-    @reply_to(c.SYS.NVLength.Req(SysId=1, SubId=0, partial=True))
+    @reply_to(c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, SubId=0, partial=True))
     def nvram_length(self, req):
         value = self.nvram["osal"].get(req.ItemId, b"")
 
         return c.SYS.NVLength.Rsp(Length=len(value))
 
-    @reply_to(c.SYS.NVRead.Req(SysId=1, SubId=0, partial=True))
+    @reply_to(c.SYS.NVRead.Req(SysId=NvSysIds.ZSTACK, SubId=0, partial=True))
     def nvram_read(self, req):
         if req.ItemId not in self.nvram["osal"]:
             return c.SYS.NVRead.Rsp(Status=t.Status.FAILURE, Value=b"")
@@ -721,7 +721,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             Status=t.Status.SUCCESS, Value=value[req.Offset :][: req.Length]
         )
 
-    @reply_to(c.SYS.NVWrite.Req(SysId=1, SubId=0, partial=True))
+    @reply_to(c.SYS.NVWrite.Req(SysId=NvSysIds.ZSTACK, SubId=0, partial=True))
     def nvram_write(self, req):
         if req.ItemId not in self.nvram["osal"]:
             return c.SYS.NVWrite.Rsp(Status=t.Status.FAILURE)
@@ -732,7 +732,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
         return c.SYS.NVWrite.Rsp(Status=t.Status.SUCCESS)
 
-    @reply_to(c.SYS.NVCreate.Req(SysId=1, SubId=0, partial=True))
+    @reply_to(c.SYS.NVCreate.Req(SysId=NvSysIds.ZSTACK, SubId=0, partial=True))
     def nvram_create(self, req):
         if req.ItemId in self.nvram["osal"]:
             return c.SYS.NVCreate.Rsp(Status=t.Status.SUCCESS)

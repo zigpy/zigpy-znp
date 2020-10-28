@@ -12,6 +12,17 @@ class ZclPortNvIds(BaseNvIds):
     SINK_TABLE = 0x0003
 
 
+class NvSysIds(t.enum_uint8):
+    NVDRVR = 0  # Refrain from use
+    ZSTACK = 1
+    TIMAC = 2
+    REMOTI = 3
+    BLE = 4
+    _6MESH = 5
+    TIOP = 6
+    APP = 7
+
+
 class OsalExNvIds(BaseNvIds):
     # OSAL NV Item IDs
     LEGACY = 0x0000
