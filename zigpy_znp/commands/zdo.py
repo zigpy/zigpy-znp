@@ -70,6 +70,10 @@ class EnergyValues(t.LVList, item_type=t.uint8_t, length_type=t.uint8_t):
     pass
 
 
+class ChildInfoList(t.LVList, item_type=t.EUI64, length_type=t.uint8_t):
+    pass
+
+
 class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
     @classmethod
     def deserialize(cls, data: bytes) -> typing.Tuple["NullableNodeDescriptor", bytes]:
@@ -1046,6 +1050,18 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
             ),
             t.Param("ServerMask", t.ZDOStatus, "Server mask response"),
+        ),
+    )
+
+    ParentAnnceRsp = t.CommandDef(
+        t.CommandType.AREQ,
+        0x9F,
+        rsp_schema=(
+            t.Param("Src", t.NWK, "message's source network address"),
+            t.Param(
+                "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
+            ),
+            t.Param("ChildInfo", ChildInfoList),
         ),
     )
 
