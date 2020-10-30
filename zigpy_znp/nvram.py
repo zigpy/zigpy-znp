@@ -5,7 +5,7 @@ from zigpy_znp.exceptions import SecurityError, InvalidCommandResponse
 
 # Some NVIDs don't really exist and Z-Stack doesn't behave consistently when operations
 # are performed on them.
-PROXIED_NVIDS = {nvids.NwkNvIds.POLL_RATE_OLD16}
+PROXIED_NVIDS = {nvids.OsalNvIds.POLL_RATE_OLD16}
 
 
 class NVRAMHelper:

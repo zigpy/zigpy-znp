@@ -23,7 +23,7 @@ class NvSysIds(t.enum_uint8):
     APP = 7
 
 
-class OsalExNvIds(BaseNvIds):
+class ExNvIds(BaseNvIds):
     # OSAL NV Item IDs
     LEGACY = 0x0000
     ADDRMGR = 0x0001
@@ -35,7 +35,7 @@ class OsalExNvIds(BaseNvIds):
     NWK_SEC_MATERIAL_TABLE = 0x0007
 
 
-class NwkNvIds(BaseNvIds):
+class OsalNvIds(BaseNvIds):
     # Introduced by zigbeer/zigbee-shepherd and now used by Zigbee2MQTT
     HAS_CONFIGURED_ZSTACK1 = 0x0F00
     HAS_CONFIGURED_ZSTACK3 = 0x0060
@@ -229,42 +229,42 @@ class NwkNvIds(BaseNvIds):
 
 
 NWK_NVID_TABLES = {
-    NwkNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START: (
-        NwkNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END
+    OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START: (
+        OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END
     ),
-    NwkNvIds.LEGACY_TCLK_IC_TABLE_START: NwkNvIds.LEGACY_TCLK_IC_TABLE_END,
-    NwkNvIds.LEGACY_TCLK_TABLE_START: NwkNvIds.LEGACY_TCLK_TABLE_END,
-    NwkNvIds.LEGACY_APS_LINK_KEY_DATA_START: NwkNvIds.LEGACY_APS_LINK_KEY_DATA_END,
-    NwkNvIds.LEGACY_PROXY_TABLE_START: NwkNvIds.LEGACY_PROXY_TABLE_END,
-    NwkNvIds.LEGACY_SINK_TABLE_START: NwkNvIds.LEGACY_SINK_TABLE_END,
+    OsalNvIds.LEGACY_TCLK_IC_TABLE_START: OsalNvIds.LEGACY_TCLK_IC_TABLE_END,
+    OsalNvIds.LEGACY_TCLK_TABLE_START: OsalNvIds.LEGACY_TCLK_TABLE_END,
+    OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START: OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END,
+    OsalNvIds.LEGACY_PROXY_TABLE_START: OsalNvIds.LEGACY_PROXY_TABLE_END,
+    OsalNvIds.LEGACY_SINK_TABLE_START: OsalNvIds.LEGACY_SINK_TABLE_END,
 }
 
 NWK_NVID_TABLE_KEYS = set(NWK_NVID_TABLES.keys()) | set(NWK_NVID_TABLES.values())
 
 
-def is_secure_nvid(nvid: NwkNvIds) -> bool:
+def is_secure_nvid(nvid: OsalNvIds) -> bool:
     """
     Returns whether or not an nvid may be prevented from being read from NVRAM.
     """
 
     if nvid in (
-        NwkNvIds.IMPLICIT_CERTIFICATE,
-        NwkNvIds.CA_PUBLIC_KEY,
-        NwkNvIds.DEVICE_PRIVATE_KEY,
-        NwkNvIds.NWK_ACTIVE_KEY_INFO,
-        NwkNvIds.NWK_ALTERN_KEY_INFO,
-        NwkNvIds.PRECFGKEY,
-        NwkNvIds.TCLK_SEED,
+        OsalNvIds.IMPLICIT_CERTIFICATE,
+        OsalNvIds.CA_PUBLIC_KEY,
+        OsalNvIds.DEVICE_PRIVATE_KEY,
+        OsalNvIds.NWK_ACTIVE_KEY_INFO,
+        OsalNvIds.NWK_ALTERN_KEY_INFO,
+        OsalNvIds.PRECFGKEY,
+        OsalNvIds.TCLK_SEED,
     ):
         return True
 
-    if NwkNvIds.LEGACY_TCLK_TABLE_START <= nvid <= NwkNvIds.LEGACY_TCLK_TABLE_END:
+    if OsalNvIds.LEGACY_TCLK_TABLE_START <= nvid <= OsalNvIds.LEGACY_TCLK_TABLE_END:
         return True
 
     if (
-        NwkNvIds.LEGACY_APS_LINK_KEY_DATA_START
+        OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START
         <= nvid
-        <= NwkNvIds.LEGACY_APS_LINK_KEY_DATA_END
+        <= OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END
     ):
         return True
 

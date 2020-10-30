@@ -10,9 +10,9 @@ from zigpy_znp.exceptions import CommandNotRecognized
 from zigpy_znp.types.nvids import (
     NWK_NVID_TABLES,
     NWK_NVID_TABLE_KEYS,
+    ExNvIds,
     NvSysIds,
-    NwkNvIds,
-    OsalExNvIds,
+    OsalNvIds,
 )
 from zigpy_znp.tools.common import setup_parser
 
@@ -21,9 +21,9 @@ LOGGER = logging.getLogger(__name__)
 
 async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
     if clear:
-        nvids = NwkNvIds
+        nvids = OsalNvIds
     else:
-        nvids = [NwkNvIds.HAS_CONFIGURED_ZSTACK1, NwkNvIds.HAS_CONFIGURED_ZSTACK3]
+        nvids = [OsalNvIds.HAS_CONFIGURED_ZSTACK1, OsalNvIds.HAS_CONFIGURED_ZSTACK3]
 
     for nvid in nvids:
         if nvid in NWK_NVID_TABLES:
@@ -48,9 +48,9 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
                 LOGGER.debug("Item does not exist: %s", nvid)
 
     if clear:
-        for nvid in OsalExNvIds:
+        for nvid in ExNvIds:
             # Skip the LEGACY items, we did them above
-            if nvid == OsalExNvIds.LEGACY:
+            if nvid == ExNvIds.LEGACY:
                 continue
 
             for sub_id in range(2 ** 16):
@@ -72,7 +72,7 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
     else:
         LOGGER.info("Clearing config and state on next start")
         await znp.nvram.osal_write(
-            NwkNvIds.STARTUP_OPTION,
+            OsalNvIds.STARTUP_OPTION,
             t.StartupOptions.ClearConfig | t.StartupOptions.ClearState,
             create=True,
         )

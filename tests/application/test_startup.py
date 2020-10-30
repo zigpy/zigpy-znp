@@ -3,7 +3,7 @@ import pytest
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
     ALL_DEVICES,
@@ -116,8 +116,8 @@ async def test_bad_nvram_value(device, make_application):
     app, znp_server = make_application(server_cls=device)
 
     # An invalid value is still bad
-    znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
-    znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
+    znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
+    znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
 
     with pytest.raises(RuntimeError):
         await app.startup(auto_form=False)
@@ -139,16 +139,16 @@ async def test_reset(device, make_application, mocker):
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_write_nvram(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
-    nvram = znp_server.nvram[OsalExNvIds.LEGACY]
+    nvram = znp_server.nvram[ExNvIds.LEGACY]
 
     # Change NVRAM value we should change it back
-    assert nvram[NwkNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
-    nvram[NwkNvIds.LOGICAL_TYPE] = t.DeviceLogicalType.EndDevice.serialize()
+    assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
+    nvram[OsalNvIds.LOGICAL_TYPE] = t.DeviceLogicalType.EndDevice.serialize()
 
     mocker.spy(app, "_reset")
     await app.startup()
 
-    assert nvram[NwkNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
+    assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
 
     await app.shutdown()
 
@@ -218,21 +218,21 @@ async def test_auto_form_necessary(device, make_application, mocker):
 
     if issubclass(device, BaseZStack3Device):
         assert (
-            znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK3]
+            znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3]
             == b"\x55"
         )
     else:
         assert (
-            znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK1]
+            znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1]
             == b"\x55"
         )
 
     assert (
-        znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.LOGICAL_TYPE]
+        znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.LOGICAL_TYPE]
         == t.DeviceLogicalType.Coordinator.serialize()
     )
     assert (
-        znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.ZDO_DIRECT_CB]
+        znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.ZDO_DIRECT_CB]
         == t.Bool(True).serialize()
     )
 

@@ -8,7 +8,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.types.nvids import NwkNvIds
+from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
@@ -47,13 +47,13 @@ async def network_scan(
     # state in the NIB, which we have to temporarily delete in order for the scan to be
     # possible.
     if znp._version.MinorRel == 6:
-        previous_nib = await znp.nvram.osal_read(NwkNvIds.NIB)
-        await znp.nvram.osal_delete(NwkNvIds.NIB)
+        previous_nib = await znp.nvram.osal_read(OsalNvIds.NIB)
+        await znp.nvram.osal_delete(OsalNvIds.NIB)
     else:
         previous_nib = None
 
-    previous_channels = await znp.nvram.osal_read(NwkNvIds.CHANLIST)
-    await znp.nvram.osal_write(NwkNvIds.CHANLIST, t.Channels.ALL_CHANNELS)
+    previous_channels = await znp.nvram.osal_read(OsalNvIds.CHANLIST)
+    await znp.nvram.osal_write(OsalNvIds.CHANLIST, t.Channels.ALL_CHANNELS)
 
     try:
         await znp.request_callback_rsp(
@@ -91,9 +91,9 @@ async def network_scan(
                 )
     finally:
         if previous_nib is not None:
-            await znp.nvram.osal_write(NwkNvIds.NIB, previous_nib, create=True)
+            await znp.nvram.osal_write(OsalNvIds.NIB, previous_nib, create=True)
 
-        await znp.nvram.osal_write(NwkNvIds.CHANLIST, previous_channels)
+        await znp.nvram.osal_write(OsalNvIds.CHANLIST, previous_channels)
         znp.close()
 
 

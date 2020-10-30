@@ -12,7 +12,7 @@ async def test_writes_invalid(connected_znp):
 
     # Passing in untyped integers is not allowed
     with pytest.raises(TypeError):
-        await znp.nvram.osal_write(nvids.NwkNvIds.STARTUP_OPTION, 0xAB)
+        await znp.nvram.osal_write(nvids.OsalNvIds.STARTUP_OPTION, 0xAB)
 
 
 @pytest.mark.parametrize(
@@ -26,7 +26,7 @@ async def test_writes_invalid(connected_znp):
 async def test_write_existing(connected_znp, value):
     znp, znp_server = connected_znp
 
-    nvid = nvids.NwkNvIds.STARTUP_OPTION
+    nvid = nvids.OsalNvIds.STARTUP_OPTION
 
     # The item is one byte long
     length_rsp = znp_server.reply_once_to(
@@ -50,7 +50,7 @@ async def test_write_existing(connected_znp, value):
 async def test_write_same_length(connected_znp):
     znp, znp_server = connected_znp
 
-    nvid = nvids.NwkNvIds.STARTUP_OPTION
+    nvid = nvids.OsalNvIds.STARTUP_OPTION
     value = b"\x01"
 
     # The existing item is also one byte long so we will not recreate it
@@ -72,7 +72,7 @@ async def test_write_same_length(connected_znp):
     await write_rsp
 
 
-@pytest.mark.parametrize("nvid", [nvids.NwkNvIds.STARTUP_OPTION])
+@pytest.mark.parametrize("nvid", [nvids.OsalNvIds.STARTUP_OPTION])
 @pytest.mark.parametrize("value", [b"\x01\x02"])
 async def test_write_wrong_length(connected_znp, nvid, value):
     znp, znp_server = connected_znp
@@ -106,7 +106,7 @@ async def test_write_wrong_length(connected_znp, nvid, value):
     await write_rsp
 
 
-@pytest.mark.parametrize("nvid", [nvids.NwkNvIds.STARTUP_OPTION])
+@pytest.mark.parametrize("nvid", [nvids.OsalNvIds.STARTUP_OPTION])
 @pytest.mark.parametrize("value", [b"test"])
 async def test_write_bad_length(connected_znp, nvid, value):
     znp, znp_server = connected_znp
@@ -123,7 +123,7 @@ async def test_write_bad_length(connected_znp, nvid, value):
     await length_rsp
 
 
-@pytest.mark.parametrize("nvid", [nvids.NwkNvIds.STARTUP_OPTION])
+@pytest.mark.parametrize("nvid", [nvids.OsalNvIds.STARTUP_OPTION])
 @pytest.mark.parametrize("value", [b"test"])
 async def test_read_success(connected_znp, nvid, value):
     znp, znp_server = connected_znp
@@ -145,7 +145,7 @@ async def test_read_success(connected_znp, nvid, value):
     assert result == value
 
 
-@pytest.mark.parametrize("nvid", [nvids.NwkNvIds.STARTUP_OPTION])
+@pytest.mark.parametrize("nvid", [nvids.OsalNvIds.STARTUP_OPTION])
 @pytest.mark.parametrize("value", [b"test" * 62 + b"x"])  # 248 + 1 bytes, needs two
 async def test_read_long_success(connected_znp, nvid, value):
     znp, znp_server = connected_znp
@@ -173,7 +173,7 @@ async def test_read_long_success(connected_znp, nvid, value):
     assert result == value
 
 
-@pytest.mark.parametrize("nvid", [nvids.NwkNvIds.STARTUP_OPTION])
+@pytest.mark.parametrize("nvid", [nvids.OsalNvIds.STARTUP_OPTION])
 async def test_read_failure(connected_znp, nvid):
     znp, znp_server = connected_znp
 

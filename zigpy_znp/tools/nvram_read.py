@@ -7,7 +7,7 @@ import argparse
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
-from zigpy_znp.types.nvids import NWK_NVID_TABLES, NvSysIds, NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, NvSysIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
@@ -21,8 +21,8 @@ async def backup(radio_path: str):
     data["LEGACY"] = {}
 
     # Legacy items need to be handled first, since they are named
-    for nwk_nvid in NwkNvIds:
-        if nwk_nvid == NwkNvIds.INVALID_INDEX:
+    for nwk_nvid in OsalNvIds:
+        if nwk_nvid == OsalNvIds.INVALID_INDEX:
             continue
 
         # Tables span ranges of items. Naming them properly is useful.
@@ -56,9 +56,9 @@ async def backup(radio_path: str):
             LOGGER.info("%s = %s", nwk_nvid, value)
             data["LEGACY"][nwk_nvid.name] = value.hex()
 
-    for nvid in OsalExNvIds:
+    for nvid in ExNvIds:
         # Skip the LEGACY items, we did them above
-        if nvid == OsalExNvIds.LEGACY:
+        if nvid == ExNvIds.LEGACY:
             continue
 
         for sub_id in range(2 ** 16):

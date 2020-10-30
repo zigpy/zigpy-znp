@@ -9,7 +9,7 @@ import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import InvalidCommandResponse
-from zigpy_znp.types.nvids import NvSysIds, NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
@@ -25,17 +25,17 @@ async def restore(radio_path, backup):
         if "+" in nwk_nvid:
             nwk_nvid, _, offset = nwk_nvid.partition("+")
             offset = int(offset)
-            nvid = NwkNvIds[nwk_nvid] + offset
+            nvid = OsalNvIds[nwk_nvid] + offset
         else:
-            nvid = NwkNvIds[nwk_nvid]
+            nvid = OsalNvIds[nwk_nvid]
 
         value = bytes.fromhex(value)
         await znp.nvram.osal_write(nvid, value, create=True)
 
     for item_name, sub_ids in backup.items():
-        item_id = OsalExNvIds[item_name]
+        item_id = ExNvIds[item_name]
 
-        if item_id == OsalExNvIds.LEGACY:
+        if item_id == ExNvIds.LEGACY:
             continue
 
         for sub_id, value in sub_ids.items():

@@ -13,5 +13,5 @@ def _test_nvid_uniqueness(nvids_table):
 
 def test_nvid_uniqueness():
     _test_nvid_uniqueness(nvids.ZclPortNvIds)
-    _test_nvid_uniqueness(nvids.OsalExNvIds)
-    _test_nvid_uniqueness(nvids.NwkNvIds)
+    _test_nvid_uniqueness(nvids.ExNvIds)
+    _test_nvid_uniqueness(nvids.OsalNvIds)

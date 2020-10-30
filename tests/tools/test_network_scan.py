@@ -3,7 +3,7 @@ import pytest
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.exceptions import InvalidCommandResponse
-from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.network_scan import main as network_scan
 
 from ..conftest import FormedZStack1CC2531, FormedLaunchpadCC26X2R1
@@ -15,7 +15,7 @@ pytestmark = [pytest.mark.asyncio]
 async def test_network_scan(device, make_znp_server, capsys):
     znp_server = make_znp_server(server_cls=device)
 
-    original_channels = znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.CHANLIST]
+    original_channels = znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
 
     # Scan 1 results
     znp_server.reply_once_to(
@@ -249,7 +249,7 @@ async def test_network_scan(device, make_znp_server, capsys):
     await network_scan(["-n", "4", znp_server._port_path, "-v", "-v"])
 
     # The channels in NVRAM were restored
-    assert znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.CHANLIST] == original_channels
+    assert znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST] == original_channels
 
     captured = capsys.readouterr()
 
@@ -263,7 +263,7 @@ async def test_network_scan(device, make_znp_server, capsys):
 async def test_network_scan_failure(device, make_znp_server):
     znp_server = make_znp_server(server_cls=device)
 
-    original_channels = znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.CHANLIST]
+    original_channels = znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
 
     znp_server.reply_once_to(
         c.ZDO.NetworkDiscoveryReq.Req(Channels=t.Channels.ALL_CHANNELS, ScanDuration=2),
@@ -274,7 +274,7 @@ async def test_network_scan_failure(device, make_znp_server):
         await network_scan([znp_server._port_path, "-v", "-v"])
 
     # The channels in NVRAM were restored even when we had a failure
-    assert znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.CHANLIST] == original_channels
+    assert znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST] == original_channels
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
@@ -352,12 +352,12 @@ async def test_network_scan_nib_clear(device, make_znp_server, capsys):
     )
 
     nib_deleted = znp_server.reply_once_to(
-        c.SYS.OSALNVDelete.Req(Id=NwkNvIds.NIB, ItemLen=len(old_nib)),
+        c.SYS.OSALNVDelete.Req(Id=OsalNvIds.NIB, ItemLen=len(old_nib)),
         responses=[],
     )
 
     nib_written = znp_server.reply_once_to(
-        c.SYS.OSALNVWriteExt.Req(Id=NwkNvIds.NIB, Offset=0, Value=old_nib),
+        c.SYS.OSALNVWriteExt.Req(Id=OsalNvIds.NIB, Offset=0, Value=old_nib),
         responses=[],
     )
 
