@@ -60,17 +60,19 @@ async def test_api_close(connected_znp, mocker):
     def dict_minus(d, minus):
         return {k: v for k, v in d.items() if k not in minus}
 
+    ignored_keys = ["_sync_request_lock", "connection_lost", "nvram"]
+
     # Closing ZNP should reset it completely to that of a fresh object
     # We have to ignore our mocked method and the lock
     znp2 = ZNP(znp._config)
     assert znp2._sync_request_lock.locked() == znp._sync_request_lock.locked()
-    assert dict_minus(
-        znp.__dict__, ["_sync_request_lock", "connection_lost"]
-    ) == dict_minus(znp2.__dict__, ["_sync_request_lock", "connection_lost"])
+    assert dict_minus(znp.__dict__, ignored_keys) == dict_minus(
+        znp2.__dict__, ignored_keys
+    )
 
     znp2.close()
     znp2.close()
 
-    assert dict_minus(
-        znp.__dict__, ["_sync_request_lock", "connection_lost"]
-    ) == dict_minus(znp2.__dict__, ["_sync_request_lock", "connection_lost"])
+    assert dict_minus(znp.__dict__, ignored_keys) == dict_minus(
+        znp2.__dict__, ignored_keys
+    )

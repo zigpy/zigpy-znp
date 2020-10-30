@@ -20,39 +20,40 @@ async def restore(radio_path, backup):
 
     await znp.connect()
 
-    for nwk_nvid, value in backup["nwk"].items():
-        nvid = NwkNvIds[nwk_nvid]
+    # First write the NVRAM items common to all radios
+    for nwk_nvid, value in backup["LEGACY"].items():
+        if "+" in nwk_nvid:
+            nwk_nvid, _, offset = nwk_nvid.partition("+")
+            offset = int(offset)
+            nvid = NwkNvIds[nwk_nvid] + offset
+        else:
+            nvid = NwkNvIds[nwk_nvid]
+
         value = bytes.fromhex(value)
+        await znp.nvram.osal_write(nvid, value, create=True)
 
-        await znp.nvram_write(nvid, value, create=True)
+    for item_name, sub_ids in backup.items():
+        item_id = OsalExNvIds[item_name]
 
-    for osal_nvid, value in backup["osal"].items():
-        nvid = OsalExNvIds[osal_nvid]
-        value = bytes.fromhex(value)
+        if item_id == OsalExNvIds.LEGACY:
+            continue
 
-        length = (
-            await znp.request(
-                c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, ItemId=nvid, SubId=0)
-            )
-        ).Length
+        for sub_id, value in sub_ids.items():
+            sub_id = int(sub_id, 16)
+            value = bytes.fromhex(value)
 
-        if length == 0:
-            await znp.request(
-                c.SYS.NVCreate.Req(
-                    SysId=NvSysIds.ZSTACK, ItemId=nvid, SubId=0, Length=len(value)
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-
-        try:
-            await znp.request(
-                c.SYS.NVWrite.Req(
-                    SysId=NvSysIds.ZSTACK, ItemId=nvid, SubId=0, Offset=0, Value=value
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-        except InvalidCommandResponse:
-            LOGGER.warning("Write failed for %s = %s", nvid, value)
+            try:
+                await znp.nvram.write(
+                    sys_id=NvSysIds.ZSTACK,
+                    item_id=item_id,
+                    sub_id=sub_id,
+                    value=value,
+                    create=True,
+                )
+            except InvalidCommandResponse:
+                LOGGER.warning(
+                    "Write failed for %s[0x%04X] = %s", item_name, sub_id, value
+                )
 
     # Reset afterwards to have the new values take effect
     await znp.request_callback_rsp(

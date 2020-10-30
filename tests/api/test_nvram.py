@@ -7,30 +7,12 @@ from zigpy_znp.types import nvids
 pytestmark = [pytest.mark.asyncio]
 
 
-async def test_wrong_order(connected_znp, event_loop):
-    znp, _ = connected_znp
-
-    class TestNvIds(nvids.BaseNvIds):
-        SECOND = 0x0002
-        FIRST = 0x0001
-        LAST = 0x0004
-        THIRD = 0x0003
-
-    # Writing too big of a value should fail, regardless of the definition order
-    with pytest.raises(ValueError):
-        await znp.nvram_write(TestNvIds.THIRD, t.uint16_t(0xAABB))
-
-
 async def test_writes_invalid(connected_znp):
     znp, _ = connected_znp
 
-    # Passing numerical addresses is disallowed
-    with pytest.raises(ValueError):
-        await znp.nvram_write(0x0003, t.uint8_t(0xAB))
-
-    # So is passing in untyped integers
+    # Passing in untyped integers is not allowed
     with pytest.raises(TypeError):
-        await znp.nvram_write(nvids.NwkNvIds.STARTUP_OPTION, 0xAB)
+        await znp.nvram.osal_write(nvids.NwkNvIds.STARTUP_OPTION, 0xAB)
 
 
 @pytest.mark.parametrize(
@@ -59,7 +41,7 @@ async def test_write_existing(connected_znp, value):
         responses=[c.SYS.OSALNVWriteExt.Rsp(Status=t.Status.SUCCESS)],
     )
 
-    await znp.nvram_write(nvid, value)
+    await znp.nvram.osal_write(nvid, value)
 
     await length_rsp
     await write_rsp
@@ -84,7 +66,7 @@ async def test_write_same_length(connected_znp):
         responses=[c.SYS.OSALNVWriteExt.Rsp(Status=t.Status.SUCCESS)],
     )
 
-    await znp.nvram_write(nvid, value)
+    await znp.nvram.osal_write(nvid, value)
 
     await length_rsp
     await write_rsp
@@ -116,7 +98,7 @@ async def test_write_wrong_length(connected_znp, nvid, value):
         responses=[c.SYS.OSALNVWriteExt.Rsp(Status=t.Status.SUCCESS)],
     )
 
-    await znp.nvram_write(nvid, value, create=True)
+    await znp.nvram.osal_write(nvid, value, create=True)
 
     await length_rsp
     await delete_rsp
@@ -136,7 +118,7 @@ async def test_write_bad_length(connected_znp, nvid, value):
     )
 
     with pytest.raises(ValueError):
-        await znp.nvram_write(nvid, value)
+        await znp.nvram.osal_write(nvid, value)
 
     await length_rsp
 
@@ -156,7 +138,7 @@ async def test_read_success(connected_znp, nvid, value):
         responses=[c.SYS.OSALNVReadExt.Rsp(Status=t.Status.SUCCESS, Value=value)],
     )
 
-    result = await znp.nvram_read(nvid)
+    result = await znp.nvram.osal_read(nvid)
     await length_rsp
     await read_rsp
 
@@ -183,7 +165,7 @@ async def test_read_long_success(connected_znp, nvid, value):
         responses=[c.SYS.OSALNVReadExt.Rsp(Status=t.Status.SUCCESS, Value=b"x")],
     )
 
-    result = await znp.nvram_read(nvid)
+    result = await znp.nvram.osal_read(nvid)
     await length_rsp
     await read_rsp1
     await read_rsp2
@@ -201,6 +183,6 @@ async def test_read_failure(connected_znp, nvid):
     )
 
     with pytest.raises(KeyError):
-        await znp.nvram_read(nvid)
+        await znp.nvram.osal_read(nvid)
 
     await length_rsp

@@ -3,7 +3,6 @@ as reset, read/write memory, read/write extended address, etc.
 """
 
 import zigpy_znp.types as t
-from zigpy_znp.types import nvids
 
 
 class BootloaderBuildType(t.enum_uint8):
@@ -138,7 +137,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x07,
         req_schema=(
-            t.Param("Id", nvids.NwkNvIds, "The Id of the NV Item"),
+            t.Param("Id", t.uint16_t, "The Id of the NV Item"),
             t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
             t.Param("Value", t.ShortBytes, "The value of the NV item"),
         ),
@@ -152,7 +151,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x08,
         req_schema=(
-            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param("Id", t.uint16_t, "The Id of the NV item"),
             t.Param(
                 "Offset",
                 t.uint8_t,
@@ -172,7 +171,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x09,
         req_schema=(
-            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param("Id", t.uint16_t, "The Id of the NV item"),
             t.Param(
                 "Offset",
                 t.uint8_t,
@@ -189,7 +188,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x12,
         req_schema=(
-            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param("Id", t.uint16_t, "The Id of the NV item"),
             t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
@@ -200,7 +199,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     OSALNVLength = t.CommandDef(
         t.CommandType.SREQ,
         0x13,
-        req_schema=(t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),),
+        req_schema=(t.Param("Id", t.uint16_t, "The Id of the NV item"),),
         rsp_schema=(t.Param("ItemLen", t.uint16_t, "Number of bytes in the NV item"),),
     )
 
@@ -399,7 +398,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x1C,
         req_schema=(
-            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param("Id", t.uint16_t, "The Id of the NV item"),
             t.Param(
                 "Offset",
                 t.uint16_t,
@@ -417,7 +416,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x1D,
         req_schema=(
-            t.Param("Id", nvids.NwkNvIds, "The Id of the NV item"),
+            t.Param("Id", t.uint16_t, "The Id of the NV item"),
             t.Param(
                 "Offset",
                 t.uint16_t,  # XXX: don't trust the documentation! This *not* 8 bits.
@@ -499,7 +498,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
                 t.uint16_t,
                 "Number of bytes offset from the beginning of the NV value",
             ),
-            # XXX: the spec has length as a a 16-bit integer but then shows it as
+            # XXX: the spec has length as a 16-bit integer but then shows it as
             # an 8-bit integer in the table below, which matches the code
             t.Param("Value", t.ShortBytes, "Value of the NV item to write"),
         ),

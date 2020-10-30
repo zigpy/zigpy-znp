@@ -205,7 +205,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             configured_nv_item = NwkNvIds.HAS_CONFIGURED_ZSTACK3
 
         try:
-            configured_value = await self._znp.nvram_read(configured_nv_item)
+            configured_value = await self._znp.nvram.osal_read(configured_nv_item)
             is_configured = configured_value == ZSTACK_CONFIGURE_SUCCESS
         except KeyError:
             is_configured = False
@@ -235,7 +235,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 c.SYS.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
             )
 
-        await self._znp.nvram_write(
+        await self._znp.nvram.osal_write(
             NwkNvIds.APS_USE_INSECURE_JOIN,
             t.Bool(self.znp_config[conf.CONF_APS_USE_INSECURE_JOIN]),
         )
@@ -414,11 +414,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             channels = t.Channels.from_channel_list([channel])
 
         # Delete any existing HAS_CONFIGURED_ZSTACK* NV items. One (or both) may fail.
-        await self._znp.nvram_delete(NwkNvIds.HAS_CONFIGURED_ZSTACK1)
-        await self._znp.nvram_delete(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
+        await self._znp.nvram.osal_delete(NwkNvIds.HAS_CONFIGURED_ZSTACK1)
+        await self._znp.nvram.osal_delete(NwkNvIds.HAS_CONFIGURED_ZSTACK3)
 
         # Instruct Z-Stack to reset everything on the next boot
-        await self._znp.nvram_write(
+        await self._znp.nvram.osal_write(
             NwkNvIds.STARTUP_OPTION,
             t.StartupOptions.ClearState | t.StartupOptions.ClearConfig,
         )
@@ -430,15 +430,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.debug("Updating network settings")
 
         await self._write_stack_settings(reset_if_changed=False)
-        await self._znp.nvram_write(NwkNvIds.PANID, pan_id, create=True)
-        await self._znp.nvram_write(
+        await self._znp.nvram.osal_write(NwkNvIds.PANID, pan_id, create=True)
+        await self._znp.nvram.osal_write(
             NwkNvIds.APS_USE_EXT_PANID, extended_pan_id, create=True
         )
-        await self._znp.nvram_write(NwkNvIds.PRECFGKEY, network_key, create=True)
-        await self._znp.nvram_write(
+        await self._znp.nvram.osal_write(NwkNvIds.PRECFGKEY, network_key, create=True)
+        await self._znp.nvram.osal_write(
             NwkNvIds.PRECFGKEYS_ENABLE, t.Bool(True), create=True
         )
-        await self._znp.nvram_write(NwkNvIds.CHANLIST, channels, create=True)
+        await self._znp.nvram.osal_write(NwkNvIds.CHANLIST, channels, create=True)
 
         # Z-Stack Home 1.2 doesn't have the BDB subsystem
         if not self.is_zstack_home_12:
@@ -492,7 +492,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ):
                     raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
             else:
-                await self._znp.nvram_write(
+                await self._znp.nvram.osal_write(
                     NwkNvIds.TCLK_SEED,
                     value=DEFAULT_TC_LINK_KEY,
                     create=True,
@@ -514,7 +514,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # not appear to be any user-facing MT command to read this information.
         while True:
             try:
-                nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+                nib = parse_nib(await self._znp.nvram.osal_read(NwkNvIds.NIB))
 
                 LOGGER.debug("Current NIB is %s", nib)
 
@@ -532,7 +532,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         else:
             configured_nv_item = NwkNvIds.HAS_CONFIGURED_ZSTACK3
 
-        await self._znp.nvram_write(
+        await self._znp.nvram.osal_write(
             configured_nv_item, ZSTACK_CONFIGURE_SUCCESS, create=True
         )
 
@@ -922,13 +922,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         for nvid, value in settings.items():
             try:
-                current_value = await self._znp.nvram_read(nvid)
+                current_value = await self._znp.nvram.osal_read(nvid)
             except InvalidCommandResponse:
                 current_value = None
 
             # There is no point in issuing a write if the value will not change
             if current_value != value.serialize():
-                await self._znp.nvram_write(nvid, value)
+                await self._znp.nvram.osal_write(nvid, value)
                 any_changed = True
 
         if reset_if_changed and any_changed:
@@ -1062,9 +1062,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def _load_device_info(self):
         # Parsing the NIB struct gives us access to low-level info, like the channel
-        self._nib = parse_nib(await self._znp.nvram_read(NwkNvIds.NIB))
+        self._nib = parse_nib(await self._znp.nvram.osal_read(NwkNvIds.NIB))
         self._network_key, _ = t.KeyData.deserialize(
-            await self._znp.nvram_read(NwkNvIds.PRECFGKEY)
+            await self._znp.nvram.osal_read(NwkNvIds.PRECFGKEY)
         )
 
         LOGGER.debug("Parsed NIB: %s", self._nib)

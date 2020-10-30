@@ -47,13 +47,13 @@ async def network_scan(
     # state in the NIB, which we have to temporarily delete in order for the scan to be
     # possible.
     if znp._version.MinorRel == 6:
-        previous_nib = await znp.nvram_read(NwkNvIds.NIB)
-        await znp.nvram_delete(NwkNvIds.NIB)
+        previous_nib = await znp.nvram.osal_read(NwkNvIds.NIB)
+        await znp.nvram.osal_delete(NwkNvIds.NIB)
     else:
         previous_nib = None
 
-    previous_channels = await znp.nvram_read(NwkNvIds.CHANLIST)
-    await znp.nvram_write(NwkNvIds.CHANLIST, t.Channels.ALL_CHANNELS)
+    previous_channels = await znp.nvram.osal_read(NwkNvIds.CHANLIST)
+    await znp.nvram.osal_write(NwkNvIds.CHANLIST, t.Channels.ALL_CHANNELS)
 
     try:
         await znp.request_callback_rsp(
@@ -91,9 +91,9 @@ async def network_scan(
                 )
     finally:
         if previous_nib is not None:
-            await znp.nvram_write(NwkNvIds.NIB, previous_nib, create=True)
+            await znp.nvram.osal_write(NwkNvIds.NIB, previous_nib, create=True)
 
-        await znp.nvram_write(NwkNvIds.CHANLIST, previous_channels)
+        await znp.nvram.osal_write(NwkNvIds.CHANLIST, previous_channels)
         znp.close()
 
 

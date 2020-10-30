@@ -1,11 +1,10 @@
 {
-    "osal": {},
-    "nwk": {
+    "LEGACY": {
         "HAS_CONFIGURED_ZSTACK1": "55",
         "EXTADDR": "8533ce1c004b1200",
         "STARTUP_OPTION": "00",
         "START_DELAY": "0a",
-        "NIB": "f3050215141500140000000105018f070002051e00000b00000000000000000000621a08000800000f0f0500010000000100000000dddddddddddddddd010000000000000000000000000000000000000000000000000000000000000000000000000f0300013c0a010000000000",
+        "NIB": "7b050215141500140000000105018f070002051e00000b00000000000000000000621a08000800000f0f0500010000000100000000dddddddddddddddd010000000000000000000000000000000000000000000000000000000000000000000000000f0300013c0a010000000000",
         "DEVICE_LIST": "0000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "ADDRMGR": "00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff00ffffffffffffffffffff",
         "POLL_RATE_OLD16": "e803",

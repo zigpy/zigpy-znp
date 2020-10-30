@@ -4,75 +4,77 @@ import asyncio
 import logging
 import argparse
 
-import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
-from zigpy_znp.types.nvids import NvSysIds, NwkNvIds, OsalExNvIds
+from zigpy_znp.types.nvids import NWK_NVID_TABLES, NvSysIds, NwkNvIds, OsalExNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
 
 
-async def backup(radio_path):
+async def backup(radio_path: str):
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
+    await znp.connect()
 
-    await znp.connect(check_version=False)
+    data = {}
+    data["LEGACY"] = {}
 
-    data = {
-        "osal": {},
-        "nwk": {},
-    }
-
+    # Legacy items need to be handled first, since they are named
     for nwk_nvid in NwkNvIds:
-        try:
-            value = await znp.nvram_read(nwk_nvid)
+        if nwk_nvid == NwkNvIds.INVALID_INDEX:
+            continue
+
+        # Tables span ranges of items. Naming them properly is useful.
+        if nwk_nvid in NWK_NVID_TABLES:
+            start = nwk_nvid
+            end = NWK_NVID_TABLES[nwk_nvid]
+
+            for offset in range(0, end - start):
+                key = f"{nwk_nvid.name}+{offset}"
+
+                try:
+                    value = await znp.nvram.osal_read(nwk_nvid + offset)
+                except SecurityError:
+                    LOGGER.error("Read not allowed for %s", key)
+                    continue
+                except KeyError:
+                    break
+
+                LOGGER.info("%s = %s", key, value)
+                data["LEGACY"][key] = value.hex()
+        else:
+            try:
+                value = await znp.nvram.osal_read(nwk_nvid)
+            except KeyError:
+                LOGGER.warning("Read failed for %s", nwk_nvid)
+                continue
+            except SecurityError:
+                LOGGER.error("Read not allowed for %s", nwk_nvid)
+                continue
+
             LOGGER.info("%s = %s", nwk_nvid, value)
+            data["LEGACY"][nwk_nvid.name] = value.hex()
 
-            data["nwk"][nwk_nvid.name] = value.hex()
-        except KeyError:
-            LOGGER.warning("Read failed for %s", nwk_nvid)
-            continue
-        except SecurityError:
-            LOGGER.error("Read not allowed for %s", nwk_nvid)
+    for nvid in OsalExNvIds:
+        # Skip the LEGACY items, we did them above
+        if nvid == OsalExNvIds.LEGACY:
             continue
 
-    try:
-        # Old versions of Z-Stack do not have the OSAL NVIDs
-        await znp.request(
-            c.SYS.NVLength.Req(
-                SysId=NvSysIds.ZSTACK, ItemId=OsalExNvIds.DEVICE_LIST, SubId=0
-            )
-        )
-    except CommandNotRecognized:
-        return data
+        for sub_id in range(2 ** 16):
+            try:
+                value = await znp.nvram.read(
+                    sys_id=NvSysIds.ZSTACK, item_id=nvid, sub_id=sub_id
+                )
+            except CommandNotRecognized:
+                # CC2531 only supports the legacy NVRAM interface, even on Z-Stack 3
+                return data
+            except KeyError:
+                # Once a read fails, no later reads will succeed
+                break
 
-    for osal_nvid in OsalExNvIds:
-        length_rsp = await znp.request(
-            c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, ItemId=osal_nvid, SubId=0)
-        )
-        length = length_rsp.Length
-
-        if length == 0:
-            LOGGER.warning("Read failed for %s", osal_nvid)
-            continue
-
-        value = (
-            await znp.request(
-                c.SYS.NVRead.Req(
-                    SysId=NvSysIds.ZSTACK,
-                    ItemId=osal_nvid,
-                    SubId=0,
-                    Offset=0,
-                    Length=length,
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-        ).Value
-        LOGGER.info("%s = %s", osal_nvid, value)
-
-        data["osal"][osal_nvid.name] = value.hex()
+            LOGGER.info("%s[0x%04X] = %s", nvid.name, sub_id, value)
+            data.setdefault(nvid.name, {})[f"0x{sub_id:04X}"] = value.hex()
 
     return data
 

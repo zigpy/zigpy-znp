@@ -3,7 +3,7 @@ import pytest
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-from zigpy_znp.types.nvids import NwkNvIds
+from zigpy_znp.types.nvids import NwkNvIds, OsalExNvIds
 
 from ..conftest import (
     ALL_DEVICES,
@@ -27,10 +27,10 @@ pytestmark = [pytest.mark.asyncio]
             FormedLaunchpadCC26X2R1,
             "CC13X2/CC26X2, Z-Stack 3.30.00/3.40.00/4.10.00",
             15,
-            t.Channels.from_channel_list([15, 20, 25]),
-            0x1C0E,
-            "ca:4e:c6:ac:c3:c8:63:01",
-            t.KeyData.deserialize(bytes.fromhex("0a0a73b4990dc6e2f46a511986528b66"))[0],
+            t.Channels.from_channel_list([15]),
+            0x77AE,
+            "24:a2:d7:77:97:47:a7:37",
+            t.KeyData.deserialize(bytes.fromhex("c927e9ce1544c9aa42340e4d5dc4c257"))[0],
         ),
         # Z2M/zigpy-cc
         (
@@ -116,8 +116,8 @@ async def test_bad_nvram_value(device, make_application):
     app, znp_server = make_application(server_cls=device)
 
     # An invalid value is still bad
-    znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
-    znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
+    znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
+    znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
 
     with pytest.raises(RuntimeError):
         await app.startup(auto_form=False)
@@ -139,7 +139,7 @@ async def test_reset(device, make_application, mocker):
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_write_nvram(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
-    nvram = znp_server.nvram["nwk"]
+    nvram = znp_server.nvram[OsalExNvIds.LEGACY]
 
     # Change NVRAM value we should change it back
     assert nvram[NwkNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
@@ -217,14 +217,23 @@ async def test_auto_form_necessary(device, make_application, mocker):
     assert app.channels is not None
 
     if issubclass(device, BaseZStack3Device):
-        assert znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
+        assert (
+            znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK3]
+            == b"\x55"
+        )
     else:
-        assert znp_server.nvram["nwk"][NwkNvIds.HAS_CONFIGURED_ZSTACK1] == b"\x55"
+        assert (
+            znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.HAS_CONFIGURED_ZSTACK1]
+            == b"\x55"
+        )
 
     assert (
-        znp_server.nvram["nwk"][NwkNvIds.LOGICAL_TYPE]
+        znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.LOGICAL_TYPE]
         == t.DeviceLogicalType.Coordinator.serialize()
     )
-    assert znp_server.nvram["nwk"][NwkNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
+    assert (
+        znp_server.nvram[OsalExNvIds.LEGACY][NwkNvIds.ZDO_DIRECT_CB]
+        == t.Bool(True).serialize()
+    )
 
     await app.shutdown()

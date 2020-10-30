@@ -228,6 +228,20 @@ class NwkNvIds(BaseNvIds):
     INVALID_INDEX = 0xFFFF
 
 
+NWK_NVID_TABLES = {
+    NwkNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START: (
+        NwkNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END
+    ),
+    NwkNvIds.LEGACY_TCLK_IC_TABLE_START: NwkNvIds.LEGACY_TCLK_IC_TABLE_END,
+    NwkNvIds.LEGACY_TCLK_TABLE_START: NwkNvIds.LEGACY_TCLK_TABLE_END,
+    NwkNvIds.LEGACY_APS_LINK_KEY_DATA_START: NwkNvIds.LEGACY_APS_LINK_KEY_DATA_END,
+    NwkNvIds.LEGACY_PROXY_TABLE_START: NwkNvIds.LEGACY_PROXY_TABLE_END,
+    NwkNvIds.LEGACY_SINK_TABLE_START: NwkNvIds.LEGACY_SINK_TABLE_END,
+}
+
+NWK_NVID_TABLE_KEYS = set(NWK_NVID_TABLES.keys()) | set(NWK_NVID_TABLES.values())
+
+
 def is_secure_nvid(nvid: NwkNvIds) -> bool:
     """
     Returns whether or not an nvid may be prevented from being read from NVRAM.
