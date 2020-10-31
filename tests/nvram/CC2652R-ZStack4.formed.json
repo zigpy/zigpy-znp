@@ -18,7 +18,7 @@
         "BCAST_DELIVERY_TIME": "1e",
         "CONCENTRATOR_ENABLE": "01",
         "CONCENTRATOR_DISCOVERY": "78",
-        "CONCENTRATOR_RADIUS_OLD16": "0a",
+        "CONCENTRATOR_RADIUS": "0a",
         "CONCENTRATOR_RC": "01",
         "NWK_MGR_MODE": "01",
         "SRC_RTG_EXPIRY_TIME": "ff",

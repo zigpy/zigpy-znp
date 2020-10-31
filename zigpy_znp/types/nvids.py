@@ -66,10 +66,8 @@ class OsalNvIds(BaseNvIds):
     NWK_MODE = 0x0031  # Deprecated, as this will always be Mesh
     CONCENTRATOR_ENABLE = 0x0032
     CONCENTRATOR_DISCOVERY = 0x0033
-
-    CONCENTRATOR_RADIUS_OLD16 = 0x0034
-    CONCENTRATOR_RADIUS = 0x0035  # used above for new 32 bit Poll Rate
-
+    CONCENTRATOR_RADIUS = 0x0034
+    POLL_RATE = 0x0035
     CONCENTRATOR_RC = 0x0036
     NWK_MGR_MODE = 0x0037
     SRC_RTG_EXPIRY_TIME = 0x0038
