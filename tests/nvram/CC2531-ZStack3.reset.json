@@ -44,6 +44,7 @@
         "BDBNODEISONANETWORK": "00",
         "PRECFGKEY": "8cda26db5bdb791b62eb686f2d6cddad",
         "PRECFGKEYS_ENABLE": "00",
+        "SECURITY_MODE": "04",
         "SECURE_PERMIT_JOIN": "01",
         "APS_LINK_KEY_TYPE": "01",
         "APS_ALLOW_R19_SECURITY": "00",

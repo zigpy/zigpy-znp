@@ -51,8 +51,9 @@ class OsalNvIds(BaseNvIds):
     DEVICE_LIST = 0x0022
     ADDRMGR = 0x0023
     POLL_RATE_OLD16 = 0x0024  # Deprecated when poll rate changed from 16 to 32 bits
-    POLL_RATE = 0x0035
-
+    QUEUED_POLL_RATE = 0x0025
+    RESPONSE_POLL_RATE = 0x0026
+    REJOIN_POLL_RATE = 0x0027
     DATA_RETRIES = 0x0028
     POLL_FAILURE_RETRIES = 0x0029
     STACK_PROFILE = 0x002A
@@ -62,7 +63,7 @@ class OsalNvIds(BaseNvIds):
     BCAST_RETRIES = 0x002E
     PASSIVE_ACK_TIMEOUT = 0x002F
     BCAST_DELIVERY_TIME = 0x0030
-    # NWK_MODE                   = 0x0031  #Deprecated, as this will always be Mesh
+    NWK_MODE = 0x0031  # Deprecated, as this will always be Mesh
     CONCENTRATOR_ENABLE = 0x0032
     CONCENTRATOR_DISCOVERY = 0x0033
 
@@ -114,7 +115,7 @@ class OsalNvIds(BaseNvIds):
     PRECFGKEY = 0x0062
     PRECFGKEYS_ENABLE = 0x0063
     # Deprecated Item as there is only one security mode supported now Z3.0
-    # SECURITY_MODE = 0x0064
+    SECURITY_MODE = 0x0064
     SECURE_PERMIT_JOIN = 0x0065
     APS_LINK_KEY_TYPE = 0x0066
     APS_ALLOW_R19_SECURITY = 0x0067
@@ -166,8 +167,6 @@ class OsalNvIds(BaseNvIds):
 
     # NV Items Reserved for Commissioning Cluster Startup Attribute Set (SAS):
     # 0x00B1 - 0x00BF: Parameters related to APS and NWK layers
-    # 0x00C1 - 0x00CF: Parameters related to Security
-    # 0x00D1 - 0x00DF: Current key parameters
     SAS_SHORT_ADDR = 0x00B1
     SAS_EXT_PANID = 0x00B2
     SAS_PANID = 0x00B3
@@ -176,6 +175,7 @@ class OsalNvIds(BaseNvIds):
     SAS_STACK_PROFILE = 0x00B6
     SAS_STARTUP_CTRL = 0x00B7
 
+    # 0x00C1 - 0x00CF: Parameters related to Security
     SAS_TC_ADDR = 0x00C1
     SAS_TC_MASTER_KEY = 0x00C2
     SAS_NWK_KEY = 0x00C3
@@ -185,6 +185,7 @@ class OsalNvIds(BaseNvIds):
     SAS_NWK_KEY_TYPE = 0x00C7
     SAS_NWK_MGR_ADDR = 0x00C8
 
+    # 0x00D1 - 0x00DF: Current key parameters
     SAS_CURR_TC_MASTER_KEY = 0x00D1
     SAS_CURR_NWK_KEY = 0x00D2
     SAS_CURR_PRECFG_LINK_KEY = 0x00D3
@@ -224,6 +225,17 @@ class OsalNvIds(BaseNvIds):
     # 0x0320 - 0x032F
     LEGACY_SINK_TABLE_START = 0x0320  # Deprecated. Refer to EX_GP_SINK_TABLE
     LEGACY_SINK_TABLE_END = 0x032F
+
+    APP_ITEM_1 = 0x0F01
+    APP_ITEM_2 = 0x0F02
+    APP_ITEM_3 = 0x0F03
+    APP_ITEM_4 = 0x0F04
+    APP_ITEM_5 = 0x0F05
+    APP_ITEM_6 = 0x0F06
+
+    RF_TEST_PARMS = 0x0F07
+
+    UNKNOWN = 0x0F08
 
     INVALID_INDEX = 0xFFFF
 
