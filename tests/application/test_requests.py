@@ -376,3 +376,60 @@ async def test_nonstandard_profile(device, make_application):
     await data_req
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_request_cancellation_shielding(
+    device, make_application, mocker, event_loop
+):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    # The data confirm timeout must be shorter than the ARSP timeout
+    mocker.spy(app._znp, "_unhandled_command")
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+
+    delayed_reply_sent = event_loop.create_future()
+
+    def delayed_reply(req):
+        async def inner():
+            # Happens after DATA_CONFIRM_TIMEOUT expires but before ARSP_TIMEOUT
+            await asyncio.sleep(0.5)
+            znp_server.send(
+                c.AF.DataConfirm.Callback(
+                    Status=t.Status.SUCCESS, Endpoint=1, TSN=req.TSN
+                )
+            )
+            delayed_reply_sent.set_result(True)
+
+        asyncio.create_task(inner())
+
+    data_req = znp_server.reply_once_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            delayed_reply,
+        ],
+    )
+
+    with pytest.raises(asyncio.TimeoutError):
+        await app.request(
+            device=device,
+            profile=260,
+            cluster=1,
+            src_ep=1,
+            dst_ep=1,
+            sequence=1,
+            data=b"\x00",
+        )
+
+    await data_req
+    await delayed_reply_sent
+
+    assert app._znp._unhandled_command.call_count == 0
+
+    await app.shutdown()

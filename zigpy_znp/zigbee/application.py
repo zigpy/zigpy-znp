@@ -1231,10 +1231,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         else:
             async with self._limit_concurrency():
                 async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-                    response = await self._znp.request_callback_rsp(
-                        request=request,
-                        RspStatus=t.Status.SUCCESS,
-                        callback=c.AF.DataConfirm.Callback(partial=True, TSN=sequence),
+                    # Shield from cancellation to prevent requests that time out in
+                    # higher layers from missing expected responses
+                    response = await asyncio.shield(
+                        self._znp.request_callback_rsp(
+                            request=request,
+                            RspStatus=t.Status.SUCCESS,
+                            callback=c.AF.DataConfirm.Callback(
+                                partial=True, TSN=sequence
+                            ),
+                        )
                     )
 
                 LOGGER.debug("Received a data request confirmation: %s", response)
