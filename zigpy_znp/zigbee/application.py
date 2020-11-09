@@ -18,7 +18,13 @@ import zigpy.profiles
 import zigpy.zcl.foundation
 from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
-from zigpy.zdo.types import CLUSTERS as ZDO_CLUSTERS, ZDOCmd, ZDOHeader, MultiAddress
+from zigpy.zdo.types import (
+    CLUSTERS as ZDO_CLUSTERS,
+    ZDOCmd,
+    Neighbor,
+    ZDOHeader,
+    MultiAddress,
+)
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
@@ -653,25 +659,44 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             data=data,
         )
 
-    async def force_remove(self, device) -> None:
+    async def force_remove(self, device: zigpy.device.Device) -> None:
         """
-        Forcibly removes a direct child from the network.
+        Attempts to forcibly remove a device from the network.
         """
 
-        async with self._limit_concurrency():
-            leave_rsp = await self._znp.request_callback_rsp(
-                request=c.ZDO.MgmtLeaveReq.Req(
-                    DstAddr=0x0000,  # We handle it
-                    IEEE=device.ieee,
-                    RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, partial=True),
+        parents = []
+
+        for dev in self.devices.values():
+            for neighbor in dev.neighbors:
+                if neighbor.ieee != device.ieee:
+                    continue
+
+                if neighbor.relationship != Neighbor.RelationShip.Child:
+                    continue
+
+                parents.append(dev)
+
+        if not parents:
+            LOGGER.warning(
+                "Could not find parent for device %s, falling back to the coordinator",
+                device.ieee,
             )
+            parents.append(self.zigpy_device)
 
-        assert leave_rsp.Status == t.ZDOStatus.SUCCESS
-
-        # TODO: see what happens when we forcibly remove a device that isn't our child
+        for parent in parents:
+            async with self._limit_concurrency():
+                await self._znp.request_callback_rsp(
+                    request=c.ZDO.MgmtLeaveReq.Req(
+                        DstAddr=parents[-1].nwk,
+                        IEEE=device.ieee,
+                        RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
+                    ),
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.ZDO.MgmtLeaveRsp.Callback(
+                        Src=parents[-1].nwk,
+                        partial=True,
+                    ),
+                )
 
     async def permit_ncp(self, time_s: int) -> None:
         """
