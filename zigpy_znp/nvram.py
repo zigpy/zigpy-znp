@@ -218,15 +218,17 @@ class NVRAMHelper:
                     RspStatus=t.Status.SUCCESS,
                 )
 
-            await self.znp.request(
+            create_rsp = await self.znp.request(
                 c.SYS.NVCreate.Req(
                     SysId=sys_id,
                     ItemId=item_id,
                     SubId=sub_id,
                     Length=len(value),
-                ),
-                RspStatus=t.Status.NV_ITEM_UNINIT,
+                )
             )
+
+            if create_rsp.Status not in (t.Status.SUCCESS, t.Status.NV_ITEM_UNINIT):
+                raise InvalidCommandResponse("Bad create status", create_rsp)
 
         # 244 bytes is the most you can fit in a single `SYS.NVWrite` command
         for offset in range(0, len(value), 244):
