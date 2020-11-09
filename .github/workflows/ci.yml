@@ -44,7 +44,7 @@ jobs:
           python -m venv venv
           . venv/bin/activate
           pip install -U pip setuptools pre-commit
-          pip install -e '.[testing]''
+          pip install -e '.[testing]'
 
   pre-commit:
     name: Prepare pre-commit environment
