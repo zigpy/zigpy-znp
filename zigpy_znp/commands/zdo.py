@@ -23,10 +23,52 @@ class StartupState(t.enum_uint8):
     NotStarted = 0x02
 
 
-class RouteDiscoveryOptions(t.enum_uint8):
-    Suppress = 0x00
-    Enable = 0x01
-    Force = 0x02
+class RouteDiscoveryOptions(t.enum_flag_uint8):
+    UNICAST = 0x00
+    MTO_WITH_ROUTE_CACHE = 0x01
+    MTO_WITHOUT_ROUTE_CACHE = 0x03
+
+
+class RouteStatus(t.enum_uint8):
+    INIT = 0
+    ACTIVE = 1
+    DISC = 2
+    LINK_FAIL = 3
+    REPAIR = 4
+
+
+class RouteOptions(t.enum_flag_uint8):
+    # Used in option of NLME_RouteDiscoveryRequest() and rtgTable[]
+    MTO_ROUTE = 0x01
+
+    # Used in option of NLME_RouteDiscoveryRequest() and rtgTable[]
+    NO_ROUTE_CACHE = 0x02
+
+    # Used in option of rtgTable[]
+    RTG_RECORD = 0x04
+
+    # Sender has route cache. Used in option of rtgTable[]
+    MTO_ROUTE_RC = 0x08
+
+    # Sender doesn't have route cache. Used in option of rtgTable[]
+    MTO_ROUTE_NRC = 0x10
+
+    # Used in option of route request command frame
+    DEST_IEEE_ADDR = 0x20
+
+    # Used in all three places
+    MULTICAST_ROUTE = 0x40
+
+
+class RoutingStatus(t.enum_uint8):
+    SUCCESS = 0
+    FAIL = 1
+    TBL_FULL = 2
+    HIGHER_COST = 3
+    NO_ENTRY = 4
+    INVALID_PATH = 5
+    INVALID_PARAM = 6
+    SRC_TBL_FULL = 7
 
 
 class MACCapabilities(t.enum_flag_uint8):
@@ -717,10 +759,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x46,
         req_schema=(
             t.Param("Dst", t.NWK, "Short address of the destination"),
-            t.Param("RtStatus", t.uint8_t, "Status value for routing entries"),
-            t.Param("Options", t.uint8_t, "Route options"),
+            t.Param("RtStatus", RouteStatus, "Status value for routing entries"),
+            t.Param("Options", RouteOptions, "Route options"),
         ),
-        rsp_schema=t.STATUS_SCHEMA,
+        rsp_schema=(t.Param("Status", RoutingStatus, "Route status"),),
     )
 
     # handle the ZDO extended remove group extension message

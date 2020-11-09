@@ -7,6 +7,7 @@ from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
+from zigpy_znp.exceptions import InvalidCommandResponse
 
 from ..conftest import FORMED_DEVICES, CoroutineMock
 
@@ -164,7 +165,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     mocker.spy(app, "_send_request")
 
     # Fail to turn on the light
-    with pytest.raises(zigpy.exceptions.DeliveryError):
+    with pytest.raises(InvalidCommandResponse):
         await device.endpoints[1].on_off.on()
 
     assert app._send_request.call_count == 1
@@ -227,7 +228,7 @@ async def test_force_remove(device, make_application, mocker):
         request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, partial=True),
         responses=[
             c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtLeaveRsp.Callback(Src=0x000, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
@@ -431,5 +432,149 @@ async def test_request_cancellation_shielding(
     await delayed_reply_sent
 
     assert app._znp._unhandled_command.call_count == 0
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_request_route_rediscovery_zdo(
+    device, make_application, mocker, event_loop
+):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    # The data confirm timeout must be shorter than the ARSP timeout
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
+    device.status = zigpy.device.Status.ENDPOINTS_INIT
+    device.initializing = False
+
+    # Fail the first time
+    route_discovered = False
+
+    def route_replier(req):
+        nonlocal route_discovered
+
+        if not route_discovered:
+            return c.ZDO.ExtRouteChk.Rsp(Status=c.zdo.RoutingStatus.FAIL)
+        else:
+            return c.ZDO.ExtRouteChk.Rsp(Status=c.zdo.RoutingStatus.SUCCESS)
+
+    def set_route_discovered(req):
+        nonlocal route_discovered
+        route_discovered = True
+
+        return c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)
+
+    znp_server.reply_to(
+        c.ZDO.ExtRouteChk.Req(Dst=device.nwk, partial=True),
+        responses=[route_replier],
+        override=True,
+    )
+
+    was_route_discovered = znp_server.reply_once_to(
+        c.ZDO.ExtRouteDisc.Req(
+            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
+        ),
+        responses=[set_route_discovered],
+    )
+
+    zdo_req = znp_server.reply_once_to(
+        c.ZDO.ActiveEpReq.Req(DstAddr=device.nwk, NWKAddrOfInterest=device.nwk),
+        responses=[
+            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.ActiveEpRsp.Callback(
+                Src=device.nwk,
+                Status=t.ZDOStatus.SUCCESS,
+                NWK=device.nwk,
+                ActiveEndpoints=[],
+            ),
+        ],
+    )
+
+    await device.zdo.Active_EP_req(device.nwk)
+
+    await was_route_discovered
+    await zdo_req
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_request_route_rediscovery_af(
+    device, make_application, mocker, event_loop
+):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    # The data confirm timeout must be shorter than the ARSP timeout
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
+    device.status = zigpy.device.Status.ENDPOINTS_INIT
+    device.initializing = False
+
+    # Fail the first time
+    route_discovered = False
+
+    def data_confirm_replier(req):
+        nonlocal route_discovered
+
+        if not route_discovered:
+            return (
+                c.AF.DataConfirm.Callback(
+                    Status=t.Status.NWK_NO_ROUTE,
+                    Endpoint=1,
+                    TSN=1,
+                ),
+            )
+        else:
+            return (
+                c.AF.DataConfirm.Callback(
+                    Status=t.Status.SUCCESS,
+                    Endpoint=1,
+                    TSN=1,
+                ),
+            )
+
+    def set_route_discovered(req):
+        nonlocal route_discovered
+        route_discovered = True
+
+        return c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)
+
+    was_route_discovered = znp_server.reply_once_to(
+        c.ZDO.ExtRouteDisc.Req(
+            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
+        ),
+        responses=[set_route_discovered],
+    )
+
+    znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
+    await app.request(
+        device=device,
+        profile=260,
+        cluster=1,
+        src_ep=1,
+        dst_ep=1,
+        sequence=1,
+        data=b"\x00",
+    )
+
+    await was_route_discovered
 
     await app.shutdown()

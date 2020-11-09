@@ -234,7 +234,10 @@ class BaseServerZNP(ZNP):
 
         return called_future
 
-    def reply_to(self, request, responses):
+    def reply_to(self, request, responses, *, override=False):
+        if override:
+            self._listeners[request.header].clear()
+
         async def callback(request):
             callback.call_count += 1
 
@@ -491,6 +494,10 @@ class BaseZStackDevice(BaseServerZNP):
             asyncio.get_running_loop().call_later(0.1, update_channel)
 
             return c.ZDO.MgmtNWKUpdateReq.Rsp(Status=t.Status.SUCCESS)
+
+    @reply_to(c.ZDO.ExtRouteChk.Req(partial=True))
+    def zdo_route_check(self, request):
+        return c.ZDO.ExtRouteChk.Rsp(Status=c.zdo.RoutingStatus.SUCCESS)
 
 
 class BaseZStack1CC2531(BaseZStackDevice):

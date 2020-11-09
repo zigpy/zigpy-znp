@@ -47,6 +47,13 @@ ZDO_REQUEST_TIMEOUT = 10  # seconds
 DATA_CONFIRM_TIMEOUT = 8  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 
+INTERNAL_REQUEST_MAX_RETRIES = 10
+INTERNAL_REQUEST_RETRYABLE_ERRORS = {
+    t.Status.MEM_ERROR,
+    t.Status.NWK_NO_ROUTE,
+    t.Status.BUFFER_FULL,
+}
+
 DEFAULT_TC_LINK_KEY = t.TCLinkKey(
     ExtAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),  # global
     Key=t.KeyData(b"ZigBeeAlliance09"),
@@ -1180,9 +1187,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             cluster=zdo_rsp_cluster, tsn=sequence, sender=device, **zdo_response_kwargs
         )
 
-        return response.Status, "Request sent successfully"
+        return response
 
-    async def _send_request(
+    async def _send_request_raw(
         self,
         dst_addr,
         dst_ep,
@@ -1193,16 +1200,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         options,
         radius,
         data,
-    ) -> typing.Tuple[t.Status, str]:
+    ):
         """
         Used by `request`/`mrequest`/`broadcast` to send a request.
         Picks the correct request sending mechanism and fixes endpoint information.
         """
 
+        # ZDO requests must be handled by the translation layer, since Z-Stack will
+        # "steal" the responses
         if dst_ep == ZDO_ENDPOINT and not (
             cluster == ZDOCmd.Mgmt_Permit_Joining_req
             and dst_addr.mode == t.AddrMode.Broadcast
         ):
+            # ZDO requests will not trigger `ZDO.DataConfirm` messages indicating that
+            # a route is missing so we need to explicitly check for one.
+            if dst_addr.mode != t.AddrMode.Broadcast and dst_addr.address != 0x0000:
+                route_status = await self._znp.request(
+                    c.ZDO.ExtRouteChk.Req(
+                        Dst=dst_addr.address,
+                        RtStatus=c.zdo.RouteStatus.ACTIVE,
+                        Options=(
+                            c.zdo.RouteOptions.MTO_ROUTE
+                            | c.zdo.RouteOptions.NO_ROUTE_CACHE
+                        ),
+                    )
+                )
+
+                if route_status.Status != c.zdo.RoutingStatus.SUCCESS:
+                    await self._discover_route(dst_addr.address)
+
             return await self._send_zdo_request(
                 dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
             )
@@ -1224,29 +1250,110 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         if dst_addr.mode == t.AddrMode.Broadcast:
-            # We won't always get a data confirmation
+            # Broadcasts will not receive a confirmation but they still take time
+            # and use up concurrency slots
             response = await self._znp.request(
                 request=request, RspStatus=t.Status.SUCCESS
             )
+
+            await asyncio.sleep(0.1 * self._nib.BroadcastDeliveryTime)
         else:
-            async with self._limit_concurrency():
-                async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-                    # Shield from cancellation to prevent requests that time out in
-                    # higher layers from missing expected responses
-                    response = await asyncio.shield(
-                        self._znp.request_callback_rsp(
-                            request=request,
-                            RspStatus=t.Status.SUCCESS,
-                            callback=c.AF.DataConfirm.Callback(
-                                partial=True, TSN=sequence
-                            ),
-                        )
+            # Limit request concurrency for the entire (potential) retry cycle.
+            # If we run out of memory, there is no point in allowing other requests to
+            # do the same.
+            async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+                # Shield from cancellation to prevent requests that time out
+                # in higher layers from missing expected responses
+                response = await asyncio.shield(
+                    self._znp.request_callback_rsp(
+                        request=request,
+                        RspStatus=t.Status.SUCCESS,
+                        callback=c.AF.DataConfirm.Callback(
+                            partial=True,
+                            TSN=sequence,
+                            # XXX: can this ever not match?
+                            # Endpoint=src_ep,
+                        ),
+                    )
+                )
+
+                # Both the callback and the response can have an error status
+                if response.Status != t.Status.SUCCESS:
+                    raise InvalidCommandResponse(
+                        "Unsuccessful request status code", response
                     )
 
-                LOGGER.debug("Received a data request confirmation: %s", response)
+        return response
+
+    async def _discover_route(self, nwk: t.NWK):
+        """
+        Instructs the coordinator to re-discover routes to the provided NWK.
+        """
+
+        await self._znp.request(
+            c.ZDO.ExtRouteDisc.Req(
+                Dst=nwk,
+                Options=c.zdo.RouteDiscoveryOptions.UNICAST,
+                Radius=0,
+            ),
+        )
+
+        await asyncio.sleep(0.1 * self._nib.RouteDiscoveryTime)
+
+    async def _send_request(
+        self,
+        dst_addr,
+        dst_ep,
+        src_ep,
+        profile,
+        cluster,
+        sequence,
+        options,
+        radius,
+        data,
+    ) -> typing.Tuple[t.Status, str]:
+        """
+        Fault-tolerant wrapper around `_send_request_raw` that transparently performs
+        multiple retries when internal errors with Z-Stack are encountered.
+        """
+
+        # Don't release the concurrency-limiting semaphore until we are done trying.
+        # There is no point in allowing requests to take turns getting buffer errors.
+        async with self._limit_concurrency():
+            for attempt in range(INTERNAL_REQUEST_MAX_RETRIES):
+                try:
+                    response = await self._send_request_raw(
+                        dst_addr=dst_addr,
+                        dst_ep=dst_ep,
+                        src_ep=src_ep,
+                        profile=profile,
+                        cluster=cluster,
+                        sequence=sequence,
+                        options=options,
+                        radius=radius,
+                        data=data,
+                    )
+                    break
+                except InvalidCommandResponse as e:
+                    if e.response.Status not in INTERNAL_REQUEST_RETRYABLE_ERRORS:
+                        raise
+
+                    # Missing routes need to be explicitly rediscovered
+                    if e.response.Status == t.Status.NWK_NO_ROUTE:
+                        await self._discover_route(dst_addr.address)
+
+                    LOGGER.debug(
+                        "Request failed (%s), retry attempt %s of %s",
+                        e,
+                        attempt + 1,
+                        INTERNAL_REQUEST_MAX_RETRIES,
+                    )
+            else:
+                raise RuntimeError(
+                    f"Request failed after {INTERNAL_REQUEST_MAX_RETRIES} attempts"
+                )
 
         if response.Status != t.Status.SUCCESS:
-            LOGGER.warning("Failed to send request %s: %s", request, response.Status)
-            return response.Status, "Invalid response status"
+            return response.Status, "Failed to send request"
 
-        return response.Status, "Request sent successfully"
+        return response.Status, "Sent request successfully"
