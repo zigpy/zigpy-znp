@@ -13,10 +13,10 @@ Together with zigpy and compatible home automation software (namely Home Assista
 Install the Python module within your virtual environment:
 
 ```console
-$ virtualenv -p python3.8 venv                                 # if you don't already have one
+$ virtualenv -p python3.8 venv                                # if you don't already have one
 $ source venv/bin/activate
 (venv) $ pip install git+https://github.com/zigpy/zigpy-znp/  # latest commit from Git
-(venv) $ pip install zigpy-znp                                 # or, latest stable from PyPI
+(venv) $ pip install zigpy-znp                                # or, latest stable from PyPI
 ```
 
 ## Home Assistant
@@ -79,16 +79,19 @@ zha:
 ```
 
 # NVRAM Backup and restore
-A complete NVRAM backup can be performed to migrate between different radios **based on the same chip**. Anything else will not work.
+A complete NVRAM backup and restore can be performed between similar devices and Z-Stack versions:
 
 ```console
 (venv) $ python -m zigpy_znp.tools.nvram_read /dev/serial/by-id/old_radio -o backup.json
 (venv) $ python -m zigpy_znp.tools.nvram_write /dev/serial/by-id/new_radio -i backup.json
 ```
 
-Tested migrations:
+**Note**:
 
- - LAUNCHXL-CC26X2R1 running 3.30.00.03 to and from the zig-a-zig-ah! running 4.10.00.78.
+ - Firmware upgrades usually erase all settings, including your network information.
+     Perform a backup before upgrading and restore it after to preserve your settings.
+     You will experience some routing issues while the coordinator rebuilds its routing table.
+ - CC2531 backups can only be restored to CC2531 devices running similar firmware versions.
 
 # Energy scan
 Perform an energy scan to find a quiet Zigbee channel:
