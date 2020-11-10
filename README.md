@@ -1,6 +1,6 @@
 # zigpy-znp
 
-[![Build Status](https://github.com/zigpy/zigpy-znp/workflows/ci/badge.svg)](https://github.com/zigpy/zigpy-znp/actions)
+[![Build Status](https://github.com/zigpy/zigpy-znp/workflows/CI/badge.svg)](https://github.com/zigpy/zigpy-znp/actions)
 [![Coverage Status](https://codecov.io/gh/zigpy/zigpy-znp/branch/dev/graph/badge.svg?token=Y1994N9D74)](https://codecov.io/gh/zigpy/zigpy-znp)
 
 **[zigpy-znp](https://github.com/zigpy/zigpy-znp/)** is a Python library that adds support for common [Texas Instruments ZNP (Zigbee Network Processors)](http://dev.ti.com/tirex/content/simplelink_zigbee_sdk_plugin_2_20_00_06/docs/zigbee_user_guide/html/zigbee/introduction.html) [Zigbee](https://www.zigbee.org) radio modules to [zigpy](https://github.com/zigpy/), a Python Zigbee stack project.
