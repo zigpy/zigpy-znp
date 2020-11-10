@@ -1198,11 +1198,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         try:
-            async with self._limit_concurrency():
-                async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
-                    response = await self._znp.request_callback_rsp(
-                        request=request, RspStatus=t.Status.SUCCESS, callback=callback
-                    )
+            async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
+                response = await self._znp.request_callback_rsp(
+                    request=request, RspStatus=t.Status.SUCCESS, callback=callback
+                )
         except InvalidCommandResponse as e:
             raise DeliveryError(f"Could not send command: {e.response.Status}") from e
 
