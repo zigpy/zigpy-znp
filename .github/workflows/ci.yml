@@ -275,14 +275,6 @@ jobs:
         with:
           name: coverage-${{ matrix.python-version }}
           path: .coverage
-      - name: Coveralls
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_FLAG_NAME: ${{ matrix.python-version }}
-          COVERALLS_PARALLEL: true
-        run: |
-          . venv/bin/activate
-          coveralls
 
 
   coverage:
@@ -321,9 +313,3 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v1.0.14
-      - name: Upload coverage to Coveralls
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          . venv/bin/activate
-          coveralls --finish
