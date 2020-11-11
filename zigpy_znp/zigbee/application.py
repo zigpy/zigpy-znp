@@ -680,10 +680,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         for dev in self.devices.values():
             for neighbor in dev.neighbors:
-                if neighbor.ieee != device.ieee:
+                if neighbor.device is not device:
                     continue
 
-                if neighbor.relationship != Neighbor.RelationShip.Child:
+                if neighbor.neighbor.relationship != Neighbor.RelationShip.Child:
                     continue
 
                 parents.append(dev)
