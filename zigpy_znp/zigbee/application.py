@@ -58,6 +58,9 @@ INTERNAL_REQUEST_RETRYABLE_ERRORS = {
     t.Status.MEM_ERROR,
     t.Status.NWK_NO_ROUTE,
     t.Status.BUFFER_FULL,
+    t.Status.MAC_NO_ACK,
+    t.Status.MAC_CHANNEL_ACCESS_FAILURE,
+    t.Status.MAC_TRANSACTION_EXPIRED,
 }
 
 DEFAULT_TC_LINK_KEY = t.TCLinkKey(
