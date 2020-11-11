@@ -4,6 +4,17 @@ getting device info, getting NV info, subscribing callbacks, etc."""
 import zigpy_znp.types as t
 
 
+class NodeRelation(t.enum_uint8):
+    PARENT = 0
+    CHILD_RFD = 1
+    CHILD_RFD_RX_IDLE = 2
+    CHILD_FFD = 3
+    CHILD_FFD_RX_IDLE = 4
+    NEIGHBOR = 5
+    OTHER = 6
+    NOTUSED = 0xFF
+
+
 class BindEntry(t.Struct):
     srcEP: t.uint8_t
     dstGroupMode: t.uint8_t  # 0 - Normal address index, 1 - Group address
@@ -31,7 +42,7 @@ class LinkInfo(t.Struct):
 class Device(t.Struct):
     shortAddr: t.NWK
     addrIdx: t.uint16_t
-    nodeRelation: t.uint8_t
+    nodeRelation: NodeRelation
     devStatus: t.uint8_t
     assocCnt: t.uint8_t
     age: t.uint8_t
@@ -452,6 +463,32 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
                 ),
             ),
         ),
+    )
+
+    # Z2M firmware: proxy call to AssocRemove
+    AssocRemove = t.CommandDef(
+        t.CommandType.SREQ,
+        0x63,
+        req_schema=(
+            t.Param("IEEE", t.EUI64, "Extended address of the device to remove"),
+        ),
+        rsp_schema=t.STATUS_SCHEMA,
+    )
+
+    # Z2M firmware: proxy call to AssocAddNew
+    AssocAdd = t.CommandDef(
+        t.CommandType.SREQ,
+        0x64,
+        req_schema=(
+            t.Param("NWK", t.NWK, "Short address of the device"),
+            t.Param("IEEE", t.EUI64, "Extended address of the device to add"),
+            t.Param(
+                "NodeRelation",
+                NodeRelation,
+                "Relation of the device to the coordinator",
+            ),
+        ),
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # a proxy call to zclGeneral_KeyEstablish_InitiateKeyEstablishment()
