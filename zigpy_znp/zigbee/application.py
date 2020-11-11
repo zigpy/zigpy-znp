@@ -32,7 +32,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.znp.nib import NIB, CC2531NIB, parse_nib
-from zigpy_znp.exceptions import InvalidCommandResponse
+from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
 
@@ -53,15 +53,24 @@ ZDO_REQUEST_TIMEOUT = 10  # seconds
 DATA_CONFIRM_TIMEOUT = 8  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 
-INTERNAL_REQUEST_MAX_RETRIES = 10
-INTERNAL_REQUEST_RETRYABLE_ERRORS = {
-    t.Status.MEM_ERROR,
-    t.Status.NWK_NO_ROUTE,
+REQUEST_MAX_RETRIES = 10
+REQUEST_TRANSIENT_ERROR_RETRY_DELAY = 0.5  # second
+
+# Errors that go away on their own after waiting for a bit
+REQUEST_TRANSIENT_ERRORS = {
     t.Status.BUFFER_FULL,
-    t.Status.MAC_NO_ACK,
     t.Status.MAC_CHANNEL_ACCESS_FAILURE,
+    t.Status.MAC_NO_RESOURCES,
+    t.Status.MEM_ERROR,
+}
+
+REQUEST_ROUTING_ERRORS = {
+    t.Status.NWK_NO_ROUTE,
+    t.Status.MAC_NO_ACK,
     t.Status.MAC_TRANSACTION_EXPIRED,
 }
+
+REQUEST_RETRYABLE_ERRORS = REQUEST_TRANSIENT_ERRORS | REQUEST_ROUTING_ERRORS
 
 DEFAULT_TC_LINK_KEY = t.TCLinkKey(
     ExtAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),  # global
@@ -1344,40 +1353,153 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         multiple retries when internal errors with Z-Stack are encountered.
         """
 
+        if dst_addr.mode == t.AddrMode.NWK:
+            device = self.get_device(nwk=dst_addr.address)
+        elif dst_addr.mode == t.AddrMode.IEEE:
+            device = self.get_device(ieee=dst_addr.address)
+        else:
+            device = None
+
+        status = None
+        response = None
+        association = None
+
+        tried_assoc_remove = False
+        tried_route_discovery = False
+        tried_find_new_nwk = False
+
         # Don't release the concurrency-limiting semaphore until we are done trying.
         # There is no point in allowing requests to take turns getting buffer errors.
-        async with self._limit_concurrency():
-            for attempt in range(INTERNAL_REQUEST_MAX_RETRIES):
-                try:
-                    response = await self._send_request_raw(
-                        dst_addr=dst_addr,
-                        dst_ep=dst_ep,
-                        src_ep=src_ep,
-                        profile=profile,
-                        cluster=cluster,
-                        sequence=sequence,
-                        options=options,
-                        radius=radius,
-                        data=data,
-                    )
-                    break
-                except InvalidCommandResponse as e:
-                    if e.response.Status not in INTERNAL_REQUEST_RETRYABLE_ERRORS:
-                        raise
+        try:
+            async with self._limit_concurrency():
+                for attempt in range(REQUEST_MAX_RETRIES):
+                    try:
+                        response = await self._send_request_raw(
+                            dst_addr=dst_addr,
+                            dst_ep=dst_ep,
+                            src_ep=src_ep,
+                            profile=profile,
+                            cluster=cluster,
+                            sequence=sequence,
+                            options=options,
+                            radius=radius,
+                            data=data,
+                        )
+                        break
+                    except InvalidCommandResponse as e:
+                        status = e.response.Status
 
-                    # Missing routes need to be explicitly rediscovered
-                    if e.response.Status == t.Status.NWK_NO_ROUTE:
-                        await self._discover_route(dst_addr.address)
+                        if status not in REQUEST_RETRYABLE_ERRORS:
+                            raise
 
-                    LOGGER.debug(
-                        "Request failed (%s), retry attempt %s of %s",
-                        e,
-                        attempt + 1,
-                        INTERNAL_REQUEST_MAX_RETRIES,
+                        # We can't do anything but retry if the error is transient, we
+                        # have not just tried retrying it once, we are sending the
+                        # request to group, or we are sending a broadcast
+                        if (
+                            status in REQUEST_TRANSIENT_ERRORS
+                            or attempt == 0
+                            or device is None
+                        ):
+                            await asyncio.sleep(REQUEST_TRANSIENT_ERROR_RETRY_DELAY)
+                            continue
+
+                        # Child aging is disabled so if a child switches parents from
+                        # the coordinator to another router, we will not be able to
+                        # re-discover a route to it. We have to manually drop the child
+                        # to do this.
+                        if (
+                            status == t.Status.MAC_TRANSACTION_EXPIRED
+                            and association is None
+                            and not tried_assoc_remove
+                        ):
+                            # XXX: do we use NWK or IEEE?
+                            association = await self._znp.request(
+                                c.Util.AssocGetWithAddress(
+                                    IEEE=device.ieee,
+                                    NWK=device.nwk,
+                                )
+                            )
+
+                            if association.nodeRelation != c.util.NodeRelation.NOTUSED:
+                                try:
+                                    await self._znp.request(
+                                        c.Util.AssocRemove(IEEE=device.ieee)
+                                    )
+                                    tried_assoc_remove = True
+                                except CommandNotRecognized:
+                                    LOGGER.debug(
+                                        "The UTIL.AssocRemove command is available only"
+                                        " in Z-Stack releases built after 20201017"
+                                    )
+                        elif not tried_route_discovery:
+                            # If that doesn't work, try re-discovering the route.
+                            # While we can in theory poll and wait until until it's
+                            # fixed, letting the retry mechanism deal with it simpler.
+                            await self._discover_route(device.nwk)
+                            tried_route_discovery = True
+                        elif not tried_find_new_nwk and dst_addr.mode == t.AddrMode.NWK:
+                            # Finally, try checking to see if the device changed its
+                            # address but we missed the change
+                            try:
+                                nwk_addr_rsp = await self._znp.request_callback_rsp(
+                                    request=c.ZDO.NwkAddrReq.Req(
+                                        IEEE=device.ieee,
+                                        RequestType=0x00,  # we don't need child info
+                                        StartIndex=0,
+                                    ),
+                                    RspStatus=t.Status.SUCCESS,
+                                    callback=c.ZDO.NwkAddrRsp.Callback(
+                                        partial=True,
+                                        IEEE=device.ieee,
+                                    ),
+                                    timeout=2,  # We don't want to wait forever
+                                )
+                            except asyncio.TimeoutError:
+                                nwk_addr_rsp = None
+
+                            tried_find_new_nwk = True
+
+                            if (
+                                nwk_addr_rsp is not None
+                                and nwk_addr_rsp.Status == t.ZDOStatus.SUCCESS
+                                and nwk_addr_rsp.NWK != device.nwk
+                            ):
+                                LOGGER.warning(
+                                    "Device NWK change detected for %s: %s => %s",
+                                    device.ieee,
+                                    device.nwk,
+                                    nwk_addr_rsp.NWK,
+                                )
+
+                                # No point in continuing to retry
+                                dst_addr.address = device.nwk
+                                device.nwk = nwk_addr_rsp.NWK
+                        else:
+                            # We've tried everything already so at this point just wait
+                            await asyncio.sleep(REQUEST_TRANSIENT_ERROR_RETRY_DELAY)
+
+                        LOGGER.debug(
+                            "Request failed (%s), retry attempt %s of %s",
+                            e,
+                            attempt + 1,
+                            REQUEST_MAX_RETRIES,
+                        )
+                else:
+                    raise RuntimeError(
+                        f"Request failed after {REQUEST_MAX_RETRIES} attempts:"
+                        f" {status!r}"
                     )
-            else:
-                raise RuntimeError(
-                    f"Request failed after {INTERNAL_REQUEST_MAX_RETRIES} attempts"
+        finally:
+            # We *must* re-add the device association if we previously removed it but
+            # the request still failed. Otherwise, it may be a direct child and we will
+            # not be able to find it again.
+            if tried_assoc_remove and response is None:
+                await self._znp.request(
+                    c.Util.AssocAdd(
+                        NWK=device.nwk,
+                        IEEE=device.ieee,
+                        NodeRelation=association.NodeRelation,
+                    )
                 )
 
         if response.Status != t.Status.SUCCESS:
