@@ -697,18 +697,26 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         for parent in parents:
             async with self._limit_concurrency():
-                await self._znp.request_callback_rsp(
-                    request=c.ZDO.MgmtLeaveReq.Req(
-                        DstAddr=parents[-1].nwk,
-                        IEEE=device.ieee,
-                        RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
-                    ),
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.ZDO.MgmtLeaveRsp.Callback(
-                        Src=parents[-1].nwk,
-                        partial=True,
-                    ),
-                )
+                try:
+                    await self._znp.request_callback_rsp(
+                        request=c.ZDO.MgmtLeaveReq.Req(
+                            DstAddr=parents[-1].nwk,
+                            IEEE=device.ieee,
+                            RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
+                        ),
+                        RspStatus=t.Status.SUCCESS,
+                        callback=c.ZDO.MgmtLeaveRsp.Callback(
+                            Src=parents[-1].nwk,
+                            partial=True,
+                        ),
+                    )
+                except Exception as e:
+                    LOGGER.warning(
+                        "Failed to remove device %s from parent %s: %s",
+                        device.ieee,
+                        parent.nwk,
+                        e,
+                    )
 
     async def permit_ncp(self, time_s: int) -> None:
         """
