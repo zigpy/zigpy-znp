@@ -226,30 +226,147 @@ class Status(MissingEnumMixin, basic.enum_uint8):
     NWK_NO_ACK = 0xCC  # not in spec
     NWK_NO_ROUTE = 0xCD
 
+    # The operation is not supported in the current configuration
+    MAC_UNSUPPORTED = 0x18
+
+    # The operation could not be performed in the current state
+    MAC_BAD_STATE = 0x19
+
+    # The operation could not be completed because no memory resources were available
+    MAC_NO_RESOURCES = 0x1A
+
+    # For internal use only
+    MAC_ACK_PENDING = 0x1B
+
+    # For internal use only
+    MAC_NO_TIME = 0x1C
+
+    # For internal use only
+    MAC_TX_ABORTED = 0x1D
+
+    # For internal use only - A duplicated entry is added to the source matching table
+    MAC_DUPLICATED_ENTRY = 0x1E
+
+    # The frame counter puportedly applied by the originator of the received frame
+    # is invalid
+    MAC_COUNTER_ERROR = 0xDB
+
+    # The key purportedly applied by the originator of the received frame is not allowed
+    MAC_IMPROPER_KEY_TYPE = 0xDC
+
+    # The security level purportedly applied by the originator of the received frame
+    # does not meet the minimum security level
+    MAC_IMPROPER_SECURITY_LEVEL = 0xDD
+
+    # The received frame was secured with legacy security which is not supported
+    MAC_UNSUPPORTED_LEGACY = 0xDE
+
+    # The security of the received frame is not supported
+    MAC_UNSUPPORTED_SECURITY = 0xDF
+
+    # The beacon was lost following a synchronization request
     MAC_BEACON_LOSS = 0xE0
+
+    # The operation or data request failed because of activity on the channel
     MAC_CHANNEL_ACCESS_FAILURE = 0xE1
+
+    # The MAC was not able to enter low power mode.
     MAC_DENIED = 0xE2
+
+    # Unused
     MAC_DISABLE_TRX_FAILURE = 0xE3
-    MAC_FAILED_SECURITY_CHECK = 0xE4
+
+    # Cryptographic processing of the secure frame failed
+    MAC_SECURITY_ERROR = 0xE4
+
+    # The received frame or frame resulting from an operation or data request is
+    # too long to be processed by the MAC
     MAC_FRAME_TOO_LONG = 0xE5
+
+    # Unused
     MAC_INVALID_GTS = 0xE6
+
+    # The purge request contained an invalid handle
     MAC_INVALID_HANDLE = 0xE7
+
+    # The API function parameter is out of range
     MAC_INVALID_PARAMETER = 0xE8
+
+    # The operation or data request failed because no acknowledgement was received
     MAC_NO_ACK = 0xE9
+
+    # The scan request failed because no beacons were received or the orphan scan failed
+    # because no coordinator realignment was received
     MAC_NO_BEACON = 0xEA
+
+    # The associate request failed because no associate response was received or the
+    # poll request did not return any data
     MAC_NO_DATA = 0xEB
-    MAC_NO_SHORT_ADDR = 0xEC
+
+    # The short address parameter of the start request was invalid
+    MAC_NO_SHORT_ADDRESS = 0xEC
+
+    # Unused
     MAC_OUT_OF_CAP = 0xED
-    MAC_PANIDCONFLICT = 0xEE
+
+    # A PAN identifier conflict has been detected and communicated to the PAN
+    # coordinator
+    MAC_PAN_ID_CONFLICT = 0xEE
+
+    # A coordinator realignment command has been received
     MAC_REALIGNMENT = 0xEF
 
+    # The associate response, disassociate request, or indirect data transmission failed
+    # because the peer device did not respond before the transaction expired or was
+    # purged
     MAC_TRANSACTION_EXPIRED = 0xF0
-    MAC_TRANSACTION_OVER_FLOW = 0xF1
+
+    # The request failed because MAC data buffers are full
+    MAC_TRANSACTION_OVERFLOW = 0xF1
+
+    # Unused
     MAC_TX_ACTIVE = 0xF2
-    MAC_UN_AVAILABLE_KEY = 0xF3
+
+    # The operation or data request failed because the security key is not available
+    MAC_UNAVAILABLE_KEY = 0xF3
+
+    # The set or get request failed because the attribute is not supported
     MAC_UNSUPPORTED_ATTRIBUTE = 0xF4
-    MAC_UNSUPPORTED = 0xF5
-    MAC_SRC_MATCH_INVALID_INDEX = 0xFF
+
+    # The data request failed because neither the source address nor destination address
+    # parameters were present
+    MAC_INVALID_ADDRESS = 0xF5
+
+    # Unused
+    MAC_ON_TIME_TOO_LONG = 0xF6
+
+    # Unused
+    MAC_PAST_TIME = 0xF7
+
+    # The start request failed because the device is not tracking the beacon of its
+    # coordinator
+    MAC_TRACKING_OFF = 0xF8
+
+    # Unused
+    MAC_INVALID_INDEX = 0xF9
+
+    # The scan terminated because the PAN descriptor storage limit was reached
+    MAC_LIMIT_REACHED = 0xFA
+
+    # A set request was issued with a read-only identifier
+    MAC_READ_ONLY = 0xFB
+
+    # The scan request failed because a scan is already in progress
+    MAC_SCAN_IN_PROGRESS = 0xFC
+
+    # The beacon start time overlapped the coordinator transmission time
+    MAC_SUPERFRAME_OVERLAP = 0xFD
+
+    # The AUTOPEND pending all is turned on
+    MAC_AUTOACK_PENDING_ALL_ON = 0xFE
+
+    # The AUTOPEND pending all is turned off
+    MAC_AUTOACK_PENDING_ALL_OFF = 0xFF
 
 
 class ResetReason(basic.enum_uint8):
