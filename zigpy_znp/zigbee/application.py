@@ -1422,7 +1422,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         ):
                             # XXX: do we use NWK or IEEE?
                             association = await self._znp.request(
-                                c.Util.AssocGetWithAddress(
+                                c.Util.AssocGetWithAddress.Req(
                                     IEEE=device.ieee,
                                     NWK=device.nwk,
                                 )
@@ -1431,7 +1431,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             if association.nodeRelation != c.util.NodeRelation.NOTUSED:
                                 try:
                                     await self._znp.request(
-                                        c.Util.AssocRemove(IEEE=device.ieee)
+                                        c.Util.AssocRemove.Req(IEEE=device.ieee)
                                     )
                                     tried_assoc_remove = True
                                 except CommandNotRecognized:
@@ -1503,7 +1503,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # not be able to find it again.
             if tried_assoc_remove and response is None:
                 await self._znp.request(
-                    c.Util.AssocAdd(
+                    c.Util.AssocAdd.Req(
                         NWK=device.nwk,
                         IEEE=device.ieee,
                         NodeRelation=association.NodeRelation,
