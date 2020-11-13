@@ -859,32 +859,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         LOGGER.info("ZDO device announce: %s", msg)
-
-        try:
-            device = self.get_device(ieee=msg.IEEE)
-        except KeyError:
-            LOGGER.warning(
-                "Received a ZDO message from an unknown device: %s", msg.IEEE
-            )
-            return
-
-        # We turn this back into a ZDO message and let zigpy handle it
-        self._receive_zdo_message(
-            cluster=ZDOCmd.Device_annce,
-            tsn=0xFF,
-            sender=device,
-            NWKAddr=msg.NWK,
-            IEEEAddr=msg.IEEE,
-            Capability=msg.Capabilities,
-        )
+        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=None)
 
     def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
         """
         ZDO trust center device join callback
         """
 
-        LOGGER.info("TC device join: %s", msg)
-        self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
+        LOGGER.info("TC device join (ignored): %s", msg)
 
     def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
         LOGGER.info("ZDO device left: %s", msg)
