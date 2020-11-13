@@ -31,7 +31,7 @@ async def test_callback_rsp(connected_znp, event_loop):
             SrcEndpoint=78,
             ClusterId=90,
             TSN=1,
-            Options=c.af.TransmitOptions.RouteDiscovery,
+            Options=c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK,
             Radius=30,
             Data=b"hello",
         ),

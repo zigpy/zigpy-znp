@@ -4,15 +4,19 @@ import zigpy_znp.types as t
 class TransmitOptions(t.enum_flag_uint8):
     NONE = 0
 
-    Reserved1 = 1 << 0
-    Reserved2 = 1 << 1
-    Reserved3 = 1 << 2
-    Reserved4 = 1 << 3
+    # Will force the message to use Wildcard ProfileID
+    WILDCARD_PROFILEID = 0x02
 
-    APSAck = 1 << 4
-    RouteDiscovery = 1 << 5
-    APSSecurity = 1 << 6
-    SkipRouting = 1 << 7
+    # Will force APS to callback to preprocess before calling NWK layer
+    APS_PREPROCESS = 0x04
+    LIMIT_CONCENTRATOR = 0x08
+    ACK_REQUEST = 0x10
+
+    # Suppress Route Discovery for intermediate routes (route discovery preformed for
+    # initiating device)
+    SUPPRESS_ROUTE_DISC_NETWORK = 0x20
+    ENABLE_SECURITY = 0x40
+    SKIP_ROUTING = 0x80
 
 
 class LatencyReq(t.enum_uint8):

@@ -597,10 +597,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         expect_reply=True,
         use_ieee=False,
     ) -> typing.Tuple[t.Status, str]:
-        tx_options = c.af.TransmitOptions.RouteDiscovery
+        tx_options = c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
 
         if expect_reply:
-            tx_options |= c.af.TransmitOptions.APSAck
+            tx_options |= c.af.TransmitOptions.ACK_REQUEST
 
         if use_ieee:
             destination = t.AddrModeAddress(mode=t.AddrMode.IEEE, address=device.ieee)
