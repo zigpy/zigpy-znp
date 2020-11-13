@@ -98,7 +98,7 @@ async def main(argv):
 
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
 
-    await znp.connect(check_version=False)
+    await znp.connect()
     await nvram_reset(znp, clear=args.clear)
 
 

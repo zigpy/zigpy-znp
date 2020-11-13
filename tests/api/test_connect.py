@@ -15,14 +15,14 @@ async def test_connect_no_communication(connected_znp):
     assert znp_server._uart.data_received.call_count == 0
 
 
-async def test_connect_skip_bootloader(make_znp_server, mocker):
+async def test_connect_skip_bootloader(make_znp_server):
     znp_server = make_znp_server(server_cls=BaseServerZNP)
     znp = ZNP(config_for_port_path(FAKE_SERIAL_PORT))
 
     await znp.connect(test_port=False)
 
     # Nothing should have been sent except for bootloader skip bytes
-    # XXX: `c[-2][0] == c.args[0]`
+    # NOTE: `c[-2][0]` is `c.args[0]`, just compatible with all Python versions
     data_written = b"".join(c[-2][0] for c in znp_server._uart.data_received.mock_calls)
     assert set(data_written) == {0xEF}
     assert len(data_written) >= 167

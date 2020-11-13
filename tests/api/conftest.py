@@ -20,7 +20,7 @@ def connected_znp(event_loop, make_znp_server, mocker):
     znp = ZNP(config)
     znp_server = make_znp_server(server_cls=BaseServerZNP)
 
-    event_loop.run_until_complete(znp.connect(test_port=False, check_version=False))
+    event_loop.run_until_complete(znp.connect(test_port=False))
 
     yield znp, znp_server
 

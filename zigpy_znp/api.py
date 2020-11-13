@@ -184,7 +184,7 @@ class ZNP:
     def _port_path(self) -> str:
         return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
-    async def connect(self, *, test_port=True, check_version=True) -> None:
+    async def connect(self, *, test_port=True) -> None:
         """
         Connects to the device specified by the "device" section of the config dict.
 
@@ -231,18 +231,7 @@ class ZNP:
                 LOGGER.debug("Testing connection to %s", self._port_path)
 
                 # Make sure that our port works
-                version = await self.request(c.SYS.Version.Req())
-
-                if (version.TransportRev, version.MajorRel, version.MinorRel) not in {
-                    (2, 2, 6),
-                    (2, 2, 7),
-                }:
-                    raise RuntimeError(
-                        f"Your device is running an unsupported"
-                        f" release of Z-Stack: {version}"
-                    )
-
-                self._version = version
+                self._version = await self.request(c.SYS.Version.Req())
                 self._capabilities = (await self.request(c.SYS.Ping.Req())).Capabilities
         except Exception:
             LOGGER.debug("Connection to %s failed, cleaning up", self._port_path)
