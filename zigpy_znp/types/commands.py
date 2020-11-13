@@ -307,6 +307,7 @@ class CommandBase:
 
     def __init__(self, *, partial=False, **params):
         super().__setattr__("_partial", partial)
+        super().__setattr__("_bound_params", {})
 
         all_params = [p.name for p in self.schema]
         optional_params = [p.name for p in self.schema if p.optional]
@@ -473,12 +474,19 @@ class CommandBase:
         params = tuple(self._bound_params.items())
         return hash((type(self), self.header, self.schema, params))
 
-    def __getattr__(self, key):
-        if key not in self._bound_params:
-            raise AttributeError(f"{self} has no attribute {key!r}")
+    def __getattribute__(self, key):
+        try:
+            return object.__getattribute__(self, key)
+        except AttributeError:
+            pass
 
-        param, value = self._bound_params[key]
-        return value
+        try:
+            param, value = object.__getattribute__(self, "_bound_params")[key]
+            return value
+        except KeyError:
+            pass
+
+        raise AttributeError(f"{self} has no attribute {key!r}")
 
     def __setattr__(self, key, value):
         raise RuntimeError("Command instances are immutable")
