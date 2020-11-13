@@ -1376,6 +1376,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         tried_assoc_remove = False
         tried_route_discovery = False
         tried_find_new_nwk = False
+        tried_disable_route_suppression = False
 
         # Don't release the concurrency-limiting semaphore until we are done trying.
         # There is no point in allowing requests to take turns getting buffer errors.
@@ -1483,6 +1484,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 # No point in continuing to retry
                                 dst_addr.address = device.nwk
                                 device.nwk = nwk_addr_rsp.NWK
+                        elif not tried_disable_route_suppression:
+                            # As a last resort, disable route discovery suppression
+                            options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
+                            tried_disable_route_suppression = True
                         else:
                             # We've tried everything already so at this point just wait
                             await asyncio.sleep(REQUEST_TRANSIENT_ERROR_RETRY_DELAY)
