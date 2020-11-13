@@ -1,12 +1,23 @@
 import typing
 import asyncio
 import logging
+import platform
 import warnings
 from collections import defaultdict
 
 import serial
 import serial.tools
-from serial.tools.list_ports import comports as list_com_ports
+
+try:
+    from serial.tools.list_ports import comports as list_com_ports
+except ValueError:
+    # macOS Big Sur can't import this method with current PySerial
+    if platform.system() != "Darwin":
+        raise
+
+    def list_com_ports():
+        return []
+
 
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
