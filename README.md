@@ -78,8 +78,8 @@ zha:
       auto_reconnect_retry_delay: 5
 ```
 
-# NVRAM Backup and restore
-A complete NVRAM backup and restore can be performed between similar devices and Z-Stack versions:
+# NVRAM
+A complete NVRAM backup and restore can be performed between similar devices and Z-Stack versions to copy your network between similar devices:
 
 ```console
 (venv) $ python -m zigpy_znp.tools.nvram_read /dev/serial/by-id/old_radio -o backup.json
@@ -92,6 +92,17 @@ A complete NVRAM backup and restore can be performed between similar devices and
      Perform a backup before upgrading and restore it after to preserve your settings.
      You will experience some routing issues while the coordinator rebuilds its routing table.
  - CC2531 backups can only be restored to CC2531 devices running similar firmware versions.
+
+You can erase the NVRAM entries in your device and reset it by running one of the following commands:
+
+```console
+# Erases the NVRAM items that indicate that a network has been formed
+(venv) $ python -m zigpy_znp.tools.nvram_reset /dev/serial/by-id/your-radio
+
+# Erases every single NVRAM item, resetting your stick as much as possible
+# Unplug and re-plug the adapter after doing this
+(venv) $ python -m zigpy_znp.tools.nvram_reset -c /dev/serial/by-id/your-radio
+```
 
 # Energy scan
 Perform an energy scan to find a quiet Zigbee channel:
