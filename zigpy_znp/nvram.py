@@ -118,24 +118,17 @@ class NVRAMHelper:
                 )
 
                 data += read_rsp.Value
-        except InvalidCommandResponse:
-            # Not all items can be read out due to security policies, though this can
-            # easily be bypassed for some
-            if (
-                not nvids.is_secure_nvid(nv_id)
-                or not self.znp._capabilities & t.MTCapabilities.CAP_SAPI
-            ):
-                raise
+        except InvalidCommandResponse as e:
+            # Only expected status code is INVALID_PARAMETER
+            assert e.response.Status == t.Status.INVALID_PARAMETER
 
-            # The SAPI "ConfigId" is only 8 bits, which means some nvids are not
-            # able to read this way
-            if nv_id > 0xFF:
+            # Not all items can be read out due to security policies, though this can
+            # easily be bypassed for some. The SAPI "ConfigId" is only 8 bits which
+            # means some nvids are not able to read this way.
+            if not self.znp._capabilities & t.MTCapabilities.CAP_SAPI or nv_id > 0xFF:
                 raise SecurityError(
                     f"NV item cannot be read due to security constraints: {nv_id!r}"
                 )
-
-            # It is impossible to read an item that will not fit in a single response
-            assert length <= 247
 
             read_rsp = await self.znp.request(
                 c.SAPI.ZBReadConfiguration.Req(ConfigId=nv_id),

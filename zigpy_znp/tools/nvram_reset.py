@@ -31,13 +31,10 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
             end = NWK_NVID_TABLES[nvid]
 
             for nvid in range(start, end + 1):
-                try:
-                    deleted = await znp.nvram.osal_delete(nvid)
-                    LOGGER.info("Cleared %s[%s]", start, nvid - start)
+                deleted = await znp.nvram.osal_delete(nvid)
+                LOGGER.info("Cleared %s[%s]", start, nvid - start)
 
-                    if not deleted:
-                        break
-                except KeyError:
+                if not deleted:
                     break
         elif nvid in NWK_NVID_TABLE_KEYS:
             continue

@@ -8,7 +8,6 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 
@@ -42,18 +41,13 @@ async def restore(radio_path, backup):
             sub_id = int(sub_id, 16)
             value = bytes.fromhex(value)
 
-            try:
-                await znp.nvram.write(
-                    sys_id=NvSysIds.ZSTACK,
-                    item_id=item_id,
-                    sub_id=sub_id,
-                    value=value,
-                    create=True,
-                )
-            except InvalidCommandResponse:
-                LOGGER.warning(
-                    "Write failed for %s[0x%04X] = %s", item_name, sub_id, value
-                )
+            await znp.nvram.write(
+                sys_id=NvSysIds.ZSTACK,
+                item_id=item_id,
+                sub_id=sub_id,
+                value=value,
+                create=True,
+            )
 
     # Reset afterwards to have the new values take effect
     await znp.request_callback_rsp(

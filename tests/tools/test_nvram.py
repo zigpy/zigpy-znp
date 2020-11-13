@@ -9,7 +9,7 @@ from zigpy_znp.tools.nvram_read import main as nvram_read
 from zigpy_znp.tools.nvram_reset import main as nvram_reset
 from zigpy_znp.tools.nvram_write import main as nvram_write
 
-from ..conftest import ALL_DEVICES
+from ..conftest import ALL_DEVICES, BaseZStack1CC2531
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -55,6 +55,14 @@ async def test_nvram_read(device, make_znp_server, tmp_path, mocker):
     # Make one reaaally long, requiring multiple writes to read it
     znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\xFF" * 300
 
+    # Make a few secure but unreadable
+    if issubclass(device, BaseZStack1CC2531):
+        # Normal NVID
+        znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.TCLK_SEED] = b"\xFF" * 32
+
+        # Part of a table
+        znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.LEGACY_TCLK_TABLE_START] = b"\xFF"
+
     # XXX: this is not a great way to do it but deepcopy won't work here
     old_nvram_repr = repr(znp_server.nvram)
 
@@ -63,6 +71,11 @@ async def test_nvram_read(device, make_znp_server, tmp_path, mocker):
 
     # No NVRAM was modified during the read
     assert repr(znp_server.nvram) == old_nvram_repr
+
+    # Remove the item since it won't be present in the backup
+    if issubclass(device, BaseZStack1CC2531):
+        del znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.TCLK_SEED]
+        del znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.LEGACY_TCLK_TABLE_START]
 
     # The backup JSON written to disk should be an exact copy
     assert json.loads(backup_file.read_text()) == dump_nvram(znp_server)
