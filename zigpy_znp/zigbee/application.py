@@ -1324,7 +1324,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 # Both the callback and the response can have an error status
                 if response.Status != t.Status.SUCCESS:
                     raise InvalidCommandResponse(
-                        "Unsuccessful request status code", response
+                        f"Unsuccessful request status code: {response.Status!r}",
+                        response,
                     )
 
         return response
