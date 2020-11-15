@@ -1,3 +1,6 @@
+from zigpy.exceptions import DeliveryError
+
+
 class InvalidFrame(ValueError):
     pass
 
@@ -6,15 +9,11 @@ class SecurityError(Exception):
     pass
 
 
-class CommandError(Exception):
+class CommandNotRecognized(Exception):
     pass
 
 
-class CommandNotRecognized(CommandError):
-    pass
-
-
-class InvalidCommandResponse(CommandError):
+class InvalidCommandResponse(DeliveryError):
     def __init__(self, message, response):
         super().__init__(message)
         self.response = response

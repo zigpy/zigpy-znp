@@ -25,7 +25,6 @@ from zigpy.zdo.types import (
     ZDOHeader,
     MultiAddress,
 )
-from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -54,7 +53,7 @@ DATA_CONFIRM_TIMEOUT = 8  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 
 REQUEST_MAX_RETRIES = 10
-REQUEST_TRANSIENT_ERROR_RETRY_DELAY = 0.5  # second
+REQUEST_ERROR_RETRY_DELAY = 0.5  # second
 
 # Errors that go away on their own after waiting for a bit
 REQUEST_TRANSIENT_ERRORS = {
@@ -62,6 +61,7 @@ REQUEST_TRANSIENT_ERRORS = {
     t.Status.MAC_CHANNEL_ACCESS_FAILURE,
     t.Status.MAC_NO_RESOURCES,
     t.Status.MEM_ERROR,
+    t.Status.NWK_TABLE_FULL,
 }
 
 REQUEST_ROUTING_ERRORS = {
@@ -126,6 +126,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._nib = NIB()
         self._network_key = None
         self._concurrent_requests_semaphore = None
+        self._route_discovery_futures = {}
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
@@ -184,6 +185,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         self._reconnect_task.cancel()
+
+        for f in self._route_discovery_futures.values():
+            f.cancel()
+
+        self._route_discovery_futures.clear()
 
         if self._znp is not None:
             self._znp.close()
@@ -662,7 +668,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         return await self._send_request(
             dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=group_id),
             dst_ep=src_ep,
-            src_ep=src_ep,  # not actually used?
+            src_ep=src_ep,
             profile=profile,
             cluster=cluster,
             sequence=sequence,
@@ -790,7 +796,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._znp = None
 
-        # exc=None means that the connection was closed
+        # exc=None means the connection was closed
         if exc is None:
             LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
             return
@@ -877,6 +883,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             IEEEAddr=msg.IEEE,
             Capability=msg.Capabilities,
         )
+
+        asyncio.create_task(self._discover_route(msg.NWK))
 
     def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
         """
@@ -1194,8 +1202,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         zdo_args, _ = list_deserialize(data, field_types)
         zdo_kwargs = dict(zip(field_names, zdo_args))
 
-        device = self.get_device(nwk=dst_addr.address)
-
         if cluster not in ZDO_CONVERTERS:
             LOGGER.error(
                 "ZDO converter for cluster %s has not been implemented!"
@@ -1207,8 +1213,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Call the converter with the ZDO request's kwargs
         req_factory, rsp_factory, zdo_rsp_factory = ZDO_CONVERTERS[cluster]
-        request = req_factory(dst_addr.address, device, **zdo_kwargs)
-        callback = rsp_factory(dst_addr.address)
+        request = req_factory(dst_addr, **zdo_kwargs)
+        callback = rsp_factory(dst_addr)
 
         LOGGER.debug(
             "Intercepted AP ZDO request %s(%s) and replaced with %s",
@@ -1217,19 +1223,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             request,
         )
 
-        try:
-            async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
-                response = await self._znp.request_callback_rsp(
-                    request=request, RspStatus=t.Status.SUCCESS, callback=callback
-                )
-        except InvalidCommandResponse as e:
-            raise DeliveryError(f"Could not send command: {e.response.Status}") from e
+        async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
+            response = await self._znp.request_callback_rsp(
+                request=request, RspStatus=t.Status.SUCCESS, callback=callback
+            )
 
-        zdo_rsp_cluster, zdo_response_kwargs = zdo_rsp_factory(response)
+        # Z-Stack ZDO also returns "replies" for broadcasts, which we can't handle
+        if dst_addr.mode == t.AddrMode.NWK:
+            zdo_rsp_cluster, zdo_response_kwargs = zdo_rsp_factory(response)
 
-        self._receive_zdo_message(
-            cluster=zdo_rsp_cluster, tsn=sequence, sender=device, **zdo_response_kwargs
-        )
+            self._receive_zdo_message(
+                cluster=zdo_rsp_cluster,
+                tsn=sequence,
+                sender=self.get_device(nwk=dst_addr.address),
+                **zdo_response_kwargs,
+            )
 
         return response
 
@@ -1252,27 +1260,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # ZDO requests must be handled by the translation layer, since Z-Stack will
         # "steal" the responses
-        if dst_ep == ZDO_ENDPOINT and not (
-            cluster == ZDOCmd.Mgmt_Permit_Joining_req
-            and dst_addr.mode == t.AddrMode.Broadcast
-        ):
-            # ZDO requests will not trigger `ZDO.DataConfirm` messages indicating that
-            # a route is missing so we need to explicitly check for one.
-            if dst_addr.mode != t.AddrMode.Broadcast and dst_addr.address != 0x0000:
-                route_status = await self._znp.request(
-                    c.ZDO.ExtRouteChk.Req(
-                        Dst=dst_addr.address,
-                        RtStatus=c.zdo.RouteStatus.ACTIVE,
-                        Options=(
-                            c.zdo.RouteOptions.MTO_ROUTE
-                            | c.zdo.RouteOptions.NO_ROUTE_CACHE
-                        ),
-                    )
-                )
-
-                if route_status.Status != c.zdo.RoutingStatus.SUCCESS:
-                    await self._discover_route(dst_addr.address)
-
+        if dst_ep == ZDO_ENDPOINT:
             return await self._send_zdo_request(
                 dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
             )
@@ -1330,20 +1318,35 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return response
 
-    async def _discover_route(self, nwk: t.NWK):
+    async def _discover_route(self, nwk: t.NWK) -> None:
         """
         Instructs the coordinator to re-discover routes to the provided NWK.
+        Runs concurrently and at most once per NWK, even if called multiple times.
         """
 
-        await self._znp.request(
-            c.ZDO.ExtRouteDisc.Req(
-                Dst=nwk,
-                Options=c.zdo.RouteDiscoveryOptions.UNICAST,
-                Radius=0,
-            ),
-        )
+        # Both Z-Stack 1.2 and Z-Stack 3.0.2 on the CC2531 are unstable (Z2M#2901)
+        if self.is_cc2531:
+            return
 
-        await asyncio.sleep(0.1 * self._nib.RouteDiscoveryTime)
+        if nwk in self._route_discovery_futures:
+            return await self._route_discovery_futures[nwk]
+
+        future = asyncio.get_running_loop().create_future()
+        self._route_discovery_futures[nwk] = future
+
+        try:
+            await self._znp.request(
+                c.ZDO.ExtRouteDisc.Req(
+                    Dst=nwk,
+                    Options=c.zdo.RouteDiscoveryOptions.UNICAST,
+                    Radius=30,
+                ),
+            )
+
+            await asyncio.sleep(0.1 * self._nib.RouteDiscoveryTime)
+        finally:
+            future.set_result(True)
+            del self._route_discovery_futures[nwk]
 
     async def _send_request(
         self,
@@ -1384,6 +1387,28 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             async with self._limit_concurrency():
                 for attempt in range(REQUEST_MAX_RETRIES):
                     try:
+                        # ZDO requests do not generate `AF.DataConfirm` messages
+                        # indicating that a route is missing so we need to explicitly
+                        # check for one.
+                        if (
+                            dst_ep == ZDO_ENDPOINT
+                            and dst_addr.mode == t.AddrMode.NWK
+                            and dst_addr.address != 0x0000
+                        ):
+                            route_status = await self._znp.request(
+                                c.ZDO.ExtRouteChk.Req(
+                                    Dst=dst_addr.address,
+                                    RtStatus=c.zdo.RouteStatus.ACTIVE,
+                                    Options=(
+                                        c.zdo.RouteOptions.MTO_ROUTE
+                                        | c.zdo.RouteOptions.NO_ROUTE_CACHE
+                                    ),
+                                )
+                            )
+
+                            if route_status.Status != c.zdo.RoutingStatus.SUCCESS:
+                                await self._discover_route(dst_addr.address)
+
                         response = await self._send_request_raw(
                             dst_addr=dst_addr,
                             dst_ep=dst_ep,
@@ -1402,15 +1427,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         if status not in REQUEST_RETRYABLE_ERRORS:
                             raise
 
-                        # We can't do anything but retry if the error is transient, we
-                        # have not just tried retrying it once, we are sending the
-                        # request to group, or we are sending a broadcast
+                        # We cannot do anything but retry if the error is transient or
+                        # we are not sending a unicast request
                         if (
                             status in REQUEST_TRANSIENT_ERRORS
                             or attempt == 0
                             or device is None
                         ):
-                            await asyncio.sleep(REQUEST_TRANSIENT_ERROR_RETRY_DELAY)
+                            LOGGER.debug(
+                                "Request failed (%s), retry attempt %s of %s",
+                                e,
+                                attempt + 1,
+                                REQUEST_MAX_RETRIES,
+                            )
+                            await asyncio.sleep(3 * REQUEST_ERROR_RETRY_DELAY)
                             continue
 
                         # Child aging is disabled so if a child switches parents from
@@ -1439,12 +1469,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 except CommandNotRecognized:
                                     LOGGER.debug(
                                         "The UTIL.AssocRemove command is available only"
-                                        " in Z-Stack releases built after 20201017"
+                                        " in Z-Stack 3 releases built after 20201017"
                                     )
                         elif not tried_route_discovery:
                             # If that doesn't work, try re-discovering the route.
-                            # While we can in theory poll and wait until until it's
-                            # fixed, letting the retry mechanism deal with it simpler.
+                            # While we can in theory poll and wait until it is fixed,
+                            # letting the retry mechanism deal with it simpler.
                             await self._discover_route(device.nwk)
                             tried_route_discovery = True
                         elif not tried_find_new_nwk and dst_addr.mode == t.AddrMode.NWK:
@@ -1481,16 +1511,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                     nwk_addr_rsp.NWK,
                                 )
 
-                                # No point in continuing to retry
+                                # No point in retrying with the old address
                                 dst_addr.address = device.nwk
                                 device.nwk = nwk_addr_rsp.NWK
                         elif not tried_disable_route_suppression:
                             # As a last resort, disable route discovery suppression
                             options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
                             tried_disable_route_suppression = True
-                        else:
-                            # We've tried everything already so at this point just wait
-                            await asyncio.sleep(REQUEST_TRANSIENT_ERROR_RETRY_DELAY)
 
                         LOGGER.debug(
                             "Request failed (%s), retry attempt %s of %s",
@@ -1498,6 +1525,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             attempt + 1,
                             REQUEST_MAX_RETRIES,
                         )
+
+                        # We've tried everything already so at this point just wait
+                        await asyncio.sleep(REQUEST_ERROR_RETRY_DELAY)
                 else:
                     raise RuntimeError(
                         f"Request failed after {REQUEST_MAX_RETRIES} attempts:"

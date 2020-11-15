@@ -1,6 +1,5 @@
 from zigpy.zdo.types import ZDOCmd
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
 """
@@ -22,11 +21,11 @@ We use setup proxy functions that rewrite requests and responses based on their 
 ZDO_CONVERTERS = {
     ZDOCmd.Node_Desc_req: (
         (
-            lambda addr, device, NWKAddrOfInterest: c.ZDO.NodeDescReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
+            lambda addr, NWKAddrOfInterest: c.ZDO.NodeDescReq.Req(
+                DstAddr=addr.address, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (lambda addr: c.ZDO.NodeDescRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.NodeDescRsp.Callback(partial=True, Src=addr.address)),
         (
             lambda rsp: (
                 ZDOCmd.Node_Desc_rsp,
@@ -40,11 +39,11 @@ ZDO_CONVERTERS = {
     ),
     ZDOCmd.Active_EP_req: (
         (
-            lambda addr, device, NWKAddrOfInterest: c.ZDO.ActiveEpReq.Req(
-                DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest
+            lambda addr, NWKAddrOfInterest: c.ZDO.ActiveEpReq.Req(
+                DstAddr=addr.address, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (lambda addr: c.ZDO.ActiveEpRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.ActiveEpRsp.Callback(partial=True, Src=addr.address)),
         (
             lambda rsp: (
                 ZDOCmd.Active_EP_rsp,
@@ -58,13 +57,15 @@ ZDO_CONVERTERS = {
     ),
     ZDOCmd.Simple_Desc_req: (
         (
-            lambda addr, device, NWKAddrOfInterest, EndPoint: (
+            lambda addr, NWKAddrOfInterest, EndPoint: (
                 c.ZDO.SimpleDescReq.Req(
-                    DstAddr=addr, NWKAddrOfInterest=NWKAddrOfInterest, Endpoint=EndPoint
+                    DstAddr=addr.address,
+                    NWKAddrOfInterest=NWKAddrOfInterest,
+                    Endpoint=EndPoint,
                 )
             )
         ),
-        (lambda addr: c.ZDO.SimpleDescRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.SimpleDescRsp.Callback(partial=True, Src=addr.address)),
         (
             lambda rsp: (
                 ZDOCmd.Simple_Desc_rsp,
@@ -78,34 +79,34 @@ ZDO_CONVERTERS = {
     ),
     ZDOCmd.Mgmt_Permit_Joining_req: (
         (
-            lambda addr, device, PermitDuration, TC_Significant: (
+            lambda addr, PermitDuration, TC_Significant: (
                 c.ZDO.MgmtPermitJoinReq.Req(
-                    AddrMode=t.AddrMode.NWK,
-                    Dst=addr,
+                    AddrMode=addr.mode,
+                    Dst=addr.address,
                     Duration=PermitDuration,
                     TCSignificance=TC_Significant,
                 )
             )
         ),
-        (lambda addr: c.ZDO.MgmtPermitJoinRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.MgmtPermitJoinRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Mgmt_Permit_Joining_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Mgmt_Leave_req: (
         (
-            lambda addr, device, DeviceAddress, Options: c.ZDO.MgmtLeaveReq.Req(
-                DstAddr=addr,
-                IEEE=device.ieee,
+            lambda addr, DeviceAddress, Options: c.ZDO.MgmtLeaveReq.Req(
+                DstAddr=addr.address,
+                IEEE=DeviceAddress,
                 RemoveChildren_Rejoin=c.zdo.LeaveOptions(Options),
             )
         ),
-        (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Bind_req: (
         (
-            lambda addr, device, SrcAddress, SrcEndpoint, ClusterID, DstAddress: (
+            lambda addr, SrcAddress, SrcEndpoint, ClusterID, DstAddress: (
                 c.ZDO.BindReq.Req(
-                    Dst=addr,
+                    Dst=addr.address,
                     Src=SrcAddress,
                     SrcEndpoint=SrcEndpoint,
                     ClusterId=ClusterID,
@@ -113,19 +114,19 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Bind_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Mgmt_Lqi_req: (
         (
-            lambda addr, device, StartIndex: (
+            lambda addr, StartIndex: (
                 c.ZDO.MgmtLqiReq.Req(
-                    Dst=addr,
+                    Dst=addr.address,
                     StartIndex=StartIndex,
                 )
             )
         ),
-        (lambda addr: c.ZDO.MgmtLqiRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.MgmtLqiRsp.Callback(partial=True, Src=addr.address)),
         (
             lambda rsp: (
                 ZDOCmd.Mgmt_Lqi_rsp,
@@ -137,12 +138,12 @@ ZDO_CONVERTERS = {
         (
             lambda addr, StartIndex: (
                 c.ZDO.MgmtLqiReq.Req(
-                    Dst=addr,
+                    Dst=addr.address,
                     StartIndex=StartIndex,
                 )
             )
         ),
-        (lambda addr: c.ZDO.MgmtRtgRsp.Callback(partial=True, Src=addr)),
+        (lambda addr: c.ZDO.MgmtRtgRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Mgmt_Rtg_rsp, {"Status": rsp.Status})),
     ),
 }

@@ -58,7 +58,7 @@ class ForwardingSerialTransport:
         self.protocol.data_received(data)
 
     def close(self, *, error=ValueError("Connection was closed")):
-        LOGGER.error("Closing %s", self)
+        LOGGER.debug("Closing %s", self)
         if not self._is_connected:
             return
 

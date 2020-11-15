@@ -8,7 +8,6 @@ from zigpy.zdo.types import SizePrefixedSimpleDescriptor
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-from zigpy_znp.exceptions import InvalidCommandResponse
 
 from ..conftest import FORMED_DEVICES, FORMED_ZSTACK3_DEVICES
 
@@ -19,18 +18,22 @@ pytestmark = [pytest.mark.asyncio]
 async def test_permit_join(device, make_application):
     app, znp_server = make_application(server_cls=device)
 
-    # Handle the ZDO broadcast sent by Zigpy
-    data_req_sent = znp_server.reply_once_to(
-        request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
+    # Handle the permit join request sent by us
+    permit_join_unicast = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=10, partial=True
+        ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=0, TSN=1),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
-    # Handle the permit join request sent by us
-    permit_join_sent = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(Duration=10, partial=True),
+    # Handle the ZDO broadcast sent by Zigpy
+    permit_join_broadcast = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=10, partial=True
+        ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
@@ -41,7 +44,7 @@ async def test_permit_join(device, make_application):
     await app.permit(time_s=10)
 
     # Make sure both commands were received
-    await asyncio.gather(data_req_sent, permit_join_sent)
+    await asyncio.gather(permit_join_unicast, permit_join_broadcast)
 
     await app.shutdown()
 
@@ -50,21 +53,25 @@ async def test_permit_join(device, make_application):
 async def test_permit_join_failure(device, make_application):
     app, znp_server = make_application(server_cls=device)
 
-    # Handle the ZDO broadcast sent by Zigpy
-    data_req_sent = znp_server.reply_once_to(
-        request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
+    # Handle the permit join request sent by us
+    permit_join_unicast = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=10, partial=True
+        ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=0, TSN=1),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.TIMEOUT),
         ],
     )
 
-    # Handle the permit join request sent by us
-    permit_join_sent = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(Duration=10, partial=True),
+    # Handle the ZDO broadcast sent by Zigpy
+    permit_join_broadcast = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=10, partial=True
+        ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.TIMEOUT),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
@@ -74,13 +81,13 @@ async def test_permit_join_failure(device, make_application):
         await app.permit(time_s=10)
 
     # Make sure both commands were received
-    await asyncio.gather(data_req_sent, permit_join_sent)
+    await asyncio.gather(permit_join_unicast, permit_join_broadcast)
 
     await app.shutdown()
 
 
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
-@pytest.mark.parametrize("status", [t.Status.SUCCESS, t.Status.MAC_MEM_ERROR])
+@pytest.mark.parametrize("status", [t.ZDOStatus.SUCCESS, t.ZDOStatus.TIMEOUT])
 async def test_permit_join_with_key(device, status, make_application):
     app, znp_server = make_application(server_cls=device)
 
@@ -104,18 +111,22 @@ async def test_permit_join_with_key(device, status, make_application):
         ],
     )
 
-    # Handle the ZDO broadcast sent by Zigpy (or fail)
-    data_req_sent = znp_server.reply_once_to(
-        request=c.AF.DataRequestExt.Req(partial=True, SrcEndpoint=0, DstEndpoint=0),
+    # Handle the permit join request sent by us (or fail)
+    permit_join_unicast = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=1, partial=True
+        ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=status),
-            c.AF.DataConfirm.Callback(Status=t.Status.SUCCESS, Endpoint=0, TSN=1),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=status),
         ],
     )
 
-    # Handle the permit join request sent by us
-    permit_join_sent = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
+    # Handle the ZDO broadcast sent by Zigpy
+    permit_join_broadcast = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=1, partial=True
+        ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
@@ -131,17 +142,15 @@ async def test_permit_join_with_key(device, status, make_application):
 
     await app.startup(auto_form=False)
 
-    with contextlib.nullcontext() if status == t.Status.SUCCESS else pytest.raises(
-        InvalidCommandResponse
+    with contextlib.nullcontext() if status == t.ZDOStatus.SUCCESS else pytest.raises(
+        RuntimeError
     ):
         await app.permit_with_key(node=ieee, code=code, time_s=1)
 
     await bdb_add_install_code
     await join_enable_install_code
-    await data_req_sent
-
-    if status == t.Status.SUCCESS:
-        await permit_join_sent
+    await permit_join_unicast
+    await permit_join_broadcast
 
     # The install code policy is reset right after
     await join_disable_install_code
@@ -173,31 +182,22 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
     nwk = 0x6A7C
     ieee = t.EUI64.convert("00:17:88:01:08:64:6C:81")
 
-    # Handle the ZDO permit join broadcast sent by Zigpy
+    # Handle the permit join request sent by us (or fail)
     znp_server.reply_once_to(
-        request=c.AF.DataRequestExt.Req(
-            partial=True,
-            DstAddrModeAddress=t.AddrModeAddress(
-                mode=t.AddrMode.Broadcast,
-                address=zigpy.types.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
-            ),
-            DstEndpoint=0,
-            DstPanId=0x0000,
-            SrcEndpoint=0,
-            ClusterId=54,
-            Radius=0,
-            Data=b"\x01\x3C\x00",
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=60, partial=True
         ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            lambda r: c.AF.DataConfirm.Callback(
-                Status=t.Status.SUCCESS, Endpoint=0, TSN=r.TSN
-            ),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
+    # Handle the ZDO broadcast sent by Zigpy
     znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(partial=True),
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=60, partial=True
+        ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
