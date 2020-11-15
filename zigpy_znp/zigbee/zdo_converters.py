@@ -137,7 +137,7 @@ ZDO_CONVERTERS = {
     ZDOCmd.Mgmt_Rtg_req: (
         (
             lambda addr, StartIndex: (
-                c.ZDO.MgmtLqiReq.Req(
+                c.ZDO.MgmtRtgReq.Req(
                     Dst=addr.address,
                     StartIndex=StartIndex,
                 )
