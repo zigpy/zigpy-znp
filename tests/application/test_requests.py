@@ -9,7 +9,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.exceptions import InvalidCommandResponse
 
-from ..conftest import FORMED_DEVICES, CoroutineMock
+from ..conftest import FORMED_DEVICES, CoroutineMock, FormedLaunchpadCC26X2R1
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -436,10 +436,8 @@ async def test_request_cancellation_shielding(
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_request_route_rediscovery_zdo(
-    device, make_application, mocker, event_loop
-):
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_request_route_rediscovery_zdo(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
@@ -504,10 +502,8 @@ async def test_request_route_rediscovery_zdo(
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_request_route_rediscovery_af(
-    device, make_application, mocker, event_loop
-):
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_request_route_rediscovery_af(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
