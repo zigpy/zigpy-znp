@@ -36,7 +36,7 @@ async def test_permit_join(device, make_application):
         ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
@@ -71,7 +71,7 @@ async def test_permit_join_failure(device, make_application):
         ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
@@ -129,7 +129,7 @@ async def test_permit_join_with_key(device, status, make_application):
         ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
@@ -200,7 +200,7 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
         ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0xFFFC, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
             c.ZDO.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0000),
         ],
     )

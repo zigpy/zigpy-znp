@@ -1174,9 +1174,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self, dst_addr, dst_ep, src_ep, cluster, sequence, options, radius, data
     ):
         """
-        Zigpy doesn't send ZDO requests via TI's ZDO_* MT commands,
-        so it will never receive a reply because ZNP intercepts ZDO replies, never
-        sends a DataConfirm, and instead replies with one of its ZDO_* MT responses.
+        Zigpy doesn't send ZDO requests via TI's ZDO_* MT commands, so it will never
+        receive a reply because ZNP intercepts ZDO replies, never sends a DataConfirm,
+        and instead replies with one of its ZDO_* MT responses.
 
         This method translates the ZDO_* MT response into one zigpy can handle.
         """
@@ -1223,12 +1223,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             request,
         )
 
+        # The coordinator responds to broadcasts
+        if dst_addr.mode == t.AddrMode.Broadcast:
+            callback = callback.replace(Src=0x0000)
+
         async with async_timeout.timeout(ZDO_REQUEST_TIMEOUT):
             response = await self._znp.request_callback_rsp(
                 request=request, RspStatus=t.Status.SUCCESS, callback=callback
             )
 
-        # Z-Stack ZDO also returns "replies" for broadcasts, which we can't handle
+        # We should only send zigpy unicast responses
         if dst_addr.mode == t.AddrMode.NWK:
             zdo_rsp_cluster, zdo_response_kwargs = zdo_rsp_factory(response)
 
