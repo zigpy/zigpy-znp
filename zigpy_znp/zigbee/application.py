@@ -741,7 +741,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 TCSignificance=1,
             ),
             RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtPermitJoinRsp.Callback(partial=True),
+            callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
         )
 
         if response.Status != t.Status.SUCCESS:
