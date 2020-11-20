@@ -25,6 +25,7 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
     else:
         nvids = [OsalNvIds.HAS_CONFIGURED_ZSTACK1, OsalNvIds.HAS_CONFIGURED_ZSTACK3]
 
+    # The legacy items are shared by all Z-Stack versions
     for nvid in nvids:
         if nvid in NWK_NVID_TABLES:
             start = nvid
@@ -44,35 +45,43 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
             else:
                 LOGGER.debug("Item does not exist: %s", nvid)
 
-    if clear:
+    try:
+        await znp.nvram.read(
+            sys_id=NvSysIds.ZSTACK,
+            item_id=ExNvIds.LEGACY,
+            sub_id=OsalNvIds.POLL_RATE_OLD16,
+        )
+        supports_new_nvram = True
+    except CommandNotRecognized:
+        # CC2531 only supports the legacy NVRAM interface, even on Z-Stack 3
+        supports_new_nvram = False
+    except KeyError:
+        # The read can fail if we clear everything, but this is still fine
+        supports_new_nvram = True
+
+    if clear and supports_new_nvram:
         for nvid in ExNvIds:
             # Skip the LEGACY items, we did them above
             if nvid == ExNvIds.LEGACY:
                 continue
 
             for sub_id in range(2 ** 16):
-                try:
-                    await znp.nvram.read(
-                        sys_id=NvSysIds.ZSTACK, item_id=nvid, sub_id=sub_id
-                    )
-                    await znp.nvram.delete(
-                        sys_id=NvSysIds.ZSTACK, item_id=nvid, sub_id=sub_id
-                    )
-                except CommandNotRecognized:
-                    # CC2531 only supports the legacy NVRAM interface, even on Z-Stack 3
-                    return
-                except KeyError:
+                existed = await znp.nvram.delete(
+                    sys_id=NvSysIds.ZSTACK, item_id=nvid, sub_id=sub_id
+                )
+                LOGGER.info("Cleared %s[0x%04X]", nvid.name, sub_id)
+
+                if not existed:
                     # Once a delete fails, no later reads will succeed
                     break
 
-                LOGGER.info("Cleared %s[0x%04X]", nvid.name, sub_id)
-    else:
-        LOGGER.info("Clearing config and state on next start")
-        await znp.nvram.osal_write(
-            OsalNvIds.STARTUP_OPTION,
-            t.StartupOptions.ClearConfig | t.StartupOptions.ClearState,
-            create=True,
-        )
+    # Even though we cleared NVRAM, some data is inaccessible and Z-Stack needs to do it
+    LOGGER.info("Clearing config and state on next start")
+    await znp.nvram.osal_write(
+        OsalNvIds.STARTUP_OPTION,
+        t.StartupOptions.ClearConfig | t.StartupOptions.ClearState,
+        create=True,
+    )
 
     LOGGER.info("Resetting...")
     await znp.request_callback_rsp(

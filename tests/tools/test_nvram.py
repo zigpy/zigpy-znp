@@ -154,12 +154,17 @@ async def test_nvram_reset_normal(device, make_znp_server, mocker):
 @pytest.mark.parametrize("device", ALL_DEVICES)
 async def test_nvram_reset_everything(device, make_znp_server, mocker):
     znp_server = make_znp_server(server_cls=device)
+    znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.STARTUP_OPTION] = b"\xFF"
 
     await nvram_reset(["-c", znp_server._port_path])
 
-    # Nothing exists but synthetic POLL_RATE_OLD16 in LEGACY
-    assert OsalNvIds.POLL_RATE_OLD16 in znp_server.nvram[ExNvIds.LEGACY]
-    assert len(znp_server.nvram[ExNvIds.LEGACY].keys()) == 1
+    # Nothing exists but the synthetic POLL_RATE_OLD16 and STARTUP_OPTION
+    assert len(znp_server.nvram[ExNvIds.LEGACY].keys()) == 2
     assert len([v for v in znp_server.nvram.values() if v]) == 1
+    assert OsalNvIds.POLL_RATE_OLD16 in znp_server.nvram[ExNvIds.LEGACY]
+    assert (
+        znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.STARTUP_OPTION]
+        == (t.StartupOptions.ClearConfig | t.StartupOptions.ClearState).serialize()
+    )
 
     znp_server.close()

@@ -770,8 +770,11 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
     @reply_to(c.SYS.NVDelete.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_delete(self, req):
-        self.nvram.get(ExNvIds(req.ItemId), {}).pop(req.SubId)
-        return c.SYS.NVDelete.Rsp(Status=t.Status.SUCCESS)
+        try:
+            self.nvram.get(ExNvIds(req.ItemId), {}).pop(req.SubId)
+            return c.SYS.NVDelete.Rsp(Status=t.Status.SUCCESS)
+        except KeyError:
+            return c.SYS.NVDelete.Rsp(Status=t.Status.NV_OPER_FAILED)
 
     @reply_to(c.SYS.Version.Req())
     def version_replier(self, request):
