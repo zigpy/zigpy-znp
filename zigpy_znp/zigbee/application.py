@@ -311,6 +311,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         async with async_timeout.timeout(STARTUP_TIMEOUT):
             await started_as_coordinator
 
+        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
+        # unless they are explicitly disabled. We can't fix this but we can disable them
+        # as early as possible to shrink the window of opportunity for unwanted joins.
+        await self.permit_ncp(time_s=0)
+
         # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
         # before the coordinator has started.
         if self.znp_config[conf.CONF_LED_MODE] is not None:

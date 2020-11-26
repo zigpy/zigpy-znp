@@ -216,7 +216,10 @@ class BaseServerZNP(ZNP):
             for response in responses:
                 yield from self._flatten_responses(request, response)
 
-    def reply_once_to(self, request, responses):
+    def reply_once_to(self, request, responses, *, override=False):
+        if override:
+            self._listeners[request.header].clear()
+
         future = self.wait_for_response(request)
         called_future = asyncio.get_running_loop().create_future()
 
@@ -610,6 +613,23 @@ class BaseZStack1CC2531(BaseZStackDevice):
                     descriptor_capability_field=0,
                 ),
             ),
+        ]
+
+    @reply_to(
+        c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, TCSignificance=1, partial=True
+        )
+    )
+    def permit_join(self, request):
+        if request.Duration != 0:
+            rsp = [c.ZDO.PermitJoinInd.Callback(Duration=request.Duration)]
+        else:
+            rsp = []
+
+        return rsp + [
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.PermitJoinInd.Callback(Duration=0),
         ]
 
 
