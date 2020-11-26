@@ -1464,7 +1464,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 )
                             )
 
-                            if association.nodeRelation != c.util.NodeRelation.NOTUSED:
+                            if (
+                                association.Device.nodeRelation
+                                != c.util.NodeRelation.NOTUSED
+                            ):
                                 try:
                                     await self._znp.request(
                                         c.Util.AssocRemove.Req(IEEE=device.ieee)
