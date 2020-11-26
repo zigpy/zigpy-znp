@@ -65,6 +65,7 @@ REQUEST_TRANSIENT_ERRORS = {
 }
 
 REQUEST_ROUTING_ERRORS = {
+    t.Status.APS_NO_ACK,
     t.Status.NWK_NO_ROUTE,
     t.Status.MAC_NO_ACK,
     t.Status.MAC_TRANSACTION_EXPIRED,
