@@ -345,20 +345,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
         self.zigpy_device.node_desc = node_descriptor_rsp.NodeDescriptor
 
-        # Get the currently active endpoints
-        endpoints = await self._znp.request_callback_rsp(
-            request=c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.ActiveEpRsp.Callback(partial=True),
-        )
-
-        # Clear them out
-        for endpoint in endpoints.ActiveEndpoints:
-            await self._znp.request(
-                c.AF.Delete.Req(Endpoint=endpoint), RspStatus=t.Status.SUCCESS
-            )
-
-        # And register our own
+        # Register our endpoints
         await self._register_endpoint(
             endpoint=1,
             profile_id=zigpy.profiles.zha.PROFILE_ID,
