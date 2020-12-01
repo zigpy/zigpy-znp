@@ -14,12 +14,21 @@ from ..conftest import FORMED_DEVICES, CoroutineMock, FormedLaunchpadCC26X2R1
 pytestmark = [pytest.mark.asyncio]
 
 
+def initialize_device(device):
+    device.status = zigpy.device.Status.ENDPOINTS_INIT
+
+    # Newer Zigpy releases don't need this
+    if not hasattr(device, "_init_handle"):
+        device.initializing = False
+
+
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_zdo_request_interception(device, make_application):
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
+    initialize_device(device)
 
     # Send back a request response
     active_ep_req = znp_server.reply_once_to(
@@ -71,8 +80,7 @@ async def test_zigpy_request(device, make_application):
     TSN = 1
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    device.status = zigpy.device.Status.ENDPOINTS_INIT
-    device.initializing = False
+    initialize_device(device)
 
     ep = device.add_endpoint(1)
     ep.profile_id = 260
@@ -132,8 +140,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     TSN = 1
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    device.status = zigpy.device.Status.ENDPOINTS_INIT
-    device.initializing = False
+    initialize_device(device)
 
     ep = device.add_endpoint(1)
     ep.profile_id = 260
@@ -186,6 +193,8 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
     await app.startup(auto_form=False)
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+    initialize_device(device)
+
     mocker.patch.object(app, "_send_request", new=CoroutineMock())
 
     await app.request(
@@ -214,8 +223,7 @@ async def test_force_remove(device, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.ZDO_REQUEST_TIMEOUT", new=0.3)
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    device.status = zigpy.device.Status.ENDPOINTS_INIT
-    device.initializing = False
+    initialize_device(device)
 
     # Reply to zigpy's leave request
     bad_mgmt_leave_req = znp_server.reply_once_to(
@@ -272,6 +280,7 @@ async def test_request_concurrency(device, make_application, mocker):
     await app.startup()
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+    initialize_device(device)
 
     # Keep track of how many requests we receive at once
     in_flight_requests = 0
@@ -328,9 +337,8 @@ async def test_nonstandard_profile(device, make_application):
     await app.startup(auto_form=False)
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
-    device.status = zigpy.device.Status.ENDPOINTS_INIT
-    device.initializing = False
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
+    initialize_device(device)
 
     ep = device.add_endpoint(2)
     ep.profile_id = 0x9876  # non-standard profile
@@ -393,6 +401,7 @@ async def test_request_cancellation_shielding(
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    initialize_device(device)
 
     delayed_reply_sent = event_loop.create_future()
 
@@ -448,8 +457,7 @@ async def test_request_route_rediscovery_zdo(device, make_application, mocker):
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
-    device.status = zigpy.device.Status.ENDPOINTS_INIT
-    device.initializing = False
+    initialize_device(device)
 
     # Fail the first time
     route_discovered = False
@@ -514,8 +522,7 @@ async def test_request_route_rediscovery_af(device, make_application, mocker):
 
     device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
-    device.status = zigpy.device.Status.ENDPOINTS_INIT
-    device.initializing = False
+    initialize_device(device)
 
     # Fail the first time
     route_discovered = False
