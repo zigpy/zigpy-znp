@@ -50,6 +50,7 @@ PROBE_TIMEOUT = 5  # seconds
 STARTUP_TIMEOUT = 5  # seconds
 ZDO_REQUEST_TIMEOUT = 15  # seconds
 DATA_CONFIRM_TIMEOUT = 8  # seconds
+DEVICE_JOIN_MAX_DELAY = 2  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 
 REQUEST_MAX_RETRIES = 10
@@ -128,6 +129,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._network_key = None
         self._concurrent_requests_semaphore = None
         self._route_discovery_futures = {}
+        self._join_announce_tasks = {}
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
@@ -852,13 +854,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         LOGGER.info("ZDO device announce: %s", msg)
 
-        try:
-            device = self.get_device(ieee=msg.IEEE)
-        except KeyError:
-            LOGGER.warning(
-                "Received a ZDO message from an unknown device: %s", msg.IEEE
-            )
-            return
+        # Cancel an existing join timer so we don't double announce
+        if msg.IEEE in self._join_announce_tasks:
+            self._join_announce_tasks.pop(msg.IEEE).cancel()
+
+        # Sometimes devices change their NWK when announcing so re-join it.
+        self.handle_join(
+            nwk=msg.NWK,
+            ieee=msg.IEEE,
+            parent_nwk=None,
+        )
+
+        device = self.get_device(ieee=msg.IEEE)
 
         # We turn this back into a ZDO message and let zigpy handle it
         self._receive_zdo_message(
@@ -870,15 +877,31 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             Capability=msg.Capabilities,
         )
 
-        asyncio.create_task(self._discover_route(msg.NWK))
-
     def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
         """
-        ZDO trust center device join callback
+        ZDO trust center device join callback.
         """
 
         LOGGER.info("TC device join: %s", msg)
-        self.handle_join(nwk=msg.SrcNwk, ieee=msg.SrcIEEE, parent_nwk=msg.ParentNwk)
+
+        # Perform route discovery (just in case) when a device joins the network so that
+        # we can begin initialization as soon as possible.
+        asyncio.create_task(self._discover_route(msg.SrcNwk))
+
+        if msg.SrcIEEE in self._join_announce_tasks:
+            self._join_announce_tasks.pop(msg.SrcIEEE).cancel()
+
+        # Some devices really don't like zigpy beginning its initialization process
+        # before the device has announced itself. Wait a second or two before calling
+        # `handle_join`, just in case the device announces itself first.
+        self._join_announce_tasks[msg.SrcIEEE] = asyncio.get_running_loop().call_later(
+            DEVICE_JOIN_MAX_DELAY,
+            lambda: self.handle_join(
+                nwk=msg.SrcNwk,
+                ieee=msg.SrcIEEE,
+                parent_nwk=msg.ParentNwk,
+            ),
+        )
 
     def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
         LOGGER.info("ZDO device left: %s", msg)

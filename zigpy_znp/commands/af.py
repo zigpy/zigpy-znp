@@ -105,7 +105,7 @@ class AF(t.CommandsBase, subsystem=t.Subsystem.AF):
             t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
             t.Param(
                 "Options",
-                t.uint8_t,
+                TransmitOptions,
                 (
                     "Transmit options bitmask: bit 4 -- APS Ack, "
                     "bit 5 -- Route Discovery, "
@@ -136,7 +136,7 @@ class AF(t.CommandsBase, subsystem=t.Subsystem.AF):
             t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
             t.Param(
                 "Options",
-                t.uint8_t,
+                TransmitOptions,
                 (
                     "Transmit options bitmask: bit 4 -- APS Ack, "
                     "bit 5 -- Route Discovery, "
