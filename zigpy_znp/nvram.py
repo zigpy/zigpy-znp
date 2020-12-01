@@ -8,6 +8,21 @@ from zigpy_znp.exceptions import SecurityError, InvalidCommandResponse
 PROXIED_NVIDS = {nvids.OsalNvIds.POLL_RATE_OLD16}
 
 
+def serialize(value) -> bytes:
+    if hasattr(value, "serialize"):
+        value = value.serialize()
+    elif not isinstance(value, (bytes, bytearray)):
+        raise TypeError(
+            f"Only bytes or serializable types can be written to NVRAM."
+            f" Got {value!r} (type {type(value)})"
+        )
+
+    if not value:
+        raise ValueError("NVRAM value cannot be empty")
+
+    return value
+
+
 class NVRAMHelper:
     def __init__(self, znp):
         self.znp = znp
@@ -36,17 +51,7 @@ class NVRAMHelper:
         Serializes all serializable values and passes bytes directly.
         """
 
-        if hasattr(value, "serialize"):
-            value = value.serialize()
-        elif not isinstance(value, (bytes, bytearray)):
-            raise TypeError(
-                f"Only bytes or serializable types can be written to NVRAM."
-                f" Got {nv_id!r}={value!r} (type {type(value)})"
-            )
-
-        if not value:
-            raise ValueError(f"NV item {nv_id!r} cannot be empty")
-
+        value = serialize(value)
         length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
 
         # Recreate the item if the length is not correct
@@ -171,17 +176,7 @@ class NVRAMHelper:
         NVWrite(sys_id=ZSTACK, item_id=LEGACY, sub_id=1) in the background.
         """
 
-        if hasattr(value, "serialize"):
-            value = value.serialize()
-        elif not isinstance(value, (bytes, bytearray)):
-            raise TypeError(
-                f"Only bytes or serializable types can be written to NVRAM."
-                f" Got {value!r} (type {type(value)})"
-            )
-
-        if not value:
-            raise ValueError("NV item cannot be empty")
-
+        value = serialize(value)
         length = (
             await self.znp.request(
                 c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
