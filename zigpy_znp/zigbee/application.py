@@ -222,13 +222,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._bind_callbacks()
 
-        # XXX: To make sure we don't switch to the wrong device upon reconnect,
-        #      update our config to point to the last-detected port.
-        if self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == "auto":
-            self._config[conf.CONF_DEVICE][
-                conf.CONF_DEVICE_PATH
-            ] = self._znp._uart._transport.serial.name
-
         # Next, read out the NVRAM item that Zigbee2MQTT writes when it has configured
         # a device to make sure that our network settings will not be reset.
         if self.is_zstack_home_12:

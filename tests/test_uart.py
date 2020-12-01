@@ -222,18 +222,6 @@ def test_uart_frame_received_error(connected_uart, mocker):
 
 
 @pytest.mark.asyncio
-async def test_connect_auto(dummy_serial_conn, mocker):
-    device, _ = dummy_serial_conn
-
-    mocker.patch("zigpy_znp.uart.guess_port", return_value=device)
-
-    znp = mocker.Mock()
-    await znp_uart.connect(
-        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: "auto"}), api=znp, toggle_rts=False
-    )
-
-
-@pytest.mark.asyncio
 async def test_connection_lost(dummy_serial_conn, mocker, event_loop):
     device, _ = dummy_serial_conn
 

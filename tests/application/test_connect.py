@@ -123,23 +123,6 @@ async def test_reconnect(device, event_loop, make_application):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_auto_connect(device, mocker, make_application):
-    app, znp_server = make_application(server_cls=device)
-
-    uart_guess_port = mocker.patch(
-        "zigpy_znp.uart.guess_port", return_value=znp_server._port_path
-    )
-
-    app._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] = "auto"
-    await app.startup(auto_form=False)
-
-    assert uart_guess_port.call_count == 1
-    assert app._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH] == znp_server._port_path
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_shutdown_from_app(device, mocker, make_application):
     app, znp_server = make_application(server_cls=device)
 

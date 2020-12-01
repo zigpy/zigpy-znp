@@ -1,23 +1,9 @@
 import typing
 import asyncio
 import logging
-import platform
 import warnings
-from collections import defaultdict
 
 import serial
-import serial.tools
-
-try:
-    from serial.tools.list_ports import comports as list_com_ports
-except ValueError:
-    # macOS Big Sur can't import this method with current PySerial
-    if platform.system() != "Darwin":
-        raise
-
-    def list_com_ports():
-        return []
-
 
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
@@ -155,79 +141,12 @@ class ZnpMtProtocol(asyncio.Protocol):
         return f"<{type(self).__name__} for {self._api}>"
 
 
-def find_ti_ports() -> typing.Iterable[
-    typing.Tuple[str, serial.tools.list_ports_common.ListPortInfo]
-]:
-    """
-    Finds all TI serial ports and yields an iterable of tuples, where the first element
-    is the serial number of the device.
-    """
-
-    # Each dev kit has two serial ports, one of which is a debugger
-    found_ports = defaultdict(list)
-
-    for port in list_com_ports():
-        if (port.vid, port.pid) == (0x0451, 0x16A8):
-            # CC2531
-            found_ports[port.serial_number].append(port)
-        elif (port.vid, port.pid) == (0x0451, 0xBEF3):
-            # LAUNCHXL-CC26X2R1
-            found_ports[port.serial_number].append(port)
-        elif (port.vid, port.pid) == (0x10C4, 0xEA60):
-            # slae.sh CC2652RB stick
-            if "slae.sh cc2652rb stick" in (port.product or ""):
-                found_ports[port.serial_number].append(port)
-            else:
-                found_ports["CP210x"].append(port)
-        elif (port.vid, port.pid) == (0x1A86, 0x7523):
-            # ZZH (CH340, no way to distinguish it from any other CH340 device)
-            found_ports["CH340"].append(port)
-
-    # Python guarantees insertion order for dictionaries
-    for serial_number, ports in found_ports.items():
-        first_port = sorted(ports, key=lambda p: p.device)[0]
-
-        yield serial_number, first_port
-
-
-def guess_port() -> str:
-    """
-    Autodetects the best TI radio.
-
-    The CH340 used by the ZZH adapter has no distinguishing information so it is not
-    possible to tell whether or not a port belongs to a cheap Arduino clone or the ZZH.
-    Known TI serial ports are picked over the CH340, which may belong to a cheap Arduino
-    clone instead of the ZZH.
-    """
-
-    # Move generic serial adapters to the bottom of the list but keep the order of the
-    # rest because Python's sort is stable.
-    candidates = sorted(find_ti_ports(), key=lambda p: p[0] in ("CH340", "CP210x"))
-
-    if not candidates:
-        raise RuntimeError("Failed to detect any TI ports")
-
-    _, port = candidates[0]
-
-    if len(candidates) > 1:
-        LOGGER.warning(
-            "Found multiple possible Texas Instruments devices: %s",
-            candidates,
-        )
-        LOGGER.warning("Picking the first one: %s", port)
-
-    return port.device
-
-
 async def connect(config: conf.ConfigType, api, *, toggle_rts=True) -> ZnpMtProtocol:
     loop = asyncio.get_running_loop()
 
     port = config[conf.CONF_DEVICE_PATH]
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]
     flow_control = config[conf.CONF_DEVICE_FLOW_CONTROL]
-
-    if port == "auto":
-        port = guess_port()
 
     LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
 
