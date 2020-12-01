@@ -48,7 +48,7 @@ with warnings.catch_warnings():
 ZDO_ENDPOINT = 0
 PROBE_TIMEOUT = 5  # seconds
 STARTUP_TIMEOUT = 5  # seconds
-ZDO_REQUEST_TIMEOUT = 10  # seconds
+ZDO_REQUEST_TIMEOUT = 15  # seconds
 DATA_CONFIRM_TIMEOUT = 8  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 
