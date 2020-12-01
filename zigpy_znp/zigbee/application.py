@@ -1242,6 +1242,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         options,
         radius,
         data,
+        *,
+        relays=None,
     ):
         """
         Used by `request`/`mrequest`/`broadcast` to send a request.
@@ -1259,17 +1261,30 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # We pick ours based on the registered endpoints.
         src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
 
-        request = c.AF.DataRequestExt.Req(
-            DstAddrModeAddress=dst_addr,
-            DstEndpoint=dst_ep,
-            DstPanId=0x0000,
-            SrcEndpoint=src_ep,
-            ClusterId=cluster,
-            TSN=sequence,
-            Options=options,
-            Radius=radius,
-            Data=data,
-        )
+        if relays is None:
+            request = c.AF.DataRequestExt.Req(
+                DstAddrModeAddress=dst_addr,
+                DstEndpoint=dst_ep,
+                DstPanId=0x0000,
+                SrcEndpoint=src_ep,
+                ClusterId=cluster,
+                TSN=sequence,
+                Options=options,
+                Radius=radius,
+                Data=data,
+            )
+        else:
+            request = c.AF.DataRequestSrcRtg.Req(
+                DstAddr=dst_addr.address,
+                DstEndpoint=dst_ep,
+                SrcEndpoint=src_ep,
+                ClusterId=cluster,
+                TSN=sequence,
+                Options=options,
+                Radius=radius,
+                SourceRoute=relays,  # force the packet to go through specific parents
+                Data=data,
+            )
 
         if dst_addr.mode == t.AddrMode.Broadcast:
             # Broadcasts will not receive a confirmation but they still take time
@@ -1351,8 +1366,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         data,
     ) -> typing.Tuple[t.Status, str]:
         """
-        Fault-tolerant wrapper around `_send_request_raw` that transparently performs
-        multiple retries when internal errors with Z-Stack are encountered.
+        Fault-tolerant wrapper around `_send_request_raw` that transparently attempts to
+        repair routes and contact the device through other methods when Z-Stack errors
+        are encountered.
         """
 
         if dst_addr.mode == t.AddrMode.NWK:
@@ -1365,11 +1381,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         status = None
         response = None
         association = None
+        force_relays = None
 
         tried_assoc_remove = False
         tried_route_discovery = False
+        tried_last_good_route = False
         tried_find_new_nwk = False
-        tried_disable_route_suppression = False
+        tried_disable_route_discovery_suppression = False
 
         # Don't release the concurrency-limiting semaphore until we are done trying.
         # There is no point in allowing requests to take turns getting buffer errors.
@@ -1409,6 +1427,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             options=options,
                             radius=radius,
                             data=data,
+                            relays=force_relays,
                         )
                         break
                     except InvalidCommandResponse as e:
@@ -1432,6 +1451,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             )
                             await asyncio.sleep(3 * REQUEST_ERROR_RETRY_DELAY)
                             continue
+
+                        # If we can't contact the device by forcing a specific route,
+                        # there is not point in trying this more than once.
+                        if tried_last_good_route and force_relays is not None:
+                            force_relays = None
 
                         # Child aging is disabled so if a child switches parents from
                         # the coordinator to another router, we will not be able to
@@ -1470,10 +1494,29 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # letting the retry mechanism deal with it simpler.
                             await self._discover_route(device.nwk)
                             tried_route_discovery = True
+                        elif (
+                            not tried_last_good_route
+                            and device is not None
+                            and device.relays is not None
+                        ):
+                            # `ZDO.SrcRtgInd` callbacks tell us the last path taken by
+                            # messages from the device back to the coordinator. Sending
+                            # packets backwards via this same route may work.
+                            force_relays = device.relays[::-1]
+                            tried_last_good_route = True
+                        elif not tried_disable_route_discovery_suppression:
+                            # Disable route discovery suppression. This appears to
+                            # generate a bit more network traffic.
+                            options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
+                            tried_disable_route_discovery_suppression = True
                         elif not tried_find_new_nwk and dst_addr.mode == t.AddrMode.NWK:
                             # Finally, try checking to see if the device changed its
-                            # address but we missed the change
+                            # address but we somehow missed the change.
                             try:
+                                # XXX: sometimes two parents can respond with different
+                                # addresses. It may be useful to try both and possibly
+                                # notify the wrong parent of the error, though child
+                                # aging should automatically take care of this.
                                 nwk_addr_rsp = await self._znp.request_callback_rsp(
                                     request=c.ZDO.NwkAddrReq.Req(
                                         IEEE=device.ieee,
@@ -1507,10 +1550,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 # No point in retrying with the old address
                                 dst_addr.address = device.nwk
                                 device.nwk = nwk_addr_rsp.NWK
-                        elif not tried_disable_route_suppression:
-                            # As a last resort, disable route discovery suppression
-                            options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
-                            tried_disable_route_suppression = True
+                                device.schedule_initialize()
 
                         LOGGER.debug(
                             "Request failed (%s), retry attempt %s of %s",
