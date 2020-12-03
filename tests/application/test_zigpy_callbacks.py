@@ -64,7 +64,7 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
         nwk=new_nwk, ieee=device.ieee, parent_nwk=None
     )
     assert app.handle_message.call_count == 1
-    assert app.handle_message.mock_calls[0].kwargs["cluster"] == ZDOCmd.Device_annce
+    assert app.handle_message.mock_calls[0][2]["cluster"] == ZDOCmd.Device_annce
 
     # The device's NWK updated
     assert device.nwk == new_nwk
