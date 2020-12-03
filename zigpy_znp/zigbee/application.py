@@ -18,13 +18,7 @@ import zigpy.profiles
 import zigpy.zcl.foundation
 from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
-from zigpy.zdo.types import (
-    CLUSTERS as ZDO_CLUSTERS,
-    ZDOCmd,
-    Neighbor,
-    ZDOHeader,
-    MultiAddress,
-)
+from zigpy.zdo.types import CLUSTERS as ZDO_CLUSTERS, ZDOCmd, ZDOHeader, MultiAddress
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -668,56 +662,29 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def force_remove(self, device: zigpy.device.Device) -> None:
         """
         Attempts to forcibly remove a device from the network.
+        Z-Stack does not expose any additional ways to to do this.
         """
 
-        parents = []
-
-        for dev in self.devices.values():
-            for neighbor in dev.neighbors:
-                # Scanned relationships are not always both present so we need to find
-                # potential parents through both the parent and the child
-                if (
-                    dev is device
-                    and neighbor.neighbor.relationship == Neighbor.RelationShip.Parent
-                    and neighbor.device not in parents
-                ):
-                    parents.append(neighbor.device)
-                elif (
-                    neighbor.device is device
-                    and neighbor.neighbor.relationship == Neighbor.RelationShip.Child
-                    and dev not in parents
-                ):
-                    parents.append(dev)
-
-        if not parents:
-            LOGGER.warning(
-                "Could not find parent for device %s, falling back to the coordinator",
-                device.ieee,
-            )
-            parents.append(self.zigpy_device)
-
-        for parent in parents:
+        try:
             async with self._limit_concurrency():
-                try:
-                    await self._znp.request_callback_rsp(
-                        request=c.ZDO.MgmtLeaveReq.Req(
-                            DstAddr=parents[-1].nwk,
-                            IEEE=device.ieee,
-                            RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
-                        ),
-                        RspStatus=t.Status.SUCCESS,
-                        callback=c.ZDO.MgmtLeaveRsp.Callback(
-                            Src=parents[-1].nwk,
-                            partial=True,
-                        ),
-                    )
-                except Exception as e:
-                    LOGGER.warning(
-                        "Failed to remove device %s from parent %s: %s",
-                        device.ieee,
-                        parent.nwk,
-                        e,
-                    )
+                await self._znp.request_callback_rsp(
+                    request=c.ZDO.MgmtLeaveReq.Req(
+                        DstAddr=0x0000,
+                        IEEE=device.ieee,
+                        RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
+                    ),
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.ZDO.MgmtLeaveRsp.Callback(
+                        Src=0x0000,
+                        partial=True,
+                    ),
+                )
+        except Exception as e:
+            LOGGER.warning(
+                "Failed to remove device %s from coordinator: %s",
+                device.ieee,
+                e,
+            )
 
     async def permit_ncp(self, time_s: int) -> None:
         """

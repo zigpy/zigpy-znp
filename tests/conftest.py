@@ -334,6 +334,8 @@ class BaseZStackDevice(BaseServerZNP):
 
     def _unhandled_command(self, command):
         # XXX: check the capabilities with `ping_replier` to use `InvalidSubsystem`?
+        LOGGER.warning("Server does not have a handler for command %s", command)
+
         self.send(
             c.RPCError.CommandNotRecognized.Rsp(
                 ErrorCode=c.rpc_error.ErrorCode.InvalidCommandId,

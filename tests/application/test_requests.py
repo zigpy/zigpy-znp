@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-import zigpy.types
 from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
 
 import zigpy_znp.types as t
@@ -203,110 +202,45 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_force_remove_no_parent(device, make_application, mocker):
+@pytest.mark.parametrize("status", [t.ZDOStatus.SUCCESS, t.ZDOStatus.TIMEOUT, None])
+async def test_force_remove(device, make_application, status, mocker):
     app, znp_server = make_application(server_cls=device)
+    app._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
 
     await app.startup(auto_form=False)
-
-    mocker.patch("zigpy_znp.zigbee.application.ZDO_REQUEST_TIMEOUT", new=0.3)
-
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
-    # Reply to zigpy's leave request
-    bad_mgmt_leave_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=device.nwk, partial=True),
-        responses=[c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.FAILURE)],
-    )
+    responses = [c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS)]
 
-    # Reply to our own leave request
-    good_mgmt_leave_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, partial=True),
+    if status is not None:
+        responses.append(c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, Status=status))
+
+    # Normal ZDO leave must fail
+    normal_remove_req = znp_server.reply_once_to(
+        request=c.ZDO.MgmtLeaveReq.Req(
+            DstAddr=device.nwk, IEEE=device.ieee, partial=True
+        ),
         responses=[
             c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MgmtLeaveRsp.Callback(Src=device.nwk, Status=t.ZDOStatus.TIMEOUT),
         ],
+    )
+
+    force_remove_req = znp_server.reply_once_to(
+        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, IEEE=device.ieee, partial=True),
+        responses=responses,
     )
 
     # Make sure the device exists
     assert app.get_device(nwk=device.nwk) is device
 
     await app.remove(device.ieee)
-    await asyncio.gather(bad_mgmt_leave_req, good_mgmt_leave_req)
+    await normal_remove_req
+    await force_remove_req
 
     # Make sure the device is gone once we remove it
     with pytest.raises(KeyError):
         app.get_device(nwk=device.nwk)
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-@pytest.mark.parametrize("skip_relationship", ["parent", "child", "neither"])
-async def test_force_remove_parent(device, skip_relationship, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
-
-    await app.startup(auto_form=False)
-
-    mocker.patch("zigpy_znp.zigbee.application.ZDO_REQUEST_TIMEOUT", new=0.3)
-
-    device = app.add_initialized_device(ieee=t.EUI64([0x11] * 8), nwk=0xAABB)
-    parent = app.add_initialized_device(ieee=t.EUI64([0x22] * 8), nwk=0xCCDD)
-    non_parent = app.add_initialized_device(ieee=t.EUI64([0x33] * 8), nwk=0xEEFF)
-
-    def create_neighbor(dev, relationship):
-        return zigpy.zdo.types.Neighbor(
-            extended_pan_id=app.extended_pan_id,
-            ieee=dev.ieee,
-            nwk=dev.nwk,
-            packed=zigpy.zdo.types.Neighbor.RelationShip[relationship] << 4,
-            permit_joining=zigpy.zdo.types.Neighbor.PermitJoins.Unknown,
-            depth=0,
-            lqi=0,
-        )
-
-    if skip_relationship != "parent":
-        device.neighbors._add_neighbor(False, create_neighbor(parent, "Parent"))
-
-    if skip_relationship != "child":
-        parent.neighbors._add_neighbor(False, create_neighbor(device, "Child"))
-
-    # Child <-> non-parent
-    device.neighbors._add_neighbor(False, create_neighbor(non_parent, "Sibling"))
-    non_parent.neighbors._add_neighbor(False, create_neighbor(device, "Sibling"))
-
-    # Reply to zigpy's leave request
-    bad_mgmt_leave_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=device.nwk, partial=True),
-        responses=[c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.FAILURE)],
-    )
-
-    # Reply only to the expected leave request
-    parent_mgmt_leave_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=parent.nwk, partial=True),
-        responses=[
-            c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtLeaveRsp.Callback(Src=parent.nwk, Status=t.ZDOStatus.SUCCESS),
-        ],
-    )
-
-    # And no others
-    unexpected_mgmt_leave_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(partial=True),
-        responses=[],
-    )
-
-    # Make sure the device exists
-    assert app.get_device(nwk=device.nwk) is device
-
-    await app.remove(device.ieee)
-    await asyncio.gather(bad_mgmt_leave_req, parent_mgmt_leave_req)
-
-    # Make sure the device is gone once we remove it
-    with pytest.raises(KeyError):
-        app.get_device(nwk=device.nwk)
-
-    # We did not send leave requests to any other nodes
-    assert not unexpected_mgmt_leave_req.done()
 
     await app.shutdown()
 
