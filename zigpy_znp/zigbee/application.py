@@ -674,13 +674,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         for dev in self.devices.values():
             for neighbor in dev.neighbors:
-                if neighbor.device is not device:
-                    continue
-
-                if neighbor.neighbor.relationship != Neighbor.RelationShip.Child:
-                    continue
-
-                parents.append(dev)
+                # Scanned relationships are not always both present so we need to find
+                # potential parents through both the parent and the child
+                if (
+                    dev is device
+                    and neighbor.neighbor.relationship == Neighbor.RelationShip.Parent
+                    and neighbor.device not in parents
+                ):
+                    parents.append(neighbor.device)
+                elif (
+                    neighbor.device is device
+                    and neighbor.neighbor.relationship == Neighbor.RelationShip.Child
+                    and dev not in parents
+                ):
+                    parents.append(dev)
 
         if not parents:
             LOGGER.warning(

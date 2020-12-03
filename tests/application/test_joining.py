@@ -200,12 +200,91 @@ async def test_on_zdo_device_join(device, make_application, mocker):
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_join")
+    mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0)
 
     nwk = 0x1234
     ieee = t.EUI64.convert("11:22:33:44:55:66:77:88")
 
     znp_server.send(c.ZDO.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0001))
+
+    await asyncio.sleep(0.1)
+
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_on_zdo_device_join_and_announce_fast(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "handle_join")
+    mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.5)
+
+    nwk = 0x1234
+    ieee = t.EUI64.convert("11:22:33:44:55:66:77:88")
+
+    assert not app._join_announce_tasks
+
+    znp_server.send(c.ZDO.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0001))
+
+    # We're waiting for the device to announce itself
+    assert app.handle_join.call_count == 0
+
+    await asyncio.sleep(0.1)
+
+    znp_server.send(
+        c.ZDO.EndDeviceAnnceInd.Callback(
+            Src=nwk,
+            NWK=nwk,
+            IEEE=ieee,
+            Capabilities=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
+        )
+    )
+
+    app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=None)
+
+    # Everything is cleaned up
+    assert not app._join_announce_tasks
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_on_zdo_device_join_and_announce_slow(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "handle_join")
+    mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
+
+    nwk = 0x1234
+    ieee = t.EUI64.convert("11:22:33:44:55:66:77:88")
+
+    assert not app._join_announce_tasks
+
+    znp_server.send(c.ZDO.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0001))
+
+    # We're waiting for the device to announce itself
+    assert app.handle_join.call_count == 0
+
+    await asyncio.sleep(0.3)
+
+    # Too late, it already happened
+    app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
+
+    znp_server.send(
+        c.ZDO.EndDeviceAnnceInd.Callback(
+            Src=nwk,
+            NWK=nwk,
+            IEEE=ieee,
+            Capabilities=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
+        )
+    )
+
+    # The announcement will trigger another join indication
+    assert app.handle_join.call_count == 2
 
     await app.shutdown()
 

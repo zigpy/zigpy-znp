@@ -40,47 +40,34 @@ async def test_on_zdo_relays_message_callback_unknown(
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_on_zdo_device_announce(device, make_application, mocker):
+async def test_on_zdo_device_announce_nwk_change(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
+    mocker.spy(app, "handle_join")
     mocker.patch.object(app, "handle_message")
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
+    new_nwk = device.nwk + 1
 
+    # Assume its NWK changed and we're just finding out
     znp_server.send(
         c.ZDO.EndDeviceAnnceInd.Callback(
             Src=0x0001,
-            NWK=device.nwk,
+            NWK=new_nwk,
             IEEE=device.ieee,
             Capabilities=c.zdo.MACCapabilities.Router,
         )
     )
 
-    app.handle_message.called_once_with(cluster=ZDOCmd.Device_annce)
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_on_zdo_device_announce_unknown(device, make_application, mocker, caplog):
-    app, znp_server = make_application(server_cls=device)
-    await app.startup(auto_form=False)
-
-    mocker.patch.object(app, "handle_message")
-
-    caplog.set_level(logging.WARNING)
-    znp_server.send(
-        c.ZDO.EndDeviceAnnceInd.Callback(
-            Src=0x0001,
-            NWK=0xFA9E,
-            IEEE=t.EUI64(range(8)),
-            Capabilities=c.zdo.MACCapabilities.Router,
-        )
+    app.handle_join.assert_called_once_with(
+        nwk=new_nwk, ieee=device.ieee, parent_nwk=None
     )
+    assert app.handle_message.call_count == 1
+    assert app.handle_message.mock_calls[0].kwargs["cluster"] == ZDOCmd.Device_annce
 
-    assert app.handle_message.call_count == 0
-    assert "unknown device" in caplog.text
+    # The device's NWK updated
+    assert device.nwk == new_nwk
 
     await app.shutdown()
 

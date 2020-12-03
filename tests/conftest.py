@@ -5,6 +5,7 @@ import pathlib
 import contextlib
 
 import pytest
+import zigpy.device
 
 try:
     # Python 3.8 already has this
@@ -198,6 +199,18 @@ def make_application(make_znp_server):
         server_config = merge_dicts(default, server_config or {})
 
         app = ControllerApplication(client_config)
+
+        def add_initialized_device(self, *args, **kwargs):
+            device = self.add_device(*args, **kwargs)
+            device.status = zigpy.device.Status.ENDPOINTS_INIT
+
+            # Newer Zigpy releases don't need this
+            if not hasattr(device, "_init_handle"):
+                device.initializing = False
+
+            return device
+
+        app.add_initialized_device = add_initialized_device.__get__(app)
 
         return app, make_znp_server(server_cls=server_cls, config=server_config)
 

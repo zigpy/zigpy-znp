@@ -14,21 +14,12 @@ from ..conftest import FORMED_DEVICES, CoroutineMock, FormedLaunchpadCC26X2R1
 pytestmark = [pytest.mark.asyncio]
 
 
-def initialize_device(device):
-    device.status = zigpy.device.Status.ENDPOINTS_INIT
-
-    # Newer Zigpy releases don't need this
-    if not hasattr(device, "_init_handle"):
-        device.initializing = False
-
-
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_zdo_request_interception(device, make_application):
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
-    initialize_device(device)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
 
     # Send back a request response
     active_ep_req = znp_server.reply_once_to(
@@ -79,8 +70,7 @@ async def test_zigpy_request(device, make_application):
 
     TSN = 1
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    initialize_device(device)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     ep = device.add_endpoint(1)
     ep.profile_id = 260
@@ -139,8 +129,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
 
     TSN = 1
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    initialize_device(device)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     ep = device.add_endpoint(1)
     ep.profile_id = 260
@@ -192,8 +181,7 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
     await app.startup(auto_form=False)
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    initialize_device(device)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     mocker.patch.object(app, "_send_request", new=CoroutineMock())
 
@@ -215,15 +203,14 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_force_remove(device, make_application, mocker):
+async def test_force_remove_no_parent(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
     mocker.patch("zigpy_znp.zigbee.application.ZDO_REQUEST_TIMEOUT", new=0.3)
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    initialize_device(device)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     # Reply to zigpy's leave request
     bad_mgmt_leave_req = znp_server.reply_once_to(
@@ -254,6 +241,77 @@ async def test_force_remove(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
+@pytest.mark.parametrize("skip_relationship", ["parent", "child", "neither"])
+async def test_force_remove_parent(device, skip_relationship, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    mocker.patch("zigpy_znp.zigbee.application.ZDO_REQUEST_TIMEOUT", new=0.3)
+
+    device = app.add_initialized_device(ieee=t.EUI64([0x11] * 8), nwk=0xAABB)
+    parent = app.add_initialized_device(ieee=t.EUI64([0x22] * 8), nwk=0xCCDD)
+    non_parent = app.add_initialized_device(ieee=t.EUI64([0x33] * 8), nwk=0xEEFF)
+
+    def create_neighbor(dev, relationship):
+        return zigpy.zdo.types.Neighbor(
+            extended_pan_id=app.extended_pan_id,
+            ieee=dev.ieee,
+            nwk=dev.nwk,
+            packed=zigpy.zdo.types.Neighbor.RelationShip[relationship] << 4,
+            permit_joining=zigpy.zdo.types.Neighbor.PermitJoins.Unknown,
+            depth=0,
+            lqi=0,
+        )
+
+    if skip_relationship != "parent":
+        device.neighbors._add_neighbor(False, create_neighbor(parent, "Parent"))
+
+    if skip_relationship != "child":
+        parent.neighbors._add_neighbor(False, create_neighbor(device, "Child"))
+
+    # Child <-> non-parent
+    device.neighbors._add_neighbor(False, create_neighbor(non_parent, "Sibling"))
+    non_parent.neighbors._add_neighbor(False, create_neighbor(device, "Sibling"))
+
+    # Reply to zigpy's leave request
+    bad_mgmt_leave_req = znp_server.reply_once_to(
+        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=device.nwk, partial=True),
+        responses=[c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.FAILURE)],
+    )
+
+    # Reply only to the expected leave request
+    parent_mgmt_leave_req = znp_server.reply_once_to(
+        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=parent.nwk, partial=True),
+        responses=[
+            c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtLeaveRsp.Callback(Src=parent.nwk, Status=t.ZDOStatus.SUCCESS),
+        ],
+    )
+
+    # And no others
+    unexpected_mgmt_leave_req = znp_server.reply_once_to(
+        request=c.ZDO.MgmtLeaveReq.Req(partial=True),
+        responses=[],
+    )
+
+    # Make sure the device exists
+    assert app.get_device(nwk=device.nwk) is device
+
+    await app.remove(device.ieee)
+    await asyncio.gather(bad_mgmt_leave_req, parent_mgmt_leave_req)
+
+    # Make sure the device is gone once we remove it
+    with pytest.raises(KeyError):
+        app.get_device(nwk=device.nwk)
+
+    # We did not send leave requests to any other nodes
+    assert not unexpected_mgmt_leave_req.done()
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_mrequest(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
@@ -279,8 +337,7 @@ async def test_request_concurrency(device, make_application, mocker):
 
     await app.startup()
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-    initialize_device(device)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     # Keep track of how many requests we receive at once
     in_flight_requests = 0
@@ -336,9 +393,8 @@ async def test_nonstandard_profile(device, make_application):
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
-    initialize_device(device)
 
     ep = device.add_endpoint(2)
     ep.profile_id = 0x9876  # non-standard profile
@@ -400,8 +456,7 @@ async def test_request_cancellation_shielding(
     mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-    initialize_device(device)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
     delayed_reply_sent = event_loop.create_future()
 
@@ -455,9 +510,8 @@ async def test_request_route_rediscovery_zdo(device, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
-    initialize_device(device)
 
     # Fail the first time
     route_discovered = False
@@ -520,9 +574,8 @@ async def test_request_route_rediscovery_af(device, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
-    device = app.add_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
-    initialize_device(device)
 
     # Fail the first time
     route_discovered = False
