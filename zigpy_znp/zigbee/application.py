@@ -1326,7 +1326,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Runs concurrently and at most once per NWK, even if called multiple times.
         """
 
-        # Both Z-Stack 1.2 and Z-Stack 3.0.2 on the CC2531 are unstable (Z2M#2901)
+        # Route discovery with Z-Stack 1.2 and Z-Stack 3.0.2 on the CC2531 doesn't
+        # appear to work very well (Z2M#2901)
         if self.is_cc2531:
             return
 
@@ -1382,9 +1383,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         tried_assoc_remove = False
         tried_route_discovery = False
-        tried_last_good_route = False
-        tried_find_new_nwk = False
         tried_disable_route_discovery_suppression = False
+        tried_last_good_route = False
 
         # Don't release the concurrency-limiting semaphore until we are done trying.
         # There is no point in allowing requests to take turns getting buffer errors.
@@ -1434,7 +1434,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             raise
 
                         # We cannot do anything but retry if the error is transient or
-                        # we are not sending a unicast request
+                        # we are not sending a unicast request. Retry at least once.
                         if (
                             status in REQUEST_TRANSIENT_ERRORS
                             or attempt == 0
@@ -1491,6 +1491,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # letting the retry mechanism deal with it simpler.
                             await self._discover_route(device.nwk)
                             tried_route_discovery = True
+                        elif not tried_disable_route_discovery_suppression:
+                            # Disable route discovery suppression. This appears to
+                            # generate a bit more network traffic.
+                            options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
+                            tried_disable_route_discovery_suppression = True
                         elif (
                             not tried_last_good_route
                             and device is not None
@@ -1501,53 +1506,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # packets backwards via this same route may work.
                             force_relays = device.relays[::-1]
                             tried_last_good_route = True
-                        elif not tried_disable_route_discovery_suppression:
-                            # Disable route discovery suppression. This appears to
-                            # generate a bit more network traffic.
-                            options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
-                            tried_disable_route_discovery_suppression = True
-                        elif not tried_find_new_nwk and dst_addr.mode == t.AddrMode.NWK:
-                            # Finally, try checking to see if the device changed its
-                            # address but we somehow missed the change.
-                            try:
-                                # XXX: sometimes two parents can respond with different
-                                # addresses. It may be useful to try both and possibly
-                                # notify the wrong parent of the error, though child
-                                # aging should automatically take care of this.
-                                nwk_addr_rsp = await self._znp.request_callback_rsp(
-                                    request=c.ZDO.NwkAddrReq.Req(
-                                        IEEE=device.ieee,
-                                        RequestType=0x00,  # we don't need child info
-                                        StartIndex=0,
-                                    ),
-                                    RspStatus=t.Status.SUCCESS,
-                                    callback=c.ZDO.NwkAddrRsp.Callback(
-                                        partial=True,
-                                        IEEE=device.ieee,
-                                    ),
-                                    timeout=2,  # We don't want to wait forever
-                                )
-                            except asyncio.TimeoutError:
-                                nwk_addr_rsp = None
-
-                            tried_find_new_nwk = True
-
-                            if (
-                                nwk_addr_rsp is not None
-                                and nwk_addr_rsp.Status == t.ZDOStatus.SUCCESS
-                                and nwk_addr_rsp.NWK != device.nwk
-                            ):
-                                LOGGER.warning(
-                                    "Device NWK change detected for %s: %s => %s",
-                                    device.ieee,
-                                    device.nwk,
-                                    nwk_addr_rsp.NWK,
-                                )
-
-                                # No point in retrying with the old address
-                                dst_addr.address = device.nwk
-                                device.nwk = nwk_addr_rsp.NWK
-                                device.schedule_initialize()
 
                         LOGGER.debug(
                             "Request failed (%s), retry attempt %s of %s",
