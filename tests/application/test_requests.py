@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+import zigpy.zdo
 from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
 
 import zigpy_znp.types as t
@@ -263,6 +264,61 @@ async def test_mrequest(device, make_application, mocker):
     await app.shutdown()
 
 
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_unimplemented_zdo_converter(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup()
+
+    with pytest.raises(RuntimeError):
+        await zigpy.zdo.broadcast(
+            app,
+            ZDOCmd.Remove_node_cache_req,
+            0x0000,
+            0x00,
+            t.NWK(0x1234),
+            t.EUI64.convert("11:22:33:44:55:66:77:88"),
+            broadcast_address=0xFFFC,
+        )
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_broadcast(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup()
+
+    znp_server.reply_once_to(
+        request=c.AF.DataRequestExt.Req(
+            DstAddrModeAddress=t.AddrModeAddress(
+                mode=t.AddrMode.Broadcast, address=0xFFFD
+            ),
+            DstEndpoint=0xFF,
+            DstPanId=0x0000,
+            SrcEndpoint=1,
+            ClusterId=3,
+            TSN=1,
+            Radius=3,
+            Data=b"???",
+            partial=True,
+        ),
+        responses=[c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    await app.broadcast(
+        profile=260,  # ZHA
+        cluster=0x0003,  # Identify
+        src_ep=1,
+        dst_ep=0xFF,  # Any endpoint
+        grpid=0,
+        radius=3,
+        sequence=1,
+        data=b"???",
+    )
+
+    await app.shutdown()
+
+
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_request_concurrency(device, make_application, mocker):
     app, znp_server = make_application(
@@ -435,7 +491,7 @@ async def test_request_cancellation_shielding(
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_request_route_rediscovery_zdo(device, make_application, mocker):
+async def test_request_recovery_route_rediscovery_zdo(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
@@ -499,7 +555,7 @@ async def test_request_route_rediscovery_zdo(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_request_route_rediscovery_af(device, make_application, mocker):
+async def test_request_recovery_route_rediscovery_af(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
@@ -517,22 +573,11 @@ async def test_request_route_rediscovery_af(device, make_application, mocker):
     def data_confirm_replier(req):
         nonlocal route_discovered
 
-        if not route_discovered:
-            return (
-                c.AF.DataConfirm.Callback(
-                    Status=t.Status.NWK_NO_ROUTE,
-                    Endpoint=1,
-                    TSN=1,
-                ),
-            )
-        else:
-            return (
-                c.AF.DataConfirm.Callback(
-                    Status=t.Status.SUCCESS,
-                    Endpoint=1,
-                    TSN=1,
-                ),
-            )
+        return c.AF.DataConfirm.Callback(
+            Status=t.Status.SUCCESS if route_discovered else t.Status.NWK_NO_ROUTE,
+            Endpoint=1,
+            TSN=1,
+        )
 
     def set_route_discovered(req):
         nonlocal route_discovered
@@ -566,5 +611,241 @@ async def test_request_route_rediscovery_af(device, make_application, mocker):
     )
 
     await was_route_discovered
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+@pytest.mark.parametrize("can_assoc_remove", [True, False])
+@pytest.mark.parametrize("final_status", [t.Status.SUCCESS, t.Status.APS_NO_ACK])
+async def test_request_recovery_assoc_remove(
+    device, can_assoc_remove, final_status, make_application, mocker
+):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    mocker.patch("zigpy_znp.zigbee.application.REQUEST_ERROR_RETRY_DELAY", new=0)
+
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
+
+    assoc_device, _ = c.util.Device.deserialize(b"\xFF" * 100)
+    assoc_device.shortAddr = device.nwk
+    assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
+
+    def data_confirm_replier(req):
+        bad_assoc = assoc_device
+
+        return c.AF.DataConfirm.Callback(
+            Status=t.Status.MAC_TRANSACTION_EXPIRED if bad_assoc else final_status,
+            Endpoint=1,
+            TSN=1,
+        )
+
+    znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
+    def assoc_get_with_addr(req):
+        nonlocal assoc_device
+
+        if assoc_device is None:
+            dev, _ = c.util.Device.deserialize(b"\xFF" * 100)
+            return c.Util.AssocGetWithAddress.Rsp(Device=dev)
+
+        return c.Util.AssocGetWithAddress.Rsp(Device=assoc_device)
+
+    did_assoc_get = znp_server.reply_once_to(
+        c.Util.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
+        responses=[assoc_get_with_addr],
+    )
+
+    # Not all firmwares support Add/Remove
+    if can_assoc_remove:
+
+        def assoc_remove(req):
+            nonlocal assoc_device
+
+            if assoc_device is None:
+                return c.Util.AssocRemove.Rsp(Status=t.Status.FAILURE)
+
+            assoc_device = None
+            return c.Util.AssocRemove.Rsp(Status=t.Status.SUCCESS)
+
+        did_assoc_remove = znp_server.reply_once_to(
+            c.Util.AssocRemove.Req(IEEE=device.ieee),
+            responses=[assoc_remove],
+        )
+
+        did_assoc_add = znp_server.reply_once_to(
+            c.Util.AssocAdd.Req(
+                NWK=device.nwk,
+                IEEE=device.ieee,
+                NodeRelation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+            ),
+            responses=[c.Util.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
+        )
+    else:
+        did_assoc_remove = None
+        did_assoc_add = None
+
+    was_route_discovered = znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(
+            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
+        ),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    req = app.request(
+        device=device,
+        profile=260,
+        cluster=1,
+        src_ep=1,
+        dst_ep=1,
+        sequence=1,
+        data=b"\x00",
+    )
+
+    if can_assoc_remove and final_status == t.Status.SUCCESS:
+        await req
+    else:
+        with pytest.raises(RuntimeError):
+            await req
+
+    await did_assoc_get
+
+    if can_assoc_remove:
+        await did_assoc_remove
+
+        if final_status != t.Status.SUCCESS:
+            # The association is re-added on failure
+            await did_assoc_add
+        else:
+            assert not did_assoc_add.done()
+
+    assert was_route_discovered.call_count >= 1
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+@pytest.mark.parametrize("succeed", [True, False])
+async def test_request_recovery_manual_source_route(
+    device, succeed, make_application, mocker
+):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    mocker.patch("zigpy_znp.zigbee.application.REQUEST_ERROR_RETRY_DELAY", new=0)
+
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    device.relays = [0x1111, 0x2222, 0x3333]
+    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
+
+    def data_confirm_replier(req):
+        if isinstance(req, c.AF.DataRequestExt.Req) or not succeed:
+            return c.AF.DataConfirm.Callback(
+                Status=t.Status.MAC_NO_ACK,
+                Endpoint=1,
+                TSN=1,
+            )
+        else:
+            return c.AF.DataConfirm.Callback(
+                Status=t.Status.SUCCESS,
+                Endpoint=1,
+                TSN=1,
+            )
+
+    normal_data_request = znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
+    source_routing_data_request = znp_server.reply_to(
+        c.AF.DataRequestSrcRtg.Req(partial=True),
+        responses=[
+            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
+    znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(
+            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
+        ),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    req = app.request(
+        device=device,
+        profile=260,
+        cluster=1,
+        src_ep=1,
+        dst_ep=1,
+        sequence=1,
+        data=b"\x00",
+    )
+
+    if succeed:
+        await req
+    else:
+        with pytest.raises(RuntimeError):
+            await req
+
+    # In either case only one source routing attempt is performed
+    assert source_routing_data_request.call_count == 1
+    assert normal_data_request.call_count >= 1
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_route_discovery_concurrency(device, make_application):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    route_discovery1 = znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(Dst=0x1234, partial=True),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    route_discovery2 = znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(Dst=0x5678, partial=True),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    await asyncio.gather(
+        app._discover_route(0x1234),
+        app._discover_route(0x5678),
+        app._discover_route(0x1234),
+        app._discover_route(0x5678),
+        app._discover_route(0x5678),
+        app._discover_route(0x5678),
+        app._discover_route(0x1234),
+    )
+
+    assert route_discovery1.call_count == 1
+    assert route_discovery2.call_count == 1
+
+    await app._discover_route(0x5678)
+
+    assert route_discovery1.call_count == 1
+    assert route_discovery2.call_count == 2
 
     await app.shutdown()

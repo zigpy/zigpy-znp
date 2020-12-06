@@ -194,6 +194,20 @@ async def test_permit_join_with_key(device, status, make_application):
     await app.shutdown()
 
 
+@pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
+async def test_permit_join_with_invalid_key(device, make_application):
+    app, znp_server = make_application(server_cls=device)
+
+    # Consciot bulb
+    ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
+    code = bytes.fromhex("17D1856872570CEB7ACB53030C5D6DA368B1")[:-1]  # truncate it
+
+    with pytest.raises(ValueError):
+        await app.permit_with_key(node=ieee, code=code, time_s=1)
+
+    await app.shutdown()
+
+
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)

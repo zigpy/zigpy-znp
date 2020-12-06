@@ -1185,6 +1185,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         zdo_args, _ = list_deserialize(data, field_types)
         zdo_kwargs = dict(zip(field_names, zdo_args))
 
+        # TODO: Check out `ZDO.MsgCallbackRegister`
+
         if cluster not in ZDO_CONVERTERS:
             LOGGER.error(
                 "ZDO converter for cluster %s has not been implemented!"
@@ -1192,7 +1194,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 " https://github.com/zigpy/zigpy-znp/issues/new",
                 cluster,
             )
-            return t.Status.FAILURE, "No ZDO converter"
+            raise RuntimeError("No ZDO converter")
 
         # Call the converter with the ZDO request's kwargs
         req_factory, rsp_factory, zdo_rsp_factory = ZDO_CONVERTERS[cluster]
@@ -1292,9 +1294,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
             await asyncio.sleep(0.1 * self._nib.BroadcastDeliveryTime)
         else:
-            # Limit request concurrency for the entire (potential) retry cycle.
-            # If we run out of memory, there is no point in allowing other requests to
-            # do the same.
             async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
                 # Shield from cancellation to prevent requests that time out
                 # in higher layers from missing expected responses
@@ -1480,6 +1479,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                         c.Util.AssocRemove.Req(IEEE=device.ieee)
                                     )
                                     tried_assoc_remove = True
+
+                                    # Route discovery must be performed right after
+                                    await self._discover_route(device.nwk)
                                 except CommandNotRecognized:
                                     LOGGER.debug(
                                         "The UTIL.AssocRemove command is available only"
@@ -1530,7 +1532,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     c.Util.AssocAdd.Req(
                         NWK=device.nwk,
                         IEEE=device.ieee,
-                        NodeRelation=association.NodeRelation,
+                        NodeRelation=association.Device.nodeRelation,
                     )
                 )
 
