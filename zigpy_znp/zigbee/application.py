@@ -48,7 +48,7 @@ DATA_CONFIRM_TIMEOUT = 8  # seconds
 DEVICE_JOIN_MAX_DELAY = 2  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 
-REQUEST_MAX_RETRIES = 10
+REQUEST_MAX_RETRIES = 5
 REQUEST_ERROR_RETRY_DELAY = 0.5  # second
 
 # Errors that go away on their own after waiting for a bit
