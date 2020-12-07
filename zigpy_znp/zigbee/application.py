@@ -122,6 +122,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._nib = NIB()
         self._network_key = None
         self._concurrent_requests_semaphore = None
+        self._currently_waiting_requests = 0
         self._route_discovery_futures = {}
         self._join_announce_tasks = {}
 
@@ -978,25 +979,31 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
         Async context manager that prevents devices from being overwhelmed by requests.
         Mainly a thin wrapper around `asyncio.Semaphore` that logs when it has to wait.
-
-        TODO: it would be better to also delay requests in response to `TABLE_FULL`.
         """
 
         start_time = time.time()
         was_locked = self._concurrent_requests_semaphore.locked()
 
         if was_locked:
-            LOGGER.debug("Max concurrency reached, delaying requests")
+            self._currently_waiting_requests += 1
+            LOGGER.debug(
+                "Max concurrency reached, delaying requests (%s enqueued)",
+                self._currently_waiting_requests,
+            )
 
-        async with self._concurrent_requests_semaphore:
+        try:
+            async with self._concurrent_requests_semaphore:
+                if was_locked:
+                    LOGGER.debug(
+                        "Previously delayed request is now running, "
+                        "delayed by %0.2f seconds",
+                        time.time() - start_time,
+                    )
+
+                yield
+        finally:
             if was_locked:
-                LOGGER.debug(
-                    "Previously delayed request is now running, "
-                    "delayed by %0.2f seconds",
-                    time.time() - start_time,
-                )
-
-            yield
+                self._currently_waiting_requests -= 1
 
     def _receive_zdo_message(
         self,
