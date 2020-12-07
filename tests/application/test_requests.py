@@ -3,6 +3,7 @@ import asyncio
 import pytest
 import zigpy.zdo
 from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
+from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -319,10 +320,11 @@ async def test_broadcast(device, make_application, mocker):
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_request_concurrency(device, make_application, mocker):
     app, znp_server = make_application(
-        server_cls=device, client_config={conf.CONF_MAX_CONCURRENT_REQUESTS: 2}
+        server_cls=device,
+        client_config={"znp_config": {conf.CONF_MAX_CONCURRENT_REQUESTS: 2}},
     )
 
     await app.startup()
@@ -331,10 +333,16 @@ async def test_request_concurrency(device, make_application, mocker):
 
     # Keep track of how many requests we receive at once
     in_flight_requests = 0
+    did_lock = False
 
     def make_response(req):
         async def callback(req):
             nonlocal in_flight_requests
+            nonlocal did_lock
+
+            if app._concurrent_requests_semaphore.locked():
+                did_lock = True
+
             in_flight_requests += 1
             assert in_flight_requests <= 2
 
@@ -369,13 +377,71 @@ async def test_request_concurrency(device, make_application, mocker):
                 sequence=seq,
                 data=b"\x00",
             )
-            for seq in range(20)
+            for seq in range(10)
         ]
     )
 
     assert all(status == t.Status.SUCCESS for status, msg in responses)
+    assert in_flight_requests == 0
+    assert did_lock
 
     await app.shutdown()
+
+
+"""
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_request_concurrency_overflow(device, make_application, mocker):
+    mocker.patch("zigpy_znp.zigbee.application.MAX_WAITING_REQUESTS", new=1)
+
+    app, znp_server = make_application(
+        server_cls=device, client_config={
+            'znp_config': {conf.CONF_MAX_CONCURRENT_REQUESTS: 1}
+        }
+    )
+
+    await app.startup()
+
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
+
+    def make_response(req):
+        async def callback(req):
+            await asyncio.sleep(0.01 * req.TSN)
+
+            znp_server.send(c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS))
+            znp_server.send(
+                c.AF.DataConfirm.Callback(
+                    Status=t.Status.SUCCESS, Endpoint=1, TSN=req.TSN
+                )
+            )
+
+        asyncio.create_task(callback(req))
+
+    znp_server.reply_to(
+        request=c.AF.DataRequestExt.Req(partial=True), responses=[make_response]
+    )
+
+    # We can only handle 1 in-flight request and 1 enqueued request. Last one will fail.
+    responses = await asyncio.gather(
+        *[
+            app.request(
+                device,
+                profile=260,
+                cluster=1,
+                src_ep=1,
+                dst_ep=1,
+                sequence=seq,
+                data=b"\x00",
+            )
+            for seq in range(3)
+        ], return_exceptions=True)
+
+    (rsp1, stat1), (rsp2, stat2), error3 = responses
+
+    assert rsp1 == rsp2 == t.Status.SUCCESS
+    assert isinstance(error3, ValueError)
+
+    await app.shutdown()
+"""
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -717,7 +783,7 @@ async def test_request_recovery_assoc_remove(
     if can_assoc_remove and final_status == t.Status.SUCCESS:
         await req
     else:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(DeliveryError):
             await req
 
     await did_assoc_get
@@ -804,7 +870,7 @@ async def test_request_recovery_manual_source_route(
     if succeed:
         await req
     else:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(DeliveryError):
             await req
 
     # In either case only one source routing attempt is performed

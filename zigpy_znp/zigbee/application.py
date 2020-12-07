@@ -19,6 +19,7 @@ import zigpy.zcl.foundation
 from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
 from zigpy.zdo.types import CLUSTERS as ZDO_CLUSTERS, ZDOCmd, ZDOHeader, MultiAddress
+from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -1521,7 +1522,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         # We've tried everything already so at this point just wait
                         await asyncio.sleep(REQUEST_ERROR_RETRY_DELAY)
                 else:
-                    raise RuntimeError(
+                    raise DeliveryError(
                         f"Request failed after {REQUEST_MAX_RETRIES} attempts:"
                         f" {status!r}"
                     )
