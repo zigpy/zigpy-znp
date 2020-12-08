@@ -19,6 +19,7 @@ setup(
     packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=[
         "pyserial-asyncio",
+        "pyusb>=1.1.0",
         "zigpy>=0.25.0",
         "async_timeout",
         "voluptuous",
