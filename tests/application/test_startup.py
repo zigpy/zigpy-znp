@@ -63,7 +63,7 @@ async def test_info(
 
     # These should not raise any errors even if our NIB is empty
     assert app.pan_id is None
-    assert app.ext_pan_id is None
+    assert app.extended_pan_id is None
     assert app.channel is None
     assert app.channels is None
     assert app.network_key is None
@@ -71,7 +71,7 @@ async def test_info(
     await app.startup(auto_form=False)
 
     assert app.pan_id == pan_id
-    assert app.ext_pan_id == t.EUI64.convert(ext_pan_id)
+    assert app.extended_pan_id == t.EUI64.convert(ext_pan_id)
     assert app.channel == channel
     assert app.channels == channels
     assert app.network_key == network_key

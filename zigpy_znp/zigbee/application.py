@@ -144,7 +144,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         return self._nib.nwkPanId
 
     @property
-    def ext_pan_id(self) -> typing.Optional[t.EUI64]:
+    def extended_pan_id(self) -> typing.Optional[t.EUI64]:
         return self._nib.extendedPANID
 
     @property
