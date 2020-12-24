@@ -420,3 +420,8 @@ class TCLinkKey(struct.Struct):
     Key: KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
+
+
+class NwkKeyDesc(struct.Struct):
+    KeySeqNum: basic.uint8_t
+    Key: KeyData

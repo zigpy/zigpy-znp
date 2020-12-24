@@ -1,15 +1,7 @@
 import pytest
 
 import zigpy_znp.types as t
-from zigpy_znp.znp.nib import (
-    NIB,
-    CC2531NIB,
-    Empty,
-    NwkState8,
-    NwkState16,
-    PaddingByte,
-    parse_nib,
-)
+from zigpy_znp.znp.nib import NIB, CC2531NIB, Empty, NwkState8, NwkState16, parse_nib
 
 NEW_NIB = bytes.fromhex(
     """
@@ -36,16 +28,16 @@ def test_nwk_state():
 
 def test_padding_byte():
     with pytest.raises(ValueError):
-        PaddingByte.deserialize(b"")
+        t.PaddingByte.deserialize(b"")
 
     with pytest.raises(ValueError):
-        PaddingByte(b"ab")
+        t.PaddingByte(b"ab")
 
     with pytest.raises(ValueError):
-        PaddingByte(b"")
+        t.PaddingByte(b"")
 
-    assert PaddingByte.deserialize(b"abc") == (PaddingByte(b"a"), b"bc")
-    assert PaddingByte.deserialize(b"a") == (PaddingByte(b"a"), b"")
+    assert t.PaddingByte.deserialize(b"abc") == (t.PaddingByte(b"a"), b"bc")
+    assert t.PaddingByte.deserialize(b"a") == (t.PaddingByte(b"a"), b"")
 
 
 def test_empty():
@@ -64,7 +56,7 @@ def test_nib_classes():
     fixed_new_nib = [
         a if a.type != NwkState16 else old_nib_nwk_state
         for a in NIB.fields()
-        if a.type is not PaddingByte
+        if a.type is not t.PaddingByte
     ]
 
     assert fixed_new_nib == list(CC2531NIB.fields())

@@ -2,7 +2,6 @@
 getting device info, getting NV info, subscribing callbacks, etc."""
 
 import zigpy_znp.types as t
-from zigpy_znp.znp.nib import PaddingByte
 
 
 class NodeRelation(t.enum_uint8):
@@ -49,21 +48,21 @@ class Device(t.Struct):
     age: t.uint8_t
     linkInfo: LinkInfo
 
-    PaddingByte1: PaddingByte
-    PaddingByte2: PaddingByte
+    PaddingByte1: t.PaddingByte
+    PaddingByte2: t.PaddingByte
 
     endDev: AgingEndDevice
 
-    PaddingByte3: PaddingByte
-    PaddingByte4: PaddingByte
-    PaddingByte5: PaddingByte
+    PaddingByte3: t.PaddingByte
+    PaddingByte4: t.PaddingByte
+    PaddingByte5: t.PaddingByte
 
     timeoutCounter: t.uint32_t
     keepaliveRcv: t.uint8_t  # not a bool, can be 0xFF
     ctrl: t.uint8_t
 
-    PaddingByte6: PaddingByte
-    PaddingByte7: PaddingByte
+    PaddingByte6: t.PaddingByte
+    PaddingByte7: t.PaddingByte
 
 
 class Key(t.FixedList, item_type=t.uint8_t, length=42):

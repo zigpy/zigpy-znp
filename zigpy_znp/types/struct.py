@@ -2,6 +2,8 @@ import typing
 import inspect
 import dataclasses
 
+import zigpy_znp.types.basic as t
+
 NoneType = type(None)
 
 
@@ -282,3 +284,20 @@ class StructField:
 
     def replace(self, **kwargs) -> "StructField":
         return dataclasses.replace(self, **kwargs)
+
+
+class PaddingByte(t.Bytes):
+    def __new__(cls, *args, **kwargs):
+        instance = super().__new__(cls, *args, **kwargs)
+
+        if len(instance) != 1:
+            raise ValueError("Padding byte must be a single byte")
+
+        return instance
+
+    @classmethod
+    def deserialize(cls, data: bytes) -> typing.Tuple[t.Bytes, bytes]:
+        if not data:
+            raise ValueError("Data is empty and cannot contain a padding byte")
+
+        return cls(data[:1]), data[1:]

@@ -18,14 +18,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import ZnpMtProtocol
-from zigpy_znp.znp.nib import (
-    NIB,
-    CC2531NIB,
-    NwkState8,
-    NwkKeyDesc,
-    NwkState16,
-    parse_nib,
-)
+from zigpy_znp.znp.nib import NIB, CC2531NIB, NwkState8, NwkState16, parse_nib
 from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds, is_secure_nvid
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -861,10 +854,10 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             nodeDepth=0,
             extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkKeyLoaded=t.Bool.false,
-            spare1=NwkKeyDesc(
+            spare1=t.NwkKeyDesc(
                 keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
-            spare2=NwkKeyDesc(
+            spare2=t.NwkKeyDesc(
                 keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
             spare3=0,
@@ -960,11 +953,11 @@ class BaseZStack3CC2531(BaseZStack3Device):
             nodeDepth=0,
             extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkKeyLoaded=t.Bool.false,
-            spare1=NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            spare1=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
-            spare2=NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            spare2=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
             spare3=0,
             spare4=0,
