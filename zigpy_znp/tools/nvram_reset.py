@@ -6,7 +6,6 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.exceptions import CommandNotRecognized
 from zigpy_znp.types.nvids import (
     NWK_NVID_TABLES,
     NWK_NVID_TABLE_KEYS,
@@ -45,21 +44,7 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
             else:
                 LOGGER.debug("Item does not exist: %s", nvid)
 
-    try:
-        await znp.nvram.read(
-            sys_id=NvSysIds.ZSTACK,
-            item_id=ExNvIds.LEGACY,
-            sub_id=OsalNvIds.POLL_RATE_OLD16,
-        )
-        supports_new_nvram = True
-    except CommandNotRecognized:
-        # CC2531 only supports the legacy NVRAM interface, even on Z-Stack 3
-        supports_new_nvram = False
-    except KeyError:
-        # The read can fail if we clear everything, but this is still fine
-        supports_new_nvram = True
-
-    if clear and supports_new_nvram:
+    if clear and znp.version >= 3.30:
         for nvid in ExNvIds:
             # Skip the LEGACY items, we did them above
             if nvid == ExNvIds.LEGACY:

@@ -91,15 +91,12 @@ class ZNPCoordinator(zigpy.device.Device):
 
     @property
     def model(self):
-        # There is no way to query the Z-Stack version or even the hardware at runtime.
-        # Instead we have to rely on these sorts of "hints"
-        if self.application.is_cc2531:
+        if self.application._znp.version == 1.2:
             model = "CC2531"
-
-            if self.application.is_zstack_home_12:
-                version = "Home 1.2"
-            else:
-                version = "3.0.1/3.0.2"
+            version = "Home 1.2"
+        elif self.application._znp.version == 3.0:
+            model = "CC2531"
+            version = "3.0.1/3.0.2"
         else:
             model = "CC13X2/CC26X2"
             version = "3.30.00/3.40.00/4.10.00"
@@ -222,7 +219,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Next, read out the NVRAM item that Zigbee2MQTT writes when it has configured
         # a device to make sure that our network settings will not be reset.
-        if self.is_zstack_home_12:
+        if self._znp.version == 1.2:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK1
         else:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK3
@@ -264,7 +261,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # The AUTOSTART startup NV item doesn't do anything.
-        if self.is_zstack_home_12:
+        if self._znp.version == 1.2:
             # Z-Stack Home 1.2 has a simple startup sequence
             await self._znp.request(
                 c.ZDO.StartupFromApp.Req(StartDelay=100),
@@ -451,7 +448,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram.osal_write(OsalNvIds.CHANLIST, channels, create=True)
 
         # Z-Stack Home 1.2 doesn't have the BDB subsystem
-        if not self.is_zstack_home_12:
+        if self._znp.version > 1.2:
             await self._znp.request(
                 c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
                 RspStatus=t.Status.SUCCESS,
@@ -482,7 +479,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ),
             ]
         ):
-            if not self.is_zstack_home_12:
+            if self._znp.version > 1.2:
                 # Z-Stack 3 uses the BDB subsystem
                 commissioning_rsp = await self._znp.request_callback_rsp(
                     request=c.AppConfig.BDBStartCommissioning.Req(
@@ -537,7 +534,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await asyncio.sleep(1)
 
         # Create the NV item that keeps track of whether or not we're fully configured.
-        if self.is_zstack_home_12:
+        if self._znp.version == 1.2:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK1
         else:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK3
@@ -920,14 +917,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         return self.devices[self.ieee]
-
-    @property
-    def is_zstack_home_12(self) -> bool:
-        return self._znp._version.MinorRel == 6
-
-    @property
-    def is_cc2531(self) -> bool:
-        return isinstance(self._nib, CC2531NIB)
 
     @property
     def znp_config(self) -> conf.ConfigType:
@@ -1330,7 +1319,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Route discovery with Z-Stack 1.2 and Z-Stack 3.0.2 on the CC2531 doesn't
         # appear to work very well (Z2M#2901)
-        if self.is_cc2531:
+        if self._znp.version < 3.30:
             return
 
         if nwk in self._route_discovery_futures:
