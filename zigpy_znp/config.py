@@ -71,7 +71,7 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
                 ): VolPositiveNumber,
                 vol.Optional(CONF_SKIP_BOOTLOADER, default=True): cv_boolean,
-                vol.Optional(CONF_LED_MODE, default=None): vol.Any(
+                vol.Optional(CONF_LED_MODE, default=LEDMode.OFF): vol.Any(
                     None, EnumValue(LEDMode, lambda v: str(v).upper())
                 ),
                 vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default="auto"): vol.Any(

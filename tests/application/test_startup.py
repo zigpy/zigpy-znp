@@ -178,9 +178,13 @@ async def test_led_mode(device, make_application):
         client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_LED_MODE: "off"}},
     )
 
+    # Z-Stack just does not respond to this command if HAL_LED is not enabled
+    # It does not send the usual "command not recognized" response
     set_led_mode = znp_server.reply_once_to(
         request=c.Util.LEDControl.Req(partial=True),
-        responses=[c.Util.LEDControl.Rsp(Status=t.Status.SUCCESS)],
+        responses=[]
+        if device is FormedLaunchpadCC26X2R1
+        else [c.Util.LEDControl.Rsp(Status=t.Status.SUCCESS)],
     )
 
     await app.startup(auto_form=False)

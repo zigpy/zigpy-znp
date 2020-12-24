@@ -302,12 +302,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
         # before the coordinator has started.
         if self.znp_config[conf.CONF_LED_MODE] is not None:
-            led_mode = self.znp_config[conf.CONF_LED_MODE]
-
-            await self._znp.request(
-                c.Util.LEDControl.Req(LED=0xFF, Mode=led_mode),
-                RspStatus=t.Status.SUCCESS,
-            )
+            await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
         device_info = await self._znp.request(
             c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
@@ -925,6 +920,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         return self.config[conf.CONF_ZNP_CONFIG]
+
+    async def _set_led_mode(self, *, led, mode) -> None:
+        """
+        Attempts to set the provided LED's mode. A Z-Stack bug causes the underlying
+        command to never receive a response if the board has no LEDs, requiring this
+        wrapper function prevent the command from taking many seconds to time out.
+        """
+
+        # XXX: If Z-Stack is not compiled with HAL_LED, it will just not respond at all
+        try:
+            async with async_timeout.timeout(0.1):
+                await self._znp.request(
+                    c.Util.LEDControl.Req(LED=led, Mode=mode),
+                    RspStatus=t.Status.SUCCESS,
+                )
+        except asyncio.TimeoutError:
+            LOGGER.info("This build of Z-Stack does not appear to support LED control")
 
     async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
         """

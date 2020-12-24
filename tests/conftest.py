@@ -640,6 +640,10 @@ class BaseZStack1CC2531(BaseZStackDevice):
             c.ZDO.PermitJoinInd.Callback(Duration=0),
         ]
 
+    @reply_to(c.Util.LEDControl.Req(partial=True))
+    def led_responder(self, req):
+        return req.Rsp(Status=t.Status.SUCCESS)
+
 
 class BaseZStack3Device(BaseZStackDevice):
     def __init__(self, *args, **kwargs):
@@ -901,6 +905,11 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             ),
         ]
 
+    @reply_to(c.Util.LEDControl.Req(partial=True))
+    def led_responder(self, req):
+        # XXX: Yes, there is *no response*
+        return
+
 
 class BaseZStack3CC2531(BaseZStack3Device):
     @reply_to(c.SYS.Version.Req())
@@ -974,6 +983,10 @@ class BaseZStack3CC2531(BaseZStack3Device):
         )
 
     node_desc_responder = BaseZStack1CC2531.node_desc_responder
+
+    @reply_to(c.Util.LEDControl.Req(partial=True))
+    def led_responder(self, req):
+        return req.Rsp(Status=t.Status.SUCCESS)
 
 
 class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
