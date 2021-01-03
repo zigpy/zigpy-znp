@@ -117,6 +117,21 @@ ZDO_CONVERTERS = {
         (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Bind_rsp, {"Status": rsp.Status})),
     ),
+    ZDOCmd.Unbind_req: (
+        (
+            lambda addr, SrcAddress, SrcEndpoint, ClusterID, DstAddress: (
+                c.ZDO.UnBindReq.Req(
+                    Dst=addr.address,
+                    Src=SrcAddress,
+                    SrcEndpoint=SrcEndpoint,
+                    ClusterId=ClusterID,
+                    Address=DstAddress,
+                )
+            )
+        ),
+        (lambda addr: c.ZDO.UnBindRsp.Callback(partial=True, Src=addr.address)),
+        (lambda rsp: (ZDOCmd.Unbind_rsp, {"Status": rsp.Status})),
+    ),
     ZDOCmd.Mgmt_Lqi_req: (
         (
             lambda addr, StartIndex: (
