@@ -284,11 +284,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         async with async_timeout.timeout(STARTUP_TIMEOUT):
             await started_as_coordinator
 
-        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
-        # unless they are explicitly disabled. We can't fix this but we can disable them
-        # as early as possible to shrink the window of opportunity for unwanted joins.
-        await self.permit_ncp(time_s=0)
-
         # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
         # before the coordinator has started.
         if self.znp_config[conf.CONF_LED_MODE] is not None:
@@ -346,6 +341,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.channel,
             max_concurrent_requests,
         )
+
+        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
+        # unless they are explicitly disabled. We can't fix this but we can disable them
+        # as early as possible to shrink the window of opportunity for unwanted joins.
+        await self.permit(time_s=0)
 
     async def update_network_channel(self, channel: t.uint8_t):
         """
@@ -665,28 +665,28 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 e,
             )
 
+    async def permit(self, time_s=60, node=None):
+        """
+        Overrides the `permit` method to throw an error when joins are permitted on only
+        the coordinator.
+        """
+
+        if node is not None and node == self.ieee:
+            raise RuntimeError("Joins cannot be permitted only on the coordinator")
+
+        return await super().permit(time_s=time_s, node=node)
+
     async def permit_ncp(self, time_s: int) -> None:
         """
-        Permits new devices to join the network *only through us*.
-        Zigpy sends a broadcast to all routers on its own.
+        Permits joins on the coordinator.
         """
 
-        response = await self._znp.request_callback_rsp(
-            request=c.ZDO.MgmtPermitJoinReq.Req(
-                AddrMode=t.AddrMode.NWK,
-                Dst=0x0000,  # Only us!
-                Duration=time_s,
-                # "This field shall always have a value of 1,
-                #  indicating a request to change the
-                #  Trust Center policy."
-                TCSignificance=1,
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
-        )
-
-        if response.Status != t.Status.SUCCESS:
-            raise RuntimeError(f"Permit join response failure: {response}")
+        # Z-Stack does not have a way to change just the trust center policy without
+        # also permitting joins on the coordinator. Sending a unicast permit join
+        # request to 0x0000 causes the coordinator to later reject joins done through
+        # another router if the coordinator is also not permitting joins, unfortunately
+        # forcing this method to be a no-op.
+        pass
 
     async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
         """
@@ -781,6 +781,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._znp.callback_for_response(
             c.ZDO.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
         )
+
+        self._znp.callback_for_response(
+            c.ZDO.PermitJoinInd.Callback(partial=True), self.on_zdo_permit_join_message
+        )
+
+    def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
+        """
+        Coordinator join status change message. Only sent with Z-Stack 1.2 and 3.0.
+        """
+
+        if msg.Duration == 0:
+            LOGGER.info("Coordinator is not permitting joins anymore")
+        else:
+            LOGGER.info("Coordinator is permitting joins for %d seconds", msg.Duration)
 
     def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
         """

@@ -262,7 +262,7 @@ class BaseServerZNP(ZNP):
         return callback
 
     def send(self, response):
-        if response is not None:
+        if response is not None and self._uart is not None:
             self._uart.send(response.to_frame())
 
     def close(self):
@@ -625,7 +625,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
 
     @reply_to(
         c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, TCSignificance=1, partial=True
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, partial=True
         )
     )
     def permit_join(self, request):
@@ -666,7 +666,7 @@ class BaseZStack3Device(BaseZStackDevice):
 
     @reply_to(
         c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, TCSignificance=1
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
         )
     )
     def permit_join(self, request):

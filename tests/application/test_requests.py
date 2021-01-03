@@ -69,7 +69,7 @@ async def test_zigpy_request(device, make_application):
     app, znp_server = make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 1
+    TSN = 2
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
@@ -128,7 +128,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     app, znp_server = make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 1
+    TSN = 2
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
