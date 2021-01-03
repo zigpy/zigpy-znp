@@ -1472,6 +1472,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             status == t.Status.MAC_TRANSACTION_EXPIRED
                             and association is None
                             and not tried_assoc_remove
+                            and self._znp.version >= 3.30
                         ):
                             # XXX: do we use NWK or IEEE?
                             association = await self._znp.request(
