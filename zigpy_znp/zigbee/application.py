@@ -939,7 +939,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     c.Util.LEDControl.Req(LED=led, Mode=mode),
                     RspStatus=t.Status.SUCCESS,
                 )
-        except asyncio.TimeoutError:
+        except (asyncio.TimeoutError, CommandNotRecognized):
             LOGGER.info("This build of Z-Stack does not appear to support LED control")
 
     async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
