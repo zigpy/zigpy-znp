@@ -859,10 +859,10 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkKeyLoaded=t.Bool.false,
             spare1=t.NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
             spare2=t.NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
             spare3=0,
             spare4=0,

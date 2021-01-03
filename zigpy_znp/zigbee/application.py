@@ -119,6 +119,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._nib = NIB()
         self._network_key = None
+        self._network_key_seq = None
         self._concurrent_requests_semaphore = None
         self._currently_waiting_requests = 0
         self._route_discovery_futures = {}
@@ -129,25 +130,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ##################################################################
 
     @property
-    def channel(self) -> typing.Optional[int]:
-        return self._nib.nwkLogicalChannel
-
-    @property
-    def channels(self) -> typing.Optional[t.Channels]:
-        return self._nib.channelList
-
-    @property
-    def pan_id(self) -> typing.Optional[t.NWK]:
-        return self._nib.nwkPanId
-
-    @property
-    def extended_pan_id(self) -> typing.Optional[t.EUI64]:
-        return self._nib.extendedPANID
-
-    @property
     def network_key(self) -> typing.Optional[t.KeyData]:
         # This is not a standard Zigpy property
         return self._network_key
+
+    @property
+    def network_key_seq(self) -> typing.Optional[t.uint8_t]:
+        # This is not a standard Zigpy property
+        return self._network_key_seq
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
@@ -1108,13 +1098,30 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     async def _load_device_info(self):
+        """
+        Loads low-level network information from NVRAM.
+        """
+
         # Parsing the NIB struct gives us access to low-level info, like the channel
         self._nib = parse_nib(await self._znp.nvram.osal_read(OsalNvIds.NIB))
-        self._network_key, _ = t.KeyData.deserialize(
-            await self._znp.nvram.osal_read(OsalNvIds.PRECFGKEY)
-        )
-
         LOGGER.debug("Parsed NIB: %s", self._nib)
+
+        nwkkey = await self._znp.nvram.osal_read(OsalNvIds.NWKKEY)
+
+        if self._znp.version < 3.30:
+            key_info, _ = t.NwkActiveKeyItemsCC2531.deserialize(nwkkey)
+        else:
+            key_info, _ = t.NwkActiveKeyItems.deserialize(nwkkey)
+
+        self._channel = self._nib.nwkLogicalChannel
+        self._channels = self._nib.channelList
+        self._pan_id = self._nib.nwkPanId
+        self._ext_pan_id = self._nib.extendedPANID
+
+        self._network_key = key_info.Active.Key
+        self._network_key_seq = key_info.Active.KeySeqNum
+
+        LOGGER.debug("Parsed key info: %s", key_info)
 
     async def _reset(self):
         """

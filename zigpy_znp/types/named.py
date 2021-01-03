@@ -425,3 +425,68 @@ class TCLinkKey(struct.Struct):
 class NwkKeyDesc(struct.Struct):
     KeySeqNum: basic.uint8_t
     Key: KeyData
+
+
+class NwkActiveKeyItemsCC2531(struct.Struct):
+    Active: NwkKeyDesc
+    FrameCounter: basic.uint32_t
+
+
+class NwkActiveKeyItems(struct.Struct):
+    Active: NwkKeyDesc
+
+    PaddingByte1: struct.PaddingByte
+    PaddingByte2: struct.PaddingByte
+    PaddingByte3: struct.PaddingByte
+
+    FrameCounter: basic.uint32_t
+
+
+class KeyType(MissingEnumMixin, basic.enum_uint8):
+    # Standard Network Key
+    NWK = 1
+    # Application Master Key
+    APP_MASTER = 2
+    # Application Link Key
+    APP_LINK = 3
+    # Trust Center Link Key
+    TC_LINK = 4
+
+
+class KeyAttributes(basic.enum_uint8):
+    # Used for IC derived keys
+    PROVISIONAL_KEY = 0x00
+    # Unique key that is not verified
+    UNVERIFIED_KEY = 0x01
+    # Unique key that got verified by ZC
+    VERIFIED_KEY = 0x02
+
+    # Internal definitions
+
+    # Use default key to join
+    DISTRIBUTED_DEFAULT_KEY = 0xFC
+    # Joined a network which is not R21 nwk, so TCLK process finished.
+    NON_R21_NWK_JOINED = 0xFD
+    # Unique key that got verified by Joining device.
+    # This means that key is stored as plain text (not seed hashed)
+    VERIFIED_KEY_JOINING_DEV = 0xFE
+    # Entry using default key
+    DEFAULT_KEY = 0xFF
+
+
+class TCLKDevEntry(struct.Struct):
+    txFrmCntr: basic.uint32_t
+    rxFrmCntr: basic.uint32_t
+
+    extAddr: EUI64
+    keyAttributes: KeyAttributes
+    keyType: KeyType
+
+    # For Unique key this is the number of shifts
+    # for IC this is the offset on the NvId index
+    SeedShift_IcIndex: basic.uint8_t
+
+
+class NwkSecMaterialDesc(struct.Struct):
+    FrameCounter: basic.uint32_t
+    ExtendedPanID: EUI64
