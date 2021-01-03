@@ -205,9 +205,11 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 @pytest.mark.parametrize("status", [t.ZDOStatus.SUCCESS, t.ZDOStatus.TIMEOUT, None])
-async def test_force_remove(device, make_application, status, mocker):
+async def test_remove(device, make_application, status, mocker):
     app, znp_server = make_application(server_cls=device)
     app._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
+
+    mocker.spy(app, "_remove_device")
 
     await app.startup(auto_form=False)
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
@@ -228,21 +230,14 @@ async def test_force_remove(device, make_application, status, mocker):
         ],
     )
 
-    force_remove_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, IEEE=device.ieee, partial=True),
-        responses=responses,
-    )
-
     # Make sure the device exists
     assert app.get_device(nwk=device.nwk) is device
 
     await app.remove(device.ieee)
     await normal_remove_req
-    await force_remove_req
 
-    # Make sure the device is gone once we remove it
-    with pytest.raises(KeyError):
-        app.get_device(nwk=device.nwk)
+    # Make sure the device is going to be removed
+    assert app._remove_device.call_count == 1
 
     await app.shutdown()
 
