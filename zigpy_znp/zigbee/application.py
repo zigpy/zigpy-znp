@@ -641,29 +641,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def force_remove(self, device: zigpy.device.Device) -> None:
         """
         Attempts to forcibly remove a device from the network.
-        Z-Stack does not expose any additional ways to to do this.
         """
 
-        try:
-            async with self._limit_concurrency():
-                await self._znp.request_callback_rsp(
-                    request=c.ZDO.MgmtLeaveReq.Req(
-                        DstAddr=0x0000,
-                        IEEE=device.ieee,
-                        RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
-                    ),
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.ZDO.MgmtLeaveRsp.Callback(
-                        Src=0x0000,
-                        partial=True,
-                    ),
-                )
-        except Exception as e:
-            LOGGER.warning(
-                "Failed to remove device %s from coordinator: %s",
-                device.ieee,
-                e,
-            )
+        LOGGER.warning("Z-Stack does not support force remove")
 
     async def permit(self, time_s=60, node=None):
         """

@@ -209,7 +209,9 @@ async def test_remove(device, make_application, status, mocker):
     app, znp_server = make_application(server_cls=device)
     app._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
 
-    mocker.spy(app, "_remove_device")
+    # Only zigpy>=0.29.0 has this method
+    if hasattr(app, "_remove_device"):
+        mocker.spy(app, "_remove_device")
 
     await app.startup(auto_form=False)
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
@@ -236,8 +238,13 @@ async def test_remove(device, make_application, status, mocker):
     await app.remove(device.ieee)
     await normal_remove_req
 
-    # Make sure the device is going to be removed
-    assert app._remove_device.call_count == 1
+    if hasattr(app, "_remove_device"):
+        # Make sure the device is going to be removed
+        assert app._remove_device.call_count == 1
+    else:
+        # Make sure the device is gone
+        with pytest.raises(KeyError):
+            app.get_device(ieee=device.ieee)
 
     await app.shutdown()
 
