@@ -75,7 +75,6 @@ def config_for_port_path(path):
 @pytest.fixture
 async def make_znp_server(mocker):
     transports = []
-    double_connect = False
 
     mocker.patch("zigpy_znp.api.AFTER_CONNECT_DELAY", 0.001)
     mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0.001)
@@ -86,6 +85,7 @@ async def make_znp_server(mocker):
             config = config_for_port_path(FAKE_SERIAL_PORT)
 
         server = server_cls(config)
+        server._transports = transports
 
         server.port_path = FAKE_SERIAL_PORT
         server._uart = None
@@ -97,10 +97,9 @@ async def make_znp_server(mocker):
 
             # No double connections!
             if any([t._is_connected for t in transports]):
-                nonlocal double_connect
-                double_connect = True
-
-                assert False, "Refusing to connect twice"
+                raise RuntimeError(
+                    "Cannot open two connections to the same serial port"
+                )
 
             if server._uart is None:
                 server._uart = ZnpMtProtocol(server)
@@ -138,14 +137,6 @@ async def make_znp_server(mocker):
         return server
 
     yield inner
-
-    # Ensure there are no leaks
-    if transports:
-        assert not any([t._is_connected for t in transports]), "Connection leaked"
-
-    # and no double connects
-    if double_connect:
-        assert False, "Cannot connect twice"
 
 
 def simple_deepcopy(d):
