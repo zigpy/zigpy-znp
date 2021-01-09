@@ -231,7 +231,7 @@ async def test_osal_write_nonexistent(connected_znp, nvid):
 @pytest.mark.parametrize("value", [b"keydata"])
 async def test_osal_read_security_bypass(connected_znp, nvid, value):
     znp, znp_server = connected_znp
-    znp._capabilities |= t.MTCapabilities.CAP_SAPI
+    znp.capabilities |= t.MTCapabilities.CAP_SAPI
 
     # Length is reported correctly
     length_rsp = znp_server.reply_once_to(

@@ -130,7 +130,7 @@ class NVRAMHelper:
             # Not all items can be read out due to security policies, though this can
             # easily be bypassed for some. The SAPI "ConfigId" is only 8 bits which
             # means some nvids are not able to read this way.
-            if not self.znp._capabilities & t.MTCapabilities.CAP_SAPI or nv_id > 0xFF:
+            if not self.znp.capabilities & t.MTCapabilities.CAP_SAPI or nv_id > 0xFF:
                 raise SecurityError(
                     f"NV item cannot be read due to security constraints: {nv_id!r}"
                 )

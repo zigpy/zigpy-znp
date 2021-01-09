@@ -137,7 +137,7 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
             t.Param(
                 "InstallCodeFormat",
                 InstallCodeFormat,
-                ("0x01 -- Install code + CRC" "0x02 -- Key derived from install code"),
+                ("0x01 -- Install code + CRC  0x02 -- Key derived from install code"),
             ),
             t.Param("IEEE", t.EUI64, "IEEE address of the joining device"),
             t.Param(

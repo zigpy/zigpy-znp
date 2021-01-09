@@ -415,7 +415,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             t.Param("SrcEndpoint", t.uint8_t, "binding source endpoint"),
             t.Param("ClusterId", t.ClusterId, "Cluster id to match in messages"),
             t.Param(
-                "Address", zigpy.zdo.types.MultiAddress, "Binding address/endpoint"
+                "Address", zigpy.zdo.types.MultiAddress, "Unbinding address/endpoint"
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,

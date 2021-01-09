@@ -33,23 +33,6 @@ class NwkState16(t.enum_uint16):
     NWK_REJOINING = 9
 
 
-class PaddingByte(t.Bytes):
-    def __new__(cls, *args, **kwargs):
-        instance = super().__new__(cls, *args, **kwargs)
-
-        if len(instance) != 1:
-            raise ValueError("Padding byte must be a single byte")
-
-        return instance
-
-    @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple[t.Bytes, bytes]:
-        if not data:
-            raise ValueError("Data is empty and cannot contain a padding byte")
-
-        return cls(data[:1]), data[1:]
-
-
 class Empty(t.Bytes):
     def __new__(cls, *args, **kwargs):
         instance = super().__new__(cls, *args, **kwargs)
@@ -62,11 +45,6 @@ class Empty(t.Bytes):
     @classmethod
     def deserialize(cls, data: bytes) -> typing.Tuple[t.Bytes, bytes]:
         return cls(), data
-
-
-class NwkKeyDesc(t.Struct):
-    keySeqNum: t.uint8_t
-    key: t.KeyData
 
 
 class NIB(t.Struct):
@@ -86,7 +64,7 @@ class NIB(t.Struct):
     SymLink: t.uint8_t
     CapabilityFlags: t.uint8_t
 
-    PaddingByte0: PaddingByte
+    PaddingByte0: t.PaddingByte
 
     TransactionPersistenceTime: t.uint16_t
 
@@ -94,13 +72,13 @@ class NIB(t.Struct):
     RouteDiscoveryTime: t.uint8_t
     RouteExpiryTime: t.uint8_t
 
-    PaddingByte1: PaddingByte
+    PaddingByte1: t.PaddingByte
 
     nwkDevAddress: t.NWK
 
     nwkLogicalChannel: t.uint8_t
 
-    PaddingByte2: PaddingByte
+    PaddingByte2: t.PaddingByte
 
     nwkCoordAddress: t.NWK
     nwkCoordExtAddress: t.EUI64
@@ -122,8 +100,8 @@ class NIB(t.Struct):
 
     nwkKeyLoaded: t.Bool
 
-    spare1: NwkKeyDesc
-    spare2: NwkKeyDesc
+    spare1: t.NwkKeyDesc
+    spare2: t.NwkKeyDesc
 
     spare3: t.uint8_t
     spare4: t.uint8_t
@@ -136,13 +114,13 @@ class NIB(t.Struct):
     nwkConcentratorRadius: t.uint8_t
     nwkAllFresh: t.uint8_t
 
-    PaddingByte3: PaddingByte
+    PaddingByte3: t.PaddingByte
 
     nwkManagerAddr: t.NWK
     nwkTotalTransmissions: t.uint16_t
     nwkUpdateId: t.uint8_t
 
-    PaddingByte4: PaddingByte
+    PaddingByte4: t.PaddingByte
 
 
 class CC2531NIB(t.Struct):
@@ -203,8 +181,8 @@ class CC2531NIB(t.Struct):
 
     nwkKeyLoaded: t.Bool
 
-    spare1: NwkKeyDesc
-    spare2: NwkKeyDesc
+    spare1: t.NwkKeyDesc
+    spare2: t.NwkKeyDesc
 
     spare3: t.uint8_t
     spare4: t.uint8_t

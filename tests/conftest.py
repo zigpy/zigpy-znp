@@ -18,14 +18,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import ZnpMtProtocol
-from zigpy_znp.znp.nib import (
-    NIB,
-    CC2531NIB,
-    NwkState8,
-    NwkKeyDesc,
-    NwkState16,
-    parse_nib,
-)
+from zigpy_znp.znp.nib import NIB, CC2531NIB, NwkState8, NwkState16, parse_nib
 from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds, is_secure_nvid
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -82,7 +75,6 @@ def config_for_port_path(path):
 @pytest.fixture
 async def make_znp_server(mocker):
     transports = []
-    double_connect = False
 
     mocker.patch("zigpy_znp.api.AFTER_CONNECT_DELAY", 0.001)
     mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0.001)
@@ -93,6 +85,7 @@ async def make_znp_server(mocker):
             config = config_for_port_path(FAKE_SERIAL_PORT)
 
         server = server_cls(config)
+        server._transports = transports
 
         server.port_path = FAKE_SERIAL_PORT
         server._uart = None
@@ -104,10 +97,9 @@ async def make_znp_server(mocker):
 
             # No double connections!
             if any([t._is_connected for t in transports]):
-                nonlocal double_connect
-                double_connect = True
-
-                assert False, "Refusing to connect twice"
+                raise RuntimeError(
+                    "Cannot open two connections to the same serial port"
+                )
 
             if server._uart is None:
                 server._uart = ZnpMtProtocol(server)
@@ -145,14 +137,6 @@ async def make_znp_server(mocker):
         return server
 
     yield inner
-
-    # Ensure there are no leaks
-    if transports:
-        assert not any([t._is_connected for t in transports]), "Connection leaked"
-
-    # and no double connects
-    if double_connect:
-        assert False, "Cannot connect twice"
 
 
 def simple_deepcopy(d):
@@ -269,7 +253,7 @@ class BaseServerZNP(ZNP):
         return callback
 
     def send(self, response):
-        if response is not None:
+        if response is not None and self._uart is not None:
             self._uart.send(response.to_frame())
 
     def close(self):
@@ -632,7 +616,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
 
     @reply_to(
         c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, TCSignificance=1, partial=True
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, partial=True
         )
     )
     def permit_join(self, request):
@@ -646,6 +630,10 @@ class BaseZStack1CC2531(BaseZStackDevice):
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
             c.ZDO.PermitJoinInd.Callback(Duration=0),
         ]
+
+    @reply_to(c.Util.LEDControl.Req(partial=True))
+    def led_responder(self, req):
+        return req.Rsp(Status=t.Status.SUCCESS)
 
 
 class BaseZStack3Device(BaseZStackDevice):
@@ -669,7 +657,7 @@ class BaseZStack3Device(BaseZStackDevice):
 
     @reply_to(
         c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, TCSignificance=1
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
         )
     )
     def permit_join(self, request):
@@ -861,11 +849,11 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             nodeDepth=0,
             extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkKeyLoaded=t.Bool.false,
-            spare1=NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            spare1=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
-            spare2=NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            spare2=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
             spare3=0,
             spare4=0,
@@ -907,6 +895,11 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
                 ),
             ),
         ]
+
+    @reply_to(c.Util.LEDControl.Req(partial=True))
+    def led_responder(self, req):
+        # XXX: Yes, there is *no response*
+        return
 
 
 class BaseZStack3CC2531(BaseZStack3Device):
@@ -960,11 +953,11 @@ class BaseZStack3CC2531(BaseZStack3Device):
             nodeDepth=0,
             extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkKeyLoaded=t.Bool.false,
-            spare1=NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            spare1=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
-            spare2=NwkKeyDesc(
-                keySeqNum=0, key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            spare2=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ),
             spare3=0,
             spare4=0,
@@ -981,6 +974,10 @@ class BaseZStack3CC2531(BaseZStack3Device):
         )
 
     node_desc_responder = BaseZStack1CC2531.node_desc_responder
+
+    @reply_to(c.Util.LEDControl.Req(partial=True))
+    def led_responder(self, req):
+        return req.Rsp(Status=t.Status.SUCCESS)
 
 
 class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):

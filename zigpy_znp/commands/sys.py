@@ -561,7 +561,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
             t.Param(
                 "JammerInd",
                 t.Bool,
-                "TRUE if jammer detected, " "FALSE if changed to undetected",
+                "TRUE if jammer detected, FALSE if changed to undetected",
             ),
         ),
     )

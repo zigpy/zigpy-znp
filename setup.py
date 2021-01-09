@@ -17,8 +17,10 @@ setup(
     author_email="alexei.chetroi@outlook.com",
     license="GPL-3.0",
     packages=find_packages(exclude=["tests", "tests.*"]),
+    python_requires=">=3.7",
     install_requires=[
-        "pyserial-asyncio",
+        'pyserial-asyncio; platform_system!="Windows"',
+        'pyserial-asyncio!=0.5; platform_system=="Windows"',  # 0.5 broke writes
         "zigpy>=0.25.0",
         "async_timeout",
         "voluptuous",

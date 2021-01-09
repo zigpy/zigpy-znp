@@ -69,7 +69,7 @@ async def test_zigpy_request(device, make_application):
     app, znp_server = make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 1
+    TSN = 2
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
@@ -128,7 +128,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     app, znp_server = make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 1
+    TSN = 2
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
@@ -205,9 +205,13 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 @pytest.mark.parametrize("status", [t.ZDOStatus.SUCCESS, t.ZDOStatus.TIMEOUT, None])
-async def test_force_remove(device, make_application, status, mocker):
+async def test_remove(device, make_application, status, mocker):
     app, znp_server = make_application(server_cls=device)
     app._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
+
+    # Only zigpy>=0.29.0 has this method
+    if hasattr(app, "_remove_device"):
+        mocker.spy(app, "_remove_device")
 
     await app.startup(auto_form=False)
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
@@ -228,21 +232,19 @@ async def test_force_remove(device, make_application, status, mocker):
         ],
     )
 
-    force_remove_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(DstAddr=0x0000, IEEE=device.ieee, partial=True),
-        responses=responses,
-    )
-
     # Make sure the device exists
     assert app.get_device(nwk=device.nwk) is device
 
     await app.remove(device.ieee)
     await normal_remove_req
-    await force_remove_req
 
-    # Make sure the device is gone once we remove it
-    with pytest.raises(KeyError):
-        app.get_device(nwk=device.nwk)
+    if hasattr(app, "_remove_device"):
+        # Make sure the device is going to be removed
+        assert app._remove_device.call_count == 1
+    else:
+        # Make sure the device is gone
+        with pytest.raises(KeyError):
+            app.get_device(ieee=device.ieee)
 
     await app.shutdown()
 
@@ -681,13 +683,13 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-@pytest.mark.parametrize("can_assoc_remove", [True, False])
+@pytest.mark.parametrize("device_cls", FORMED_DEVICES)
+@pytest.mark.parametrize("fw_assoc_remove", [True, False])
 @pytest.mark.parametrize("final_status", [t.Status.SUCCESS, t.Status.APS_NO_ACK])
 async def test_request_recovery_assoc_remove(
-    device, can_assoc_remove, final_status, make_application, mocker
+    device_cls, fw_assoc_remove, final_status, make_application, mocker
 ):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device_cls)
 
     await app.startup(auto_form=False)
 
@@ -734,8 +736,11 @@ async def test_request_recovery_assoc_remove(
         responses=[assoc_get_with_addr],
     )
 
+    if not issubclass(device_cls, FormedLaunchpadCC26X2R1):
+        fw_assoc_remove = False
+
     # Not all firmwares support Add/Remove
-    if can_assoc_remove:
+    if fw_assoc_remove:
 
         def assoc_remove(req):
             nonlocal assoc_device
@@ -780,15 +785,13 @@ async def test_request_recovery_assoc_remove(
         data=b"\x00",
     )
 
-    if can_assoc_remove and final_status == t.Status.SUCCESS:
+    if fw_assoc_remove and final_status == t.Status.SUCCESS:
         await req
     else:
         with pytest.raises(DeliveryError):
             await req
 
-    await did_assoc_get
-
-    if can_assoc_remove:
+    if fw_assoc_remove:
         await did_assoc_remove
 
         if final_status != t.Status.SUCCESS:
@@ -796,8 +799,13 @@ async def test_request_recovery_assoc_remove(
             await did_assoc_add
         else:
             assert not did_assoc_add.done()
-
-    assert was_route_discovered.call_count >= 1
+    elif issubclass(device_cls, FormedLaunchpadCC26X2R1):
+        await did_assoc_get
+        assert was_route_discovered.call_count >= 1
+    else:
+        # Don't even attempt this with older firmwares
+        assert not did_assoc_get.done()
+        assert was_route_discovered.call_count == 0
 
     await app.shutdown()
 

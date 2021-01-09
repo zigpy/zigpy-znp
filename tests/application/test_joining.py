@@ -9,7 +9,7 @@ from zigpy.zdo.types import SizePrefixedSimpleDescriptor
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from ..conftest import FORMED_DEVICES, FORMED_ZSTACK3_DEVICES
+from ..conftest import FORMED_DEVICES, FORMED_ZSTACK3_DEVICES, CoroutineMock
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -21,19 +21,7 @@ async def test_permit_join(device, make_application):
     # Handle the startup permit join clear
     znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-        override=True,
-    )
-
-    # Handle the permit join request sent by us
-    permit_join_unicast = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=10, partial=True
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
         ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
@@ -55,64 +43,14 @@ async def test_permit_join(device, make_application):
     await app.startup(auto_form=False)
     await app.permit(time_s=10)
 
-    # Make sure both commands were received
-    await asyncio.gather(permit_join_unicast, permit_join_broadcast)
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_permit_join_failure(device, make_application):
-    app, znp_server = make_application(server_cls=device)
-
-    # Handle the startup permit join clear
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-        override=True,
-    )
-
-    # Handle the permit join request sent by us
-    permit_join_unicast = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=10, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.TIMEOUT),
-        ],
-    )
-
-    # Handle the ZDO broadcast sent by Zigpy
-    permit_join_broadcast = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=10, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-    )
-
-    await app.startup(auto_form=False)
-
-    with pytest.raises(RuntimeError):
-        await app.permit(time_s=10)
-
-    # Make sure both commands were received
-    await asyncio.gather(permit_join_unicast, permit_join_broadcast)
+    await permit_join_broadcast
 
     await app.shutdown()
 
 
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
-@pytest.mark.parametrize("status", [t.ZDOStatus.SUCCESS, t.ZDOStatus.TIMEOUT])
-async def test_permit_join_with_key(device, status, make_application):
+@pytest.mark.parametrize("permit_result", [None, asyncio.TimeoutError()])
+async def test_permit_join_with_key(device, permit_result, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     # Consciot bulb
@@ -135,38 +73,8 @@ async def test_permit_join_with_key(device, status, make_application):
         ],
     )
 
-    # Handle the startup permit join clear
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-        override=True,
-    )
-
-    # Handle the permit join request sent by us (or fail)
-    permit_join_unicast = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=1, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=status),
-        ],
-    )
-
-    # Handle the ZDO broadcast sent by Zigpy
-    permit_join_broadcast = znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=1, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
+    mocker.patch.object(
+        app, "permit", new=CoroutineMock(side_effect=[None, permit_result])
     )
 
     join_disable_install_code = znp_server.reply_once_to(
@@ -178,15 +86,14 @@ async def test_permit_join_with_key(device, status, make_application):
 
     await app.startup(auto_form=False)
 
-    with contextlib.nullcontext() if status == t.ZDOStatus.SUCCESS else pytest.raises(
-        RuntimeError
+    with contextlib.nullcontext() if permit_result is None else pytest.raises(
+        asyncio.TimeoutError
     ):
         await app.permit_with_key(node=ieee, code=code, time_s=1)
 
     await bdb_add_install_code
     await join_enable_install_code
-    await permit_join_unicast
-    await permit_join_broadcast
+    assert app.permit.call_count == 2
 
     # The install code policy is reset right after
     await join_disable_install_code
@@ -314,24 +221,13 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
     # Handle the startup permit join clear
     znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
         ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
         override=True,
-    )
-
-    # Handle the permit join request sent by us (or fail)
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=60, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
     )
 
     # Handle the ZDO broadcast sent by Zigpy

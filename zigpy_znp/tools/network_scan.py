@@ -46,7 +46,7 @@ async def network_scan(
     # If we don't start Z-Stack 3 it will always work but Z-Stack 1 keeps the device
     # state in the NIB, which we have to temporarily delete in order for the scan to be
     # possible.
-    if znp._version.MinorRel == 6:
+    if znp.version == 1.2:
         previous_nib = await znp.nvram.osal_read(OsalNvIds.NIB)
         await znp.nvram.osal_delete(OsalNvIds.NIB)
     else:

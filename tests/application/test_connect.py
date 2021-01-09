@@ -11,7 +11,6 @@ from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1, swap_attribute
 pytestmark = [pytest.mark.asyncio]
 
 
-@pytest.mark.xfail(raises=AssertionError)
 async def test_no_double_connect(make_znp_server, mocker):
     znp_server = make_znp_server(server_cls=FormedLaunchpadCC26X2R1)
 
@@ -19,19 +18,36 @@ async def test_no_double_connect(make_znp_server, mocker):
     await uart_connect(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port}), app
     )
-    await uart_connect(
-        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port}), app
-    )
+
+    with pytest.raises(RuntimeError):
+        await uart_connect(
+            conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port}), app
+        )
 
 
-@pytest.mark.xfail(raises=AssertionError)
 async def test_leak_detection(make_znp_server, mocker):
     znp_server = make_znp_server(server_cls=FormedLaunchpadCC26X2R1)
 
+    def count_connected():
+        return sum([t._is_connected for t in znp_server._transports])
+
+    # Opening and closing one connection will keep the count at zero
+    assert count_connected() == 0
     app = mocker.Mock()
-    await uart_connect(
+    protocol1 = await uart_connect(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port}), app
     )
+    assert count_connected() == 1
+    protocol1.close()
+    assert count_connected() == 0
+
+    # Once more for good measure
+    protocol2 = await uart_connect(
+        conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port}), app
+    )
+    assert count_connected() == 1
+    protocol2.close()
+    assert count_connected() == 0
 
 
 async def test_probe_unsuccessful():
@@ -57,6 +73,8 @@ async def test_probe_unsuccessful_slow(device, make_znp_server, mocker):
         )
     )
 
+    assert not any([t._is_connected for t in znp_server._transports])
+
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_probe_successful(device, make_znp_server):
@@ -65,6 +83,7 @@ async def test_probe_successful(device, make_znp_server):
     assert await ControllerApplication.probe(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port})
     )
+    assert not any([t._is_connected for t in znp_server._transports])
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -79,6 +98,7 @@ async def test_probe_multiple(device, make_znp_server):
     assert await ControllerApplication.probe(config)
     assert await ControllerApplication.probe(config)
     assert await ControllerApplication.probe(config)
+    assert not any([t._is_connected for t in znp_server._transports])
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)

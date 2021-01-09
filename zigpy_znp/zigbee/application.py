@@ -91,15 +91,12 @@ class ZNPCoordinator(zigpy.device.Device):
 
     @property
     def model(self):
-        # There is no way to query the Z-Stack version or even the hardware at runtime.
-        # Instead we have to rely on these sorts of "hints"
-        if self.application.is_cc2531:
+        if self.application._znp.version == 1.2:
             model = "CC2531"
-
-            if self.application.is_zstack_home_12:
-                version = "Home 1.2"
-            else:
-                version = "3.0.1/3.0.2"
+            version = "Home 1.2"
+        elif self.application._znp.version == 3.0:
+            model = "CC2531"
+            version = "3.0.1/3.0.2"
         else:
             model = "CC13X2/CC26X2"
             version = "3.30.00/3.40.00/4.10.00"
@@ -122,6 +119,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._nib = NIB()
         self._network_key = None
+        self._network_key_seq = None
         self._concurrent_requests_semaphore = None
         self._currently_waiting_requests = 0
         self._route_discovery_futures = {}
@@ -132,25 +130,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ##################################################################
 
     @property
-    def channel(self) -> typing.Optional[int]:
-        return self._nib.nwkLogicalChannel
-
-    @property
-    def channels(self) -> typing.Optional[t.Channels]:
-        return self._nib.channelList
-
-    @property
-    def pan_id(self) -> typing.Optional[t.NWK]:
-        return self._nib.nwkPanId
-
-    @property
-    def ext_pan_id(self) -> typing.Optional[t.EUI64]:
-        return self._nib.extendedPANID
-
-    @property
     def network_key(self) -> typing.Optional[t.KeyData]:
         # This is not a standard Zigpy property
         return self._network_key
+
+    @property
+    def network_key_seq(self) -> typing.Optional[t.uint8_t]:
+        # This is not a standard Zigpy property
+        return self._network_key_seq
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
@@ -222,7 +209,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Next, read out the NVRAM item that Zigbee2MQTT writes when it has configured
         # a device to make sure that our network settings will not be reset.
-        if self.is_zstack_home_12:
+        if self._znp.version == 1.2:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK1
         else:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK3
@@ -264,7 +251,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # The AUTOSTART startup NV item doesn't do anything.
-        if self.is_zstack_home_12:
+        if self._znp.version == 1.2:
             # Z-Stack Home 1.2 has a simple startup sequence
             await self._znp.request(
                 c.ZDO.StartupFromApp.Req(StartDelay=100),
@@ -297,20 +284,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         async with async_timeout.timeout(STARTUP_TIMEOUT):
             await started_as_coordinator
 
-        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
-        # unless they are explicitly disabled. We can't fix this but we can disable them
-        # as early as possible to shrink the window of opportunity for unwanted joins.
-        await self.permit_ncp(time_s=0)
-
         # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
         # before the coordinator has started.
         if self.znp_config[conf.CONF_LED_MODE] is not None:
-            led_mode = self.znp_config[conf.CONF_LED_MODE]
-
-            await self._znp.request(
-                c.Util.LEDControl.Req(LED=0xFF, Mode=led_mode),
-                RspStatus=t.Status.SUCCESS,
-            )
+            await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
         device_info = await self._znp.request(
             c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
@@ -364,6 +341,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.channel,
             max_concurrent_requests,
         )
+
+        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
+        # unless they are explicitly disabled. We can't fix this but we can disable them
+        # as early as possible to shrink the window of opportunity for unwanted joins.
+        await self.permit(time_s=0)
 
     async def update_network_channel(self, channel: t.uint8_t):
         """
@@ -451,7 +433,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._znp.nvram.osal_write(OsalNvIds.CHANLIST, channels, create=True)
 
         # Z-Stack Home 1.2 doesn't have the BDB subsystem
-        if not self.is_zstack_home_12:
+        if self._znp.version > 1.2:
             await self._znp.request(
                 c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
                 RspStatus=t.Status.SUCCESS,
@@ -482,7 +464,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ),
             ]
         ):
-            if not self.is_zstack_home_12:
+            if self._znp.version > 1.2:
                 # Z-Stack 3 uses the BDB subsystem
                 commissioning_rsp = await self._znp.request_callback_rsp(
                     request=c.AppConfig.BDBStartCommissioning.Req(
@@ -537,7 +519,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await asyncio.sleep(1)
 
         # Create the NV item that keeps track of whether or not we're fully configured.
-        if self.is_zstack_home_12:
+        if self._znp.version == 1.2:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK1
         else:
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK3
@@ -659,52 +641,32 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def force_remove(self, device: zigpy.device.Device) -> None:
         """
         Attempts to forcibly remove a device from the network.
-        Z-Stack does not expose any additional ways to to do this.
         """
 
-        try:
-            async with self._limit_concurrency():
-                await self._znp.request_callback_rsp(
-                    request=c.ZDO.MgmtLeaveReq.Req(
-                        DstAddr=0x0000,
-                        IEEE=device.ieee,
-                        RemoveChildren_Rejoin=c.zdo.LeaveOptions.NONE,
-                    ),
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.ZDO.MgmtLeaveRsp.Callback(
-                        Src=0x0000,
-                        partial=True,
-                    ),
-                )
-        except Exception as e:
-            LOGGER.warning(
-                "Failed to remove device %s from coordinator: %s",
-                device.ieee,
-                e,
-            )
+        LOGGER.warning("Z-Stack does not support force remove")
+
+    async def permit(self, time_s=60, node=None):
+        """
+        Overrides the `permit` method to throw an error when joins are permitted on only
+        the coordinator.
+        """
+
+        if node is not None and node == self.ieee:
+            raise RuntimeError("Joins cannot be permitted only on the coordinator")
+
+        return await super().permit(time_s=time_s, node=node)
 
     async def permit_ncp(self, time_s: int) -> None:
         """
-        Permits new devices to join the network *only through us*.
-        Zigpy sends a broadcast to all routers on its own.
+        Permits joins on the coordinator.
         """
 
-        response = await self._znp.request_callback_rsp(
-            request=c.ZDO.MgmtPermitJoinReq.Req(
-                AddrMode=t.AddrMode.NWK,
-                Dst=0x0000,  # Only us!
-                Duration=time_s,
-                # "This field shall always have a value of 1,
-                #  indicating a request to change the
-                #  Trust Center policy."
-                TCSignificance=1,
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
-        )
-
-        if response.Status != t.Status.SUCCESS:
-            raise RuntimeError(f"Permit join response failure: {response}")
+        # Z-Stack does not have a way to change just the trust center policy without
+        # also permitting joins on the coordinator. Sending a unicast permit join
+        # request to 0x0000 causes the coordinator to later reject joins done through
+        # another router if the coordinator is also not permitting joins, unfortunately
+        # forcing this method to be a no-op.
+        pass
 
     async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
         """
@@ -799,6 +761,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._znp.callback_for_response(
             c.ZDO.SrcRtgInd.Callback(partial=True), self.on_zdo_relays_message
         )
+
+        self._znp.callback_for_response(
+            c.ZDO.PermitJoinInd.Callback(partial=True), self.on_zdo_permit_join_message
+        )
+
+    def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
+        """
+        Coordinator join status change message. Only sent with Z-Stack 1.2 and 3.0.
+        """
+
+        if msg.Duration == 0:
+            LOGGER.info("Coordinator is not permitting joins anymore")
+        else:
+            LOGGER.info("Coordinator is permitting joins for %d seconds", msg.Duration)
 
     def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
         """
@@ -922,20 +898,29 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         return self.devices[self.ieee]
 
     @property
-    def is_zstack_home_12(self) -> bool:
-        return self._znp._version.MinorRel == 6
-
-    @property
-    def is_cc2531(self) -> bool:
-        return isinstance(self._nib, CC2531NIB)
-
-    @property
     def znp_config(self) -> conf.ConfigType:
         """
         Shortcut property to access the ZNP radio config.
         """
 
         return self.config[conf.CONF_ZNP_CONFIG]
+
+    async def _set_led_mode(self, *, led, mode) -> None:
+        """
+        Attempts to set the provided LED's mode. A Z-Stack bug causes the underlying
+        command to never receive a response if the board has no LEDs, requiring this
+        wrapper function prevent the command from taking many seconds to time out.
+        """
+
+        # XXX: If Z-Stack is not compiled with HAL_LED, it will just not respond at all
+        try:
+            async with async_timeout.timeout(0.1):
+                await self._znp.request(
+                    c.Util.LEDControl.Req(LED=led, Mode=mode),
+                    RspStatus=t.Status.SUCCESS,
+                )
+        except (asyncio.TimeoutError, CommandNotRecognized):
+            LOGGER.info("This build of Z-Stack does not appear to support LED control")
 
     async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
         """
@@ -1107,13 +1092,30 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     async def _load_device_info(self):
+        """
+        Loads low-level network information from NVRAM.
+        """
+
         # Parsing the NIB struct gives us access to low-level info, like the channel
         self._nib = parse_nib(await self._znp.nvram.osal_read(OsalNvIds.NIB))
-        self._network_key, _ = t.KeyData.deserialize(
-            await self._znp.nvram.osal_read(OsalNvIds.PRECFGKEY)
-        )
-
         LOGGER.debug("Parsed NIB: %s", self._nib)
+
+        nwkkey = await self._znp.nvram.osal_read(OsalNvIds.NWKKEY)
+
+        if self._znp.version < 3.30:
+            key_info, _ = t.NwkActiveKeyItemsCC2531.deserialize(nwkkey)
+        else:
+            key_info, _ = t.NwkActiveKeyItems.deserialize(nwkkey)
+
+        self._channel = self._nib.nwkLogicalChannel
+        self._channels = self._nib.channelList
+        self._pan_id = self._nib.nwkPanId
+        self._ext_pan_id = self._nib.extendedPANID
+
+        self._network_key = key_info.Active.Key
+        self._network_key_seq = key_info.Active.KeySeqNum
+
+        LOGGER.debug("Parsed key info: %s", key_info)
 
     async def _reset(self):
         """
@@ -1330,7 +1332,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Route discovery with Z-Stack 1.2 and Z-Stack 3.0.2 on the CC2531 doesn't
         # appear to work very well (Z2M#2901)
-        if self.is_cc2531:
+        if self._znp.version < 3.30:
             return
 
         if nwk in self._route_discovery_futures:
@@ -1464,6 +1466,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             status == t.Status.MAC_TRANSACTION_EXPIRED
                             and association is None
                             and not tried_assoc_remove
+                            and self._znp.version >= 3.30
                         ):
                             # XXX: do we use NWK or IEEE?
                             association = await self._znp.request(

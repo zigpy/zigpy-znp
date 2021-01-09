@@ -16,6 +16,7 @@ from zigpy_znp import uart
 from zigpy_znp.nvram import NVRAMHelper
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.types.nvids import ExNvIds, NvSysIds
 
 LOGGER = logging.getLogger(__name__)
 AFTER_CONNECT_DELAY = 1  # seconds
@@ -53,6 +54,29 @@ def _deduplicate_commands(
 
     # The start of each chain is the maximal element
     return tuple(maximal_commands)
+
+
+async def detect_zstack_version(znp) -> float:
+    """
+    Feature detects the major version of Z-Stack running on the device.
+    """
+
+    # Z-Stack 1.2 does not have the AppConfig subsystem
+    if not znp.capabilities & t.MTCapabilities.CAP_APP_CNF:
+        return 1.2
+
+    try:
+        # Only Z-Stack 3.30+ has the new NVRAM system
+        await znp.nvram.read(
+            sys_id=NvSysIds.ZSTACK,
+            item_id=ExNvIds.TCLK_TABLE,
+            sub_id=0x0000,
+        )
+        return 3.30
+    except KeyError:
+        return 3.30
+    except CommandNotRecognized:
+        return 3.0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -168,11 +192,12 @@ class ZNP:
         self._uart = None
         self._app = None
         self._config = config
-        self._version = None
-        self._capabilities = t.MTCapabilities(0)
 
         self._listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
+
+        self.capabilities = None
+        self.version = None
 
         self.nvram = NVRAMHelper(self)
 
@@ -231,8 +256,10 @@ class ZNP:
                 LOGGER.debug("Testing connection to %s", self._port_path)
 
                 # Make sure that our port works
-                self._version = await self.request(c.SYS.Version.Req())
-                self._capabilities = (await self.request(c.SYS.Ping.Req())).Capabilities
+                self.capabilities = (await self.request(c.SYS.Ping.Req())).Capabilities
+                self.version = await detect_zstack_version(self)
+
+                LOGGER.debug("Detected Z-Stack %s", self.version)
         except Exception:
             LOGGER.debug("Connection to %s failed, cleaning up", self._port_path)
             self.close()
@@ -278,7 +305,8 @@ class ZNP:
                 listener.cancel()
 
         self._listeners.clear()
-        self._version = None
+        self.version = None
+        self.capabilities = None
 
         if self._uart is not None:
             self._uart.close()
