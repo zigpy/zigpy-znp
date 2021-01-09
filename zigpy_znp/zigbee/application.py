@@ -375,6 +375,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._load_device_info()
             await asyncio.sleep(1)
 
+    async def update_pan_id(self, pan_id: t.uint16_t) -> None:
+        """
+        Updates the network PAN ID, bypassing Z-Stack anti-collision checks.
+        """
+
+        await self._reset()
+
+        nib = parse_nib(await self._znp.nvram.osal_read(OsalNvIds.NIB))
+        nib.nwkPanId = pan_id
+
+        await self._znp.nvram.osal_write(OsalNvIds.NIB, nib)
+        await self._znp.nvram.osal_write(OsalNvIds.PANID, pan_id)
+
     async def form_network(self):
         """
         Clears the current config and forms a new network with a random network key,
@@ -422,7 +435,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.debug("Updating network settings")
 
         await self._write_stack_settings(reset_if_changed=False)
-        await self._znp.nvram.osal_write(OsalNvIds.PANID, pan_id, create=True)
+
+        # Ignore the user's PAN ID for now and just let Z-Stack pick one that works
+        await self._znp.nvram.osal_write(
+            OsalNvIds.PANID, t.uint16_t(0xFFFF), create=True
+        )
         await self._znp.nvram.osal_write(
             OsalNvIds.APS_USE_EXT_PANID, extended_pan_id, create=True
         )
@@ -517,6 +534,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 pass
 
             await asyncio.sleep(1)
+
+        if pan_id != 0xFFFF:
+            # Update the PAN ID at runtime after the network has formed to make sure
+            # Z-Stack does not complain about collisions on Z-Stack 3.
+            await self.update_pan_id(pan_id)
 
         # Create the NV item that keeps track of whether or not we're fully configured.
         if self._znp.version == 1.2:
@@ -1117,7 +1139,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         LOGGER.debug("Parsed key info: %s", key_info)
 
-    async def _reset(self):
+    async def _reset(self) -> None:
         """
         Performs a soft reset within Z-Stack.
         A hard reset resets the serial port, causing the device to disconnect.
