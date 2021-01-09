@@ -336,11 +336,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
 
-        LOGGER.info(
-            "Currently on channel %d. Limiting concurrent requests to %d",
-            self.channel,
-            max_concurrent_requests,
-        )
+        LOGGER.info("Network settings")
+        LOGGER.info("  Z-Stack version: %s", self._znp.version)
+        LOGGER.info("  Channel: %s", self.channel)
+        LOGGER.info("  PAN ID: 0x%04x", self.pan_id)
+        LOGGER.info("  Extended PAN ID: %s", self.extended_pan_id)
+        LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
 
         # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
         # unless they are explicitly disabled. We can't fix this but we can disable them
