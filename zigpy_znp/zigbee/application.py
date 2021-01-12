@@ -341,12 +341,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
 
+        version_rsp = await self._znp.request(c.SYS.Version.Req())
+
         LOGGER.info("Network settings")
         LOGGER.info("  Z-Stack version: %s", self._znp.version)
+        LOGGER.info("  Z-Stack build id: %s", version_rsp.CodeRevision)
+        LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
         LOGGER.info("  Channel: %s", self.channel)
         LOGGER.info("  PAN ID: 0x%04x", self.pan_id)
         LOGGER.info("  Extended PAN ID: %s", self.extended_pan_id)
-        LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
+        LOGGER.debug(
+            "  Network key: %s", ":".join(f"{c:02x}" for c in self.network_key)
+        )
 
     async def update_network_channel(self, channel: t.uint8_t):
         """
