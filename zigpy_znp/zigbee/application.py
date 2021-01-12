@@ -284,6 +284,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         async with async_timeout.timeout(STARTUP_TIMEOUT):
             await started_as_coordinator
 
+        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
+        # unless they are explicitly disabled. We can't fix this but we can disable them
+        # as early as possible to shrink the window of opportunity for unwanted joins.
+        await self.permit(time_s=0)
+
         # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
         # before the coordinator has started.
         if self.znp_config[conf.CONF_LED_MODE] is not None:
@@ -342,11 +347,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.info("  PAN ID: 0x%04x", self.pan_id)
         LOGGER.info("  Extended PAN ID: %s", self.extended_pan_id)
         LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
-
-        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
-        # unless they are explicitly disabled. We can't fix this but we can disable them
-        # as early as possible to shrink the window of opportunity for unwanted joins.
-        await self.permit(time_s=0)
 
     async def update_network_channel(self, channel: t.uint8_t):
         """
@@ -670,25 +670,34 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def permit(self, time_s=60, node=None):
         """
-        Overrides the `permit` method to throw an error when joins are permitted on only
-        the coordinator.
+        Permit joining the network via a specific node or via all router nodes.
         """
 
-        if node is not None and node == self.ieee:
-            raise RuntimeError("Joins cannot be permitted only on the coordinator")
+        # Always permit joins on the coordinator first.
+        # This unfortunately makes it impossible to permit joins via just one router
+        # alone but firmware changes can make this possible on newer hardware.
+        response = await self._znp.request_callback_rsp(
+            request=c.ZDO.MgmtPermitJoinReq.Req(
+                AddrMode=t.AddrMode.NWK,
+                Dst=0x0000,
+                Duration=time_s,
+                TCSignificance=1,
+            ),
+            RspStatus=t.Status.SUCCESS,
+            callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+        )
+
+        if response.Status != t.Status.SUCCESS:
+            raise RuntimeError(f"Failed to permit joins on the coordinator: {response}")
 
         return await super().permit(time_s=time_s, node=node)
 
     async def permit_ncp(self, time_s: int) -> None:
         """
-        Permits joins on the coordinator.
+        Permits joins only on the coordinator.
         """
 
-        # Z-Stack does not have a way to change just the trust center policy without
-        # also permitting joins on the coordinator. Sending a unicast permit join
-        # request to 0x0000 causes the coordinator to later reject joins done through
-        # another router if the coordinator is also not permitting joins, unfortunately
-        # forcing this method to be a no-op.
+        # Z-Stack does not need any special code to do this
         pass
 
     async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
@@ -989,6 +998,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Async context manager that prevents devices from being overwhelmed by requests.
         Mainly a thin wrapper around `asyncio.Semaphore` that logs when it has to wait.
         """
+
+        # Allow sending some requests before the application has fully started
+        if self._concurrent_requests_semaphore is None:
+            yield
+            return
 
         start_time = time.time()
         was_locked = self._concurrent_requests_semaphore.locked()

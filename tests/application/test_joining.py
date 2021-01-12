@@ -21,7 +21,29 @@ async def test_permit_join(device, make_application):
     # Handle the startup permit join clear
     znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
+        ),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+        ],
+        override=True,
+    )
+
+    znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
             AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
+        ),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+        ],
+    )
+
+    # Handle us opening joins on the coordinator
+    permit_join_coordinator = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=10, partial=True
         ),
         responses=[
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
@@ -43,6 +65,7 @@ async def test_permit_join(device, make_application):
     await app.startup(auto_form=False)
     await app.permit(time_s=10)
 
+    await permit_join_coordinator
     await permit_join_broadcast
 
     await app.shutdown()
@@ -228,6 +251,17 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
         override=True,
+    )
+
+    # Handle the permit join request sent by us
+    znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=60, partial=True
+        ),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+        ],
     )
 
     # Handle the ZDO broadcast sent by Zigpy

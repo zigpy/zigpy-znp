@@ -615,6 +615,9 @@ class BaseZStack1CC2531(BaseZStackDevice):
         ]
 
     @reply_to(
+        c.ZDO.MgmtPermitJoinReq.Req(AddrMode=t.AddrMode.NWK, Dst=0x0000, partial=True)
+    )
+    @reply_to(
         c.ZDO.MgmtPermitJoinReq.Req(
             AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, partial=True
         )
@@ -655,6 +658,11 @@ class BaseZStack3Device(BaseZStackDevice):
 
         return c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.SUCCESS)
 
+    @reply_to(
+        c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
+        )
+    )
     @reply_to(
         c.ZDO.MgmtPermitJoinReq.Req(
             AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
