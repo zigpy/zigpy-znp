@@ -378,6 +378,7 @@ class ResetReason(basic.enum_uint8):
 class ResetType(basic.enum_uint8):
     Hard = 0x00
     Soft = 0x01
+    Shutdown = 0x02
 
 
 class KeySource(basic.FixedList, item_type=basic.uint8_t, length=8):

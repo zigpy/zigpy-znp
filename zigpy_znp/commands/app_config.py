@@ -103,7 +103,7 @@ class AppConfig(t.CommandsBase, subsystem=t.Subsystem.APPConfig):
             t.Param(
                 "AllowRejoin",
                 t.Bool,
-                "whether or not the Trust center allows rejoins",
+                "whether or not the Trust center allows rejoins with well-known key",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
