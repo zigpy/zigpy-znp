@@ -6,8 +6,8 @@ from zigpy_znp.logger import _find_trace_level
 
 
 def test_no_trace_level():
-    # If no TRACE level exists, make TRACE == DEBUG
-    assert _find_trace_level() == logging.DEBUG
+    # If no TRACE level exists, do nothing
+    assert _find_trace_level() == logging.NOTSET
 
 
 def monkeypatch_addLevelName(monkeypatch, level, levelName):
@@ -29,5 +29,15 @@ def test_existing_trace_level(trace_level, monkeypatch):
 def test_bad_trace_level(monkeypatch):
     monkeypatch_addLevelName(monkeypatch, logging.DEBUG + 1, "TRACE")
 
-    # If a TRACE level already exists but TRACE >= DEBUG, we use DEBUG
-    assert _find_trace_level() == logging.DEBUG
+    # If a TRACE level already exists but TRACE >= DEBUG, we do nothing
+    assert _find_trace_level() == logging.NOTSET
+
+
+def test_debug_trace_logger(monkeypatch):
+    assert _find_trace_level() == logging.NOTSET
+
+    try:
+        logging.getLogger("zigpy_znp.logger").setLevel(logging.DEBUG)
+        assert _find_trace_level() == logging.DEBUG
+    finally:
+        logging.getLogger("zigpy_znp.logger").setLevel(logging.NOTSET)

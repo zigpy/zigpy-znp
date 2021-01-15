@@ -1,5 +1,6 @@
 import logging
 
+LOGGER = logging.getLogger(__name__)
 _TRACE = 5
 
 
@@ -10,9 +11,13 @@ def _find_trace_level() -> int:
     elif hasattr(logging, "TRACE") and logging.NOTSET < logging.TRACE < logging.DEBUG:
         # If a valid TRACE level exists that is between 0 and 10, use it
         return logging.TRACE
-    else:
-        # Otherwise fall back to logging everything as DEBUG
+    elif LOGGER.level == logging.DEBUG:
+        # If `zigpy_znp.logger` is explicitly passed `DEBUG` as a log level, enable
+        # `TRACE` logging under the `DEBUG` level
         return logging.DEBUG
+    else:
+        # Otherwise, do not log
+        return logging.NOTSET
 
 
 TRACE = _find_trace_level()
