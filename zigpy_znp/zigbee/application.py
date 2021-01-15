@@ -47,6 +47,7 @@ ZDO_REQUEST_TIMEOUT = 15  # seconds
 DATA_CONFIRM_TIMEOUT = 8  # seconds
 DEVICE_JOIN_MAX_DELAY = 2  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
+WATCHDOG_PERIOD = 30  # seconds
 
 REQUEST_MAX_RETRIES = 5
 REQUEST_ERROR_RETRY_DELAY = 0.5  # second
@@ -117,6 +118,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._reconnect_task = asyncio.Future()
         self._reconnect_task.cancel()
 
+        self._watchdog_task = asyncio.Future()
+        self._watchdog_task.cancel()
+
         self._nib = NIB()
         self._network_key = None
         self._network_key_seq = None
@@ -159,8 +163,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning(
                 "Failed to probe ZNP radio with config %s", device_config, exc_info=e
             )
-
-        znp.close()
+        finally:
+            znp.close()
 
         return result
 
@@ -171,6 +175,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         self._reconnect_task.cancel()
+        self._watchdog_task.cancel()
 
         for f in self._route_discovery_futures.values():
             f.cancel()
@@ -353,6 +358,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.debug(
             "  Network key: %s", ":".join(f"{c:02x}" for c in self.network_key)
         )
+
+        self._watchdog_task = asyncio.create_task(self._watchdog_loop())
 
     async def update_network_channel(self, channel: t.uint8_t):
         """
@@ -760,7 +767,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
             return
 
-        # Reconnect in the background using our previously-detected port.
+        self._watchdog_task.cancel()
+
+        # Reconnect in the background
         if self._reconnect_task.done():
             LOGGER.debug("Restarting background reconnection task")
             self._reconnect_task = asyncio.create_task(self._reconnect())
@@ -943,11 +952,29 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return self.config[conf.CONF_ZNP_CONFIG]
 
+    async def _watchdog_loop(self):
+        """
+        Watchdog loop to periodically test if Z-Stack is still running.
+        """
+
+        LOGGER.debug("Starting watchdog loop")
+
+        while True:
+            await asyncio.sleep(WATCHDOG_PERIOD)
+
+            try:
+                await self._znp.request(c.SYS.Ping.Req())
+            except Exception as e:
+                LOGGER.error(
+                    "Watchdog check failed",
+                    exc_info=e,
+                )
+
     async def _set_led_mode(self, *, led, mode) -> None:
         """
         Attempts to set the provided LED's mode. A Z-Stack bug causes the underlying
         command to never receive a response if the board has no LEDs, requiring this
-        wrapper function prevent the command from taking many seconds to time out.
+        wrapper function to prevent the command from taking many seconds to time out.
         """
 
         # XXX: If Z-Stack is not compiled with HAL_LED, it will just not respond at all
