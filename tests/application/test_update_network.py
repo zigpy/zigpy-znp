@@ -1,9 +1,11 @@
+import asyncio
+
 import pytest
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from ..conftest import FORMED_DEVICES, CoroutineMock
+from ..conftest import FORMED_DEVICES
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -22,6 +24,10 @@ async def test_update_network_channel_noop(device, make_application, mocker):
     await app.shutdown()
 
 
+async def dummy_sleep(n, *, sleep=asyncio.sleep):
+    return await sleep(0)
+
+
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_update_network_channel_change(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
@@ -31,7 +37,8 @@ async def test_update_network_channel_change(device, make_application, mocker):
 
     mocker.spy(app._znp, "request")
     mocker.patch(
-        "zigpy_znp.zigbee.application.asyncio.sleep", new_callable=CoroutineMock
+        "zigpy_znp.zigbee.application.asyncio.sleep",
+        new=dummy_sleep,
     )
 
     await app.update_network_channel(new_channel)
