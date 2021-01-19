@@ -962,6 +962,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         while True:
             await asyncio.sleep(WATCHDOG_PERIOD)
 
+            # No point in trying to test the port if it's already disconnected
+            if self._znp is None:
+                break
+
             try:
                 await self._znp.request(c.SYS.Ping.Req())
             except Exception as e:
@@ -969,6 +973,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     "Watchdog check failed",
                     exc_info=e,
                 )
+
+                # Close the port ourselves since it's effectively dead and treat this
+                # as an error to trigger a reconnect
+                self._znp.close()
+                self.connection_lost(e)
+
+                return
 
     async def _set_led_mode(self, *, led, mode) -> None:
         """
