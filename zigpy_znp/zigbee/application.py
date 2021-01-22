@@ -160,7 +160,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             result = True
         except Exception as e:
             result = False
-            LOGGER.warning(
+            LOGGER.debug(
                 "Failed to probe ZNP radio with config %s", device_config, exc_info=e
             )
         finally:
