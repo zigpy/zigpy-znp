@@ -177,3 +177,44 @@ async def test_multiple_shutdown(make_application):
     await app.shutdown()
     await app.shutdown()
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_reconnect_lockup(device, event_loop, make_application, mocker):
+    mocker.patch("zigpy_znp.zigbee.application.WATCHDOG_PERIOD", 0.1)
+
+    app, znp_server = make_application(
+        server_cls=device,
+        client_config={
+            # Make auto-reconnection happen really fast
+            conf.CONF_ZNP_CONFIG: {
+                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.01,
+                conf.CONF_SREQ_TIMEOUT: 0.1,
+            }
+        },
+    )
+
+    # Start up the server
+    await app.startup(auto_form=False)
+
+    # Stop responding
+    with swap_attribute(znp_server, "frame_received", lambda _: None):
+        assert app._znp is not None
+        assert app._reconnect_task.done()
+
+        # Wait for more than the SREQ_TIMEOUT to pass, the watchdog will notice
+        await asyncio.sleep(0.3)
+
+        # We will treat this as a disconnect
+        assert app._znp is None
+        assert app._watchdog_task.done()
+        assert not app._reconnect_task.done()
+
+    # Our reconnect task should complete after that
+    while app._znp is None:
+        await asyncio.sleep(0.1)
+
+    assert app._znp is not None
+    assert app._znp._uart is not None
+
+    await app.shutdown()
