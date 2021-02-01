@@ -218,3 +218,36 @@ async def test_reconnect_lockup(device, event_loop, make_application, mocker):
     assert app._znp._uart is not None
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_reconnect_lockup_pyserial(device, event_loop, make_application, mocker):
+    mocker.patch("zigpy_znp.zigbee.application.WATCHDOG_PERIOD", 0.1)
+
+    app, znp_server = make_application(
+        server_cls=device,
+        client_config={
+            conf.CONF_ZNP_CONFIG: {
+                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.1,
+            }
+        },
+    )
+
+    # Start up the server
+    await app.startup(auto_form=False)
+
+    # On Linux, a connection error during read with queued writes will cause PySerial to
+    # swallow the exception. This makes it appear like we intentionally closed the
+    # connection.
+
+    # We are connected
+    assert app._znp is not None
+
+    # "Drop" the connection like PySerial
+    app._znp._uart.connection_lost(exc=None)
+
+    # We should start reconnecting
+    while app._reconnect_task.done():
+        await asyncio.sleep(0.1)
+
+    await app.shutdown()

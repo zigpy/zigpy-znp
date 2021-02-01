@@ -38,9 +38,13 @@ class ZnpMtProtocol(asyncio.Protocol):
 
     def close(self) -> None:
         """Closes the port."""
+
+        self._api = None
         self._buffer.clear()
 
         if self._transport is not None:
+            LOGGER.debug("Closing serial port")
+
             self._transport.close()
             self._transport = None
 
@@ -50,10 +54,8 @@ class ZnpMtProtocol(asyncio.Protocol):
         if exc is not None:
             LOGGER.warning("Lost connection", exc_info=exc)
 
-        LOGGER.debug("Closing serial port")
-
-        self.close()
-        self._api.connection_lost(exc)
+        if self._api is not None:
+            self._api.connection_lost(exc)
 
     def connection_made(self, transport: serial_asyncio.SerialTransport) -> None:
         """Opened serial port."""
@@ -62,7 +64,8 @@ class ZnpMtProtocol(asyncio.Protocol):
 
         self._connected_event.set()
 
-        self._api.connection_made()
+        if self._api is not None:
+            self._api.connection_made()
 
     def data_received(self, data: bytes) -> None:
         """Callback when data is received."""

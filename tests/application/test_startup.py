@@ -220,24 +220,14 @@ async def test_auto_form_necessary(device, make_application, mocker):
     assert app.channel is not None
     assert app.channels is not None
 
-    if issubclass(device, BaseZStack3Device):
-        assert (
-            znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3]
-            == b"\x55"
-        )
-    else:
-        assert (
-            znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1]
-            == b"\x55"
-        )
+    nvram = znp_server.nvram[ExNvIds.LEGACY]
 
-    assert (
-        znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.LOGICAL_TYPE]
-        == t.DeviceLogicalType.Coordinator.serialize()
-    )
-    assert (
-        znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.ZDO_DIRECT_CB]
-        == t.Bool(True).serialize()
-    )
+    if issubclass(device, BaseZStack3Device):
+        assert nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
+    else:
+        assert nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK1] == b"\x55"
+
+    assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
+    assert nvram[OsalNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
 
     await app.shutdown()

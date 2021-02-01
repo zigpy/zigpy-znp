@@ -157,23 +157,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             async with async_timeout.timeout(PROBE_TIMEOUT):
                 await znp.connect()
 
-            result = True
+            return True
         except Exception as e:
-            result = False
             LOGGER.debug(
                 "Failed to probe ZNP radio with config %s", device_config, exc_info=e
             )
+            return False
         finally:
             znp.close()
-
-        return result
 
     async def shutdown(self):
         """
         Gracefully shuts down the application and cleans up all resources.
-        This method calls ZNP.close, which calls UART.close, etc.
         """
 
+        self.close()
+
+    def close(self):
         self._reconnect_task.cancel()
         self._watchdog_task.cancel()
 
@@ -182,6 +182,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._route_discovery_futures.clear()
 
+        # This will close the UART, which will then close the transport
         if self._znp is not None:
             self._znp.close()
             self._znp = None
@@ -760,19 +761,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Spawns the auto-reconnect task.
         """
 
-        self._znp = None
-
-        # exc=None means the connection was closed
-        if exc is None:
-            LOGGER.debug("Connection was purposefully closed. Not reconnecting.")
-            return
-
         self._watchdog_task.cancel()
+        self.close()
 
         # Reconnect in the background
         if self._reconnect_task.done():
             LOGGER.debug("Restarting background reconnection task")
             self._reconnect_task = asyncio.create_task(self._reconnect())
+        else:
+            LOGGER.debug("Background reconnection task is already running")
 
     #####################################################
     # Z-Stack message callbacks attached during startup #
@@ -974,9 +971,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     exc_info=e,
                 )
 
-                # Close the port ourselves since it's effectively dead and treat this
-                # as an error to trigger a reconnect
-                self._znp.close()
+                # Treat the watchdog failure as a disconnect
                 self.connection_lost(e)
 
                 return
@@ -990,7 +985,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # XXX: If Z-Stack is not compiled with HAL_LED, it will just not respond at all
         try:
-            async with async_timeout.timeout(0.1):
+            async with async_timeout.timeout(0.3):
                 await self._znp.request(
                     c.Util.LEDControl.Req(LED=led, Mode=mode),
                     RspStatus=t.Status.SUCCESS,
@@ -1123,6 +1118,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 return
             except Exception as e:
                 LOGGER.error("Failed to reconnect", exc_info=e)
+
+                if self._znp is not None:
+                    self._znp.close()
+                    self._znp = None
+
                 await asyncio.sleep(
                     self._config[conf.CONF_ZNP_CONFIG][
                         conf.CONF_AUTO_RECONNECT_RETRY_DELAY
