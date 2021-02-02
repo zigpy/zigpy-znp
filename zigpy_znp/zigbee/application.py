@@ -1580,15 +1580,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # generate a bit more network traffic.
                             options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
                             tried_disable_route_discovery_suppression = True
-                        elif (
-                            not tried_last_good_route
-                            and device is not None
-                            and device.relays is not None
-                        ):
+                        elif not tried_last_good_route and device is not None:
                             # `ZDO.SrcRtgInd` callbacks tell us the last path taken by
                             # messages from the device back to the coordinator. Sending
                             # packets backwards via this same route may work.
-                            force_relays = device.relays[::-1]
+                            force_relays = (device.relays or [])[::-1]
                             tried_last_good_route = True
 
                         LOGGER.debug(

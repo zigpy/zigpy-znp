@@ -722,6 +722,14 @@ async def test_request_recovery_assoc_remove(
         ],
     )
 
+    znp_server.reply_to(
+        c.AF.DataRequestSrcRtg.Req(partial=True),
+        responses=[
+            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
     def assoc_get_with_addr(req):
         nonlocal assoc_device
 
@@ -812,8 +820,9 @@ async def test_request_recovery_assoc_remove(
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 @pytest.mark.parametrize("succeed", [True, False])
+@pytest.mark.parametrize("relays", [[0x1111, 0x2222, 0x3333], []])
 async def test_request_recovery_manual_source_route(
-    device, succeed, make_application, mocker
+    device, succeed, relays, make_application, mocker
 ):
     app, znp_server = make_application(server_cls=device)
 
@@ -825,7 +834,7 @@ async def test_request_recovery_manual_source_route(
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-    device.relays = [0x1111, 0x2222, 0x3333]
+    device.relays = relays
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
 
     def data_confirm_replier(req):
