@@ -761,15 +761,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Spawns the auto-reconnect task.
         """
 
-        self._watchdog_task.cancel()
         self.close()
 
-        # Reconnect in the background
-        if self._reconnect_task.done():
-            LOGGER.debug("Restarting background reconnection task")
-            self._reconnect_task = asyncio.create_task(self._reconnect())
-        else:
-            LOGGER.debug("Background reconnection task is already running")
+        LOGGER.debug("Restarting background reconnection task")
+        self._reconnect_task = asyncio.create_task(self._reconnect())
 
     #####################################################
     # Z-Stack message callbacks attached during startup #
