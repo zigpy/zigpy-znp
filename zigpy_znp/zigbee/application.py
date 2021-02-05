@@ -187,7 +187,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._znp.close()
             self._znp = None
 
-    async def startup(self, auto_form=False):
+    async def startup(self, auto_form=False, force_form=False):
         """
         Performs application startup.
 
@@ -196,12 +196,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         try:
-            return await self._startup(auto_form=auto_form)
+            return await self._startup(auto_form=auto_form, force_form=force_form)
         except Exception:
             await self.shutdown()
             raise
 
-    async def _startup(self, auto_form=False):
+    async def _startup(self, auto_form=False, force_form=False):
         assert self._znp is None
 
         znp = ZNP(self.config)
@@ -226,8 +226,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         except KeyError:
             is_configured = False
 
-        if not is_configured:
-            if not auto_form:
+        if not is_configured or force_form:
+            if not auto_form and not force_form:
                 raise RuntimeError("Cannot start application, network is not formed")
 
             LOGGER.info("ZNP is not configured, forming a new network")
