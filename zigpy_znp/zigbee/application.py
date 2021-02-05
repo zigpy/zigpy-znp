@@ -810,6 +810,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         self._znp.callback_for_response(
+            c.ZDO.IEEEAddrRsp.Callback(partial=True), self.on_ieee_addr
+        )
+
+        self._znp.callback_for_response(
+            c.ZDO.NwkAddrRsp.Callback(partial=True), self.on_nwk_addr
+        )
+
+        self._znp.callback_for_response(
             c.ZDO.PermitJoinInd.Callback(partial=True), self.on_zdo_permit_join_message
         )
 
@@ -822,6 +830,47 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.info("Coordinator is not permitting joins anymore")
         else:
             LOGGER.info("Coordinator is permitting joins for %d seconds", msg.Duration)
+
+    def on_ieee_addr(self, msg: c.ZDO.IEEEAddrRsp.Callback) -> None:
+        LOGGER.warning("on_ieee_addr: check if it has changed")
+        LOGGER.warning("on_ieee_addr: %s" % msg)
+        rejoin = False
+
+        try:
+            device = self.get_device(nwk=msg.NWK)
+        except KeyError:
+            LOGGER.warning("no device found for 0x%04x. rejoining" % msg.NWK)
+            rejoin = True
+
+        if rejoin:
+            LOGGER.warning("rejoining 0x%04x" % msg.NWK)
+            self.handle_join(
+                nwk=msg.NWK,
+                ieee=msg.IEEE,
+                parent_nwk=None,
+            )
+
+    def on_nwk_addr(self, msg: c.ZDO.NwkAddrRsp.Callback) -> None:
+        LOGGER.warning("on_nwk_addr: check if it has changed")
+        LOGGER.warning("on_nwk_addr: %s" % msg)
+        rejoin = False
+
+        try:
+            device = self.get_device(nwk=msg.NWK)
+            if device.ieee != msg.IEEE:
+                LOGGER.warning("cached device with conflicting network address found for 0x%04x. rejoining" % msg.NWK)
+                rejoin = True
+        except KeyError:
+            LOGGER.warning("no device found for 0x%04x. rejoining" % msg.NWK)
+            rejoin = True
+
+        if rejoin:
+            LOGGER.warning("rejoining 0x%04x" % msg.NWK)
+            self.handle_join(
+                nwk=msg.NWK,
+                ieee=msg.IEEE,
+                parent_nwk=None,
+            )
 
     def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
         """
@@ -901,7 +950,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.info("ZDO device left: %s", msg)
         self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
 
-    def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
+    async def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
         """
         Handler for all non-ZDO messages.
         """
@@ -912,7 +961,37 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning(
                 "Received an AF message from an unknown device: 0x%04x", msg.SrcAddr
             )
-            return
+
+            LOGGER.debug("requesting IEEE address for 0x%04x" % msg.SrcAddr)
+            ieee_rsp = None
+            try:
+                ieee_rsp = await self._znp.request_callback_rsp(
+                    request=c.ZDO.IEEEAddrReq.Req(
+                        NWK=msg.SrcAddr,
+                        RequestType=0x00,
+                        StartIndex=0
+                    ),
+                    timeout=15,
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.ZDO.IEEEAddrRsp.Callback(
+                        partial=True,
+                        NWK=msg.SrcAddr,
+                    ),
+                )
+                LOGGER.debug("requesting IEEE address for 0x%04x resulted in %s" % (msg.SrcAddr, ieee_rsp))
+            except Exception as e:
+                LOGGER.exception("requesting IEEE address for 0x%04x failed" % (msg.SrcAddr))
+
+            if ieee_rsp is None:
+                LOGGER.info("requesting IEEE address for 0x%04x failed: IEEE request resulted in no response" % msg.SrcAddr)
+                return
+            try:
+                device = self.get_device(nwk=ieee_rsp.NWK)
+                LOGGER.debug("requesting IEEE address for 0x%04x succeeded" % (msg.SrcAddr))
+            except KeyError:
+                LOGGER.info("requesting IEEE address for 0x%04x failed: still no device" % msg.SrcAddr)
+                return
+
 
         device.radio_details(lqi=msg.LQI, rssi=None)
 
@@ -1470,6 +1549,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         tried_route_discovery = False
         tried_disable_route_discovery_suppression = False
         tried_last_good_route = False
+        tried_nwkaddr_lookup = False
 
         # Don't release the concurrency-limiting semaphore until we are done trying.
         # There is no point in allowing requests to take turns getting buffer errors.
@@ -1595,6 +1675,38 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # packets backwards via this same route may work.
                             force_relays = device.relays[::-1]
                             tried_last_good_route = True
+                        elif (
+                            not tried_nwkaddr_lookup
+                            and device is not None
+                        ):
+                            tried_nwkaddr_lookup = True
+                            LOGGER.debug("requesting NwkAdr address for 0x%04x before message send" % dst_addr.address)
+                            LOGGER.debug("requesting NwkAdr address for 0x%04x before message send: have IEEE %s" % (dst_addr.address, device.ieee))
+                            try:
+                                nwk_rsp = await self._znp.request_callback_rsp(
+                                    request=c.ZDO.NwkAddrReq.Req(
+                                        IEEE=device.ieee,
+                                        RequestType=0x00,
+                                        StartIndex=0
+                                    ),
+                                    timeout=5,
+                                    RspStatus=t.Status.SUCCESS,
+                                    callback=c.ZDO.NwkAddrRsp.Callback(
+                                        partial=True,
+                                        IEEE=device.ieee,
+                                    ),
+                                )
+
+                                if ("%s" % nwk_rsp.ieee).upper() != ("%s" % device.ieee).upper():
+                                    if dst_addr.mode == t.AddrMode.NWK:
+                                        device = self.get_device(nwk=nwk_rsp.NWK)
+                                    elif dst_addr.mode == t.AddrMode.IEEE:
+                                        device = self.get_device(ieee=nwk_rsp.IEEE)
+                                    LOGGER.info("requesting NwkAdr address for 0x%04x before message send: got NwkAdr: %s" % (dst_addr.address, device.nwk))
+                                else:
+                                    LOGGER.info("requesting NwkAdr address for 0x%04x before message send: no new NwkAdr found" % dst_addr.address)
+                            except Exception as e2:
+                                LOGGER.exception("requesting NwkAdr address for 0x%04x before message send: failed" % dst_addr.address)
 
                         LOGGER.debug(
                             "Request failed (%s), retry attempt %s of %s",
