@@ -40,18 +40,15 @@ async def wait_for_spy(spy):
 
 async def test_api_close(connected_znp, mocker):
     znp, znp_server = connected_znp
+    uart = znp._uart
+    mocker.spy(uart, "close")
 
-    mocker.spy(znp, "connection_lost")
     znp.close()
-
-    await wait_for_spy(znp.connection_lost)
-
-    # connection_lost with no exc indicates the port was closed
-    znp.connection_lost.assert_called_once_with(None)
 
     # Make sure our UART was actually closed
     assert znp._uart is None
     assert znp._app is None
+    assert uart.close.call_count == 1
 
     # ZNP.close should not throw any errors if called multiple times
     znp.close()
@@ -60,7 +57,7 @@ async def test_api_close(connected_znp, mocker):
     def dict_minus(d, minus):
         return {k: v for k, v in d.items() if k not in minus}
 
-    ignored_keys = ["_sync_request_lock", "connection_lost", "nvram"]
+    ignored_keys = ["_sync_request_lock", "nvram"]
 
     # Closing ZNP should reset it completely to that of a fresh object
     # We have to ignore our mocked method and the lock

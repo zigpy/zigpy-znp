@@ -285,11 +285,6 @@ class ZNP:
 
         LOGGER.debug("We were disconnected from %s: %s", self._port_path, exc)
 
-        # The UART is already closed by the time it notifies us
-        self._uart = None
-
-        self.close()
-
         if self._app is not None:
             self._app.connection_lost(exc)
 
@@ -299,6 +294,8 @@ class ZNP:
 
         Calling this will reset ZNP to the same internal state as a fresh ZNP instance.
         """
+
+        self._app = None
 
         for header, listeners in self._listeners.items():
             for listener in listeners:
