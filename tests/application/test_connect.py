@@ -243,22 +243,30 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
     # We are connected
     assert app._znp is not None
 
-    # "Drop" the connection like PySerial
+    did_reset = asyncio.get_running_loop().create_future()
+
+    async def patched_reset(*, old_reset=app._reset):
+        try:
+            return await old_reset()
+        finally:
+            did_reset.set_result(True)
+
+    with swap_attribute(app, "_reset", patched_reset):
+        # "Drop" the connection like PySerial
+        app._znp._uart.connection_lost(exc=None)
+
+        # Wait until we are reconnecting
+        await did_reset
+
+    # "Drop" the connection like PySerial again, but during connect
     app._znp._uart.connection_lost(exc=None)
 
-    # We should start reconnecting
-    while app._reconnect_task.done():
-        await asyncio.sleep(0.01)
+    # We should reconnect soon
+    mocker.spy(app, "_watchdog_loop")
 
-    # Wait until the UART has been opened and the watchdog has stopped
-    while app._znp is None or app._znp._uart is None or not app._watchdog_task.done():
+    while app._watchdog_loop.call_count == 0:
         await asyncio.sleep(0.1)
 
-    # Immediately drop the connection once during `_startup`
-    app._znp._uart.connection_lost(exc=None)
-
-    # We should fully re-connect
-    while app._watchdog_task.done():
-        await asyncio.sleep(0.1)
+    assert app._znp and app._znp._uart
 
     await app.shutdown()
