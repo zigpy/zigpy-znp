@@ -41,6 +41,7 @@ with warnings.catch_warnings():
 
 
 ZDO_ENDPOINT = 0
+
 PROBE_TIMEOUT = 5  # seconds
 STARTUP_TIMEOUT = 5  # seconds
 ZDO_REQUEST_TIMEOUT = 15  # seconds
@@ -760,6 +761,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Propagated up from UART through ZNP when the connection is lost.
         Spawns the auto-reconnect task.
         """
+
+        LOGGER.debug("Connection lost: %s", exc)
 
         self.close()
 
