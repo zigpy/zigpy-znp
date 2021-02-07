@@ -250,18 +250,15 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
     while app._reconnect_task.done():
         await asyncio.sleep(0.01)
 
-    # Wait until the UART has been opened
-    while app._znp is None or app._znp._uart is None:
+    # Wait until the UART has been opened and the watchdog has stopped
+    while app._znp is None or app._znp._uart is None or not app._watchdog_task.done():
         await asyncio.sleep(0.1)
-
-    # The watchdog should be dead at this point, since we just connected
-    assert app._watchdog_task.done()
 
     # Immediately drop the connection once during `_startup`
     app._znp._uart.connection_lost(exc=None)
 
     # We should fully re-connect
-    while not app._watchdog_task.done():
+    while app._watchdog_task.done():
         await asyncio.sleep(0.1)
 
     await app.shutdown()
