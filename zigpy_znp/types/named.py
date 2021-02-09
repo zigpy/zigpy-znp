@@ -486,8 +486,76 @@ class TCLKDevEntry(struct.Struct):
     # For Unique key this is the number of shifts
     # for IC this is the offset on the NvId index
     SeedShift_IcIndex: basic.uint8_t
+    PaddingByte1: struct.PaddingByte
 
 
 class NwkSecMaterialDesc(struct.Struct):
     FrameCounter: basic.uint32_t
     ExtendedPanID: EUI64
+
+
+class AddrMgrUserType(basic.enum_flag_uint8):
+    Default = 0x00
+    Assoc = 0x01
+    Security = 0x02
+    Binding = 0x04
+    Private1 = 0x08
+
+
+class AddrMgrEntryCC2531(struct.Struct):
+    type: AddrMgrUserType
+    nwkAddr: NWK
+    extAddr: EUI64
+
+
+class AddrMgrEntry(struct.Struct):
+    type: AddrMgrUserType
+    PaddingByte1: struct.PaddingByte
+    nwkAddr: NWK
+    extAddr: EUI64
+
+
+EMPTY_ADDR_MGR_ENTRY_CC2531 = AddrMgrEntryCC2531(
+    type=AddrMgrUserType.Default,
+    nwkAddr=0xFFFF,
+    extAddr=EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+)
+
+EMPTY_ADDR_MGR_ENTRY = AddrMgrEntry(
+    type=AddrMgrUserType.Default,
+    PaddingByte1=b"\xFF",
+    nwkAddr=0xFFFF,
+    extAddr=EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+)
+
+
+class AddressManagerTableCC2531(basic.CompleteList, item_type=AddrMgrEntryCC2531):
+    pass
+
+
+class AddressManagerTable(basic.CompleteList, item_type=AddrMgrEntry):
+    pass
+
+
+class AuthenticationOption(basic.enum_uint8):
+    NotAuthenticated = 0x00
+    AuthenticatedCBCK = 0x01
+    AuthenticatedEA = 0x02
+
+
+class LinkKeyTableEntry(struct.Struct):
+    Key: KeyData
+    TxFrameCounter: basic.uint32_t
+    RxFrameCounter: basic.uint32_t
+
+
+class APSLinkKeyTableEntry(struct.Struct):
+    AddressManagerIndex: basic.uint16_t
+    LinkKeyTableOffset: basic.uint16_t
+    AuthenticationState: AuthenticationOption
+
+
+class APSLinkKeyTable(
+    basic.LVList, length_type=basic.uint16_t, item_type=APSLinkKeyTableEntry
+):
+    pass

@@ -273,3 +273,79 @@ class NVRAMHelper:
         assert len(data) == length
 
         return data
+
+    async def write_table(
+        self, sys_id: t.uint8_t, item_id: t.uint16_t, values, *, fill_value=None
+    ):
+        values = list(values)
+
+        for sub_id in range(0x0000, 0xFFFF + 1):
+            try:
+                value = values[sub_id]
+            except IndexError:
+                value = fill_value
+
+            try:
+                await self.write(
+                    sys_id=sys_id,
+                    item_id=item_id,
+                    sub_id=sub_id,
+                    value=serialize(value),
+                    create=False,
+                )
+            except KeyError:
+                break
+
+        if sub_id < len(values) - 1:
+            raise ValueError(f"Not enough room in table for values: {values[sub_id:]}")
+
+    async def osal_write_table(
+        self, start_nvid: t.uint16_t, end_nvid: t.uint16_t, values, *, fill_value=None
+    ):
+        values = list(values)
+
+        for nvid in range(start_nvid, end_nvid + 1):
+            try:
+                value = values[nvid - start_nvid]
+            except IndexError:
+                value = fill_value
+
+            try:
+                await self.osal_write(
+                    nv_id=nvid,
+                    value=serialize(value),
+                    create=False,
+                )
+            except KeyError:
+                break
+
+        if nvid - start_nvid < len(values) - 1:
+            raise ValueError(
+                f"Not enough room in table for values: {values[nvid - start_nvid:]}"
+            )
+
+    async def read_table(
+        self,
+        sys_id: t.uint8_t,
+        item_id: t.uint16_t,
+    ):
+        for sub_id in range(0x0000, 0xFFFF + 1):
+            try:
+                yield await self.read(
+                    sys_id=sys_id,
+                    item_id=item_id,
+                    sub_id=sub_id,
+                )
+            except KeyError:
+                break
+
+    async def osal_read_table(
+        self,
+        start_nvid: t.uint16_t,
+        end_nvid: t.uint16_t,
+    ):
+        for nvid in range(start_nvid, end_nvid + 1):
+            try:
+                yield await self.osal_read(nvid)
+            except KeyError:
+                break

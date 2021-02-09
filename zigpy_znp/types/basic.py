@@ -228,6 +228,25 @@ class FixedList(list):
         return r, data
 
 
+class CompleteList(list):
+    _item_type = None
+
+    def __init_subclass__(cls, *, item_type) -> None:
+        super().__init_subclass__()
+        cls._item_type = item_type
+
+    def serialize(self) -> bytes:
+        return serialize_list([self._item_type(i) for i in self])
+
+    @classmethod
+    def deserialize(cls, data: bytes) -> typing.Tuple["CompleteList", bytes]:
+        r = cls()
+        while data:
+            item, data = cls._item_type.deserialize(data)
+            r.append(item)
+        return r, data
+
+
 def enum_flag_factory(int_type: FixedIntType) -> enum.Flag:
     """
     Mixins are broken by Python 3.8.6 so we must dynamically create the enum with the
