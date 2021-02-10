@@ -217,7 +217,10 @@ class NVRAMHelper:
 
         assert len(data) == length
 
-        return self._deserialize(data, item_type)
+        value = self._deserialize(data, item_type)
+        LOGGER.debug('Read NVRAM["LEGACY"][0x%04x] = %r', nv_id, value)
+
+        return value
 
     async def delete(
         self,
@@ -357,7 +360,10 @@ class NVRAMHelper:
 
         assert len(data) == length
 
-        return self._deserialize(data, item_type)
+        value = self._deserialize(data, item_type)
+        LOGGER.debug("Read NVRAM[%s][%s][0x%04x] = %r", sys_id, item_id, sub_id, value)
+
+        return value
 
     async def write_table(
         self,
