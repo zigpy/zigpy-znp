@@ -434,6 +434,8 @@ class NwkActiveKeyItems(struct.Struct):
 
 
 class KeyType(MissingEnumMixin, basic.enum_uint8):
+    NONE = 0
+
     # Standard Network Key
     NWK = 1
     # Application Master Key
@@ -442,6 +444,9 @@ class KeyType(MissingEnumMixin, basic.enum_uint8):
     APP_LINK = 3
     # Trust Center Link Key
     TC_LINK = 4
+
+    # XXX: just "6" in the Z-Stack source
+    UNKNOWN_6 = 6
 
 
 class KeyAttributes(basic.enum_uint8):
@@ -476,7 +481,6 @@ class TCLKDevEntry(struct.Struct):
     # For Unique key this is the number of shifts
     # for IC this is the offset on the NvId index
     SeedShift_IcIndex: basic.uint8_t
-    PaddingByte1: struct.PaddingByte
 
 
 class NwkSecMaterialDesc(struct.Struct):

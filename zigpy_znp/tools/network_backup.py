@@ -29,28 +29,24 @@ async def get_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
     global_entry = None
 
     if app._znp.version == 3.0:
-        async for value in app._znp.nvram.osal_read_table(
+        entries = app._znp.nvram.osal_read_table(
             OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START,
             OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END,
-        ):
-            entry, _ = t.NwkSecMaterialDesc.deserialize(value)
-
-            if entry.ExtendedPanID == app.extended_pan_id:
-                return entry.FrameCounter
-            elif entry.ExtendedPanID == t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):
-                global_entry = entry
+            item_type=t.NwkSecMaterialDesc,
+        )
     else:
-        # The counter stored in this region is more up-to-date
-        async for value in app._znp.nvram.read_table(
-            item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE
-        ):
-            entry, _ = t.NwkSecMaterialDesc.deserialize(value)
-            LOGGER.info("Got entry: %s", entry)
+        entries = app._znp.nvram.read_table(
+            item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
+            item_type=t.NwkSecMaterialDesc,
+        )
 
-            if entry.ExtendedPanID == app.extended_pan_id:
-                return entry.FrameCounter
-            elif entry.ExtendedPanID == t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):
-                global_entry = entry
+    async for entry in entries:
+        if entry.ExtendedPanID == app.extended_pan_id:
+            # Always prefer the entry for our current network
+            return entry.FrameCounter
+        elif entry.ExtendedPanID == t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):
+            # But keep track of the global entry if it already exists
+            global_entry = entry
 
     if global_entry is None:
         raise RuntimeError("No security material entry was found for this network")
@@ -59,11 +55,24 @@ async def get_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
 
 
 async def get_hashed_link_keys(app: ControllerApplication):
+    if app._znp.version == 1.2:
+        return
+
     seed = await app._znp.nvram.osal_read(OsalNvIds.TCLK_SEED)
 
-    async for value in app._znp.nvram.read_table(item_id=ExNvIds.TCLK_TABLE):
-        entry, _ = t.TCLKDevEntry.deserialize(value)
+    if app._znp.version == 3.30:
+        table = app._znp.nvram.read_table(
+            item_id=ExNvIds.TCLK_TABLE,
+            item_type=t.TCLKDevEntry,
+        )
+    else:
+        table = app._znp.nvram.osal_read_table(
+            start_nvid=OsalNvIds.LEGACY_TCLK_TABLE_START,
+            end_nvid=OsalNvIds.LEGACY_TCLK_TABLE_END,
+            item_type=t.TCLKDevEntry,
+        )
 
+    async for entry in table:
         if entry.extAddr == t.EUI64.convert("00:00:00:00:00:00:00:00"):
             continue
 
@@ -100,13 +109,10 @@ async def get_addr_manager_entries(app: ControllerApplication):
 
 async def get_devices(app: ControllerApplication):
     try:
-        """
         hashed_link_keys = {
             ieee: (tx_ctr, rx_ctr, key)
             async for ieee, tx_ctr, rx_ctr, key in get_hashed_link_keys(app)
         }
-        """
-        hashed_link_keys = {}
     except SecurityError:
         hashed_link_keys = {}
 
