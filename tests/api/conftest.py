@@ -19,6 +19,7 @@ def connected_znp(event_loop, make_znp_server, mocker):
     mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0)
 
     znp = ZNP(config)
+    znp.nvram.align_structs = False
     znp_server = make_znp_server(server_cls=BaseServerZNP)
 
     event_loop.run_until_complete(znp.connect(test_port=False))

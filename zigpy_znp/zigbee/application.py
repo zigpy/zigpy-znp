@@ -25,7 +25,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp.nib import NIB, CC2531NIB, parse_nib
+from zigpy_znp.znp.nib import NIB
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
@@ -342,7 +342,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
-            max_concurrent_requests = 2 if isinstance(self._nib, CC2531NIB) else 16
+            max_concurrent_requests = 2 if self._znp.nvram.align_structs else 16
         else:
             max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
@@ -398,7 +398,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._reset()
 
-        nib = parse_nib(await self._znp.nvram.osal_read(OsalNvIds.NIB))
+        nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
         nib.nwkPanId = pan_id
 
         await self._znp.nvram.osal_write(OsalNvIds.NIB, nib)
@@ -539,7 +539,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # not appear to be any user-facing MT command to read this information.
         while True:
             try:
-                nib = parse_nib(await self._znp.nvram.osal_read(OsalNvIds.NIB))
+                nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
 
                 LOGGER.debug("Current NIB is %s", nib)
 
@@ -1178,21 +1178,17 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         # Parsing the NIB struct gives us access to low-level info, like the channel
-        self._nib = parse_nib(await self._znp.nvram.osal_read(OsalNvIds.NIB))
+        self._nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
         LOGGER.debug("Parsed NIB: %s", self._nib)
-
-        nwkkey = await self._znp.nvram.osal_read(OsalNvIds.NWKKEY)
-
-        if self._znp.version < 3.30:
-            key_info, _ = t.NwkActiveKeyItemsCC2531.deserialize(nwkkey)
-        else:
-            key_info, _ = t.NwkActiveKeyItems.deserialize(nwkkey)
 
         self._channel = self._nib.nwkLogicalChannel
         self._channels = self._nib.channelList
         self._pan_id = self._nib.nwkPanId
         self._ext_pan_id = self._nib.extendedPANID
 
+        key_info = await self._znp.nvram.osal_read(
+            OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
+        )
         self._network_key = key_info.Active.Key
         self._network_key_seq = key_info.Active.KeySeqNum
 

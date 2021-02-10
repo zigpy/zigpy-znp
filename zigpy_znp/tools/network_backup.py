@@ -7,7 +7,7 @@ import logging
 import zigpy_znp
 import zigpy_znp.types as t
 from zigpy_znp.exceptions import SecurityError
-from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -42,7 +42,7 @@ async def get_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
     else:
         # The counter stored in this region is more up-to-date
         async for value in app._znp.nvram.read_table(
-            sys_id=NvSysIds.ZSTACK, item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE
+            item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE
         ):
             entry, _ = t.NwkSecMaterialDesc.deserialize(value)
             LOGGER.info("Got entry: %s", entry)
@@ -61,9 +61,7 @@ async def get_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
 async def get_hashed_link_keys(app: ControllerApplication):
     seed = await app._znp.nvram.osal_read(OsalNvIds.TCLK_SEED)
 
-    async for value in app._znp.nvram.read_table(
-        sys_id=NvSysIds.ZSTACK, item_id=ExNvIds.TCLK_TABLE
-    ):
+    async for value in app._znp.nvram.read_table(item_id=ExNvIds.TCLK_TABLE):
         entry, _ = t.TCLKDevEntry.deserialize(value)
 
         if entry.extAddr == t.EUI64.convert("00:00:00:00:00:00:00:00"):
@@ -85,16 +83,16 @@ async def get_hashed_link_keys(app: ControllerApplication):
 
 async def get_addr_manager_entries(app: ControllerApplication):
     if app._znp.version < 3.30:
-        value = await app._znp.nvram.osal_read(OsalNvIds.ADDRMGR)
-        entries, _ = t.AddressManagerTableCC2531.deserialize(value)
+        entries = await app._znp.nvram.osal_read(
+            OsalNvIds.ADDRMGR, item_type=t.AddressManagerTable
+        )
     else:
         entries = []
 
-        async for value in app._znp.nvram.read_table(
-            sys_id=NvSysIds.ZSTACK,
+        async for entry in app._znp.nvram.read_table(
             item_id=ExNvIds.ADDRMGR,
+            item_type=t.AddrMgrEntry,
         ):
-            entry, _ = t.AddrMgrEntry.deserialize(value)
             entries.append(entry)
 
     return [e for e in entries if e.nwkAddr != 0xFFFF]
@@ -102,10 +100,13 @@ async def get_addr_manager_entries(app: ControllerApplication):
 
 async def get_devices(app: ControllerApplication):
     try:
+        """
         hashed_link_keys = {
             ieee: (tx_ctr, rx_ctr, key)
             async for ieee, tx_ctr, rx_ctr, key in get_hashed_link_keys(app)
         }
+        """
+        hashed_link_keys = {}
     except SecurityError:
         hashed_link_keys = {}
 
@@ -153,9 +154,7 @@ async def backup_network(
         "metadata": {
             "version": 1,
             "format": "zigpy/open-coordinator-backup",
-            # Radio library (or other project) that generated this backup file
             "source": f"zigpy-znp@{zigpy_znp.__version__}",
-            # Opaque, anything can be put here
             "internal": {
                 "zstack": {
                     "version": app._znp.version,

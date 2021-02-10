@@ -8,7 +8,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +42,6 @@ async def restore(radio_path, backup):
             value = bytes.fromhex(value)
 
             await znp.nvram.write(
-                sys_id=NvSysIds.ZSTACK,
                 item_id=item_id,
                 sub_id=sub_id,
                 value=value,

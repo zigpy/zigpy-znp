@@ -1,31 +1,100 @@
+import logging
+import itertools
+
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.types import nvids
 from zigpy_znp.exceptions import SecurityError, InvalidCommandResponse
+
+LOGGER = logging.getLogger(__name__)
+
 
 # Some NVIDs don't really exist and Z-Stack doesn't behave consistently when operations
 # are performed on them.
 PROXIED_NVIDS = {nvids.OsalNvIds.POLL_RATE_OLD16}
 
 
-def serialize(value) -> bytes:
-    if hasattr(value, "serialize"):
-        value = value.serialize()
-    elif not isinstance(value, (bytes, bytearray)):
-        raise TypeError(
-            f"Only bytes or serializable types can be written to NVRAM."
-            f" Got {value!r} (type {type(value)})"
-        )
-
-    if not value:
-        raise ValueError("NVRAM value cannot be empty")
-
-    return value
-
-
 class NVRAMHelper:
     def __init__(self, znp):
         self.znp = znp
+        self.align_structs = None
+
+    async def _maybe_determine_alignment(self, *, item_type=None, value=None):
+        """
+        Automatically determine struct memory alignment. Must be called before any
+        structs are read/written but will be deferred if a raw read is being performed
+        or the value being written is not a struct.
+        """
+
+        # No need to check alignment twice
+        if self.align_structs is not None:
+            return
+
+        # If we are performing a read and are not expecting a struct, don't check
+        if item_type is not None and not issubclass(item_type, t.Struct):
+            return
+
+        # If we are performing a write but not with a struct, don't check
+        if value is not None and not isinstance(value, t.Struct):
+            return
+
+        # NWKKEY is almost always present, regardless of adapter state.
+        # It is an 8-bit sequence number, a 16 byte key, and a 32-bit frame counter.
+        # This is at least 1 + 16 + 4 = 21 bytes, or 24 if you have to 32-bit align.
+        value = await self.osal_read(nvids.OsalNvIds.NWKKEY)
+
+        if len(value) == 24:
+            self.align_structs = True
+        elif len(value) == 21:
+            self.align_structs = False
+        else:
+            raise ValueError(f"Unexpected value for NWKKEY: {value!r}")
+
+        LOGGER.debug("Detected struct alignment: %s", self.align_structs)
+
+    def _serialize(self, value) -> bytes:
+        """
+        Serialize an object, automatically computing struct padding based on the target
+        platform.
+        """
+
+        if hasattr(value, "serialize"):
+            assert self.align_structs is not None
+
+            if isinstance(value, t.Struct):
+                value = value.serialize(align=self.align_structs)
+            else:
+                value = value.serialize()
+        elif not isinstance(value, (bytes, bytearray)):
+            raise TypeError(
+                f"Only bytes or serializable types can be written to NVRAM."
+                f" Got {value!r} (type {type(value)})"
+            )
+
+        if not value:
+            raise ValueError("NVRAM value cannot be empty")
+
+        return value
+
+    def _deserialize(self, data: bytes, item_type):
+        """
+        Serialize raw bytes, automatically computing struct padding based on the target
+        platform.
+        """
+
+        if item_type is None:
+            return data
+
+        if issubclass(item_type, t.Struct):
+            assert self.align_structs is not None
+            value, remaining = item_type.deserialize(data, align=self.align_structs)
+        else:
+            value, remaining = item_type.deserialize(data)
+
+        if remaining:
+            raise ValueError(f"Data left after deserialization: {remaining!r}")
+
+        return value
 
     async def osal_delete(self, nv_id: t.uint16_t) -> bool:
         """
@@ -51,7 +120,9 @@ class NVRAMHelper:
         Serializes all serializable values and passes bytes directly.
         """
 
-        value = serialize(value)
+        await self._maybe_determine_alignment(value=value)
+
+        value = self._serialize(value)
         length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
 
         # Recreate the item if the length is not correct
@@ -91,12 +162,14 @@ class NVRAMHelper:
                 RspStatus=t.Status.SUCCESS,
             )
 
-    async def osal_read(self, nv_id: t.uint16_t) -> bytes:
+    async def osal_read(self, nv_id: t.uint16_t, item_type=None):
         """
         Reads a complete value from NVRAM.
 
         Raises an `KeyError` error if the NVID doesn't exist.
         """
+
+        await self._maybe_determine_alignment(item_type=item_type)
 
         # XXX: Some NVIDs don't really exist and Z-Stack behaves strangely with them
         if nv_id in PROXIED_NVIDS:
@@ -145,10 +218,14 @@ class NVRAMHelper:
 
         assert len(data) == length
 
-        return data
+        return self._deserialize(data, item_type)
 
     async def delete(
-        self, sys_id: t.uint8_t, item_id: t.uint16_t, sub_id: t.uint16_t
+        self,
+        *,
+        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
+        item_id: t.uint16_t,
+        sub_id: t.uint16_t,
     ) -> bool:
         """
         Deletes a subitem from NVRAM. Returns whether or not the item existed.
@@ -162,11 +239,11 @@ class NVRAMHelper:
 
     async def write(
         self,
-        sys_id: t.uint8_t,
+        *,
+        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
         item_id: t.uint16_t,
         sub_id: t.uint16_t,
         value,
-        *,
         create: bool = True,
     ):
         """
@@ -176,7 +253,9 @@ class NVRAMHelper:
         NVWrite(sys_id=ZSTACK, item_id=LEGACY, sub_id=1) in the background.
         """
 
-        value = serialize(value)
+        await self._maybe_determine_alignment(value=value)
+
+        value = self._serialize(value)
         length = (
             await self.znp.request(
                 c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
@@ -232,7 +311,12 @@ class NVRAMHelper:
             )
 
     async def read(
-        self, sys_id: t.uint8_t, item_id: t.uint16_t, sub_id: t.uint16_t
+        self,
+        *,
+        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
+        item_id: t.uint16_t,
+        sub_id: t.uint16_t,
+        item_type=None,
     ) -> bytes:
         """
         Reads a value from NVRAM for the specified subsystem, item, and subitem.
@@ -242,6 +326,8 @@ class NVRAMHelper:
 
         Raises an `KeyError` error if the NVID doesn't exist.
         """
+
+        await self._maybe_determine_alignment(item_type=item_type)
 
         length_rsp = await self.znp.request(
             c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
@@ -272,62 +358,55 @@ class NVRAMHelper:
 
         assert len(data) == length
 
-        return data
+        return self._deserialize(data, item_type)
 
     async def write_table(
-        self, sys_id: t.uint8_t, item_id: t.uint16_t, values, *, fill_value=None
+        self,
+        *,
+        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
+        item_id: t.uint16_t,
+        values,
+        fill_value=None,
     ):
-        values = list(values)
+        """"""
 
-        for sub_id in range(0x0000, 0xFFFF + 1):
-            try:
-                value = values[sub_id]
-            except IndexError:
-                value = fill_value
-
+        for sub_id, value in itertools.zip_longest(
+            range(0x0000, 0xFFFF + 1), values, fillvalue=fill_value
+        ):
             try:
                 await self.write(
                     sys_id=sys_id,
                     item_id=item_id,
                     sub_id=sub_id,
-                    value=serialize(value),
+                    value=self._serialize(value),
                     create=False,
                 )
             except KeyError:
                 break
-
-        if sub_id < len(values) - 1:
-            raise ValueError(f"Not enough room in table for values: {values[sub_id:]}")
 
     async def osal_write_table(
         self, start_nvid: t.uint16_t, end_nvid: t.uint16_t, values, *, fill_value=None
     ):
         values = list(values)
 
-        for nvid in range(start_nvid, end_nvid + 1):
-            try:
-                value = values[nvid - start_nvid]
-            except IndexError:
-                value = fill_value
-
+        for nvid, value in itertools.zip_longest(
+            range(start_nvid, end_nvid + 1), values, fillvalue=fill_value
+        ):
             try:
                 await self.osal_write(
                     nv_id=nvid,
-                    value=serialize(value),
+                    value=self._serialize(value),
                     create=False,
                 )
             except KeyError:
                 break
 
-        if nvid - start_nvid < len(values) - 1:
-            raise ValueError(
-                f"Not enough room in table for values: {values[nvid - start_nvid:]}"
-            )
-
     async def read_table(
         self,
-        sys_id: t.uint8_t,
+        *,
+        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
         item_id: t.uint16_t,
+        item_type=None,
     ):
         for sub_id in range(0x0000, 0xFFFF + 1):
             try:
@@ -335,6 +414,7 @@ class NVRAMHelper:
                     sys_id=sys_id,
                     item_id=item_id,
                     sub_id=sub_id,
+                    item_type=item_type,
                 )
             except KeyError:
                 break
@@ -343,9 +423,10 @@ class NVRAMHelper:
         self,
         start_nvid: t.uint16_t,
         end_nvid: t.uint16_t,
+        item_type=None,
     ):
         for nvid in range(start_nvid, end_nvid + 1):
             try:
-                yield await self.osal_read(nvid)
+                yield await self.osal_read(nvid, item_type=item_type)
             except KeyError:
                 break

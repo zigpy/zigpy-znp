@@ -16,7 +16,7 @@ from zigpy_znp import uart
 from zigpy_znp.nvram import NVRAMHelper
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
-from zigpy_znp.types.nvids import ExNvIds, NvSysIds
+from zigpy_znp.types.nvids import ExNvIds
 
 LOGGER = logging.getLogger(__name__)
 AFTER_CONNECT_DELAY = 1  # seconds
@@ -68,7 +68,6 @@ async def detect_zstack_version(znp) -> float:
     try:
         # Only Z-Stack 3.30+ has the new NVRAM system
         await znp.nvram.read(
-            sys_id=NvSysIds.ZSTACK,
             item_id=ExNvIds.TCLK_TABLE,
             sub_id=0x0000,
         )

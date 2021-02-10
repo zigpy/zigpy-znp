@@ -10,7 +10,6 @@ from zigpy_znp.types.nvids import (
     NWK_NVID_TABLES,
     NWK_NVID_TABLE_KEYS,
     ExNvIds,
-    NvSysIds,
     OsalNvIds,
 )
 from zigpy_znp.tools.common import setup_parser
@@ -51,9 +50,7 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
                 continue
 
             for sub_id in range(2 ** 16):
-                existed = await znp.nvram.delete(
-                    sys_id=NvSysIds.ZSTACK, item_id=nvid, sub_id=sub_id
-                )
+                existed = await znp.nvram.delete(item_id=nvid, sub_id=sub_id)
                 LOGGER.info("Cleared %s[0x%04X]", nvid.name, sub_id)
 
                 if not existed:

@@ -7,8 +7,8 @@ import argparse
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
-from zigpy_znp.znp.nib import parse_nib
-from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds
+from zigpy_znp.znp.nib import NIB
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -18,9 +18,9 @@ LOGGER = logging.getLogger(__name__)
 async def set_tc_frame_counter(app: ControllerApplication, counter: t.uint32_t):
     if app._znp.version == 1.2:
         # Older Z-Stack devices are simpler
-        nwkkey = await app._znp.nvram.osal_read(OsalNvIds.NWKKEY)
-
-        key_info, _ = t.NwkActiveKeyItemsCC2531.deserialize(nwkkey)
+        key_info = await app._znp.nvram.osal_read(
+            OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
+        )
         key_info.FrameCounter = counter
 
         await app._znp.nvram.osal_write(OsalNvIds.NWKKEY, key_info)
@@ -32,15 +32,13 @@ async def set_tc_frame_counter(app: ControllerApplication, counter: t.uint32_t):
 
     for sub_id in range(0x0000, 0xFFFF + 1):
         try:
-            value = await app._znp.nvram.read(
-                sys_id=NvSysIds.ZSTACK,
+            entry = await app._znp.nvram.read(
                 item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
                 sub_id=sub_id,
+                item_type=t.NwkSecMaterialDesc,
             )
         except KeyError:
             break
-
-        entry, _ = t.NwkSecMaterialDesc.deserialize(value)
 
         if entry.ExtendedPanID == app.extended_pan_id:
             best_entry = entry
@@ -55,7 +53,6 @@ async def set_tc_frame_counter(app: ControllerApplication, counter: t.uint32_t):
     best_entry.FrameCounter = counter
 
     await app._znp.nvram.write(
-        sys_id=NvSysIds.ZSTACK,
         item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
         sub_id=best_sub_id,
         value=best_entry,
@@ -104,22 +101,22 @@ async def write_addr_manager_entries(
 ):
     if app._znp.version >= 3.30:
         await app._znp.nvram.write_table(
-            sys_id=NvSysIds.ZSTACK,
             item_id=ExNvIds.ADDRMGR,
             values=entries,
             fill_value=t.EMPTY_ADDR_MGR_ENTRY,
         )
         return
 
-    table = await app._znp.nvram.osal_read(OsalNvIds.ADDRMGR)
-    old_entries, _ = t.AddressManagerTableCC2531.deserialize(table)
+    old_entries = await app._znp.nvram.osal_read(
+        OsalNvIds.ADDRMGR, item_type=t.AddrMgrEntryTable
+    )
     new_entries = len(old_entries) * [t.EMPTY_ADDR_MGR_ENTRY_CC2531]
 
     for index, entry in enumerate(entries):
         new_entries[index] = entry
 
     await app._znp.nvram.osal_write(
-        OsalNvIds.ADDRMGR, t.AddressManagerTableCC2531(new_entries)
+        OsalNvIds.ADDRMGR, t.AddressManagerTable(new_entries)
     )
 
 
@@ -223,7 +220,6 @@ async def add_devices(
 
     await write_addr_manager_entries(app, addr_mgr_entries)
     await app._znp.nvram.write_table(
-        sys_id=NvSysIds.ZSTACK,
         item_id=ExNvIds.TCLK_TABLE,
         values=tclk_table,
         fill_value=bytes.fromhex("00000000000000000000000000000000ff000000"),
@@ -258,7 +254,7 @@ async def restore_network(
 
     await app._znp.nvram.osal_write(OsalNvIds.EXTADDR, coordinator_ieee)
 
-    nib = parse_nib(await app._znp.nvram.osal_read(OsalNvIds.NIB))
+    nib = await app._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
     nib.channelList = t.Channels.from_channel_list(backup["channel_mask"])
     nib.nwkUpdateId = backup["nwk_update_id"]
     nib.SecurityLevel = backup["security_level"]
@@ -273,25 +269,13 @@ async def restore_network(
 
     nwk_frame_counter = backup["network_key"]["frame_counter"]
 
-    if app._znp.version < 3.30:
-        key_info = t.NwkActiveKeyItemsCC2531(
-            Active=t.NwkKeyDesc(
-                KeySeqNum=backup["network_key"]["sequence_number"],
-                Key=nwk_key,
-            ),
-            FrameCounter=nwk_frame_counter,
-        )
-    else:
-        key_info = t.NwkActiveKeyItems(
-            Active=t.NwkKeyDesc(
-                KeySeqNum=backup["network_key"]["sequence_number"],
-                Key=nwk_key,
-            ),
-            PaddingByte1=b"\x00",
-            PaddingByte2=b"\x00",
-            PaddingByte3=b"\x00",
-            FrameCounter=nwk_frame_counter,
-        )
+    key_info = t.NwkActiveKeyItems(
+        Active=t.NwkKeyDesc(
+            KeySeqNum=backup["network_key"]["sequence_number"],
+            Key=nwk_key,
+        ),
+        FrameCounter=nwk_frame_counter,
+    )
 
     await app._znp.nvram.osal_write(OsalNvIds.NWKKEY, key_info)
     await app._znp.nvram.osal_write(OsalNvIds.NWK_ACTIVE_KEY_INFO, key_info.Active)

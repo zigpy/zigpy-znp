@@ -428,18 +428,8 @@ class NwkKeyDesc(struct.Struct):
     Key: KeyData
 
 
-class NwkActiveKeyItemsCC2531(struct.Struct):
-    Active: NwkKeyDesc
-    FrameCounter: basic.uint32_t
-
-
 class NwkActiveKeyItems(struct.Struct):
     Active: NwkKeyDesc
-
-    PaddingByte1: struct.PaddingByte
-    PaddingByte2: struct.PaddingByte
-    PaddingByte3: struct.PaddingByte
-
     FrameCounter: basic.uint32_t
 
 
@@ -502,35 +492,17 @@ class AddrMgrUserType(basic.enum_flag_uint8):
     Private1 = 0x08
 
 
-class AddrMgrEntryCC2531(struct.Struct):
-    type: AddrMgrUserType
-    nwkAddr: NWK
-    extAddr: EUI64
-
-
 class AddrMgrEntry(struct.Struct):
     type: AddrMgrUserType
-    PaddingByte1: struct.PaddingByte
     nwkAddr: NWK
     extAddr: EUI64
 
-
-EMPTY_ADDR_MGR_ENTRY_CC2531 = AddrMgrEntryCC2531(
-    type=AddrMgrUserType.Default,
-    nwkAddr=0xFFFF,
-    extAddr=EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
-)
 
 EMPTY_ADDR_MGR_ENTRY = AddrMgrEntry(
     type=AddrMgrUserType.Default,
-    PaddingByte1=b"\xFF",
     nwkAddr=0xFFFF,
     extAddr=EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
 )
-
-
-class AddressManagerTableCC2531(basic.CompleteList, item_type=AddrMgrEntryCC2531):
-    pass
 
 
 class AddressManagerTable(basic.CompleteList, item_type=AddrMgrEntry):

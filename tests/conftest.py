@@ -18,7 +18,8 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import ZnpMtProtocol
-from zigpy_znp.znp.nib import NIB, CC2531NIB, NwkState8, NwkState16, parse_nib
+from zigpy_znp.nvram import NVRAMHelper
+from zigpy_znp.znp.nib import NIB, NwkState
 from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds, is_secure_nvid
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -297,7 +298,11 @@ def reply_to(request):
 
 
 class BaseZStackDevice(BaseServerZNP):
+    align_structs = None
+
     def __init__(self, *args, **kwargs):
+        assert self.align_structs is not None
+
         super().__init__(*args, **kwargs)
 
         self.active_endpoints = []
@@ -315,6 +320,12 @@ class BaseZStackDevice(BaseServerZNP):
                     request=req,
                     responses=[func],
                 )
+
+    def nvram_serialize(self, item):
+        return NVRAMHelper._serialize(self, item)
+
+    def nvram_deserialize(self, data, item_type):
+        return NVRAMHelper._deserialize(self, data, item_type)
 
     def _unhandled_command(self, command):
         # XXX: check the capabilities with `ping_replier` to use `InvalidSubsystem`?
@@ -373,9 +384,9 @@ class BaseZStackDevice(BaseServerZNP):
 
         if req.Id == OsalNvIds.NIB:
             assert req.Offset == 0
-            assert len(req.Value) == len(self.nib.serialize())
+            assert len(req.Value) == len(self.nvram_serialize(self.nib))
 
-            self.nib, _ = type(self.nib).deserialize(req.Value)
+            self.nib = self.nvram_deserialize(req.Value, NIB)
         else:
             value = bytearray(self.nvram[ExNvIds.LEGACY][req.Id])
 
@@ -403,7 +414,7 @@ class BaseZStackDevice(BaseServerZNP):
                     Status=t.Status.INVALID_PARAMETER, Value=t.ShortBytes(b"")
                 )
 
-            value = self.nib.serialize()
+            value = self.nvram_serialize(self.nib)
         else:
             value = self.nvram[ExNvIds.LEGACY][req.Id]
 
@@ -431,7 +442,7 @@ class BaseZStackDevice(BaseServerZNP):
     @reply_to(c.SYS.OSALNVLength.Req(partial=True))
     def osal_nvram_length(self, req):
         if req.Id == OsalNvIds.NIB and self.nib is not None:
-            length = len(self.nib.serialize())
+            length = len(self.nvram_serialize(self.nib))
         elif req.Id == OsalNvIds.POLL_RATE_OLD16:
             # XXX: the item exists but its length is wrong
             return c.SYS.OSALNVLength.Rsp(ItemLen=0)
@@ -454,7 +465,7 @@ class BaseZStackDevice(BaseServerZNP):
         if "nib" not in self.nvram[ExNvIds.LEGACY]:
             return self._default_nib()
 
-        return parse_nib(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        return self.nvram_deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB)
 
     @reply_to(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
     def reset_req(self, request):
@@ -503,6 +514,8 @@ class BaseZStackDevice(BaseServerZNP):
 
 
 class BaseZStack1CC2531(BaseZStackDevice):
+    align_structs = False
+
     @reply_to(c.SYS.OSALNVRead.Req(partial=True))
     @reply_to(c.SYS.OSALNVReadExt.Req(partial=True))
     def osal_nvram_read(self, request):
@@ -552,13 +565,13 @@ class BaseZStack1CC2531(BaseZStackDevice):
         )
 
     def _default_nib(self):
-        return CC2531NIB.deserialize(
+        return NIB.deserialize(
             load_nvram_json("CC2531-ZStack1.reset.json")[ExNvIds.LEGACY][OsalNvIds.NIB]
         )[0]
 
     @reply_to(c.ZDO.StartupFromApp.Req(partial=True))
     def startup_from_app(self, req):
-        if self.nib.nwkState == NwkState8.NWK_ROUTER:
+        if self.nib.nwkState == NwkState.NWK_ROUTER:
             return [
                 c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.RestoredNetworkState),
                 c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
@@ -566,7 +579,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
         else:
 
             def update_logical_channel(req):
-                self.nib.nwkState = NwkState8.NWK_ROUTER
+                self.nib.nwkState = NwkState.NWK_ROUTER
                 self.nib.channelList, _ = t.Channels.deserialize(
                     self.nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
                 )
@@ -762,6 +775,8 @@ class BaseZStack3Device(BaseZStackDevice):
 
 
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):
+    align_structs = True
+
     @reply_to(c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_length(self, req):
         value = self.nvram.get(ExNvIds(req.ItemId), {}).get(req.SubId, b"")
@@ -846,7 +861,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             nwkCoordAddress=0xFFFE,
             nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkPanId=0xFFFF,
-            nwkState=NwkState16.NWK_INIT,
+            nwkState=NwkState.NWK_INIT,
             channelList=t.Channels.NO_CHANNELS,
             beaconOrder=15,
             superFrameOrder=15,
@@ -875,11 +890,6 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             nwkManagerAddr=0x0000,
             nwkTotalTransmissions=0,
             nwkUpdateId=0,
-            PaddingByte0=b"\x00",
-            PaddingByte1=b"\x00",
-            PaddingByte2=b"\x00",
-            PaddingByte3=b"\x00",
-            PaddingByte4=b"\x00",
         )
 
     @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
@@ -911,6 +921,8 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
 
 class BaseZStack3CC2531(BaseZStack3Device):
+    align_structs = False
+
     @reply_to(c.SYS.Version.Req())
     def version_replier(self, request):
         return c.SYS.Version.Rsp(
@@ -925,7 +937,7 @@ class BaseZStack3CC2531(BaseZStack3Device):
         )
 
     def _default_nib(self):
-        return CC2531NIB(
+        return NIB(
             SequenceNum=0,
             PassiveAckTimeout=5,
             MaxBroadcastRetries=2,
@@ -950,7 +962,7 @@ class BaseZStack3CC2531(BaseZStack3Device):
             nwkCoordAddress=0xFFFE,
             nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkPanId=0xFFFF,
-            nwkState=NwkState8.NWK_INIT,
+            nwkState=NwkState.NWK_INIT,
             channelList=t.Channels.NO_CHANNELS,
             beaconOrder=15,
             superFrameOrder=15,
@@ -993,7 +1005,9 @@ class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
         super().__init__(*args, **kwargs)
 
         self.nvram = load_nvram_json("CC2652R-ZStack4.formed.json")
-        self.nib, _ = NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        self.nib = self.nvram_deserialize(
+            self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB
+        )
 
 
 class ResetLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
@@ -1009,7 +1023,7 @@ class FormedZStack3CC2531(BaseZStack3CC2531):
         super().__init__(*args, **kwargs)
 
         self.nvram = load_nvram_json("CC2531-ZStack3.formed.json")
-        self.nib, _ = CC2531NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        self.nib, _ = NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
 
 
 class ResetZStack3CC2531(BaseZStack3CC2531):
@@ -1025,7 +1039,7 @@ class FormedZStack1CC2531(BaseZStack1CC2531):
         super().__init__(*args, **kwargs)
 
         self.nvram = load_nvram_json("CC2531-ZStack1.formed.json")
-        self.nib, _ = CC2531NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        self.nib, _ = NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
 
 
 class ResetZStack1CC2531(BaseZStack1CC2531):
@@ -1033,7 +1047,7 @@ class ResetZStack1CC2531(BaseZStack1CC2531):
         super().__init__(*args, **kwargs)
 
         self.nvram = load_nvram_json("CC2531-ZStack1.reset.json")
-        self.nib, _ = CC2531NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        self.nib, _ = NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
 
 
 EMPTY_DEVICES = [

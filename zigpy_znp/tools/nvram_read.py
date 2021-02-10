@@ -7,7 +7,7 @@ import argparse
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
-from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, NvSysIds, OsalNvIds
+from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
@@ -63,9 +63,7 @@ async def backup(radio_path: str):
 
         for sub_id in range(2 ** 16):
             try:
-                value = await znp.nvram.read(
-                    sys_id=NvSysIds.ZSTACK, item_id=nvid, sub_id=sub_id
-                )
+                value = await znp.nvram.read(item_id=nvid, sub_id=sub_id)
             except CommandNotRecognized:
                 # CC2531 only supports the legacy NVRAM interface, even on Z-Stack 3
                 return data

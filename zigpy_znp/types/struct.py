@@ -2,6 +2,8 @@ import typing
 import inspect
 import dataclasses
 
+import zigpy.types as zigpy_t
+
 import zigpy_znp.types.basic as t
 
 NoneType = type(None)
@@ -190,22 +192,70 @@ class Struct:
     def as_dict(self) -> typing.Dict[str, typing.Any]:
         return {f.name: v for f, v in self.assigned_fields()}
 
-    def serialize(self) -> bytes:
-        return b"".join(
-            f.get_type_for(self)(v).serialize()
-            for f, v in self.assigned_fields(strict=True)
-        )
+    def flat_fields(
+        self, *, align=False
+    ) -> typing.Iterable[typing.Tuple["StructField", typing.Any]]:
+        for field, value in self.assigned_fields(strict=True):
+            if isinstance(value, Struct):
+                yield from value.flat_fields()
+            else:
+                yield field, value
+
+    def serialize(self, *, align=False, _top_level=True) -> bytes:
+        result = b""
+
+        for field, value in self.flat_fields():
+            value = field.get_type_for(self)(value)
+
+            if align and isinstance(value, (zigpy_t.FixedIntType, t.FixedIntType)):
+                alignment = value._size
+                padding = (-len(result)) % alignment
+
+                result += b"\xFF" * padding
+
+            if isinstance(value, Struct):
+                result += value.serialize(align=align, _top_level=False)
+            else:
+                result += value.serialize()
+
+        # 2-byte alignment
+        if align and _top_level and len(result) % 2 != 0:
+            result += b"\xFF"
+
+        return result
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["Struct", bytes]:
+    def deserialize(
+        cls, data: bytes, *, align=False, _top_level=True
+    ) -> typing.Tuple["Struct", bytes]:
         instance = cls()
+        orig_length = len(data)
 
         for field in cls.fields():
             if field.requires is not None and not field.requires(instance):
                 continue
 
+            field_type = field.get_type_for(instance)
+
+            if align and issubclass(field_type, (zigpy_t.FixedIntType, t.FixedIntType)):
+                offset = orig_length - len(data)
+                alignment = field_type._size
+                padding = (-offset) % alignment
+
+                if len(data) < padding:
+                    raise ValueError(
+                        f"Data is too short to contain {padding} padding bytes"
+                    )
+
+                data = data[padding:]
+
             try:
-                value, data = field.get_type_for(instance).deserialize(data)
+                if issubclass(field_type, Struct):
+                    value, data = field_type.deserialize(
+                        data, align=align, _top_level=False
+                    )
+                else:
+                    value, data = field_type.deserialize(data)
             except (ValueError, AssertionError):
                 if field.optional:
                     break
@@ -213,6 +263,13 @@ class Struct:
                 raise
 
             setattr(instance, field.name, value)
+
+        # 2-byte alignment
+        if align and _top_level and (orig_length - len(data)) % 2 != 0:
+            if not data:
+                raise ValueError("Data is too short to contain final padding byte")
+
+            data = data[1:]
 
         return instance, data
 

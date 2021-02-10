@@ -43,7 +43,7 @@ def dump_nvram(znp):
                 item[OsalNvIds(sub_id).name] = value.hex()
 
     if znp.nib is not None:
-        obj["LEGACY"]["NIB"] = znp.nib.serialize().hex()
+        obj["LEGACY"]["NIB"] = znp.nvram_serialize(znp.nib).hex()
 
     return obj
 
