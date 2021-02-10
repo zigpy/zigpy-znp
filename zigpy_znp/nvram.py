@@ -162,7 +162,7 @@ class NVRAMHelper:
                 RspStatus=t.Status.SUCCESS,
             )
 
-    async def osal_read(self, nv_id: t.uint16_t, item_type=None):
+    async def osal_read(self, nv_id: t.uint16_t, item_type=t.Bytes):
         """
         Reads a complete value from NVRAM.
 
@@ -316,7 +316,7 @@ class NVRAMHelper:
         sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
         item_id: t.uint16_t,
         sub_id: t.uint16_t,
-        item_type=None,
+        item_type=t.Bytes,
     ) -> bytes:
         """
         Reads a value from NVRAM for the specified subsystem, item, and subitem.
@@ -406,7 +406,7 @@ class NVRAMHelper:
         *,
         sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
         item_id: t.uint16_t,
-        item_type=None,
+        item_type=t.Bytes,
     ):
         for sub_id in range(0x0000, 0xFFFF + 1):
             try:
@@ -423,7 +423,7 @@ class NVRAMHelper:
         self,
         start_nvid: t.uint16_t,
         end_nvid: t.uint16_t,
-        item_type=None,
+        item_type=t.Bytes,
     ):
         for nvid in range(start_nvid, end_nvid + 1):
             try:
