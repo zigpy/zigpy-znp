@@ -1114,6 +1114,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             try:
                 await self._startup()
                 return
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 LOGGER.error("Failed to reconnect", exc_info=e)
 
