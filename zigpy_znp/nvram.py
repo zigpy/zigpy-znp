@@ -59,9 +59,8 @@ class NVRAMHelper:
         """
 
         if hasattr(value, "serialize"):
-            assert self.align_structs is not None
-
             if isinstance(value, t.Struct):
+                assert self.align_structs is not None
                 value = value.serialize(align=self.align_structs)
             else:
                 value = value.serialize()
