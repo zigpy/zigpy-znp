@@ -84,23 +84,8 @@ class CStruct:
 
         return fields
 
-    def assigned_fields(self, *, strict=False) -> typing.List["CStructField"]:
-        assigned_fields = ListSubclass()
-
-        for field in self.fields:
-            value = getattr(self, field.name)
-
-            # Missing fields cause an error if strict
-            if value is None and strict:
-                raise ValueError(f"Value for field {field.name} is required")
-
-            assigned_fields.append((field, value))
-            setattr(assigned_fields, field.name, (field, value))
-
-        return assigned_fields
-
     def as_dict(self) -> typing.Dict[str, typing.Any]:
-        return {f.name: v for f, v in self.assigned_fields()}
+        return {f.name: getattr(self, f.name) for f in self.fields}
 
     @classmethod
     def get_padded_fields(
@@ -140,7 +125,18 @@ class CStruct:
         result = b""
 
         for padding, _, field in self.get_padded_fields(align=align):
-            value = field.type(getattr(self, field.name))
+            value = getattr(self, field.name)
+
+            if value is None:
+                raise ValueError(f"Field {field} cannot be empty")
+
+            try:
+                value = field.type(value)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to convert {field.name}={value!r} from type"
+                    f" {type(value)} to {field.type}"
+                ) from e
 
             result += b"\xFF" * padding
 
@@ -204,9 +200,6 @@ class CStructField:
     def __post_init__(self) -> None:
         # Throw an error early
         self.get_size_and_alignment()
-
-    def replace(self, **kwargs) -> "CStructField":
-        return dataclasses.replace(self, **kwargs)
 
     def get_size_and_alignment(self, align=False) -> typing.Tuple[int, int]:
         if issubclass(self.type, (zigpy_t.FixedIntType, t.FixedIntType)):

@@ -205,6 +205,15 @@ def test_struct_equality():
     assert s1 != s3
     assert s1.serialize() == s3.serialize()
 
+    assert TestStruct(s1) == s1
+    assert TestStruct(a=s1.a, b=s1.b) == s1
+
+    with pytest.raises(ValueError):
+        TestStruct(s1, b=InnerStruct(s1.b))
+
+    with pytest.raises(ValueError):
+        TestStruct2(s1)
+
 
 def test_struct_repr():
     class TestStruct(t.CStruct):
@@ -213,3 +222,31 @@ def test_struct_repr():
 
     assert str(TestStruct(a=1, b=2)) == "TestStruct(a=1, b=2)"
     assert str([TestStruct(a=1, b=2)]) == "[TestStruct(a=1, b=2)]"
+
+
+def test_struct_bad_fields():
+    with pytest.raises(TypeError):
+
+        class TestStruct(t.CStruct):
+            a: t.uint8_t
+            b: int
+
+
+def test_struct_incomplete_serialization():
+    class TestStruct(t.CStruct):
+        a: t.uint8_t
+        b: t.uint8_t
+
+    TestStruct(a=1, b=2).serialize()
+
+    with pytest.raises(ValueError):
+        TestStruct(a=1, b=None).serialize()
+
+    with pytest.raises(ValueError):
+        TestStruct(a=1).serialize()
+
+    struct = TestStruct(a=1, b=2)
+    struct.b = object()
+
+    with pytest.raises(ValueError):
+        struct.serialize()
