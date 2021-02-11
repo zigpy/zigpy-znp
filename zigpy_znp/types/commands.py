@@ -10,15 +10,6 @@ import zigpy_znp.types as t
 LOGGER = logging.getLogger(__name__)
 
 
-class BindEntry(t.CStruct):
-    """Bind table entry."""
-
-    Src: t.EUI64
-    SrcEp: t.uint8_t
-    ClusterId: t.ClusterId
-    DstAddr: zigpy.zdo.types.MultiAddress
-
-
 class CommandType(t.enum_uint8):
     """Command Type."""
 

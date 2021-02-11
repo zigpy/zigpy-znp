@@ -15,7 +15,7 @@ class NodeRelation(t.enum_uint8):
     NOTUSED = 0xFF
 
 
-class BindEntry(t.CStruct):
+class BindEntry(t.Struct):
     srcEP: t.uint8_t
     dstGroupMode: t.uint8_t  # 0 - Normal address index, 1 - Group address
     dstIdx: t.uint16_t

@@ -100,7 +100,16 @@ class GroupIdList(t.LVList, item_type=t.GroupId, length_type=t.uint8_t):
     pass
 
 
-class BindEntryList(t.LVList, item_type=t.BindEntry, length_type=t.uint8_t):
+class BindEntry(t.Struct):
+    """Bind table entry."""
+
+    Src: t.EUI64
+    SrcEp: t.uint8_t
+    ClusterId: t.ClusterId
+    DstAddr: zigpy.zdo.types.MultiAddress
+
+
+class BindEntryList(t.LVList, item_type=BindEntry, length_type=t.uint8_t):
     pass
 
 

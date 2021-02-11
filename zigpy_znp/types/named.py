@@ -5,7 +5,7 @@ import dataclasses
 
 from zigpy.types import NWK, EUI64, PanId, KeyData, ClusterId, ExtendedPanId
 
-from . import basic, struct
+from . import basic, cstruct
 
 LOGGER = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ class AddrModeAddress:
         return f"{type(self).__name__}(mode={self.mode!r}, address={self.address!r})"
 
 
-class Beacon(struct.CStruct):
+class Beacon(cstruct.CStruct):
     """Beacon message."""
 
     Src: NWK
@@ -442,19 +442,19 @@ class NWKList(basic.LVList, item_type=NWK, length_type=basic.uint8_t):
     pass
 
 
-class TCLinkKey(struct.CStruct):
+class TCLinkKey(cstruct.CStruct):
     ExtAddr: EUI64
     Key: KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
 
 
-class NwkKeyDesc(struct.CStruct):
+class NwkKeyDesc(cstruct.CStruct):
     KeySeqNum: basic.uint8_t
     Key: KeyData
 
 
-class NwkActiveKeyItems(struct.CStruct):
+class NwkActiveKeyItems(cstruct.CStruct):
     Active: NwkKeyDesc
     FrameCounter: basic.uint32_t
 
@@ -496,7 +496,7 @@ class KeyAttributes(basic.enum_uint8):
     DEFAULT_KEY = 0xFF
 
 
-class TCLKDevEntry(struct.CStruct):
+class TCLKDevEntry(cstruct.CStruct):
     txFrmCntr: basic.uint32_t
     rxFrmCntr: basic.uint32_t
 
@@ -509,7 +509,7 @@ class TCLKDevEntry(struct.CStruct):
     SeedShift_IcIndex: basic.uint8_t
 
 
-class NwkSecMaterialDesc(struct.CStruct):
+class NwkSecMaterialDesc(cstruct.CStruct):
     FrameCounter: basic.uint32_t
     ExtendedPanID: EUI64
 
@@ -522,7 +522,7 @@ class AddrMgrUserType(basic.enum_flag_uint8):
     Private1 = 0x08
 
 
-class AddrMgrEntry(struct.CStruct):
+class AddrMgrEntry(cstruct.CStruct):
     type: AddrMgrUserType
     nwkAddr: NWK
     extAddr: EUI64
@@ -545,13 +545,13 @@ class AuthenticationOption(basic.enum_uint8):
     AuthenticatedEA = 0x02
 
 
-class LinkKeyTableEntry(struct.CStruct):
+class LinkKeyTableEntry(cstruct.CStruct):
     Key: KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
 
 
-class APSLinkKeyTableEntry(struct.CStruct):
+class APSLinkKeyTableEntry(cstruct.CStruct):
     AddressManagerIndex: basic.uint16_t
     LinkKeyTableOffset: basic.uint16_t
     AuthenticationState: AuthenticationOption

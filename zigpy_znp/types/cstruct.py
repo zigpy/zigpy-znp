@@ -12,39 +12,12 @@ class ListSubclass(list):
     pass
 
 
-def get_type_size_and_alignment(obj, *, align=False):
-    if issubclass(obj, (zigpy_t.FixedIntType, t.FixedIntType)):
-        return obj._size, obj._size if align else 1
-    elif issubclass(obj, zigpy_t.EUI64):
-        return 8, 1
-    elif issubclass(obj, zigpy_t.KeyData):
-        return 16, 1
-    elif issubclass(obj, t.AddrModeAddress):
-        return 1 + 8, 1
-    elif issubclass(obj, CStruct):
-        return obj.get_size(align=align), obj.get_alignment(align=align)
-    else:
-        raise ValueError(f"Cannot get size of unknown object: {obj!r}")
-
-
-class Union:
-    def __init_subclass__(cls):
-        super().__init_subclass__()
-
-        def __new__(cls, *args, **kwargs) -> "Union":
-            instance = super().__new__(cls)
-
-            return instance
-
-        cls.__new__ = __new__
-
-
 class CStruct:
     def __init_subclass__(cls):
         super().__init_subclass__()
 
         # We generate fields up here to fail early (and cache it)
-        fields = cls.fields()
+        cls.fields = cls._get_fields()
 
         # We dynamically create our subclass's `__new__` method
         def __new__(cls, *args, **kwargs) -> "CStruct":
@@ -52,7 +25,7 @@ class CStruct:
             if len(args) == 1 and isinstance(args[0], cls):
                 if kwargs:
                     raise ValueError(
-                        f"Cannot use copy constructor with kwargs: " f"{kwargs!r}"
+                        f"Cannot use copy constructor with kwargs: {kwargs!r}"
                     )
 
                 kwargs = args[0].as_dict()
@@ -67,7 +40,7 @@ class CStruct:
                         default=None,
                         annotation=f.type,
                     )
-                    for f in cls.fields()
+                    for f in cls.fields
                 ]
             )
 
@@ -78,7 +51,7 @@ class CStruct:
 
             # Set and convert the attributes to their respective types
             for name, value in bound.arguments.items():
-                field = getattr(fields, name)
+                field = getattr(cls.fields, name)
 
                 if value is not None:
                     try:
@@ -97,50 +70,14 @@ class CStruct:
         cls.__new__ = __new__
 
     @classmethod
-    def fields(cls) -> typing.List["CStructField"]:
+    def _get_fields(cls) -> typing.List["CStructField"]:
         fields = ListSubclass()
 
-        # We need both to throw type errors in case a field is not annotated
-        annotations = cls.__annotations__
-        variables = vars(cls)
-
-        # `set(annotations) | set(variables)` doesn't preserve order, which we need
-        for name in list(annotations) + [v for v in variables if v not in annotations]:
-            # It's a lot easier to debug when things break immediately instead of
-            # fields being silently skipped
-            if hasattr(cls, name):
-                field = getattr(cls, name)
-
-                if not isinstance(field, CStructField):
-                    if name.startswith("_") or name.isupper():
-                        # _foo and FOO are considered constants and ignored
-                        continue
-                    elif isinstance(field, property):
-                        # Ignore properties
-                        continue
-                    elif inspect.isfunction(field) or inspect.ismethod(field):
-                        # Ignore methods and overridden functions
-                        continue
-
-                    # Everything else is an error
-                    raise TypeError(
-                        f"Field {name!r}={field!r} is not a constant or a field"
-                    )
-            else:
-                field = CStructField(name)
-
-            field = field.replace(name=name)
-
-            if name in annotations:
-                annotation = annotations[name]
-
-                if field.type is not None and field.type != annotation:
-                    raise TypeError(
-                        f"Field {name!r} type annotation conflicts with provided type:"
-                        f" {annotation} != {field.type}"
-                    )
-
-                field = field.replace(type=annotation)
+        for name, annotation in cls.__annotations__.items():
+            try:
+                field = CStructField(name=name, type=annotation)
+            except Exception as e:
+                raise TypeError(f"Invalid field {name}={annotation!r}") from e
 
             fields.append(field)
             setattr(fields, field.name, field)
@@ -150,10 +87,10 @@ class CStruct:
     def assigned_fields(self, *, strict=False) -> typing.List["CStructField"]:
         assigned_fields = ListSubclass()
 
-        for field in self.fields():
+        for field in self.fields:
             value = getattr(self, field.name)
 
-            # Missing non-optional required fields cause an error if strict
+            # Missing fields cause an error if strict
             if value is None and strict:
                 raise ValueError(f"Value for field {field.name} is required")
 
@@ -171,8 +108,8 @@ class CStruct:
     ) -> typing.Iterable[typing.Tuple[int, int, "CStructField"]]:
         offset = 0
 
-        for field in cls.fields():
-            size, alignment = get_type_size_and_alignment(field.type, align=align)
+        for field in cls.fields:
+            size, alignment = field.get_size_and_alignment(align=align)
             padding = (-offset) % alignment
             offset += padding + size
 
@@ -182,8 +119,8 @@ class CStruct:
     def get_alignment(cls, *, align=False) -> int:
         alignments = []
 
-        for field in cls.fields():
-            size, alignment = get_type_size_and_alignment(field.type, align=align)
+        for field in cls.fields:
+            size, alignment = field.get_size_and_alignment(align=align)
             alignments.append(alignment)
 
         return max(alignments)
@@ -202,7 +139,7 @@ class CStruct:
     def serialize(self, *, align=False) -> bytes:
         result = b""
 
-        for padding, size, field in self.get_padded_fields(align=align):
+        for padding, _, field in self.get_padded_fields(align=align):
             value = field.type(getattr(self, field.name))
 
             result += b"\xFF" * padding
@@ -212,9 +149,8 @@ class CStruct:
             else:
                 result += value.serialize()
 
-        final_padding = b"\xFF" * (self.get_size(align=align) - len(result))
-
-        return result + final_padding
+        # Pad the result to our final length
+        return result.ljust(self.get_size(align=align), b"\xFF")
 
     @classmethod
     def deserialize(cls, data: bytes, *, align=False) -> typing.Tuple["CStruct", bytes]:
@@ -229,11 +165,6 @@ class CStruct:
             )
 
         for padding, _, field in cls.get_padded_fields(align=align):
-            if len(data) < padding:
-                raise ValueError(
-                    f"Data is too short to contain {padding} padding bytes"
-                )
-
             data = data[padding:]
 
             if issubclass(field.type, CStruct):
@@ -267,8 +198,26 @@ class CStruct:
 
 @dataclasses.dataclass(frozen=True)
 class CStructField:
-    name: typing.Optional[str] = None
-    type: typing.Optional[type] = None
+    name: str
+    type: type
+
+    def __post_init__(self) -> None:
+        # Throw an error early
+        self.get_size_and_alignment()
 
     def replace(self, **kwargs) -> "CStructField":
         return dataclasses.replace(self, **kwargs)
+
+    def get_size_and_alignment(self, align=False) -> typing.Tuple[int, int]:
+        if issubclass(self.type, (zigpy_t.FixedIntType, t.FixedIntType)):
+            return self.type._size, self.type._size if align else 1
+        elif issubclass(self.type, zigpy_t.EUI64):
+            return 8, 1
+        elif issubclass(self.type, zigpy_t.KeyData):
+            return 16, 1
+        elif issubclass(self.type, CStruct):
+            return self.type.get_size(align=align), self.type.get_alignment(align=align)
+        elif issubclass(self.type, t.AddrModeAddress):
+            return 1 + 8, 1
+        else:
+            raise TypeError(f"Cannot get size of unknown type: {self.type!r}")
