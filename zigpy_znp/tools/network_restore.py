@@ -28,35 +28,47 @@ async def set_tc_frame_counter(app: ControllerApplication, counter: t.uint32_t):
         return
 
     best_entry = None
-    best_sub_id = None
+    best_address = None
 
-    for sub_id in range(0x0000, 0xFFFF + 1):
-        try:
-            entry = await app._znp.nvram.read(
-                item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
-                sub_id=sub_id,
-                item_type=t.NwkSecMaterialDesc,
-            )
-        except KeyError:
-            break
+    if app._znp.version == 3.0:
+        address = OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START
+        entries = app._znp.nvram.osal_read_table(
+            start_nvid=OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START,
+            end_nvid=OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END,
+            item_type=t.NwkSecMaterialDesc,
+        )
+    else:
+        address = 0x0000
+        entries = app._znp.nvram.read_table(
+            item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
+            item_type=t.NwkSecMaterialDesc,
+        )
 
+    async for entry in entries:
         if entry.ExtendedPanID == app.extended_pan_id:
             best_entry = entry
-            best_sub_id = sub_id
+            best_address = address
             break
         elif best_entry is None and entry.ExtendedPanID == t.EUI64.convert(
             "FF:FF:FF:FF:FF:FF:FF:FF"
         ):
             best_entry = entry
-            best_sub_id = sub_id
+            best_address = address
+
+        address += 1
+    else:
+        raise RuntimeError("Failed to find open slot for security material entry")
 
     best_entry.FrameCounter = counter
 
-    await app._znp.nvram.write(
-        item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
-        sub_id=best_sub_id,
-        value=best_entry,
-    )
+    if app._znp.version == 3.0:
+        await app._znp.nvram.osal_write(best_address, best_entry)
+    else:
+        await app._znp.nvram.write(
+            item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
+            sub_id=best_address,
+            value=best_entry,
+        )
 
 
 def rotate(lst, n):
@@ -108,9 +120,9 @@ async def write_addr_manager_entries(
         return
 
     old_entries = await app._znp.nvram.osal_read(
-        OsalNvIds.ADDRMGR, item_type=t.AddrMgrEntryTable
+        OsalNvIds.ADDRMGR, item_type=t.AddressManagerTable
     )
-    new_entries = len(old_entries) * [t.EMPTY_ADDR_MGR_ENTRY_CC2531]
+    new_entries = len(old_entries) * [t.EMPTY_ADDR_MGR_ENTRY]
 
     for index, entry in enumerate(entries):
         new_entries[index] = entry
@@ -136,7 +148,7 @@ async def add_devices(
             ieees_and_keys.append((device["ieee"], key))
 
     # Find the seed that maximizes the number of keys that can be derived from it
-    if seed is None:
+    if seed is None and ieees_and_keys:
         _, seed = max(iter_seed_candidates(ieees_and_keys))
 
     addr_mgr_entries = []
@@ -152,21 +164,13 @@ async def add_devices(
         if device.get("link_key"):
             entry_type |= t.AddrMgrUserType.Security
 
-        if app._znp.version < 3.30:
-            addr_mgr_entry = t.AddrMgrEntryCC2531(
+        addr_mgr_entries.append(
+            t.AddrMgrEntry(
                 type=entry_type,
                 nwkAddr=device["nwk"],
                 extAddr=device["ieee"],
             )
-        else:
-            addr_mgr_entry = t.AddrMgrEntry(
-                type=entry_type,
-                PaddingByte1=b"\xFF",
-                nwkAddr=device["nwk"],
-                extAddr=device["ieee"],
-            )
-
-        addr_mgr_entries.append(addr_mgr_entry)
+        )
 
         if not device.get("link_key"):
             continue
@@ -204,9 +208,8 @@ async def add_devices(
                     rxFrmCntr=device["link_key"]["rx_counter"],
                     extAddr=device["ieee"],
                     keyAttributes=t.KeyAttributes.VERIFIED_KEY,
-                    keyType=t.KeyType(0x00),  # What is this?
+                    keyType=t.KeyType.NONE,
                     SeedShift_IcIndex=shift,
-                    PaddingByte1=b"\x00",
                 )
             )
 
@@ -219,11 +222,29 @@ async def add_devices(
     await app._znp.nvram.osal_write(OsalNvIds.APS_LINK_KEY_TABLE, link_key_table_value)
 
     await write_addr_manager_entries(app, addr_mgr_entries)
-    await app._znp.nvram.write_table(
-        item_id=ExNvIds.TCLK_TABLE,
-        values=tclk_table,
-        fill_value=bytes.fromhex("00000000000000000000000000000000ff000000"),
+
+    tclk_fill_value = t.TCLKDevEntry(
+        txFrmCntr=0,
+        rxFrmCntr=0,
+        extAddr=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+        keyAttributes=t.KeyAttributes.PROVISIONAL_KEY,
+        keyType=t.KeyType.NONE,
+        SeedShift_IcIndex=0,
     )
+
+    if app._znp.version == 3.30:
+        await app._znp.nvram.write_table(
+            item_id=ExNvIds.TCLK_TABLE,
+            values=tclk_table,
+            fill_value=tclk_fill_value,
+        )
+    else:
+        await app._znp.nvram.osal_write_table(
+            start_nvid=OsalNvIds.LEGACY_TCLK_TABLE_START,
+            end_nvid=OsalNvIds.LEGACY_TCLK_TABLE_END,
+            values=tclk_table,
+            fill_value=tclk_fill_value,
+        )
 
 
 async def restore_network(

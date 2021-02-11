@@ -68,37 +68,63 @@ class AddrMode(basic.enum_uint8):
     Broadcast = 0x0F
 
 
-class AddrModeAddress(struct.Struct):
-    mode: AddrMode
-    address: typing.Union[NWK, EUI64] = struct.StructField(
-        dynamic_type=lambda s: {
+class AddrModeAddress:
+    def __new__(cls, mode=None, address=None):
+        if mode is not None and address is None and isinstance(mode, cls):
+            other = mode
+            return cls(mode=other.mode, address=other.address)
+
+        instance = super().__new__(cls)
+
+        if mode is not None and mode == AddrMode.NOT_PRESENT:
+            raise ValueError(f"Invalid address mode: {mode}")
+
+        instance.mode = None if mode is None else AddrMode(mode)
+        instance.address = (
+            None if address is None else instance._get_address_type()(address)
+        )
+
+        return instance
+
+    def _get_address_type(self):
+        return {
             AddrMode.NWK: NWK,
             AddrMode.Group: NWK,
             AddrMode.Broadcast: NWK,
             AddrMode.IEEE: EUI64,
-        }[s.mode]
-    )
+        }[self.mode]
 
     @classmethod
     def deserialize(cls, data: bytes) -> "AddrModeAddress":
-        addr, data = super().deserialize(data)
+        mode, data = AddrMode.deserialize(data)
+        address, data = EUI64.deserialize(data)
 
-        if isinstance(addr.address, NWK):
-            # The address is padded
-            data = data[6:]
+        if mode != AddrMode.IEEE:
+            address, _ = NWK.deserialize(address.serialize())
 
-        return addr, data
+        return cls(mode=mode, address=address), data
 
     def serialize(self) -> bytes:
-        data = super().serialize()
+        result = (
+            self.mode.serialize() + self._get_address_type()(self.address).serialize()
+        )
 
-        if isinstance(self.address, NWK):
-            data += b"\x00\x00\x00\x00\x00\x00"
+        if self.mode != AddrMode.IEEE:
+            result += b"\x00\x00\x00\x00\x00\x00"
 
-        return data
+        return result
+
+    def __eq__(self, other):
+        if not isinstance(self, type(other)) and not isinstance(other, type(self)):
+            return False
+
+        return self.mode == other.mode and self.address == other.address
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(mode={self.mode!r}, address={self.address!r})"
 
 
-class Beacon(struct.Struct):
+class Beacon(struct.CStruct):
     """Beacon message."""
 
     Src: NWK
@@ -416,19 +442,19 @@ class NWKList(basic.LVList, item_type=NWK, length_type=basic.uint8_t):
     pass
 
 
-class TCLinkKey(struct.Struct):
+class TCLinkKey(struct.CStruct):
     ExtAddr: EUI64
     Key: KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
 
 
-class NwkKeyDesc(struct.Struct):
+class NwkKeyDesc(struct.CStruct):
     KeySeqNum: basic.uint8_t
     Key: KeyData
 
 
-class NwkActiveKeyItems(struct.Struct):
+class NwkActiveKeyItems(struct.CStruct):
     Active: NwkKeyDesc
     FrameCounter: basic.uint32_t
 
@@ -470,7 +496,7 @@ class KeyAttributes(basic.enum_uint8):
     DEFAULT_KEY = 0xFF
 
 
-class TCLKDevEntry(struct.Struct):
+class TCLKDevEntry(struct.CStruct):
     txFrmCntr: basic.uint32_t
     rxFrmCntr: basic.uint32_t
 
@@ -483,7 +509,7 @@ class TCLKDevEntry(struct.Struct):
     SeedShift_IcIndex: basic.uint8_t
 
 
-class NwkSecMaterialDesc(struct.Struct):
+class NwkSecMaterialDesc(struct.CStruct):
     FrameCounter: basic.uint32_t
     ExtendedPanID: EUI64
 
@@ -496,7 +522,7 @@ class AddrMgrUserType(basic.enum_flag_uint8):
     Private1 = 0x08
 
 
-class AddrMgrEntry(struct.Struct):
+class AddrMgrEntry(struct.CStruct):
     type: AddrMgrUserType
     nwkAddr: NWK
     extAddr: EUI64
@@ -519,13 +545,13 @@ class AuthenticationOption(basic.enum_uint8):
     AuthenticatedEA = 0x02
 
 
-class LinkKeyTableEntry(struct.Struct):
+class LinkKeyTableEntry(struct.CStruct):
     Key: KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
 
 
-class APSLinkKeyTableEntry(struct.Struct):
+class APSLinkKeyTableEntry(struct.CStruct):
     AddressManagerIndex: basic.uint16_t
     LinkKeyTableOffset: basic.uint16_t
     AuthenticationState: AuthenticationOption

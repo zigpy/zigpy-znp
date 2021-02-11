@@ -7,44 +7,26 @@ import zigpy_znp.types as t
 
 
 def test_struct_fields():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         a: t.uint8_t
-        b: typing.Optional[t.uint8_t]
+        b: t.uint16_t
 
     assert TestStruct.fields().a.name == "a"
     assert TestStruct.fields().a.type == t.uint8_t
-    assert TestStruct.fields().a.concrete_type == t.uint8_t
-    assert not TestStruct.fields().a.optional
 
     assert TestStruct.fields().b.name == "b"
-    assert TestStruct.fields().b.type == typing.Optional[t.uint8_t]
-    assert TestStruct.fields().b.concrete_type == t.uint8_t
-    assert TestStruct.fields().b.optional
+    assert TestStruct.fields().b.type == t.uint16_t
 
 
 def test_struct_subclass_creation():
-    # Optional fields must all be at the very end
-    with pytest.raises(TypeError):
-
-        class TestStruct1(t.Struct):
-            b: typing.Optional[t.uint8_t]
-            a: t.uint8_t
-
-    with pytest.raises(TypeError):
-
-        class TestStruct2(t.Struct):
-            b: typing.Optional[t.uint8_t]
-            a: t.uint8_t
-            c: typing.Optional[t.uint8_t]
-
     # Every field must be annotated
     with pytest.raises(TypeError):
 
-        class BadTestStruct3(t.Struct):
+        class BadTestStruct3(t.CStruct):
             a = 5
 
     # In-class constants are allowed
-    class TestStruct3(t.Struct):
+    class TestStruct3(t.CStruct):
         CONSTANT1: int = 123
         CONSTANT2 = 1234
         _private1: int = 456
@@ -56,41 +38,17 @@ def test_struct_subclass_creation():
     assert TestStruct3._private1 == 456
     assert TestStruct3._private2 == 4567
 
-    # This is fine
-    class TestStruct4(t.Struct):
-        a: typing.Optional[t.uint8_t]
-
-    # Still valid
-    class TestStruct5(t.Struct):
-        pass
-
     # Fields cannot have values
     with pytest.raises(TypeError):
 
-        class TestStruct6(t.Struct):
+        class TestStruct6(t.CStruct):
             a: t.uint8_t = 2
-
-    # unless they are a StructField
-    class TestStruct7(t.Struct):
-        a: t.uint8_t = t.StructField()
-
-    # Fields can only have a single concrete type
-    with pytest.raises(TypeError):
-
-        class TestStruct8(t.Struct):
-            bad: typing.Union[t.uint8_t, t.uint16_t]
 
 
 def test_struct_construction():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         a: t.uint8_t
-        b: typing.Optional[t.uint8_t]
-
-    """
-    # This breaks many unit tests
-    with pytest.raises(TypeError):
-        TestStruct()
-    """
+        b: t.uint16_t
 
     s1 = TestStruct(a=1)
     s2 = TestStruct(a=1, b=None)
@@ -98,7 +56,7 @@ def test_struct_construction():
     assert s1 == s2
     assert s1.a == s2.a
     assert s1.replace(b=2) == s2.replace(b=2)
-    assert s1.replace(b=2).serialize() == s2.replace(b=2).serialize() == b"\x01\x02"
+    assert s1.replace(b=2).serialize() == s2.replace(b=2).serialize() == b"\x01\x00\x02"
 
     assert TestStruct(s1) == s1
 
@@ -112,9 +70,8 @@ def test_struct_construction():
 
 
 def test_struct_attribute_assignment():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         a: t.uint8_t
-        b: typing.Optional[t.uint8_t]
 
     s1 = TestStruct(a=1)
     s1.a = -1
@@ -128,14 +85,13 @@ def test_struct_attribute_assignment():
 
 
 def test_nested_structs():
-    class InnerStruct(t.Struct):
+    class InnerStruct(t.CStruct):
         b: t.uint8_t
         c: t.uint8_t
 
-    class OuterStruct(t.Struct):
+    class OuterStruct(t.CStruct):
         a: t.uint8_t
-        inner: typing.Optional[InnerStruct]
-        d: typing.Optional[t.uint8_t]
+        inner: InnerStruct
 
     s1, remaining = OuterStruct.deserialize(b"\x00\x01\x02")
     assert not remaining
@@ -159,7 +115,7 @@ def test_nested_structs():
 
 
 def test_struct_init():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         a: t.uint8_t
         b: t.uint16_t
         c: t.CharacterString
@@ -188,7 +144,7 @@ def test_struct_init():
 
 
 def test_struct_string_is_none():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         a: t.CharacterString
 
     # str(None) == "None", which is bad
@@ -197,7 +153,7 @@ def test_struct_string_is_none():
 
 
 def test_struct_optional_init():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         a: t.uint8_t
         b: t.uint16_t
         c: typing.Optional[t.CharacterString]
@@ -209,10 +165,10 @@ def test_struct_optional_init():
 
 
 def test_struct_field_dependencies():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         foo: t.uint8_t
         status: t.Status
-        bar: t.uint8_t = t.StructField(requires=lambda s: s.status == t.Status.SUCCESS)
+        bar: t.uint8_t = t.CStructField(requires=lambda s: s.status == t.Status.SUCCESS)
         baz1: t.uint8_t
         baz2: typing.Optional[t.uint8_t]
 
@@ -254,9 +210,9 @@ def test_struct_field_dependencies():
 
 
 def test_struct_field_invalid_dependencies():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         status: t.uint8_t
-        value: t.uint8_t = t.StructField(requires=lambda s: s.status == 0x00)
+        value: t.uint8_t = t.CStructField(requires=lambda s: s.status == 0x00)
 
     # Value will be ignored during serialization even though it has been assigned
     ts1 = TestStruct(status=0x01, value=0x02)
@@ -284,18 +240,18 @@ def test_struct_optional_dependencies():
         # Missing members cause a parsing failure
         _missing_ = enum.Enum._missing_
 
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         foo: t.uint8_t
 
         # The first pair of (status, value) is not optional
         status1: StrictStatus
-        value1: t.uint8_t = t.StructField(
+        value1: t.uint8_t = t.CStructField(
             requires=lambda s: s.status1 == StrictStatus.SUCCESS
         )
 
         # The second one is
         status2: typing.Optional[StrictStatus]
-        value2: typing.Optional[t.uint8_t] = t.StructField(
+        value2: typing.Optional[t.uint8_t] = t.CStructField(
             requires=lambda s: s.status2 == StrictStatus.SUCCESS
         )
 
@@ -371,10 +327,10 @@ def test_struct_optional_dependencies():
 
 
 def test_struct_equality():
-    class TestStruct1(t.Struct):
+    class TestStruct1(t.CStruct):
         foo: t.uint8_t
 
-    class TestStruct2(t.Struct):
+    class TestStruct2(t.CStruct):
         foo: t.uint8_t
 
     assert TestStruct1() != TestStruct2()
@@ -397,15 +353,15 @@ def test_struct_equality():
     ],
 )
 def test_struct_subclass_extension(data):
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         foo: t.uint8_t
 
     class TestStructSubclass(TestStruct):
-        bar: t.uint8_t = t.StructField(requires=lambda s: s.foo == 0x01)
+        bar: t.uint8_t = t.CStructField(requires=lambda s: s.foo == 0x01)
 
-    class TestCombinedStruct(t.Struct):
+    class TestCombinedStruct(t.CStruct):
         foo: t.uint8_t
-        bar: t.uint8_t = t.StructField(requires=lambda s: s.foo == 0x01)
+        bar: t.uint8_t = t.CStructField(requires=lambda s: s.foo == 0x01)
 
     assert len(TestStructSubclass.fields()) == 2
     assert len(TestCombinedStruct.fields()) == 2
@@ -435,26 +391,26 @@ def test_struct_subclass_extension(data):
 def test_old_style_struct():
     with pytest.raises(TypeError):
         # `_fields` would typically be ignored but this would be very bad
-        class OldStruct(t.Struct):
+        class OldStruct(t.CStruct):
             _fields = [("foo", t.uint8_t)]
 
 
 def test_conflicting_types():
-    class GoodStruct(t.Struct):
-        foo: t.uint8_t = t.StructField(type=t.uint8_t)
+    class GoodStruct(t.CStruct):
+        foo: t.uint8_t = t.CStructField(type=t.uint8_t)
 
     with pytest.raises(TypeError):
 
-        class BadStruct(t.Struct):
-            foo: t.uint8_t = t.StructField(type=t.uint16_t)
+        class BadStruct(t.CStruct):
+            foo: t.uint8_t = t.CStructField(type=t.uint16_t)
 
 
 def test_requires_uses_instance_of_struct():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         foo: t.uint8_t
 
         # the first parameter is really an instance of TestStruct
-        bar: t.uint8_t = t.StructField(requires=lambda s: s.test)
+        bar: t.uint8_t = t.CStructField(requires=lambda s: s.test)
 
         @property
         def test(self):
@@ -466,7 +422,7 @@ def test_requires_uses_instance_of_struct():
 
 
 def test_uppercase_field():
-    class Neighbor(t.Struct):
+    class Neighbor(t.CStruct):
         """Neighbor Descriptor"""
 
         PanId: t.EUI64
@@ -483,13 +439,13 @@ def test_uppercase_field():
 
 
 def test_non_annotated_field():
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         field1: t.uint8_t
-        field2 = t.StructField(type=t.uint16_t)
+        field2 = t.CStructField(type=t.uint16_t)
 
     assert len(TestStruct.fields()) == 2
-    assert TestStruct.fields()[0] == t.StructField(name="field1", type=t.uint8_t)
-    assert TestStruct.fields()[1] == t.StructField(name="field2", type=t.uint16_t)
+    assert TestStruct.fields()[0] == t.CStructField(name="field1", type=t.uint8_t)
+    assert TestStruct.fields()[1] == t.CStructField(name="field2", type=t.uint16_t)
 
 
 def test_allowed_non_fields():
@@ -500,7 +456,7 @@ def test_allowed_non_fields():
     def foo2_(_):
         return "foo2"
 
-    class TestStruct(t.Struct):
+    class TestStruct(t.CStruct):
         @property
         def prop(self):
             return "prop"

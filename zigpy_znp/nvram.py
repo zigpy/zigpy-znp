@@ -31,11 +31,11 @@ class NVRAMHelper:
             return
 
         # If we are performing a read and are not expecting a struct, don't check
-        if item_type is not None and not issubclass(item_type, t.Struct):
+        if item_type is not None and not issubclass(item_type, t.CStruct):
             return
 
         # If we are performing a write but not with a struct, don't check
-        if value is not None and not isinstance(value, t.Struct):
+        if value is not None and not isinstance(value, t.CStruct):
             return
 
         # NWKKEY is almost always present, regardless of adapter state.
@@ -59,7 +59,7 @@ class NVRAMHelper:
         """
 
         if hasattr(value, "serialize"):
-            if isinstance(value, t.Struct):
+            if isinstance(value, t.CStruct):
                 assert self.align_structs is not None
                 value = value.serialize(align=self.align_structs)
             else:
@@ -84,7 +84,7 @@ class NVRAMHelper:
         if item_type is None:
             return data
 
-        if issubclass(item_type, t.Struct):
+        if issubclass(item_type, t.CStruct):
             assert self.align_structs is not None
             value, remaining = item_type.deserialize(data, align=self.align_structs)
         else:

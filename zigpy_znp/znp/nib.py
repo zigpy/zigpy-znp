@@ -14,7 +14,7 @@ class NwkState(t.enum_uint8):
     NWK_REJOINING = 9
 
 
-class NIB(t.Struct):
+class NIB(t.CStruct):
     SequenceNum: t.uint8_t
     PassiveAckTimeout: t.uint8_t
     MaxBroadcastRetries: t.uint8_t

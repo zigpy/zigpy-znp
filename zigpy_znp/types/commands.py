@@ -10,7 +10,7 @@ import zigpy_znp.types as t
 LOGGER = logging.getLogger(__name__)
 
 
-class BindEntry(t.Struct):
+class BindEntry(t.CStruct):
     """Bind table entry."""
 
     Src: t.EUI64
@@ -565,7 +565,7 @@ class MTCapabilities(t.enum_flag_uint16):
     CAP_UNK16 = 1 << 15
 
 
-class Network(t.Struct):
+class Network(t.CStruct):
     PanId: t.PanId
     Channel: t.uint8_t
     StackProfileVersion: t.uint8_t

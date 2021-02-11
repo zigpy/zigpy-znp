@@ -4,9 +4,7 @@ import dataclasses
 
 import zigpy.types as zigpy_t
 
-import zigpy_znp.types.basic as t
-
-NoneType = type(None)
+import zigpy_znp.types as t
 
 
 class ListSubclass(list):
@@ -14,51 +12,44 @@ class ListSubclass(list):
     pass
 
 
-class Struct:
-    @classmethod
-    def real_cls(cls) -> type:
-        # The "Optional" subclass is dynamically created and breaks types.
-        # We have to use a little introspection to find our real class.
-        return next(c for c in cls.__mro__ if c.__name__ != "Optional")
+def get_type_size_and_alignment(obj, *, align=False):
+    if issubclass(obj, (zigpy_t.FixedIntType, t.FixedIntType)):
+        return obj._size, obj._size if align else 1
+    elif issubclass(obj, zigpy_t.EUI64):
+        return 8, 1
+    elif issubclass(obj, zigpy_t.KeyData):
+        return 16, 1
+    elif issubclass(obj, t.AddrModeAddress):
+        return 1 + 8, 1
+    elif issubclass(obj, CStruct):
+        return obj.get_size(align=align), obj.get_alignment(align=align)
+    else:
+        raise ValueError(f"Cannot get size of unknown object: {obj!r}")
 
-    @classmethod
-    def _annotations(cls) -> typing.Dict[str, typing.Any]:
-        # First get our proper subclasses
-        subclasses = []
 
-        for subcls in cls.real_cls().__mro__:
-            if subcls is Struct:
-                break
-
-            subclasses.append(subcls)
-
-        annotations = {}
-
-        # Iterate over the annotations *backwards*.
-        # We want subclasses' annotations to override their parent classes'.
-        for subcls in subclasses[::-1]:
-            annotations.update(getattr(subcls, "__annotations__", {}))
-
-        return annotations
-
+class Union:
     def __init_subclass__(cls):
         super().__init_subclass__()
 
-        # Explicitly check for old-style structs and fail very early
-        if hasattr(cls, "_fields"):
-            raise TypeError(
-                "Struct subclasses do not use `_fields` anymore."
-                " Use class attributes with type annotations."
-            )
+        def __new__(cls, *args, **kwargs) -> "Union":
+            instance = super().__new__(cls)
+
+            return instance
+
+        cls.__new__ = __new__
+
+
+class CStruct:
+    def __init_subclass__(cls):
+        super().__init_subclass__()
 
         # We generate fields up here to fail early (and cache it)
-        real_cls = cls.real_cls()
-        fields = real_cls.fields()
+        fields = cls.fields()
 
         # We dynamically create our subclass's `__new__` method
-        def __new__(cls, *args, **kwargs) -> "Struct":
+        def __new__(cls, *args, **kwargs) -> "CStruct":
             # Like a copy constructor
-            if len(args) == 1 and isinstance(args[0], real_cls):
+            if len(args) == 1 and isinstance(args[0], cls):
                 if kwargs:
                     raise ValueError(
                         f"Cannot use copy constructor with kwargs: " f"{kwargs!r}"
@@ -76,28 +67,26 @@ class Struct:
                         default=None,
                         annotation=f.type,
                     )
-                    for f in real_cls.fields()
+                    for f in cls.fields()
                 ]
             )
 
             bound = signature.bind(*args, **kwargs)
             bound.apply_defaults()
 
-            instance = super().__new__(real_cls)
+            instance = super().__new__(cls)
 
             # Set and convert the attributes to their respective types
             for name, value in bound.arguments.items():
                 field = getattr(fields, name)
 
                 if value is not None:
-                    field_type = field.get_type_for(instance)
-
                     try:
-                        value = field_type(value)
+                        value = field.type(value)
                     except Exception as e:
                         raise ValueError(
                             f"Failed to convert {name}={value!r} from type"
-                            f" {type(value)} to {field_type}"
+                            f" {type(value)} to {field.type}"
                         ) from e
 
                 setattr(instance, name, value)
@@ -108,13 +97,12 @@ class Struct:
         cls.__new__ = __new__
 
     @classmethod
-    def fields(cls) -> typing.List["StructField"]:
+    def fields(cls) -> typing.List["CStructField"]:
         fields = ListSubclass()
-        seen_optional = False
 
         # We need both to throw type errors in case a field is not annotated
-        annotations = cls.real_cls()._annotations()
-        variables = vars(cls.real_cls())
+        annotations = cls.__annotations__
+        variables = vars(cls)
 
         # `set(annotations) | set(variables)` doesn't preserve order, which we need
         for name in list(annotations) + [v for v in variables if v not in annotations]:
@@ -123,7 +111,7 @@ class Struct:
             if hasattr(cls, name):
                 field = getattr(cls, name)
 
-                if not isinstance(field, StructField):
+                if not isinstance(field, CStructField):
                     if name.startswith("_") or name.isupper():
                         # _foo and FOO are considered constants and ignored
                         continue
@@ -139,7 +127,7 @@ class Struct:
                         f"Field {name!r}={field!r} is not a constant or a field"
                     )
             else:
-                field = StructField(name)
+                field = CStructField(name)
 
             field = field.replace(name=name)
 
@@ -154,34 +142,19 @@ class Struct:
 
                 field = field.replace(type=annotation)
 
-            if field.optional:
-                seen_optional = True
-
-            if seen_optional and not field.optional:
-                raise TypeError(
-                    f"No required fields can come after optional fields: {field!r}"
-                )
-
             fields.append(field)
             setattr(fields, field.name, field)
 
         return fields
 
-    def assigned_fields(self, *, strict=False) -> typing.List["StructField"]:
+    def assigned_fields(self, *, strict=False) -> typing.List["CStructField"]:
         assigned_fields = ListSubclass()
 
         for field in self.fields():
             value = getattr(self, field.name)
 
-            # Ignore fields that aren't required
-            if field.requires is not None and not field.requires(self):
-                continue
-
             # Missing non-optional required fields cause an error if strict
-            if value is None:
-                if field.optional or not strict:
-                    continue
-
+            if value is None and strict:
                 raise ValueError(f"Value for field {field.name} is required")
 
             assigned_fields.append((field, value))
@@ -192,94 +165,96 @@ class Struct:
     def as_dict(self) -> typing.Dict[str, typing.Any]:
         return {f.name: v for f, v in self.assigned_fields()}
 
-    def flat_fields(
-        self, *, align=False
-    ) -> typing.Iterable[typing.Tuple["StructField", typing.Any]]:
-        for field, value in self.assigned_fields(strict=True):
-            if isinstance(value, Struct):
-                yield from value.flat_fields()
-            else:
-                yield field, value
+    @classmethod
+    def get_padded_fields(
+        cls, *, align=False
+    ) -> typing.Iterable[typing.Tuple[int, int, "CStructField"]]:
+        offset = 0
 
-    def serialize(self, *, align=False, _top_level=True) -> bytes:
+        for field in cls.fields():
+            size, alignment = get_type_size_and_alignment(field.type, align=align)
+            padding = (-offset) % alignment
+            offset += padding + size
+
+            yield padding, size, field
+
+    @classmethod
+    def get_alignment(cls, *, align=False) -> int:
+        alignments = []
+
+        for field in cls.fields():
+            size, alignment = get_type_size_and_alignment(field.type, align=align)
+            alignments.append(alignment)
+
+        return max(alignments)
+
+    @classmethod
+    def get_size(cls, *, align=False) -> int:
+        total_size = 0
+
+        for padding, size, field in cls.get_padded_fields(align=align):
+            total_size += padding + size
+
+        final_padding = (-total_size) % cls.get_alignment(align=align)
+
+        return total_size + final_padding
+
+    def serialize(self, *, align=False) -> bytes:
         result = b""
 
-        for field, value in self.flat_fields():
-            value = field.get_type_for(self)(value)
+        for padding, size, field in self.get_padded_fields(align=align):
+            value = field.type(getattr(self, field.name))
 
-            if align and isinstance(value, (zigpy_t.FixedIntType, t.FixedIntType)):
-                alignment = value._size
-                padding = (-len(result)) % alignment
+            result += b"\xFF" * padding
 
-                result += b"\xFF" * padding
-
-            if isinstance(value, Struct):
-                result += value.serialize(align=align, _top_level=False)
+            if isinstance(value, CStruct):
+                result += value.serialize(align=align)
             else:
                 result += value.serialize()
 
-        # 2-byte alignment
-        if align and _top_level and len(result) % 2 != 0:
-            result += b"\xFF"
+        final_padding = b"\xFF" * (self.get_size(align=align) - len(result))
 
-        return result
+        return result + final_padding
 
     @classmethod
-    def deserialize(
-        cls, data: bytes, *, align=False, _top_level=True
-    ) -> typing.Tuple["Struct", bytes]:
+    def deserialize(cls, data: bytes, *, align=False) -> typing.Tuple["CStruct", bytes]:
         instance = cls()
+
         orig_length = len(data)
+        expected_size = cls.get_size(align=align)
 
-        for field in cls.fields():
-            if field.requires is not None and not field.requires(instance):
-                continue
+        if orig_length < expected_size:
+            raise ValueError(
+                f"Data is too short, must be at least {expected_size} bytes: {data!r}"
+            )
 
-            field_type = field.get_type_for(instance)
+        for padding, _, field in cls.get_padded_fields(align=align):
+            if len(data) < padding:
+                raise ValueError(
+                    f"Data is too short to contain {padding} padding bytes"
+                )
 
-            if align and issubclass(field_type, (zigpy_t.FixedIntType, t.FixedIntType)):
-                offset = orig_length - len(data)
-                alignment = field_type._size
-                padding = (-offset) % alignment
+            data = data[padding:]
 
-                if len(data) < padding:
-                    raise ValueError(
-                        f"Data is too short to contain {padding} padding bytes"
-                    )
-
-                data = data[padding:]
-
-            try:
-                if issubclass(field_type, Struct):
-                    value, data = field_type.deserialize(
-                        data, align=align, _top_level=False
-                    )
-                else:
-                    value, data = field_type.deserialize(data)
-            except (ValueError, AssertionError):
-                if field.optional:
-                    break
-
-                raise
+            if issubclass(field.type, CStruct):
+                value, data = field.type.deserialize(data, align=align)
+            else:
+                value, data = field.type.deserialize(data)
 
             setattr(instance, field.name, value)
 
-        # 2-byte alignment
-        if align and _top_level and (orig_length - len(data)) % 2 != 0:
-            if not data:
-                raise ValueError("Data is too short to contain final padding byte")
-
-            data = data[1:]
+        # Strip off the final padding
+        data = data[expected_size - (orig_length - len(data)) :]
 
         return instance, data
 
-    def replace(self, **kwargs) -> "Struct":
+    def replace(self, **kwargs) -> "CStruct":
         d = self.as_dict().copy()
         d.update(kwargs)
 
         return type(self)(**d)
 
-    def __eq__(self, other: "Struct") -> bool:
+    def __eq__(self, other: "CStruct") -> bool:
         if not isinstance(self, type(other)) and not isinstance(other, type(self)):
             return False
 
@@ -291,70 +266,9 @@ class Struct:
 
 
 @dataclasses.dataclass(frozen=True)
-class StructField:
+class CStructField:
     name: typing.Optional[str] = None
     type: typing.Optional[type] = None
 
-    dynamic_type: typing.Optional[typing.Callable[[Struct], type]] = None
-    requires: typing.Optional[typing.Callable[[Struct], bool]] = None
-
-    def __post_init__(self) -> None:
-        # Fail to initialize if the concrete type is invalid
-        if self.dynamic_type is None:
-            self.concrete_type
-
-    def get_type_for(self, struct: Struct) -> type:
-        if self.dynamic_type is not None:
-            try:
-                return self.dynamic_type(struct)
-            except ValueError:
-                raise
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to get a type for field {self!r} from {struct!r}"
-                ) from e
-
-        return self.concrete_type
-
-    @property
-    def optional(self) -> bool:
-        # typing.Optional[Foo] is really typing.Union[Foo, None]
-        if getattr(self.type, "__origin__", None) is not typing.Union:
-            return False
-
-        # I can't think of a case where this is ever False but it's best to be explicit
-        return NoneType in self.type.__args__
-
-    @property
-    def concrete_type(self) -> type:
-        if getattr(self.type, "__origin__", None) is not typing.Union:
-            return self.type
-
-        types = set(self.type.__args__) - {NoneType}
-
-        if len(types) > 1:
-            raise TypeError(
-                f"Struct field cannot have more than one concrete type: {types}"
-            )
-
-        return tuple(types)[0]
-
-    def replace(self, **kwargs) -> "StructField":
+    def replace(self, **kwargs) -> "CStructField":
         return dataclasses.replace(self, **kwargs)
-
-
-class PaddingByte(t.Bytes):
-    def __new__(cls, *args, **kwargs):
-        instance = super().__new__(cls, *args, **kwargs)
-
-        if len(instance) != 1:
-            raise ValueError("Padding byte must be a single byte")
-
-        return instance
-
-    @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple[t.Bytes, bytes]:
-        if not data:
-            raise ValueError("Data is empty and cannot contain a padding byte")
-
-        return cls(data[:1]), data[1:]

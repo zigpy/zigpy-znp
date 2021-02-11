@@ -15,7 +15,7 @@ class NodeRelation(t.enum_uint8):
     NOTUSED = 0xFF
 
 
-class BindEntry(t.Struct):
+class BindEntry(t.CStruct):
     srcEP: t.uint8_t
     dstGroupMode: t.uint8_t  # 0 - Normal address index, 1 - Group address
     dstIdx: t.uint16_t
@@ -23,12 +23,12 @@ class BindEntry(t.Struct):
     clusterIdList: t.ClusterIdList
 
 
-class AgingEndDevice(t.Struct):
+class AgingEndDevice(t.CStruct):
     endDevCfg: t.uint8_t
     deviceTimeout: t.uint32_t
 
 
-class LinkInfo(t.Struct):
+class LinkInfo(t.CStruct):
     txCounter: t.uint8_t  # Counter of transmission success/failures
     txCost: t.uint8_t  # Average of sending rssi values if link staus is enabled
     #   i.e. NWK_LINK_STATUS_PERIOD is defined as non zero
@@ -39,7 +39,7 @@ class LinkInfo(t.Struct):
     txFailure: t.uint16_t  # higher values indicate more failures
 
 
-class Device(t.Struct):
+class Device(t.CStruct):
     shortAddr: t.NWK
     addrIdx: t.uint16_t
     nodeRelation: NodeRelation
@@ -47,22 +47,10 @@ class Device(t.Struct):
     assocCnt: t.uint8_t
     age: t.uint8_t
     linkInfo: LinkInfo
-
-    PaddingByte1: t.PaddingByte
-    PaddingByte2: t.PaddingByte
-
     endDev: AgingEndDevice
-
-    PaddingByte3: t.PaddingByte
-    PaddingByte4: t.PaddingByte
-    PaddingByte5: t.PaddingByte
-
     timeoutCounter: t.uint32_t
     keepaliveRcv: t.uint8_t  # not a bool, can be 0xFF
     ctrl: t.uint8_t
-
-    PaddingByte6: t.PaddingByte
-    PaddingByte7: t.PaddingByte
 
 
 class Key(t.FixedList, item_type=t.uint8_t, length=42):

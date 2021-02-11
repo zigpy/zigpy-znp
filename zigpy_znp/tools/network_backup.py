@@ -22,7 +22,7 @@ async def get_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
     # Older Z-Stack devices are simple
     if app._znp.version == 1.2:
         nwkkey = await app._znp.nvram.osal_read(OsalNvIds.NWKKEY)
-        key_info, _ = t.NwkActiveKeyItemsCC2531.deserialize(nwkkey)
+        key_info, _ = t.NwkActiveKeyItems.deserialize(nwkkey)
 
         return key_info.FrameCounter
 
