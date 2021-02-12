@@ -831,8 +831,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning(
                 "Received a ZDO message from an unknown device: 0x%04x", msg.DstAddr
             )
-
-            asyncio.create_task(self._discover_changed_nwk(new_nwk=msg.DstAddr))
             return
 
         # `relays` is a property with a setter that emits an event
