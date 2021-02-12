@@ -831,6 +831,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning(
                 "Received a ZDO message from an unknown device: 0x%04x", msg.DstAddr
             )
+
+            asyncio.create_task(self._discover_changed_nwk(new_nwk=msg.DstAddr))
             return
 
         # `relays` is a property with a setter that emits an event
@@ -907,6 +909,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning(
                 "Received an AF message from an unknown device: 0x%04x", msg.SrcAddr
             )
+
+            asyncio.create_task(self._discover_changed_nwk(new_nwk=msg.SrcAddr))
             return
 
         device.radio_details(lqi=msg.LQI, rssi=None)
@@ -1435,6 +1439,52 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         finally:
             future.set_result(True)
             del self._route_discovery_futures[nwk]
+
+    async def _discover_changed_nwk(
+        self, new_nwk: t.NWK
+    ) -> typing.Optional[zigpy.device.Device]:
+        """
+        Attempts to discover if a device on the network has changed its NWK.
+        """
+
+        try:
+            ieee_addr_rsp = await self._znp.request_callback_rsp(
+                request=c.ZDO.IEEEAddrReq.Req(
+                    NWK=new_nwk,
+                    RequestType=0x00,  # we don't need child info
+                    StartIndex=0,
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.ZDO.IEEEAddrRsp.Callback(
+                    partial=True,
+                    NWK=new_nwk,
+                ),
+                timeout=5,  # We don't want to wait forever
+            )
+        except asyncio.TimeoutError:
+            return
+
+        try:
+            device = self.get_device(ieee=ieee_addr_rsp.IEEE)
+        except KeyError:
+            LOGGER.warning(
+                "Device %s not in the database!",
+                ieee_addr_rsp.IEEE,
+            )
+            return
+
+        LOGGER.warning(
+            "Device %s changed its NWK from %s to %s",
+            device.ieee,
+            device.nwk,
+            new_nwk,
+        )
+
+        # Notify zigpy of the change
+        device.nwk = new_nwk
+        self.listener_event("raw_device_initialized", device)
+
+        return device
 
     async def _send_request(
         self,
