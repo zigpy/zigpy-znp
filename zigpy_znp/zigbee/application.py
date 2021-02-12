@@ -188,7 +188,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._znp.close()
             self._znp = None
 
-    async def startup(self, auto_form=False, force_form=False):
+    async def startup(self, auto_form=False, force_form=False, read_only=False):
         """
         Performs application startup.
 
@@ -197,12 +197,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         try:
-            return await self._startup(auto_form=auto_form, force_form=force_form)
+            return await self._startup(
+                auto_form=auto_form,
+                force_form=force_form,
+                read_only=read_only,
+            )
         except Exception:
             await self.shutdown()
             raise
 
-    async def _startup(self, auto_form=False, force_form=False):
+    async def _startup(self, auto_form=False, force_form=False, read_only=False):
         assert self._znp is None
 
         znp = ZNP(self.config)
@@ -227,8 +231,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         except KeyError:
             is_configured = False
 
-        if not is_configured or force_form:
-            if not auto_form and not force_form:
+        if force_form:
+            LOGGER.info("Forming a new network")
+            await self.form_network()
+        elif not is_configured:
+            if not auto_form:
                 raise RuntimeError("Cannot start application, network is not formed")
 
             LOGGER.info("ZNP is not configured, forming a new network")
@@ -241,7 +248,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._reset()
 
             LOGGER.info("ZNP is already configured, not forming a new network")
-            await self._write_stack_settings(reset_if_changed=True)
+
+            if not read_only:
+                await self._write_stack_settings(reset_if_changed=True)
 
         # At this point the device state should the same, regardless of whether we just
         # formed a new network or are restoring one

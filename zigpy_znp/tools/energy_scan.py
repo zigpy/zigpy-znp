@@ -21,9 +21,15 @@ def channels_from_channel_mask(channels: t.Channels):
 async def perform_energy_scan(radio_path, num_scans=None):
     LOGGER.info("Starting up zigpy-znp")
 
-    app = await ControllerApplication.new(
-        ControllerApplication.SCHEMA({"device": {"path": radio_path}}), auto_form=True
-    )
+    config = ControllerApplication.SCHEMA({"device": {"path": radio_path}})
+    app = ControllerApplication(config)
+
+    try:
+        await app.startup(read_only=True)
+    except RuntimeError as e:
+        LOGGER.error("Could not start application: %s", e)
+        LOGGER.error("Form a network with `python -m zigpy_znp.tools.form_network`")
+        return
 
     LOGGER.info("Running scan...")
 
