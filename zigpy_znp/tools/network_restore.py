@@ -265,10 +265,10 @@ async def restore_network(
     config = ControllerApplication.SCHEMA({"device": {"path": radio_path}})
     app = ControllerApplication(config)
 
-    app.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL] = backup["channel"]
-    app.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID] = pan_id
-    app.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID] = extended_pan_id
     app.config[conf.CONF_NWK][conf.CONF_NWK_KEY] = nwk_key
+    app.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID] = pan_id
+    app.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL] = backup["channel"]
+    app.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID] = extended_pan_id
 
     await app.startup(force_form=True)
     await app._reset()

@@ -3,10 +3,10 @@ import json
 import typing
 import asyncio
 import logging
+import datetime
 
 import zigpy_znp
 import zigpy_znp.types as t
-from zigpy_znp.exceptions import SecurityError
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.zigbee.application import ControllerApplication
@@ -83,56 +83,49 @@ async def get_hashed_link_keys(app: ControllerApplication):
 
         ieee = entry.extAddr.serialize()
         rotated_seed = rotate(seed, n=entry.SeedShift_IcIndex)
-        link_key = bytes(a ^ b for a, b in zip(rotated_seed, ieee + ieee))
+        link_key_data = bytes(a ^ b for a, b in zip(rotated_seed, ieee + ieee))
+        link_key, _ = t.KeyData.deserialize(link_key_data)
 
-        yield entry.extAddr, entry.txFrmCntr, entry.rxFrmCntr, t.KeyData.deserialize(
-            link_key
-        )[0]
+        yield entry.extAddr, entry.txFrmCntr, entry.rxFrmCntr, link_key
 
 
 async def get_addr_manager_entries(app: ControllerApplication):
     if app._znp.version < 3.30:
-        entries = await app._znp.nvram.osal_read(
+        table = await app._znp.nvram.osal_read(
             OsalNvIds.ADDRMGR, item_type=t.AddressManagerTable
         )
     else:
-        entries = []
+        table = [
+            entry
+            async for entry in app._znp.nvram.read_table(
+                item_id=ExNvIds.ADDRMGR,
+                item_type=t.AddrMgrEntry,
+            )
+        ]
 
-        async for entry in app._znp.nvram.read_table(
-            item_id=ExNvIds.ADDRMGR,
-            item_type=t.AddrMgrEntry,
-        ):
-            entries.append(entry)
-
-    return [e for e in entries if e.nwkAddr != 0xFFFF]
+    return [e for e in table if e.nwkAddr != 0xFFFF]
 
 
 async def get_devices(app: ControllerApplication):
-    try:
-        hashed_link_keys = {
-            ieee: (tx_ctr, rx_ctr, key)
-            async for ieee, tx_ctr, rx_ctr, key in get_hashed_link_keys(app)
-        }
-    except SecurityError:
-        hashed_link_keys = {}
+    hashed_link_keys = {
+        ieee: (tx_ctr, rx_ctr, key)
+        async for ieee, tx_ctr, rx_ctr, key in get_hashed_link_keys(app)
+    }
 
     for entry in await get_addr_manager_entries(app):
+        obj = {
+            "nwk": entry.nwkAddr.serialize()[::-1].hex(),
+            "ieee": entry.extAddr.serialize()[::-1].hex(),
+        }
+
         if entry.extAddr in hashed_link_keys:
             tx_ctr, rx_ctr, key = hashed_link_keys[entry.extAddr]
 
-            link_key = {
+            obj["link_key"] = {
                 "tx_counter": tx_ctr,
                 "rx_counter": rx_ctr,
                 "key": key.serialize().hex(),
             }
-        else:
-            link_key = None
-
-        obj = {
-            "nwk": entry.nwkAddr.serialize()[::-1].hex(),
-            "ieee": entry.extAddr.serialize()[::-1].hex(),
-            "link_key": link_key,
-        }
 
         yield obj
 
@@ -142,19 +135,14 @@ async def backup_network(
 ) -> typing.Dict[str, typing.Any]:
     LOGGER.info("Starting up zigpy-znp")
 
-    app = await ControllerApplication.new(
-        ControllerApplication.SCHEMA({"device": {"path": radio_path}}), auto_form=False
-    )
-
-    frame_counter = await get_tc_frame_counter(app)
-
-    try:
-        tclk_seed = await app._znp.nvram.osal_read(OsalNvIds.TCLK_SEED)
-    except SecurityError:
-        tclk_seed = None
+    config = ControllerApplication.SCHEMA({"device": {"path": radio_path}})
+    app = ControllerApplication(config)
+    await app.startup(read_only=True)
 
     devices = [d async for d in get_devices(app)]
     devices.sort(key=lambda d: d["nwk"])
+
+    now = datetime.datetime.now().astimezone()
 
     obj = {
         "metadata": {
@@ -162,14 +150,10 @@ async def backup_network(
             "format": "zigpy/open-coordinator-backup",
             "source": f"zigpy-znp@{zigpy_znp.__version__}",
             "internal": {
+                "creation_time": now.isoformat(timespec="seconds"),
                 "zstack": {
                     "version": app._znp.version,
-                }
-            },
-        },
-        "stack_specific": {
-            "zstack": {
-                "tclk_seed": tclk_seed.hex() if tclk_seed else None,
+                },
             },
         },
         "coordinator_ieee": app.ieee.serialize()[::-1].hex(),
@@ -186,10 +170,16 @@ async def backup_network(
         "network_key": {
             "key": app.network_key.serialize().hex(),
             "sequence_number": app.network_key_seq,
-            "frame_counter": frame_counter,
+            "frame_counter": await get_tc_frame_counter(app),
         },
         "devices": devices,
     }
+
+    if app._znp.version > 1.2:
+        tclk_seed = await app._znp.nvram.osal_read(OsalNvIds.TCLK_SEED)
+        LOGGER.info("TCLK seed: %s", tclk_seed.hex())
+
+        obj["stack_specific"] = {"zstack": {"tclk_seed": tclk_seed.hex()}}
 
     await app._reset()
 
