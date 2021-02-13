@@ -237,6 +237,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         elif not is_configured:
             if not auto_form:
                 raise RuntimeError("Cannot start application, network is not formed")
+            elif read_only:
+                raise RuntimeError(
+                    "Cannot start application, network is not formed and read-only"
+                )
 
             LOGGER.info("ZNP is not configured, forming a new network")
 
