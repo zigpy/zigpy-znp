@@ -351,7 +351,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
-            max_concurrent_requests = 2 if self._znp.nvram.align_structs else 16
+            max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
         else:
             max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
