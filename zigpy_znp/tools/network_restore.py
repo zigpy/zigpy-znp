@@ -238,12 +238,33 @@ async def add_devices(
             values=tclk_table,
             fill_value=tclk_fill_value,
         )
+
+        await app._znp.nvram.write_table(
+            item_id=ExNvIds.APS_KEY_DATA_TABLE,
+            values=aps_key_data_table,
+            fill_value=t.LinkKeyTableEntry(
+                Key=t.KeyData([0x00] * 16),
+                TxFrameCounter=0,
+                RxFrameCounter=0,
+            ),
+        )
     else:
         await app._znp.nvram.osal_write_table(
             start_nvid=OsalNvIds.LEGACY_TCLK_TABLE_START,
             end_nvid=OsalNvIds.LEGACY_TCLK_TABLE_END,
             values=tclk_table,
             fill_value=tclk_fill_value,
+        )
+
+        await app._znp.nvram.osal_write_table(
+            start_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START,
+            end_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END,
+            values=aps_key_data_table,
+            fill_value=t.LinkKeyTableEntry(
+                Key=t.KeyData([0x00] * 16),
+                TxFrameCounter=0,
+                RxFrameCounter=0,
+            ),
         )
 
 
