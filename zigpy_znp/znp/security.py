@@ -236,7 +236,6 @@ async def read_unhashed_link_keys(app, addr_mgr_entries):
         key_table_entry = aps_key_data_table[entry.LinkKeyNvId - link_key_offset_base]
         addr_mgr_entry = addr_mgr_entries[entry.AddressManagerIndex]
 
-        assert addr_mgr_entry.type & t.AddrMgrUserType.Assoc
         assert addr_mgr_entry.type & t.AddrMgrUserType.Security
 
         yield (
@@ -264,6 +263,7 @@ async def read_devices(app: ControllerApplication):
         elif entry.type in (
             t.AddrMgrUserType.Assoc,
             t.AddrMgrUserType.Assoc | t.AddrMgrUserType.Security,
+            t.AddrMgrUserType.Security,
         ):
             devices[entry.extAddr] = StoredDevice(
                 ieee=entry.extAddr,
@@ -293,9 +293,11 @@ async def read_devices(app: ControllerApplication):
 async def write_addr_manager_entries(app: ControllerApplication, devices):
     entries = [
         t.AddrMgrEntry(
-            type=t.AddrMgrUserType.Security | t.AddrMgrUserType.Assoc
-            if d.aps_link_key
-            else t.AddrMgrUserType.Assoc,
+            type=(
+                t.AddrMgrUserType.Security
+                if d.aps_link_key
+                else t.AddrMgrUserType.Assoc
+            ),
             nwkAddr=d.nwk,
             extAddr=d.ieee,
         )
@@ -357,8 +359,8 @@ async def write_devices(
                     txFrmCntr=device.tx_counter + counter_increment,
                     rxFrmCntr=device.rx_counter,
                     extAddr=device.ieee,
-                    keyAttributes=t.KeyAttributes.DEFAULT_KEY,
-                    keyType=t.KeyType.NWK,
+                    keyAttributes=t.KeyAttributes.VERIFIED_KEY,
+                    keyType=t.KeyType.NONE,
                     SeedShift_IcIndex=shift,
                 )
             )
@@ -409,6 +411,12 @@ async def write_devices(
         SeedShift_IcIndex=0,
     )
 
+    aps_key_data_fill_value = t.APSKeyDataTableEntry(
+        Key=t.KeyData([0x00] * 16),
+        TxFrameCounter=0,
+        RxFrameCounter=0,
+    )
+
     if app._znp.version > 3.0:
         await app._znp.nvram.write_table(
             item_id=ExNvIds.TCLK_TABLE,
@@ -419,11 +427,7 @@ async def write_devices(
         await app._znp.nvram.write_table(
             item_id=ExNvIds.APS_KEY_DATA_TABLE,
             values=aps_key_data_table,
-            fill_value=t.APSKeyDataTableEntry(
-                Key=t.KeyData([0x00] * 16),
-                TxFrameCounter=0,
-                RxFrameCounter=0,
-            ),
+            fill_value=aps_key_data_fill_value,
         )
     else:
         await app._znp.nvram.osal_write_table(
@@ -437,9 +441,5 @@ async def write_devices(
             start_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START,
             end_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END,
             values=aps_key_data_table,
-            fill_value=t.APSKeyDataTableEntry(
-                Key=t.KeyData([0x00] * 16),
-                TxFrameCounter=0,
-                RxFrameCounter=0,
-            ),
+            fill_value=aps_key_data_fill_value,
         )
