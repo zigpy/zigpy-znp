@@ -529,7 +529,7 @@ class AddrMgrEntry(cstruct.CStruct):
 
 
 EMPTY_ADDR_MGR_ENTRY = AddrMgrEntry(
-    type=AddrMgrUserType.Default,
+    type=AddrMgrUserType(0xFF),
     nwkAddr=0xFFFF,
     extAddr=EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
 )
@@ -545,7 +545,7 @@ class AuthenticationOption(basic.enum_uint8):
     AuthenticatedEA = 0x02
 
 
-class LinkKeyTableEntry(cstruct.CStruct):
+class APSKeyDataTableEntry(cstruct.CStruct):
     Key: KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
@@ -553,7 +553,7 @@ class LinkKeyTableEntry(cstruct.CStruct):
 
 class APSLinkKeyTableEntry(cstruct.CStruct):
     AddressManagerIndex: basic.uint16_t
-    LinkKeyTableOffset: basic.uint16_t
+    LinkKeyNvId: basic.uint16_t
     AuthenticationState: AuthenticationOption
 
 
