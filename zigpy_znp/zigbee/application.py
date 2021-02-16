@@ -314,12 +314,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.znp_config[conf.CONF_LED_MODE] is not None:
             await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
-        device_info = await self._znp.request(
-            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
-        )
-
-        self._ieee = device_info.IEEE
-        self._nwk = 0x0000
+        await self._load_device_info()
 
         # Add the coordinator as a zigpy device. We do this up here because
         # `self._register_endpoint()` adds endpoints to this device object.
@@ -350,8 +345,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             profile_id=zigpy.profiles.zll.PROFILE_ID,
             device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
         )
-
-        await self._load_device_info()
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
@@ -1189,6 +1182,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
         Loads low-level network information from NVRAM.
         """
+
+        device_info = await self._znp.request(
+            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
+        )
+
+        self._ieee = device_info.IEEE
+        self._nwk = device_info.NWK
 
         # Parsing the NIB struct gives us access to low-level info, like the channel
         self._nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
