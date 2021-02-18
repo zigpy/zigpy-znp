@@ -389,7 +389,7 @@ class CommandBase:
         return GeneralFrame(self.header, data)
 
     @classmethod
-    def from_frame(cls, frame, *, ignore_unparsed=False) -> "CommandBase":
+    def from_frame(cls, frame, *, align=False) -> "CommandBase":
         if frame.header != cls.header:
             raise ValueError(
                 f"Wrong frame header in {cls}: {cls.header} != {frame.header}"
@@ -400,7 +400,10 @@ class CommandBase:
 
         for param in cls.schema:
             try:
-                params[param.name], data = param.type.deserialize(data)
+                if issubclass(param.type, t.CStruct):
+                    params[param.name], data = param.type.deserialize(data, align=align)
+                else:
+                    params[param.name], data = param.type.deserialize(data)
             except ValueError:
                 if not data and param.optional:
                     # If we're out of data and the parameter is optional, we're done
@@ -416,15 +419,9 @@ class CommandBase:
                     raise
 
         if data:
-            msg = (
-                f"Unparsed data remains at the end of the frame while parsing {cls}"
-                f" (parsed {params}): {data!r}"
+            raise ValueError(
+                f"Frame {frame} contains trailing data after parsing: {data}"
             )
-
-            if ignore_unparsed:
-                LOGGER.warning(msg)
-            else:
-                raise ValueError(msg)
 
         return cls(**params)
 

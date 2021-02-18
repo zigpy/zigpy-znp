@@ -1,5 +1,4 @@
 import keyword
-import logging
 import dataclasses
 from collections import defaultdict
 
@@ -474,7 +473,7 @@ def test_command_equality():
     )
 
 
-def test_command_deserialization(caplog):
+def test_command_deserialization():
     command = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
     )
@@ -483,17 +482,11 @@ def test_command_deserialization(caplog):
     assert command.to_frame() == type(command).from_frame(command.to_frame()).to_frame()
 
     # Deserialization fails if there is unparsed data at the end of the frame
+    frame = command.to_frame()
+    bad_frame = dataclasses.replace(frame, data=frame.data + b"\x00")
+
     with pytest.raises(ValueError):
-        frame = command.to_frame()
-        bad_frame = dataclasses.replace(frame, data=frame.data + b"\x00")
-
         type(command).from_frame(bad_frame)
-
-    # But it does succeed with a warning if you explicitly allow it
-    with caplog.at_level(logging.WARNING):
-        type(command).from_frame(bad_frame, ignore_unparsed=True)
-
-    assert "Unparsed" in caplog.text
 
     # Deserialization fails if you attempt to deserialize the wrong frame
     with pytest.raises(ValueError):

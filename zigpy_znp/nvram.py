@@ -19,24 +19,11 @@ class NVRAMHelper:
         self.znp = znp
         self.align_structs = None
 
-    async def _maybe_determine_alignment(self, *, item_type=None, value=None):
+    async def determine_alignment(self):
         """
         Automatically determine struct memory alignment. Must be called before any
-        structs are read/written but will be deferred if a raw read is being performed
-        or the value being written is not a struct.
+        structs are read/written.
         """
-
-        # No need to check alignment twice
-        if self.align_structs is not None:
-            return
-
-        # If we are performing a read and are not expecting a struct, don't check
-        if item_type is not None and not issubclass(item_type, t.CStruct):
-            return
-
-        # If we are performing a write but not with a struct, don't check
-        if value is not None and not isinstance(value, t.CStruct):
-            return
 
         # NWKKEY is almost always present, regardless of adapter state.
         # It is an 8-bit sequence number, a 16 byte key, and a 32-bit frame counter.
@@ -119,8 +106,6 @@ class NVRAMHelper:
         Serializes all serializable values and passes bytes directly.
         """
 
-        await self._maybe_determine_alignment(value=value)
-
         value = self._serialize(value)
         length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
 
@@ -167,8 +152,6 @@ class NVRAMHelper:
 
         Raises an `KeyError` error if the NVID doesn't exist.
         """
-
-        await self._maybe_determine_alignment(item_type=item_type)
 
         # XXX: Some NVIDs don't really exist and Z-Stack behaves strangely with them
         if nv_id in PROXIED_NVIDS:
@@ -255,8 +238,6 @@ class NVRAMHelper:
         NVWrite(sys_id=ZSTACK, item_id=LEGACY, sub_id=1) in the background.
         """
 
-        await self._maybe_determine_alignment(value=value)
-
         value = self._serialize(value)
         length = (
             await self.znp.request(
@@ -328,8 +309,6 @@ class NVRAMHelper:
 
         Raises an `KeyError` error if the NVID doesn't exist.
         """
-
-        await self._maybe_determine_alignment(item_type=item_type)
 
         length_rsp = await self.znp.request(
             c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)

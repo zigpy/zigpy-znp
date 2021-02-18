@@ -256,6 +256,9 @@ class ZNP:
 
                 # Make sure that our port works
                 self.capabilities = (await self.request(c.SYS.Ping.Req())).Capabilities
+
+                # We need to know how structs are packed to deserialize frames corectly
+                await self.nvram.determine_alignment()
                 self.version = await detect_zstack_version(self)
 
                 LOGGER.debug("Detected Z-Stack %s", self.version)
@@ -355,7 +358,7 @@ class ZNP:
         """
 
         command_cls = c.COMMANDS_BY_ID[frame.header]
-        command = command_cls.from_frame(frame)
+        command = command_cls.from_frame(frame, align=self.nvram.align_structs)
 
         LOGGER.debug("Received command: %s", command)
 
