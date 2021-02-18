@@ -307,7 +307,7 @@ class BaseZStackDevice(BaseServerZNP):
 
         self.active_endpoints = []
         self.nib = None
-        self.nvram = {}
+        self._nvram = {}
 
         self.device_state = t.DeviceState.InitializedNotStarted
 
@@ -376,10 +376,10 @@ class BaseZStackDevice(BaseServerZNP):
     @reply_to(c.SYS.OSALNVWriteExt.Req(partial=True))
     def osal_nvram_write(self, req):
         if req.Id == OsalNvIds.POLL_RATE_OLD16:
-            self.nvram[ExNvIds.LEGACY][req.Id] = req.Value[:2]
+            self._nvram[ExNvIds.LEGACY][req.Id] = req.Value[:2]
             return req.Rsp(Status=t.Status.SUCCESS)
 
-        if req.Id not in self.nvram[ExNvIds.LEGACY] and req.Id != OsalNvIds.NIB:
+        if req.Id not in self._nvram[ExNvIds.LEGACY] and req.Id != OsalNvIds.NIB:
             return req.Rsp(Status=t.Status.INVALID_PARAMETER)
 
         if req.Id == OsalNvIds.NIB:
@@ -388,7 +388,7 @@ class BaseZStackDevice(BaseServerZNP):
 
             self.nib = self.nvram_deserialize(req.Value, NIB)
         else:
-            value = bytearray(self.nvram[ExNvIds.LEGACY][req.Id])
+            value = bytearray(self._nvram[ExNvIds.LEGACY][req.Id])
 
             assert req.Offset + len(req.Value) <= len(value)
 
@@ -398,14 +398,14 @@ class BaseZStackDevice(BaseServerZNP):
             else:
                 value[req.Offset : req.Offset + len(req.Value)] = req.Value
 
-            self.nvram[ExNvIds.LEGACY][req.Id] = value
+            self._nvram[ExNvIds.LEGACY][req.Id] = value
 
         return req.Rsp(Status=t.Status.SUCCESS)
 
     @reply_to(c.SYS.OSALNVRead.Req(partial=True))
     @reply_to(c.SYS.OSALNVReadExt.Req(partial=True))
     def osal_nvram_read(self, req):
-        if req.Id not in self.nvram[ExNvIds.LEGACY] and req.Id != OsalNvIds.NIB:
+        if req.Id not in self._nvram[ExNvIds.LEGACY] and req.Id != OsalNvIds.NIB:
             return req.Rsp(Status=t.Status.INVALID_PARAMETER, Value=t.ShortBytes(b""))
 
         if req.Id == OsalNvIds.NIB:
@@ -416,7 +416,7 @@ class BaseZStackDevice(BaseServerZNP):
 
             value = self.nvram_serialize(self.nib)
         else:
-            value = self.nvram[ExNvIds.LEGACY][req.Id]
+            value = self._nvram[ExNvIds.LEGACY][req.Id]
 
         if req.Id == OsalNvIds.POLL_RATE_OLD16:
             # XXX: not only is the offset ignored, the wrong command is used to respond
@@ -435,7 +435,7 @@ class BaseZStackDevice(BaseServerZNP):
         if len(req.Value) > req.ItemLen:
             return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.INVALID_PARAMETER)
 
-        self.nvram[ExNvIds.LEGACY][req.Id] = req.Value.ljust(req.ItemLen, b"\xFF")
+        self._nvram[ExNvIds.LEGACY][req.Id] = req.Value.ljust(req.ItemLen, b"\xFF")
 
         return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.NV_ITEM_UNINIT)
 
@@ -447,25 +447,25 @@ class BaseZStackDevice(BaseServerZNP):
             # XXX: the item exists but its length is wrong
             return c.SYS.OSALNVLength.Rsp(ItemLen=0)
         else:
-            length = len(self.nvram[ExNvIds.LEGACY].get(req.Id, b""))
+            length = len(self._nvram[ExNvIds.LEGACY].get(req.Id, b""))
 
         return c.SYS.OSALNVLength.Rsp(ItemLen=length)
 
     @reply_to(c.SYS.OSALNVDelete.Req(partial=True))
     def osal_nvram_delete(self, req):
-        if req.Id not in self.nvram[ExNvIds.LEGACY]:
+        if req.Id not in self._nvram[ExNvIds.LEGACY]:
             return c.SYS.OSALNVDelete.Rsp(Status=t.Status.INVALID_PARAMETER)
 
-        assert req.ItemLen == len(self.nvram[ExNvIds.LEGACY][req.Id])
-        self.nvram[ExNvIds.LEGACY].pop(req.Id)
+        assert req.ItemLen == len(self._nvram[ExNvIds.LEGACY][req.Id])
+        self._nvram[ExNvIds.LEGACY].pop(req.Id)
 
         return c.SYS.OSALNVDelete.Rsp(Status=t.Status.SUCCESS)
 
     def default_nib(self):
-        if "nib" not in self.nvram[ExNvIds.LEGACY]:
+        if "nib" not in self._nvram[ExNvIds.LEGACY]:
             return self._default_nib()
 
-        return self.nvram_deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB)
+        return self.nvram_deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB)
 
     @reply_to(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
     def reset_req(self, request):
@@ -484,7 +484,7 @@ class BaseZStackDevice(BaseServerZNP):
     def util_device_info(self, request):
         return c.Util.GetDeviceInfo.Rsp(
             Status=t.Status.SUCCESS,
-            IEEE=t.EUI64.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.EXTADDR])[0],
+            IEEE=t.EUI64.deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.EXTADDR])[0],
             NWK=t.NWK(0xFFFE),  # ???
             DeviceType=t.DeviceTypeCapabilities(7),  # fixed
             DeviceState=self.device_state,  # dynamic!!!
@@ -581,11 +581,11 @@ class BaseZStack1CC2531(BaseZStackDevice):
             def update_logical_channel(req):
                 self.nib.nwkState = NwkState.NWK_ROUTER
                 self.nib.channelList, _ = t.Channels.deserialize(
-                    self.nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
+                    self._nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
                 )
                 self.nib.nwkLogicalChannel = 15
                 self.nib.nwkPanId, _ = t.NWK.deserialize(
-                    self.nvram[ExNvIds.LEGACY][OsalNvIds.PANID]
+                    self._nvram[ExNvIds.LEGACY][OsalNvIds.PANID]
                 )
 
                 return []
@@ -698,7 +698,7 @@ class BaseZStack3Device(BaseZStackDevice):
         )
     )
     def handle_bdb_start_commissioning(self, request):
-        if self.nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] == b"\x01":
+        if self._nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] == b"\x01":
             return [
                 c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS),
                 self.update_device_state(t.DeviceState.StartedAsCoordinator),
@@ -724,7 +724,7 @@ class BaseZStack3Device(BaseZStackDevice):
                     self._new_channel = None
 
                 self.nib.nwkLogicalChannel = 15
-                self.nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] = b"\x01"
+                self._nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] = b"\x01"
 
                 return []
 
@@ -779,16 +779,16 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
     @reply_to(c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_length(self, req):
-        value = self.nvram.get(ExNvIds(req.ItemId), {}).get(req.SubId, b"")
+        value = self._nvram.get(ExNvIds(req.ItemId), {}).get(req.SubId, b"")
 
         return c.SYS.NVLength.Rsp(Length=len(value))
 
     @reply_to(c.SYS.NVRead.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_read(self, req):
-        if req.SubId not in self.nvram.get(ExNvIds(req.ItemId), {}):
+        if req.SubId not in self._nvram.get(ExNvIds(req.ItemId), {}):
             return c.SYS.NVRead.Rsp(Status=t.Status.FAILURE, Value=b"")
 
-        value = self.nvram.setdefault(req.ItemId, {})[req.SubId]
+        value = self._nvram.setdefault(req.ItemId, {})[req.SubId]
 
         return c.SYS.NVRead.Rsp(
             Status=t.Status.SUCCESS, Value=value[req.Offset :][: req.Length]
@@ -796,28 +796,28 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
     @reply_to(c.SYS.NVWrite.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_write(self, req):
-        if req.SubId not in self.nvram.get(ExNvIds(req.ItemId), {}):
+        if req.SubId not in self._nvram.get(ExNvIds(req.ItemId), {}):
             return c.SYS.NVWrite.Rsp(Status=t.Status.FAILURE)
 
-        value = bytearray(self.nvram[req.ItemId][req.SubId])
+        value = bytearray(self._nvram[req.ItemId][req.SubId])
         value[req.Offset : req.Offset + len(req.Value)] = req.Value
-        self.nvram.setdefault(req.ItemId, {})[req.SubId] = bytes(value)
+        self._nvram.setdefault(req.ItemId, {})[req.SubId] = bytes(value)
 
         return c.SYS.NVWrite.Rsp(Status=t.Status.SUCCESS)
 
     @reply_to(c.SYS.NVCreate.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_create(self, req):
-        if req.SubId in self.nvram.get(ExNvIds(req.ItemId), {}):
+        if req.SubId in self._nvram.get(ExNvIds(req.ItemId), {}):
             return c.SYS.NVCreate.Rsp(Status=t.Status.SUCCESS)
 
-        self.nvram.setdefault(req.ItemId, {})[req.SubId] = bytes(req.Length)
+        self._nvram.setdefault(req.ItemId, {})[req.SubId] = bytes(req.Length)
 
         return c.SYS.NVCreate.Rsp(Status=t.Status.NV_ITEM_UNINIT)
 
     @reply_to(c.SYS.NVDelete.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_delete(self, req):
         try:
-            self.nvram.get(ExNvIds(req.ItemId), {}).pop(req.SubId)
+            self._nvram.get(ExNvIds(req.ItemId), {}).pop(req.SubId)
             return c.SYS.NVDelete.Rsp(Status=t.Status.SUCCESS)
         except KeyError:
             return c.SYS.NVDelete.Rsp(Status=t.Status.NV_OPER_FAILED)
@@ -1004,9 +1004,9 @@ class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.nvram = load_nvram_json("CC2652R-ZStack4.formed.json")
+        self._nvram = load_nvram_json("CC2652R-ZStack4.formed.json")
         self.nib = self.nvram_deserialize(
-            self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB
+            self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB
         )
 
 
@@ -1014,7 +1014,7 @@ class ResetLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.nvram = load_nvram_json("CC2652R-ZStack4.reset.json")
+        self._nvram = load_nvram_json("CC2652R-ZStack4.reset.json")
         self.nib = None
 
 
@@ -1022,15 +1022,15 @@ class FormedZStack3CC2531(BaseZStack3CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.nvram = load_nvram_json("CC2531-ZStack3.formed.json")
-        self.nib, _ = NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        self._nvram = load_nvram_json("CC2531-ZStack3.formed.json")
+        self.nib, _ = NIB.deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
 
 
 class ResetZStack3CC2531(BaseZStack3CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.nvram = load_nvram_json("CC2531-ZStack3.reset.json")
+        self._nvram = load_nvram_json("CC2531-ZStack3.reset.json")
         self.nib = None
 
 
@@ -1038,16 +1038,16 @@ class FormedZStack1CC2531(BaseZStack1CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.nvram = load_nvram_json("CC2531-ZStack1.formed.json")
-        self.nib, _ = NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        self._nvram = load_nvram_json("CC2531-ZStack1.formed.json")
+        self.nib, _ = NIB.deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
 
 
 class ResetZStack1CC2531(BaseZStack1CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.nvram = load_nvram_json("CC2531-ZStack1.reset.json")
-        self.nib, _ = NIB.deserialize(self.nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
+        self._nvram = load_nvram_json("CC2531-ZStack1.reset.json")
+        self.nib, _ = NIB.deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB])
 
 
 EMPTY_DEVICES = [

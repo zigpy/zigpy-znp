@@ -116,8 +116,8 @@ async def test_bad_nvram_value(device, make_application):
     app, znp_server = make_application(server_cls=device)
 
     # An invalid value is still bad
-    znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
-    znp_server.nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
+    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
+    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
 
     with pytest.raises(RuntimeError):
         await app.startup(auto_form=False)
@@ -139,7 +139,7 @@ async def test_reset(device, make_application, mocker):
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_write_nvram(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
-    nvram = znp_server.nvram[ExNvIds.LEGACY]
+    nvram = znp_server._nvram[ExNvIds.LEGACY]
 
     # Change NVRAM value we should change it back
     assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
@@ -220,7 +220,7 @@ async def test_auto_form_necessary(device, make_application, mocker):
     assert app.channel is not None
     assert app.channels is not None
 
-    nvram = znp_server.nvram[ExNvIds.LEGACY]
+    nvram = znp_server._nvram[ExNvIds.LEGACY]
 
     if issubclass(device, BaseZStack3Device):
         assert nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK3] == b"\x55"
