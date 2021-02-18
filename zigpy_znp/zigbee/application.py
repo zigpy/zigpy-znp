@@ -1583,6 +1583,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                         "The UTIL.AssocRemove command is available only"
                                         " in Z-Stack 3 releases built after 20201017"
                                     )
+                        elif not tried_last_good_route and device is not None:
+                            # `ZDO.SrcRtgInd` callbacks tell us the last path taken by
+                            # messages from the device back to the coordinator. Sending
+                            # packets backwards via this same route may work.
+                            force_relays = (device.relays or [])[::-1]
+                            tried_last_good_route = True
                         elif not tried_route_discovery:
                             # If that doesn't work, try re-discovering the route.
                             # While we can in theory poll and wait until it is fixed,
@@ -1594,12 +1600,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # generate a bit more network traffic.
                             options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
                             tried_disable_route_discovery_suppression = True
-                        elif not tried_last_good_route and device is not None:
-                            # `ZDO.SrcRtgInd` callbacks tell us the last path taken by
-                            # messages from the device back to the coordinator. Sending
-                            # packets backwards via this same route may work.
-                            force_relays = (device.relays or [])[::-1]
-                            tried_last_good_route = True
 
                         LOGGER.debug(
                             "Request failed (%s), retry attempt %s of %s",
