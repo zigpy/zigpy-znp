@@ -1354,6 +1354,17 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         ),
     )
 
+    # ???
+    ConcentratorInd = t.CommandDef(
+        t.CommandType.AREQ,
+        0xC8,
+        rsp_schema=(
+            t.Param("NWK", t.NWK, "Short address"),
+            t.Param("IEEE", t.EUI64, "IEEE address"),
+            t.Param("PktCost", t.uint8_t, "Packet cost"),
+        ),
+    )
+
     # an indication to inform the host of a device leaving the network
     LeaveInd = t.CommandDef(
         t.CommandType.AREQ,

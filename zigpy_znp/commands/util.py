@@ -379,11 +379,11 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         0x48,
         req_schema=(
             t.Param(
-                "StartRelation", t.uint8_t, "A valid node relation from AssocList.h"
+                "StartRelation", NodeRelation, "A valid node relation from AssocList.h"
             ),
             t.Param(
                 "EndRelation",
-                t.uint8_t,
+                NodeRelation,
                 "Same as StartRelation, but the node relation to stop counting",
             ),
         ),
@@ -424,7 +424,7 @@ class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
 
     # send a request key to the Trust Center from an originator device who wants to
     # exchange messages with a partner device
-    APSMEREquestKeyCmd = t.CommandDef(
+    APSMERequestKeyCmd = t.CommandDef(
         t.CommandType.SREQ,
         0x4B,
         req_schema=(
