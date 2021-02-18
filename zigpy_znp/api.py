@@ -357,6 +357,10 @@ class ZNP:
         XXX: Can be called multiple times in a single event loop step!
         """
 
+        if frame.header not in c.COMMANDS_BY_ID:
+            LOGGER.error("Received an unknown frame: %s", frame)
+            return
+
         command_cls = c.COMMANDS_BY_ID[frame.header]
         command = command_cls.from_frame(frame, align=self.nvram.align_structs)
 
