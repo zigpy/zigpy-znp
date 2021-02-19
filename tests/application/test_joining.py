@@ -276,6 +276,14 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
         ],
     )
 
+    # Handle the route-discovery-upon-join request
+    znp_server.reply_once_to(
+        request=c.ZDO.ExtRouteDisc.Req(Dst=nwk, partial=True),
+        responses=[
+            c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
     znp_server.reply_to(
         request=c.ZDO.NodeDescReq.Req(DstAddr=nwk, NWKAddrOfInterest=nwk),
         responses=[

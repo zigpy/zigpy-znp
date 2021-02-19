@@ -668,6 +668,15 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
         ],
     )
 
+    # Ignore the source routing request as well
+    znp_server.reply_to(
+        c.AF.DataRequestSrcRtg.Req(partial=True),
+        responses=[
+            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
     await app.request(
         device=device,
         profile=260,

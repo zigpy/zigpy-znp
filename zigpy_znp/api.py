@@ -515,7 +515,7 @@ class ZNP:
             # If our request has no response, we cannot wait for one
             if not request.Rsp:
                 LOGGER.debug("Request has no response, not waiting for one.")
-                self._uart.send(request.to_frame())
+                self._uart.send(request.to_frame(align=self.nvram.align_structs))
                 return
 
             # We need to create the response listener before we send the request
@@ -528,7 +528,7 @@ class ZNP:
                 ]
             )
 
-            self._uart.send(request.to_frame())
+            self._uart.send(request.to_frame(align=self.nvram.align_structs))
 
             # We should get a SRSP in a reasonable amount of time
             async with async_timeout.timeout(

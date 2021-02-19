@@ -203,6 +203,8 @@ def make_application(make_znp_server):
 
 
 class BaseServerZNP(ZNP):
+    align_structs = False
+
     def _flatten_responses(self, request, responses):
         if responses is None:
             return
@@ -255,7 +257,7 @@ class BaseServerZNP(ZNP):
 
     def send(self, response):
         if response is not None and self._uart is not None:
-            self._uart.send(response.to_frame())
+            self._uart.send(response.to_frame(align=self.align_structs))
 
     def close(self):
         # We don't clear listeners on shutdown
@@ -298,11 +300,7 @@ def reply_to(request):
 
 
 class BaseZStackDevice(BaseServerZNP):
-    align_structs = None
-
     def __init__(self, *args, **kwargs):
-        assert self.align_structs is not None
-
         super().__init__(*args, **kwargs)
 
         self.active_endpoints = []

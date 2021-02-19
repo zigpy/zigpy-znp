@@ -375,18 +375,25 @@ class CommandBase:
 
         super().__setattr__("_bound_params", bound_params)
 
-    def to_frame(self):
+    def to_frame(self, *, align=False):
         if self._partial:
             raise ValueError(f"Cannot serialize a partial frame: {self}")
 
         from zigpy_znp.frames import GeneralFrame
 
-        # At this point the optional params are assumed to be in a valid order
-        data = b"".join(
-            [v.serialize() for p, v in self._bound_params.values() if v is not None]
-        )
+        chunks = []
 
-        return GeneralFrame(self.header, data)
+        for param, value in self._bound_params.values():
+            # At this point the optional params are assumed to be in a valid order
+            if value is None:
+                continue
+
+            if issubclass(param.type, t.CStruct):
+                chunks.append(value.serialize(align=align))
+            else:
+                chunks.append(value.serialize())
+
+        return GeneralFrame(self.header, b"".join(chunks))
 
     @classmethod
     def from_frame(cls, frame, *, align=False) -> "CommandBase":
