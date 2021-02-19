@@ -343,6 +343,11 @@ class BaseZStackDevice(BaseServerZNP):
 
         return super().connection_lost(exc)
 
+    def update_device_state(self, state):
+        self.device_state = state
+
+        return c.ZDO.StateChangeInd.Callback(State=state)
+
     @reply_to(c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
     def active_endpoints_request(self, req):
         return [
@@ -482,11 +487,16 @@ class BaseZStackDevice(BaseServerZNP):
 
     @reply_to(c.Util.GetDeviceInfo.Req())
     def util_device_info(self, request):
+        nwk = 0xFFFE
+
+        if self.device_state == t.DeviceState.StartedAsCoordinator:
+            nwk = 0x0000
+
         return c.Util.GetDeviceInfo.Rsp(
             Status=t.Status.SUCCESS,
             IEEE=t.EUI64.deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.EXTADDR])[0],
-            NWK=t.NWK(0xFFFE),  # ???
-            DeviceType=t.DeviceTypeCapabilities(7),  # fixed
+            NWK=nwk,
+            DeviceType=t.DeviceTypeCapabilities(7),
             DeviceState=self.device_state,  # dynamic!!!
             AssociatedDevices=[],
         )
@@ -574,7 +584,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
         if self.nib.nwkState == NwkState.NWK_ROUTER:
             return [
                 c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.RestoredNetworkState),
-                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+                self.update_device_state(t.DeviceState.StartedAsCoordinator),
             ]
         else:
 
@@ -592,16 +602,10 @@ class BaseZStack1CC2531(BaseZStackDevice):
 
             return [
                 c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.NewNetworkState),
-                c.ZDO.StateChangeInd.Callback(
-                    State=t.DeviceState.StartingAsCoordinator
-                ),
-                c.ZDO.StateChangeInd.Callback(
-                    State=t.DeviceState.StartingAsCoordinator
-                ),
-                c.ZDO.StateChangeInd.Callback(
-                    State=t.DeviceState.StartingAsCoordinator
-                ),
-                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator),
+                self.update_device_state(t.DeviceState.StartingAsCoordinator),
+                self.update_device_state(t.DeviceState.StartingAsCoordinator),
+                self.update_device_state(t.DeviceState.StartingAsCoordinator),
+                self.update_device_state(t.DeviceState.StartedAsCoordinator),
                 update_logical_channel,
             ]
 
@@ -686,11 +690,6 @@ class BaseZStack3Device(BaseZStackDevice):
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ]
-
-    def update_device_state(self, state):
-        self.device_state = state
-
-        return c.ZDO.StateChangeInd.Callback(State=state)
 
     @reply_to(
         c.AppConfig.BDBStartCommissioning.Req(
