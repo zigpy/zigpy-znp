@@ -80,7 +80,9 @@ class ZnpMtProtocol(asyncio.Protocol):
                 self._api.frame_received(frame.payload)
             except Exception as e:
                 LOGGER.error(
-                    "Received an exception while passing frame to API", exc_info=e
+                    "Received an exception while passing frame to API: %s",
+                    frame,
+                    exc_info=e,
                 )
 
     def send(self, payload: frames.GeneralFrame) -> None:

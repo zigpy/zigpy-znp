@@ -50,7 +50,7 @@ class Device(t.CStruct):
     endDev: AgingEndDevice
     timeoutCounter: t.uint32_t
     keepaliveRcv: t.uint8_t  # not a bool, can be 0xFF
-    ctrl: t.uint8_t
+    ctrl: t.uint8_t  # XXX: This field is only present in Z-Stack 3.30+ !!!
 
 
 class Key(t.FixedList, item_type=t.uint8_t, length=42):
