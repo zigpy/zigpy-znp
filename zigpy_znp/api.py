@@ -260,7 +260,7 @@ class ZNP:
                 self.version = await detect_zstack_version(self)
 
                 LOGGER.debug("Detected Z-Stack %s", self.version)
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             LOGGER.debug("Connection to %s failed, cleaning up", self._port_path)
             self.close()
             raise

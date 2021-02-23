@@ -41,6 +41,7 @@ with warnings.catch_warnings():
 
 
 ZDO_ENDPOINT = 0
+
 PROBE_TIMEOUT = 5  # seconds
 STARTUP_TIMEOUT = 5  # seconds
 ZDO_REQUEST_TIMEOUT = 15  # seconds
@@ -187,7 +188,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._znp.close()
             self._znp = None
 
-    async def startup(self, auto_form=False):
+    async def startup(self, auto_form=False, force_form=False):
         """
         Performs application startup.
 
@@ -196,12 +197,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         try:
-            return await self._startup(auto_form=auto_form)
+            return await self._startup(auto_form=auto_form, force_form=force_form)
         except Exception:
             await self.shutdown()
             raise
 
-    async def _startup(self, auto_form=False):
+    async def _startup(self, auto_form=False, force_form=False):
         assert self._znp is None
 
         znp = ZNP(self.config)
@@ -226,8 +227,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         except KeyError:
             is_configured = False
 
-        if not is_configured:
-            if not auto_form:
+        if not is_configured or force_form:
+            if not auto_form and not force_form:
                 raise RuntimeError("Cannot start application, network is not formed")
 
             LOGGER.info("ZNP is not configured, forming a new network")
@@ -761,6 +762,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Spawns the auto-reconnect task.
         """
 
+        LOGGER.debug("Connection lost: %s", exc)
+
         self.close()
 
         LOGGER.debug("Restarting background reconnection task")
@@ -1190,6 +1193,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             try:
                 await self._startup()
                 return
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 LOGGER.error("Failed to reconnect", exc_info=e)
 
