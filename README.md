@@ -81,13 +81,21 @@ zha:
 # NVRAM
 A complete NVRAM backup and restore can be performed between similar devices and Z-Stack versions to copy your network between similar devices.
 
-NVRAM backup ("zigpy_znp.tools.nvram_read") on Linux or macOS based OS:
+NVRAM backup ("zigpy_znp.tools.nvram_read") on Linux based OS:
 ```console
 (venv) $ python -m zigpy_znp.tools.nvram_read -p /dev/serial/by-id/old_radio -o backup.json
 ```
-NVRAM restore ("zigpy_znp.tools.nvram_write") on Linux or macOS based OS:
+NVRAM restore ("zigpy_znp.tools.nvram_write") on Linux based OS:
 ```console
 (venv) $ python -m zigpy_znp.tools.nvram_write -p /dev/serial/by-id/new_radio -i backup.json
+```
+NVRAM backup ("zigpy_znp.tools.nvram_read") on macOS based OS:
+```console
+(venv) $ python -m zigpy_znp.tools.nvram_read -p /dev/cu.usbserial* -o backup.json
+```
+NVRAM restore ("zigpy_znp.tools.nvram_write") on macOS based OS:
+```console
+(venv) $ python -m zigpy_znp.tools.nvram_write -p /dev/cu.usbserial* -i backup.json
 ```
 NVRAM backup ("zigpy_znp.tools.nvram_read") on Windows based OS:
 ```console
@@ -105,13 +113,12 @@ NVRAM restore ("zigpy_znp.tools.nvram_write") on Windows based OS:
      You will experience some routing issues while the coordinator rebuilds its routing table.
  - CC2531 backups can only be restored to CC2531 devices running similar firmware versions.
  - To run "zigpy_znp.tools.nvram_read" and "zigpy_znp.tools.nvram_write" you need to have Python installed on your system as well as required dependencies.
-   - If you are running a Linux or macOS based OS you need to have python and pip installed on your system. If you do not have them installed, refer to your distribution package manager to get it set up. (On Debian/Ubuntu; `sudo apt update && sudo apt-get install python3-pip` should work. `sudo pip` ... is not the optimal way of installing packages but Python package management is out of scope for this document.)
-     - Download and extract zigpy-znp using `wget -O cc2538-bsl.zip https://codeload.github.com/zigpy/zigpy-znp/zip/master && unzip zigpy-znp.zip`
-   - If you are running a Windows based OS download [Python for Windows](https://www.python.org/downloads/) and install. After installation verify Python is correctly installed by running `python -V` in the Command Prompt (cmd.exe). It should return Python and the version number. 
-     - Download the [zipped code](https://github.com/zigpy/zigpy-znp/archive/master.zip) and extract to a folder, then run the wanted "zigpy_znp.tools.nvram_read" and "zigpy_znp.tools.nvram_write" commands from the `\zigpy-znp-master\zigpy_znp\tools\` directory via the command-line/prompt.
-       - If you receive a message similar to `Python is not recognized as an internal or external command, operable program or batch file.`, it means that Python is either not installed or the system variable PATH has not been set. You will need to launch Python from the folder in which it is installed or adjust your system variables to allow it to be launched from any location.
-   - To install the required dependencies "pyserial" and "intelhex", open command-line/prompt and check if `pip` is installed by running `pip -V` which will show its version and install location. Then From the same command-line/prompt run the command `pip3 install pyserial intelhex`.
- - The specific serial port (a.k.a. COM port) to use is selected in python using the `-p` option, like `-p /dev/ttyUSB0` (Linux and macOS) or `-p COM1` (Windows).
+   - If you are running a Linux or macOS based OS you need to have python and pip installed on your system. If you do not have them installed, refer to your distribution package manager to get it set up. (On Debian/Ubuntu; `sudo apt update && sudo apt-get install python3-pip` should work.
+   - If you are running a Windows based OS download [Python for Windows](https://www.python.org/downloads/) and install it. After installation verify Python is correctly installed by running `python -V` in the Command Prompt (cmd.exe). It should return Python and the version number.
+   - To install the required dependencies "pyserial" and "intelhex", open command-line/prompt and check if `pip` is installed by running `pip -V` which will show its version and install location. Then from the same command-line/prompt run the command `sudo pip3 install pyserial intelhex` or `pip3 install pyserial intelhex` from Windows.
+ - Download and extract zigpy-znp using the command `wget -O zigpy-znp-master.zip https://codeload.github.com/zigpy/zigpy-znp/zip/master && unzip zigpy-znp-master.zip`, then run the wanted "zigpy_znp.tools.nvram_read" and "zigpy_znp.tools.nvram_write" commands.
+  - The specific serial port (a.k.a. COM port) to use is selected in python using the `-p` option, like `-p /dev/ttyUSB0` (Linux), `-p /dev/cu.usbserial* (macOS)`, or `-p COM1` (Windows).
+  - If you receive a message similar to `Python is not recognized as an internal or external command, operable program or batch file.`, it means that Python is either not installed or the system variable PATH has not been set. You will need to launch Python from the folder in which it is installed or adjust your system variables to allow it to be launched from any location.
 
 You can erase the NVRAM entries in your device and reset it by running one of the following commands:
 
