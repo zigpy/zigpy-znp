@@ -3,6 +3,7 @@ import json
 import typing
 import asyncio
 import logging
+import argparse
 import datetime
 
 import zigpy_znp
@@ -75,18 +76,23 @@ async def backup_network(radio_path: str) -> typing.Dict[str, typing.Any]:
 
         obj["stack_specific"] = {"zstack": {"tclk_seed": tclk_seed.hex()}}
 
+    znp.close()
+
     return obj
 
 
 async def main(argv):
     parser = setup_parser("Backup adapter network settings")
+    parser.add_argument(
+        "--output", "-o", type=argparse.FileType("w"), help="Output file", default="-"
+    )
     args = parser.parse_args(argv)
 
     backup_obj = await backup_network(
         radio_path=args.serial,
     )
 
-    print(json.dumps(backup_obj, indent=4))
+    args.output.write(json.dumps(backup_obj, indent=4))
 
 
 if __name__ == "__main__":
