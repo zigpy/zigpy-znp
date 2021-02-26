@@ -96,11 +96,20 @@ def test_struct_nesting():
 def test_struct_aligned_serialization_deserialization():
     class TestStruct(t.CStruct):
         a: t.uint8_t
+        # One padding byte here
         b: t.uint16_t
-        c: t.uint32_t
+        # No padding here
+        c: t.uint32_t  # largest type, so the struct is 32 bit aligned
         d: t.uint8_t
+        # Three padding bytes here
         e: t.uint32_t
         f: t.uint8_t
+        # Three more to make the struct 32 bit aligned
+
+    assert TestStruct.get_alignment(align=False) == 1
+    assert TestStruct.get_alignment(align=True) == 32 // 8
+    assert TestStruct.get_size(align=False) == (1 + 2 + 4 + 1 + 4 + 1)
+    assert TestStruct.get_size(align=True) == (1 + 2 + 4 + 1 + 4 + 1) + (1 + 3 + 3)
 
     expected = b""
     expected += t.uint8_t(1).serialize()
