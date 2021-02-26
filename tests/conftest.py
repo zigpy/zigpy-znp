@@ -320,10 +320,10 @@ class BaseZStackDevice(BaseServerZNP):
                 )
 
     def nvram_serialize(self, item):
-        return NVRAMHelper._serialize(self, item)
+        return NVRAMHelper.serialize(self, item)
 
     def nvram_deserialize(self, data, item_type):
-        return NVRAMHelper._deserialize(self, data, item_type)
+        return NVRAMHelper.deserialize(self, data, item_type)
 
     def _unhandled_command(self, command):
         # XXX: check the capabilities with `ping_replier` to use `InvalidSubsystem`?

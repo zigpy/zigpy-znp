@@ -1023,12 +1023,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         for nvid, value in settings.items():
             try:
-                current_value = await self._znp.nvram.osal_read(nvid)
+                current_value = await self._znp.nvram.osal_read(
+                    nvid, item_type=type(value)
+                )
             except InvalidCommandResponse:
                 current_value = None
 
             # There is no point in issuing a write if the value will not change
-            if current_value != value.serialize():
+            if current_value != value:
                 await self._znp.nvram.osal_write(nvid, value)
                 any_changed = True
 
