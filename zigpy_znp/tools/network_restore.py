@@ -102,6 +102,8 @@ async def restore_network(
 
     await znp.reset()
 
+    znp.close()
+
 
 async def main(argv):
     parser = setup_parser("Restore adapter network settings")
