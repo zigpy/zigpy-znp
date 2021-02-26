@@ -225,12 +225,16 @@ async def read_unhashed_link_keys(znp, addr_mgr_entries):
         # CC2531 with Z-Stack Home 1.2 just doesn't let you read this data out
         return
 
-    link_key_table, _ = t.APSLinkKeyTable.deserialize(
-        await znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
+    # The link key table's size is dynamic so it has junk at the end
+    link_key_table_raw = await znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
+    link_key_table = znp.nvram.deserialize(
+        link_key_table_raw, item_type=t.APSLinkKeyTable, allow_trailing=True
     )
 
+    LOGGER.debug("Read APS link key table: %s", link_key_table)
+
     for entry in link_key_table:
-        if not entry.AuthenticationState & t.AuthenticationOption.AuthenticatedCBCK:
+        if not entry.AuthenticationState == t.AuthenticationOption.AuthenticatedCBCK:
             continue
 
         key_table_entry = aps_key_data_table[entry.LinkKeyNvId - link_key_offset_base]

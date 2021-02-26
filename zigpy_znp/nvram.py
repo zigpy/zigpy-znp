@@ -43,14 +43,14 @@ class NVRAMHelper:
 
         LOGGER.debug("Detected struct alignment: %s", self.align_structs)
 
-    def _serialize(self, value) -> bytes:
+    def serialize(self, value) -> bytes:
         """
         Serialize an object, automatically computing struct padding based on the target
         platform.
         """
 
         if hasattr(value, "serialize"):
-            if isinstance(value, t.CStruct):
+            if isinstance(value, (t.CStruct, t.BaseListType)):
                 assert self.align_structs is not None
                 value = value.serialize(align=self.align_structs)
             else:
@@ -66,7 +66,7 @@ class NVRAMHelper:
 
         return value
 
-    def _deserialize(self, data: bytes, item_type):
+    def deserialize(self, data: bytes, item_type, *, allow_trailing=False):
         """
         Serialize raw bytes, automatically computing struct padding based on the target
         platform.
@@ -75,13 +75,13 @@ class NVRAMHelper:
         if item_type is None:
             return data
 
-        if issubclass(item_type, t.CStruct):
+        if issubclass(item_type, (t.CStruct, t.BaseListType)):
             assert self.align_structs is not None
             value, remaining = item_type.deserialize(data, align=self.align_structs)
         else:
             value, remaining = item_type.deserialize(data)
 
-        if remaining:
+        if remaining and not allow_trailing:
             raise ValueError(f"Data left after deserialization: {remaining!r}")
 
         return value
@@ -110,7 +110,7 @@ class NVRAMHelper:
         Serializes all serializable values and passes bytes directly.
         """
 
-        value = self._serialize(value)
+        value = self.serialize(value)
         length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
 
         # Recreate the item if the length is not correct
@@ -204,7 +204,7 @@ class NVRAMHelper:
 
         assert len(data) == length
 
-        value = self._deserialize(data, item_type)
+        value = self.deserialize(data, item_type)
         LOGGER.debug('Read NVRAM["LEGACY"][0x%04x] = %r', nv_id, value)
 
         return value
@@ -242,7 +242,7 @@ class NVRAMHelper:
         NVWrite(sys_id=ZSTACK, item_id=LEGACY, sub_id=1) in the background.
         """
 
-        value = self._serialize(value)
+        value = self.serialize(value)
         length = (
             await self.znp.request(
                 c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
@@ -343,7 +343,7 @@ class NVRAMHelper:
 
         assert len(data) == length
 
-        value = self._deserialize(data, item_type)
+        value = self.deserialize(data, item_type)
         LOGGER.debug("Read NVRAM[%s][%s][0x%04x] = %r", sys_id, item_id, sub_id, value)
 
         return value
@@ -366,7 +366,7 @@ class NVRAMHelper:
                     sys_id=sys_id,
                     item_id=item_id,
                     sub_id=sub_id,
-                    value=self._serialize(value),
+                    value=self.serialize(value),
                     create=False,
                 )
             except KeyError:
@@ -383,7 +383,7 @@ class NVRAMHelper:
             try:
                 await self.osal_write(
                     nv_id=nvid,
-                    value=self._serialize(value),
+                    value=self.serialize(value),
                     create=False,
                 )
             except KeyError:

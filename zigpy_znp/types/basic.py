@@ -1,6 +1,8 @@
 import enum
 import typing
 
+from zigpy_znp.types.cstruct import CStruct
+
 
 class Bytes(bytes):
     def serialize(self) -> "Bytes":
@@ -173,8 +175,28 @@ class LongBytes(ShortBytes):
     _header = uint16_t
 
 
-class LVList(list):
+class BaseListType(list):
     _item_type = None
+
+    @classmethod
+    def _serialize_item(cls, item, *, align):
+        if not isinstance(item, cls._item_type):
+            item = cls._item_type(item)
+
+        if issubclass(cls._item_type, CStruct):
+            return item.serialize(align=align)
+        else:
+            return item.serialize()
+
+    @classmethod
+    def _deserialize_item(cls, data, *, align):
+        if issubclass(cls._item_type, CStruct):
+            return cls._item_type.deserialize(data, align=align)
+        else:
+            return cls._item_type.deserialize(data)
+
+
+class LVList(BaseListType):
     _header = None
 
     def __init_subclass__(cls, *, item_type, length_type) -> None:
@@ -182,25 +204,23 @@ class LVList(list):
         cls._item_type = item_type
         cls._header = length_type
 
-    def serialize(self) -> bytes:
+    def serialize(self, *, align=False) -> bytes:
         assert self._item_type is not None
-        return self._header(len(self)).serialize() + serialize_list(
-            [self._item_type(i) for i in self]
+        return self._header(len(self)).serialize() + b"".join(
+            [self._serialize_item(i, align=align) for i in self]
         )
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["LVList", bytes]:
-        assert cls._item_type is not None
+    def deserialize(cls, data: bytes, *, align=False) -> typing.Tuple["LVList", bytes]:
         length, data = cls._header.deserialize(data)
         r = cls()
         for i in range(length):
-            item, data = cls._item_type.deserialize(data)
+            item, data = cls._deserialize_item(data, align=align)
             r.append(item)
         return r, data
 
 
-class FixedList(list):
-    _item_type = None
+class FixedList(BaseListType):
     _length = None
 
     def __init_subclass__(cls, *, item_type, length) -> None:
@@ -208,7 +228,7 @@ class FixedList(list):
         cls._item_type = item_type
         cls._length = length
 
-    def serialize(self) -> bytes:
+    def serialize(self, *, align=False) -> bytes:
         assert self._length is not None
 
         if len(self) != self._length:
@@ -216,33 +236,34 @@ class FixedList(list):
                 f"Invalid length for {self!r}: expected {self._length}, got {len(self)}"
             )
 
-        return serialize_list([self._item_type(i) for i in self])
+        return b"".join([self._serialize_item(i, align=align) for i in self])
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["FixedList", bytes]:
-        assert cls._item_type is not None
+    def deserialize(
+        cls, data: bytes, *, align=False
+    ) -> typing.Tuple["FixedList", bytes]:
         r = cls()
         for i in range(cls._length):
-            item, data = cls._item_type.deserialize(data)
+            item, data = cls._deserialize_item(data, align=align)
             r.append(item)
         return r, data
 
 
-class CompleteList(list):
-    _item_type = None
-
+class CompleteList(BaseListType):
     def __init_subclass__(cls, *, item_type) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
 
-    def serialize(self) -> bytes:
-        return serialize_list([self._item_type(i) for i in self])
+    def serialize(self, *, align=False) -> bytes:
+        return b"".join([self._serialize_item(i, align=align) for i in self])
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["CompleteList", bytes]:
+    def deserialize(
+        cls, data: bytes, *, align=False
+    ) -> typing.Tuple["CompleteList", bytes]:
         r = cls()
         while data:
-            item, data = cls._item_type.deserialize(data)
+            item, data = cls._deserialize_item(data, align=align)
             r.append(item)
         return r, data
 
