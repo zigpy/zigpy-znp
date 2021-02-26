@@ -4,7 +4,7 @@ import contextlib
 import pytest
 import zigpy.util
 import zigpy.types
-from zigpy.zdo.types import SizePrefixedSimpleDescriptor
+import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
@@ -284,6 +284,13 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
         ],
     )
 
+    if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
+        node_desc = c.zdo.NullableNodeDescriptor.old_new(
+            2, 64, 128, 4107, 89, 63, 0, 63, 0
+        )
+    else:
+        node_desc = c.zdo.NullableNodeDescriptor(2, 64, 128, 4107, 89, 63, 0, 63, 0)
+
     znp_server.reply_to(
         request=c.ZDO.NodeDescReq.Req(DstAddr=nwk, NWKAddrOfInterest=nwk),
         responses=[
@@ -295,12 +302,7 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
                 Capabilities=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
             ),
             c.ZDO.NodeDescRsp.Callback(
-                Src=nwk,
-                Status=t.ZDOStatus.SUCCESS,
-                NWK=nwk,
-                NodeDescriptor=c.zdo.NullableNodeDescriptor(
-                    2, 64, 128, 4107, 89, 63, 0, 63, 0
-                ),
+                Src=nwk, Status=t.ZDOStatus.SUCCESS, NWK=nwk, NodeDescriptor=node_desc
             ),
         ],
     )
@@ -323,7 +325,7 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
                 Src=nwk,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=nwk,
-                SimpleDescriptor=SizePrefixedSimpleDescriptor(
+                SimpleDescriptor=zdo_t.SizePrefixedSimpleDescriptor(
                     2, 260, 263, 0, [0, 1, 3, 1030, 1024, 1026], [25]
                 ),
             ),
@@ -338,7 +340,7 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
                 Src=nwk,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=nwk,
-                SimpleDescriptor=SizePrefixedSimpleDescriptor(
+                SimpleDescriptor=zdo_t.SizePrefixedSimpleDescriptor(
                     1, 49246, 2128, 2, [0], [0, 3, 4, 6, 8, 768, 5]
                 ),
             ),
