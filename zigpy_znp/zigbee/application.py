@@ -122,7 +122,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._watchdog_task = asyncio.Future()
         self._watchdog_task.cancel()
 
-        self._nib = NIB()
         self._network_key = None
         self._network_key_seq = None
         self._concurrent_requests_semaphore = None
@@ -249,7 +248,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self.form_network()
         else:
             # Issue a reset first to make sure we aren't permitting joins
-            await self._reset()
+            await self._znp.reset()
 
             LOGGER.info("ZNP is already configured, not forming a new network")
 
@@ -314,7 +313,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.znp_config[conf.CONF_LED_MODE] is not None:
             await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
-        await self._load_device_info()
+        await self._load_network_info()
 
         # Add the coordinator as a zigpy device. We do this up here because
         # `self._register_endpoint()` adds endpoints to this device object.
@@ -361,8 +360,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.info("  Z-Stack build id: %s", version_rsp.CodeRevision)
         LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
         LOGGER.info("  Channel: %s", self.channel)
-        LOGGER.info("  PAN ID: 0x%04x", self.pan_id)
+        LOGGER.info("  PAN ID: 0x%04X", self.pan_id)
         LOGGER.info("  Extended PAN ID: %s", self.extended_pan_id)
+        LOGGER.info("  Device IEEE: %s", self.ieee)
+        LOGGER.info("  Device NWK: 0x%04X", self.nwk)
         LOGGER.debug(
             "  Network key: %s", ":".join(f"{c:02x}" for c in self.network_key)
         )
@@ -394,7 +395,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # The above command takes a few seconds to work
         while self.channel != channel:
-            await self._load_device_info()
+            await self._load_network_info()
             await asyncio.sleep(1)
 
     async def update_pan_id(self, pan_id: t.uint16_t) -> None:
@@ -402,7 +403,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Updates the network PAN ID, bypassing Z-Stack anti-collision checks.
         """
 
-        await self._reset()
+        await self._znp.reset()
 
         nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
         nib.nwkPanId = pan_id
@@ -451,7 +452,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # And reset to clear everything
-        await self._reset()
+        await self._znp.reset()
 
         # Now that we've cleared everything, write back our Z-Stack settings
         LOGGER.debug("Updating network settings")
@@ -574,7 +575,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Finally, reset once more to reset the device back to a "normal" state so that
         # we can continue the normal application startup sequence.
-        await self._reset()
+        await self._znp.reset()
 
     def get_dst_address(self, cluster):
         """
@@ -1033,7 +1034,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if reset_if_changed and any_changed:
             # Reset to make the above NVRAM writes take effect
-            await self._reset()
+            await self._znp.reset()
 
     @contextlib.asynccontextmanager
     async def _limit_concurrency(self):
@@ -1178,45 +1179,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.SUCCESS,
         )
 
-    async def _load_device_info(self):
+    async def _load_network_info(self) -> None:
         """
         Loads low-level network information from NVRAM.
         """
 
-        device_info = await self._znp.request(
-            c.Util.GetDeviceInfo.Req(), RspStatus=t.Status.SUCCESS
-        )
+        await self._znp.load_network_info()
 
-        self._ieee = device_info.IEEE
-        self._nwk = device_info.NWK
-
-        # Parsing the NIB struct gives us access to low-level info, like the channel
-        self._nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
-        LOGGER.debug("Parsed NIB: %s", self._nib)
-
-        self._channel = self._nib.nwkLogicalChannel
-        self._channels = self._nib.channelList
-        self._pan_id = self._nib.nwkPanId
-        self._ext_pan_id = self._nib.extendedPANID
-
-        key_info = await self._znp.nvram.osal_read(
-            OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
-        )
-        self._network_key = key_info.Active.Key
-        self._network_key_seq = key_info.Active.KeySeqNum
-
-        LOGGER.debug("Parsed key info: %s", key_info)
-
-    async def _reset(self) -> None:
-        """
-        Performs a soft reset within Z-Stack.
-        A hard reset resets the serial port, causing the device to disconnect.
-        """
-
-        await self._znp.request_callback_rsp(
-            request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
-            callback=c.SYS.ResetInd.Callback(partial=True),
-        )
+        self._ieee = self._znp.network_info.ieee
+        self._nwk = self._znp.network_info.nwk
+        self._channel = self._znp.network_info.channel
+        self._channels = self._znp.network_info.channels
+        self._pan_id = self._znp.network_info.pan_id
+        self._ext_pan_id = self._znp.network_info.extended_pan_id
+        self._network_key = self._znp.network_info.network_key
+        self._network_key_seq = self._znp.network_info.network_key_seq
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
@@ -1387,7 +1364,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 request=request, RspStatus=t.Status.SUCCESS
             )
 
-            await asyncio.sleep(0.1 * self._nib.BroadcastDeliveryTime)
+            await asyncio.sleep(0.1 * 30)
         else:
             async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
                 # Shield from cancellation to prevent requests that time out
@@ -1440,7 +1417,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ),
             )
 
-            await asyncio.sleep(0.1 * self._nib.RouteDiscoveryTime)
+            await asyncio.sleep(0.1 * 13)
         finally:
             future.set_result(True)
             del self._route_discovery_futures[nwk]

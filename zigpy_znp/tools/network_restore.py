@@ -59,22 +59,26 @@ async def restore_network(
     app.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID] = extended_pan_id
 
     await app.startup(force_form=True)
-    await app._reset()
 
-    await app._znp.nvram.osal_write(OsalNvIds.EXTADDR, coordinator_ieee)
+    znp = app._znp
 
-    nib = await app._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
+    await znp.load_network_info()
+    await znp.reset()
+
+    await znp.nvram.osal_write(OsalNvIds.EXTADDR, coordinator_ieee)
+
+    nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
     nib.channelList = t.Channels.from_channel_list(backup["channel_mask"])
     nib.nwkUpdateId = backup["nwk_update_id"]
     nib.SecurityLevel = backup["security_level"]
-    await app._znp.nvram.osal_write(OsalNvIds.NIB, nib)
+    await znp.nvram.osal_write(OsalNvIds.NIB, nib)
 
     tclk_seed = None
 
-    if app._znp.version > 1.20:
+    if znp.version > 1.20:
         if backup.get("stack_specific", {}).get("zstack", {}).get("tclk_seed"):
             tclk_seed = bytes.fromhex(backup["stack_specific"]["zstack"]["tclk_seed"])
-            await app._znp.nvram.osal_write(OsalNvIds.TCLK_SEED, tclk_seed)
+            await znp.nvram.osal_write(OsalNvIds.TCLK_SEED, tclk_seed)
 
     nwk_frame_counter = backup["network_key"]["frame_counter"]
     nwk_frame_counter += counter_increment
@@ -87,14 +91,16 @@ async def restore_network(
         FrameCounter=nwk_frame_counter,
     )
 
-    await app._znp.nvram.osal_write(OsalNvIds.NWKKEY, key_info)
-    await app._znp.nvram.osal_write(OsalNvIds.NWK_ACTIVE_KEY_INFO, key_info.Active)
-    await app._znp.nvram.osal_write(OsalNvIds.NWK_ALTERN_KEY_INFO, key_info.Active)
-    await write_tc_frame_counter(app, nwk_frame_counter)
+    await znp.nvram.osal_write(OsalNvIds.NWKKEY, key_info)
+    await znp.nvram.osal_write(OsalNvIds.NWK_ACTIVE_KEY_INFO, key_info.Active)
+    await znp.nvram.osal_write(OsalNvIds.NWK_ALTERN_KEY_INFO, key_info.Active)
+    await write_tc_frame_counter(znp, nwk_frame_counter)
 
-    await write_devices(app, devices, seed=tclk_seed, counter_increment=2500)
+    await write_devices(
+        znp, devices, seed=tclk_seed, counter_increment=counter_increment
+    )
 
-    await app._reset()
+    await znp.reset()
 
 
 async def main(argv):

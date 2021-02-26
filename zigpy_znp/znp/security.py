@@ -3,9 +3,9 @@ import logging
 import dataclasses
 
 import zigpy_znp.types as t
+from zigpy_znp.api import ZNP
 from zigpy_znp.exceptions import SecurityError
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
-from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
 
@@ -62,9 +62,9 @@ def iter_seed_candidates(ieees_and_keys):
             break
 
 
-async def read_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
-    if app._znp.version == 1.2:
-        key_info = await app._znp.nvram.osal_read(
+async def read_tc_frame_counter(znp: ZNP) -> t.uint32_t:
+    if znp.version == 1.2:
+        key_info = await znp.nvram.osal_read(
             OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
         )
 
@@ -72,20 +72,20 @@ async def read_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
 
     global_entry = None
 
-    if app._znp.version == 3.0:
-        entries = app._znp.nvram.osal_read_table(
+    if znp.version == 3.0:
+        entries = znp.nvram.osal_read_table(
             OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START,
             OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END,
             item_type=t.NwkSecMaterialDesc,
         )
     else:
-        entries = app._znp.nvram.read_table(
+        entries = znp.nvram.read_table(
             item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
             item_type=t.NwkSecMaterialDesc,
         )
 
     async for entry in entries:
-        if entry.ExtendedPanID == app.extended_pan_id:
+        if entry.ExtendedPanID == znp.network_info.extended_pan_id:
             # Always prefer the entry for our current network
             return entry.FrameCounter
         elif entry.ExtendedPanID == t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):
@@ -98,36 +98,36 @@ async def read_tc_frame_counter(app: ControllerApplication) -> t.uint32_t:
     return global_entry.FrameCounter
 
 
-async def write_tc_frame_counter(app: ControllerApplication, counter: t.uint32_t):
-    if app._znp.version == 1.2:
-        key_info = await app._znp.nvram.osal_read(
+async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t):
+    if znp.version == 1.2:
+        key_info = await znp.nvram.osal_read(
             OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
         )
         key_info.FrameCounter = counter
 
-        await app._znp.nvram.osal_write(OsalNvIds.NWKKEY, key_info)
+        await znp.nvram.osal_write(OsalNvIds.NWKKEY, key_info)
 
         return
 
     best_entry = None
     best_address = None
 
-    if app._znp.version == 3.0:
+    if znp.version == 3.0:
         address = OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START
-        entries = app._znp.nvram.osal_read_table(
+        entries = znp.nvram.osal_read_table(
             start_nvid=OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START,
             end_nvid=OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END,
             item_type=t.NwkSecMaterialDesc,
         )
     else:
         address = 0x0000
-        entries = app._znp.nvram.read_table(
+        entries = znp.nvram.read_table(
             item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
             item_type=t.NwkSecMaterialDesc,
         )
 
     async for entry in entries:
-        if entry.ExtendedPanID == app.extended_pan_id:
+        if entry.ExtendedPanID == znp.network_info.extended_pan_id:
             best_entry = entry
             best_address = address
             break
@@ -143,28 +143,28 @@ async def write_tc_frame_counter(app: ControllerApplication, counter: t.uint32_t
 
     best_entry.FrameCounter = counter
 
-    if app._znp.version == 3.0:
-        await app._znp.nvram.osal_write(best_address, best_entry)
+    if znp.version == 3.0:
+        await znp.nvram.osal_write(best_address, best_entry)
     else:
-        await app._znp.nvram.write(
+        await znp.nvram.write(
             item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
             sub_id=best_address,
             value=best_entry,
         )
 
 
-async def read_addr_mgr_entries(app: ControllerApplication):
-    if app._znp.version >= 3.30:
+async def read_addr_mgr_entries(znp: ZNP):
+    if znp.version >= 3.30:
         entries = [
             entry
-            async for entry in app._znp.nvram.read_table(
+            async for entry in znp.nvram.read_table(
                 item_id=ExNvIds.ADDRMGR,
                 item_type=t.AddrMgrEntry,
             )
         ]
     else:
         entries = list(
-            await app._znp.nvram.osal_read(
+            await znp.nvram.osal_read(
                 OsalNvIds.ADDRMGR, item_type=t.AddressManagerTable
             )
         )
@@ -172,17 +172,17 @@ async def read_addr_mgr_entries(app: ControllerApplication):
     return entries
 
 
-async def read_hashed_link_keys(app, tclk_seed):
+async def read_hashed_link_keys(znp, tclk_seed):
     if tclk_seed is None:
         return
 
-    if app._znp.version == 3.30:
-        entries = app._znp.nvram.read_table(
+    if znp.version == 3.30:
+        entries = znp.nvram.read_table(
             item_id=ExNvIds.TCLK_TABLE,
             item_type=t.TCLKDevEntry,
         )
     else:
-        entries = app._znp.nvram.osal_read_table(
+        entries = znp.nvram.osal_read_table(
             start_nvid=OsalNvIds.LEGACY_TCLK_TABLE_START,
             end_nvid=OsalNvIds.LEGACY_TCLK_TABLE_END,
             item_type=t.TCLKDevEntry,
@@ -204,16 +204,16 @@ async def read_hashed_link_keys(app, tclk_seed):
         yield entry.extAddr, entry.txFrmCntr, entry.rxFrmCntr, link_key
 
 
-async def read_unhashed_link_keys(app, addr_mgr_entries):
-    if app._znp.version == 3.30:
+async def read_unhashed_link_keys(znp, addr_mgr_entries):
+    if znp.version == 3.30:
         link_key_offset_base = 0x0000
-        table = app._znp.nvram.read_table(
+        table = znp.nvram.read_table(
             item_id=ExNvIds.APS_KEY_DATA_TABLE,
             item_type=t.APSKeyDataTableEntry,
         )
     else:
         link_key_offset_base = OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START
-        table = app._znp.nvram.osal_read_table(
+        table = znp.nvram.osal_read_table(
             start_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START,
             end_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END,
             item_type=t.APSKeyDataTableEntry,
@@ -226,7 +226,7 @@ async def read_unhashed_link_keys(app, addr_mgr_entries):
         return
 
     link_key_table, _ = t.APSLinkKeyTable.deserialize(
-        await app._znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
+        await znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
     )
 
     for entry in link_key_table:
@@ -246,19 +246,20 @@ async def read_unhashed_link_keys(app, addr_mgr_entries):
         )
 
 
-async def read_devices(app: ControllerApplication):
+async def read_devices(znp: ZNP):
     tclk_seed = None
 
-    if app._znp.version > 1.2:
-        tclk_seed = await app._znp.nvram.osal_read(
-            OsalNvIds.TCLK_SEED, item_type=t.KeyData
-        )
+    if znp.version > 1.2:
+        tclk_seed = await znp.nvram.osal_read(OsalNvIds.TCLK_SEED, item_type=t.KeyData)
 
-    addr_mgr = await read_addr_mgr_entries(app)
+    addr_mgr = await read_addr_mgr_entries(znp)
     devices = {}
 
     for entry in addr_mgr:
-        if entry.nwkAddr == 0xFFFF:
+        if entry.extAddr in (
+            t.EUI64.convert("00:00:00:00:00:00:00:00"),
+            t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+        ):
             continue
         elif entry.type in (
             t.AddrMgrUserType.Assoc,
@@ -272,7 +273,7 @@ async def read_devices(app: ControllerApplication):
         else:
             raise ValueError(f"Unexpected entry type: {entry.type}")
 
-    async for ieee, tx_ctr, rx_ctr, key in read_hashed_link_keys(app, tclk_seed):
+    async for ieee, tx_ctr, rx_ctr, key in read_hashed_link_keys(znp, tclk_seed):
         devices[ieee] = devices[ieee].replace(
             tx_counter=tx_ctr,
             rx_counter=rx_ctr,
@@ -280,7 +281,7 @@ async def read_devices(app: ControllerApplication):
             hashed_link_key_shift=find_key_shift(ieee, key, tclk_seed),
         )
 
-    async for ieee, tx_ctr, rx_ctr, key in read_unhashed_link_keys(app, addr_mgr):
+    async for ieee, tx_ctr, rx_ctr, key in read_unhashed_link_keys(znp, addr_mgr):
         devices[ieee] = devices[ieee].replace(
             tx_counter=tx_ctr,
             rx_counter=rx_ctr,
@@ -290,7 +291,7 @@ async def read_devices(app: ControllerApplication):
     return list(devices.values())
 
 
-async def write_addr_manager_entries(app: ControllerApplication, devices):
+async def write_addr_manager_entries(znp: ZNP, devices):
     entries = [
         t.AddrMgrEntry(
             type=(
@@ -304,8 +305,8 @@ async def write_addr_manager_entries(app: ControllerApplication, devices):
         for d in devices
     ]
 
-    if app._znp.version >= 3.30:
-        await app._znp.nvram.write_table(
+    if znp.version >= 3.30:
+        await znp.nvram.write_table(
             item_id=ExNvIds.ADDRMGR,
             values=entries,
             fill_value=t.EMPTY_ADDR_MGR_ENTRY,
@@ -314,7 +315,7 @@ async def write_addr_manager_entries(app: ControllerApplication, devices):
 
     # On older devices this "table" is a single array in NVRAM whose size is dependent
     # on compile-time constants
-    old_entries = await app._znp.nvram.osal_read(
+    old_entries = await znp.nvram.osal_read(
         OsalNvIds.ADDRMGR, item_type=t.AddressManagerTable
     )
     new_entries = len(old_entries) * [t.EMPTY_ADDR_MGR_ENTRY]
@@ -322,13 +323,11 @@ async def write_addr_manager_entries(app: ControllerApplication, devices):
     for index, entry in enumerate(entries):
         new_entries[index] = entry
 
-    await app._znp.nvram.osal_write(
-        OsalNvIds.ADDRMGR, t.AddressManagerTable(new_entries)
-    )
+    await znp.nvram.osal_write(OsalNvIds.ADDRMGR, t.AddressManagerTable(new_entries))
 
 
 async def write_devices(
-    app: ControllerApplication,
+    znp: ZNP,
     devices: typing.Iterable[typing.Dict],
     counter_increment: t.uint32_t = 2500,
     seed=None,
@@ -365,7 +364,7 @@ async def write_devices(
                 )
             )
         else:
-            # Unhashed link keys are written to a table
+            # Unhashed link keys are written to another table
             aps_key_data_table.append(
                 t.APSKeyDataTableEntry(
                     Key=device.aps_link_key,
@@ -374,7 +373,7 @@ async def write_devices(
                 )
             )
 
-            if app._znp.version > 3.0:
+            if znp.version > 3.0:
                 start = 0x0000
             else:
                 start = OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START
@@ -390,17 +389,21 @@ async def write_devices(
                 )
             )
 
-    old_link_key_table = await app._znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
-    link_key_table_value = link_key_table.serialize().ljust(
+    # Make sure the new table is the same size as the old table. Because this type is
+    # prefixed by the number of entries, the trailing table bytes are not kept track of
+    # but still necessary, as the table has a static maximum capacity.
+    old_link_key_table = await znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
+    unpadded_link_key_table = znp.nvram.serialize(link_key_table)
+    new_link_key_table_value = unpadded_link_key_table.ljust(
         len(old_link_key_table), b"\x00"
     )
 
-    if len(link_key_table.serialize()) > len(old_link_key_table):
+    if len(new_link_key_table_value) > len(old_link_key_table):
         raise RuntimeError("New link key table is larger than the current one")
 
     # Postpone writes until all of the table entries have been created
-    await write_addr_manager_entries(app, devices)
-    await app._znp.nvram.osal_write(OsalNvIds.APS_LINK_KEY_TABLE, link_key_table_value)
+    await write_addr_manager_entries(znp, devices)
+    await znp.nvram.osal_write(OsalNvIds.APS_LINK_KEY_TABLE, new_link_key_table_value)
 
     tclk_fill_value = t.TCLKDevEntry(
         txFrmCntr=0,
@@ -417,27 +420,27 @@ async def write_devices(
         RxFrameCounter=0,
     )
 
-    if app._znp.version > 3.0:
-        await app._znp.nvram.write_table(
+    if znp.version > 3.0:
+        await znp.nvram.write_table(
             item_id=ExNvIds.TCLK_TABLE,
             values=hashed_link_key_table,
             fill_value=tclk_fill_value,
         )
 
-        await app._znp.nvram.write_table(
+        await znp.nvram.write_table(
             item_id=ExNvIds.APS_KEY_DATA_TABLE,
             values=aps_key_data_table,
             fill_value=aps_key_data_fill_value,
         )
     else:
-        await app._znp.nvram.osal_write_table(
+        await znp.nvram.osal_write_table(
             start_nvid=OsalNvIds.LEGACY_TCLK_TABLE_START,
             end_nvid=OsalNvIds.LEGACY_TCLK_TABLE_END,
             values=hashed_link_key_table,
             fill_value=tclk_fill_value,
         )
 
-        await app._znp.nvram.osal_write_table(
+        await znp.nvram.osal_write_table(
             start_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START,
             end_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END,
             values=aps_key_data_table,
