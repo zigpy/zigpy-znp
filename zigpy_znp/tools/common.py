@@ -27,6 +27,12 @@ class CustomArgumentParser(argparse.ArgumentParser):
         logging.getLogger().setLevel(log_level)
 
         coloredlogs.install(
+            fmt=(
+                "%(asctime)s.%(msecs)03d"
+                " %(hostname)s"
+                " %(name)s"
+                " %(levelname)s %(message)s"
+            ),
             level=log_level,
             level_styles=level_styles,
         )
