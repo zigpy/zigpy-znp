@@ -609,13 +609,18 @@ class BaseZStack1CC2531(BaseZStackDevice):
 
     @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
     def node_desc_responder(self, req):
+        if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
+            new_node_desc = c.zdo.NullableNodeDescriptor.old_new
+        else:
+            new_node_desc = c.zdo.NullableNodeDescriptor
+
         return [
             c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.NodeDescRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=0x0000,
-                NodeDescriptor=c.zdo.NullableNodeDescriptor(
+                NodeDescriptor=new_node_desc(
                     byte1=0,
                     byte2=64,
                     mac_capability_flags=143,
@@ -891,13 +896,18 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
     @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
     def node_desc_responder(self, req):
+        if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
+            new_node_desc = c.zdo.NullableNodeDescriptor.old_new
+        else:
+            new_node_desc = c.zdo.NullableNodeDescriptor
+
         return [
             c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.NodeDescRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=0x0000,
-                NodeDescriptor=c.zdo.NullableNodeDescriptor(
+                NodeDescriptor=new_node_desc(
                     byte1=0,
                     byte2=64,
                     mac_capability_flags=143,

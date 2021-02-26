@@ -121,7 +121,11 @@ def test_zdo_nullable_node_descriptor():
     assert not data
     assert desc1.serialize() == b"\x00"
 
-    desc2 = c.zdo.NullableNodeDescriptor(1, 2, 3, 4, 5, 6, 7, 8, 9)
+    if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
+        desc2 = c.zdo.NullableNodeDescriptor.old_new(1, 2, 3, 4, 5, 6, 7, 8, 9)
+    else:
+        desc2 = c.zdo.NullableNodeDescriptor(1, 2, 3, 4, 5, 6, 7, 8, 9)
+
     desc3, data = c.zdo.NullableNodeDescriptor.deserialize(desc2.serialize())
 
     assert not data
