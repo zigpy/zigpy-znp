@@ -15,8 +15,8 @@ import zigpy_znp.commands as c
 from zigpy_znp import uart
 from zigpy_znp.nvram import NVRAMHelper
 from zigpy_znp.frames import GeneralFrame
+from zigpy_znp.znp.utils import NetworkInfo, load_network_info, detect_zstack_version
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
-from zigpy_znp.types.nvids import ExNvIds
 
 LOGGER = logging.getLogger(__name__)
 AFTER_CONNECT_DELAY = 1  # seconds
@@ -54,28 +54,6 @@ def _deduplicate_commands(
 
     # The start of each chain is the maximal element
     return tuple(maximal_commands)
-
-
-async def detect_zstack_version(znp) -> float:
-    """
-    Feature detects the major version of Z-Stack running on the device.
-    """
-
-    # Z-Stack 1.2 does not have the AppConfig subsystem
-    if not znp.capabilities & t.MTCapabilities.CAP_APP_CNF:
-        return 1.2
-
-    try:
-        # Only Z-Stack 3.30+ has the new NVRAM system
-        await znp.nvram.read(
-            item_id=ExNvIds.TCLK_TABLE,
-            sub_id=0x0000,
-        )
-        return 3.30
-    except KeyError:
-        return 3.30
-    except CommandNotRecognized:
-        return 3.0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -199,10 +177,25 @@ class ZNP:
         self.version = None
 
         self.nvram = NVRAMHelper(self)
+        self.network_info: NetworkInfo = None
 
     def set_application(self, app):
         assert self._app is None
         self._app = app
+
+    async def load_network_info(self):
+        self.network_info = await load_network_info(self)
+
+    async def reset(self) -> None:
+        """
+        Performs a soft reset within Z-Stack.
+        A hard reset resets the serial port, causing the device to disconnect.
+        """
+
+        await self.request_callback_rsp(
+            request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
+            callback=c.SYS.ResetInd.Callback(partial=True),
+        )
 
     @property
     def _port_path(self) -> str:
@@ -508,6 +501,8 @@ class ZNP:
                 f"will have no effect"
             )
 
+        frame = request.to_frame(align=self.nvram.align_structs)
+
         # We should only be sending one SREQ at a time, according to the spec
         async with self._sync_request_lock:
             LOGGER.debug("Sending request: %s", request)
@@ -515,7 +510,7 @@ class ZNP:
             # If our request has no response, we cannot wait for one
             if not request.Rsp:
                 LOGGER.debug("Request has no response, not waiting for one.")
-                self._uart.send(request.to_frame(align=self.nvram.align_structs))
+                self._uart.send(frame)
                 return
 
             # We need to create the response listener before we send the request
@@ -528,7 +523,7 @@ class ZNP:
                 ]
             )
 
-            self._uart.send(request.to_frame(align=self.nvram.align_structs))
+            self._uart.send(frame)
 
             # We should get a SRSP in a reasonable amount of time
             async with async_timeout.timeout(

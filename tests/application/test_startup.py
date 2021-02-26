@@ -3,6 +3,7 @@ import pytest
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
+from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
@@ -128,10 +129,10 @@ async def test_reset(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     # `_reset` should be called at least once to put the radio into a consistent state
-    mocker.spy(app, "_reset")
+    mocker.spy(ZNP, "reset")
+    assert ZNP.reset.call_count == 0
     await app.startup()
-
-    assert app._reset.call_count >= 1
+    assert ZNP.reset.call_count >= 1
 
     await app.shutdown()
 
@@ -142,12 +143,10 @@ async def test_write_nvram(device, make_application, mocker):
     nvram = znp_server._nvram[ExNvIds.LEGACY]
 
     # Change NVRAM value we should change it back
-    assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
     nvram[OsalNvIds.LOGICAL_TYPE] = t.DeviceLogicalType.EndDevice.serialize()
 
-    mocker.spy(app, "_reset")
+    assert nvram[OsalNvIds.LOGICAL_TYPE] != t.DeviceLogicalType.Coordinator.serialize()
     await app.startup()
-
     assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
 
     await app.shutdown()
