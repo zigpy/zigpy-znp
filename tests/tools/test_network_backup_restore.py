@@ -14,7 +14,13 @@ from zigpy_znp.zigbee.application import ControllerApplication
 from zigpy_znp.tools.network_backup import main as network_backup
 from zigpy_znp.tools.network_restore import main as network_restore
 
-from ..conftest import ALL_DEVICES, EMPTY_DEVICES, FORMED_DEVICES, BaseZStack1CC2531
+from ..conftest import (
+    ALL_DEVICES,
+    EMPTY_DEVICES,
+    FORMED_DEVICES,
+    CoroutineMock,
+    BaseZStack1CC2531,
+)
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -150,24 +156,28 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
 
     load_nwk_info_mock = mocker.patch(
         "zigpy_znp.api.load_network_info",
-        return_value=NetworkInfo(
-            extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
-            ieee=None,
-            nwk=None,
-            channel=None,
-            channels=None,
-            pan_id=None,
-            nwk_update_id=None,
-            security_level=None,
-            network_key=None,
-            network_key_seq=None,
+        new=CoroutineMock(
+            return_value=NetworkInfo(
+                extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
+                ieee=None,
+                nwk=None,
+                channel=None,
+                channels=None,
+                pan_id=None,
+                nwk_update_id=None,
+                security_level=None,
+                network_key=None,
+                network_key_seq=None,
+            )
         ),
     )
 
     write_tc_counter_mock = mocker.patch(
-        "zigpy_znp.tools.network_restore.write_tc_frame_counter"
+        "zigpy_znp.tools.network_restore.write_tc_frame_counter", new=CoroutineMock()
     )
-    write_devices_mock = mocker.patch("zigpy_znp.tools.network_restore.write_devices")
+    write_devices_mock = mocker.patch(
+        "zigpy_znp.tools.network_restore.write_devices", new=CoroutineMock()
+    )
 
     # Perform the "restore"
     await network_restore([znp_server._port_path, "-i", str(backup_file), "-c", "2500"])
@@ -182,26 +192,26 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
 
     # And validate that the low-level functions were called appropriately
     assert startup_mock.call_count == 1
-    assert startup_mock.mock_calls[0].kwargs["force_form"] is True
+    assert startup_mock.mock_calls[0][2]["force_form"] is True
 
     assert load_nwk_info_mock.call_count == 1
 
     assert write_tc_counter_mock.call_count == 1
-    assert write_tc_counter_mock.mock_calls[0].args[1] == 66781 + 2500
+    assert write_tc_counter_mock.mock_calls[0][1][1] == 66781 + 2500
 
     assert write_devices_mock.call_count == 1
     write_devices_call = write_devices_mock.mock_calls[0]
 
-    assert write_devices_call.kwargs["counter_increment"] == 2500
+    assert write_devices_call[2]["counter_increment"] == 2500
 
     if issubclass(device, BaseZStack1CC2531):
-        assert write_devices_call.kwargs["seed"] is None
+        assert write_devices_call[2]["seed"] is None
     else:
-        assert write_devices_call.kwargs["seed"] == bytes.fromhex(
+        assert write_devices_call[2]["seed"] == bytes.fromhex(
             "c04884427c8a1ed7bb8412815ccce7aa"
         )
 
-    assert sorted(write_devices_call.args[1], key=lambda d: d.nwk) == [
+    assert sorted(write_devices_call[1][1], key=lambda d: d.nwk) == [
         StoredDevice(
             ieee=t.EUI64.convert("00:0b:57:ff:fe:38:b2:12"),
             nwk=0x9672,
