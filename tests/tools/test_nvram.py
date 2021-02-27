@@ -42,9 +42,6 @@ def dump_nvram(znp):
             except StopIteration:
                 item[OsalNvIds(sub_id).name] = value.hex()
 
-    if znp.nib is not None:
-        obj["LEGACY"]["NIB"] = znp.nvram_serialize(znp.nib).hex()
-
     return obj
 
 
@@ -67,7 +64,7 @@ async def test_nvram_read(device, make_znp_server, tmp_path, mocker):
     old_nvram_repr = repr(znp_server._nvram)
 
     backup_file = tmp_path / "backup.json"
-    await nvram_read([znp_server._port_path, "-o", str(backup_file), "-vvv"])
+    await nvram_read([znp_server._port_path, "-o", str(backup_file)])
 
     # No NVRAM was modified during the read
     assert repr(znp_server._nvram) == old_nvram_repr
@@ -121,10 +118,6 @@ async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
     #      backup was completely restored?
     for item_id, sub_ids in backup.items():
         for sub_id, value in sub_ids.items():
-            # The NIB is handled differently within tests
-            if sub_id == "NIB":
-                continue
-
             assert nvram_obj[item_id][sub_id] == value
 
     znp_server.close()
