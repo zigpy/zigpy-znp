@@ -20,7 +20,11 @@ LOGGER = logging.getLogger(__name__)
 async def backup_network(radio_path: str) -> typing.Dict[str, typing.Any]:
     znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": radio_path}}))
     await znp.connect()
-    await znp.load_network_info()
+
+    try:
+        await znp.load_network_info()
+    except ValueError as e:
+        raise RuntimeError("Failed to load network info") from e
 
     devices = []
 
