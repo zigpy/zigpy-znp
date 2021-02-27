@@ -30,8 +30,8 @@ async def backup_network(radio_path: str) -> typing.Dict[str, typing.Any]:
 
     for device in await read_devices(znp):
         obj = {
-            "nwk": device.nwk.serialize()[::-1].hex(),
-            "ieee": device.ieee.serialize()[::-1].hex(),
+            "nwk_address": device.nwk.serialize()[::-1].hex(),
+            "ieee_address": device.ieee.serialize()[::-1].hex(),
         }
 
         if device.aps_link_key:
@@ -43,7 +43,7 @@ async def backup_network(radio_path: str) -> typing.Dict[str, typing.Any]:
 
         devices.append(obj)
 
-    devices.sort(key=lambda d: d["ieee"])
+    devices.sort(key=lambda d: d["ieee_address"])
 
     now = datetime.datetime.now().astimezone()
 

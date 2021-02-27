@@ -35,8 +35,8 @@ async def restore_network(
     devices = []
 
     for obj in backup["devices"]:
-        nwk, _ = t.NWK.deserialize(bytes.fromhex(obj["nwk"])[::-1])
-        ieee, _ = t.EUI64.deserialize(bytes.fromhex(obj["ieee"])[::-1])
+        nwk, _ = t.NWK.deserialize(bytes.fromhex(obj["nwk_address"])[::-1])
+        ieee, _ = t.EUI64.deserialize(bytes.fromhex(obj["ieee_address"])[::-1])
 
         device = StoredDevice(nwk=nwk, ieee=ieee)
 
