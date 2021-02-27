@@ -25,7 +25,29 @@ async def load_network_info(znp) -> NetworkInfo:
     Loads low-level network information from NVRAM.
     """
 
-    nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
+    is_on_network = None
+    nib = None
+
+    if znp.version >= 3.0:
+        try:
+            is_on_network = (
+                await znp.nvram.osal_read(
+                    OsalNvIds.BDBNODEISONANETWORK, item_type=t.uint8_t
+                )
+                == 1
+            )
+        except KeyError:
+            is_on_network = False
+
+    try:
+        nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
+        is_on_network = nib.nwkLogicalChannel != 0 and nib.nwkKeyLoaded
+    except KeyError:
+        is_on_network = False
+
+    if not is_on_network:
+        raise ValueError("Device is not a part of a network")
+
     ieee = await znp.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
     key_desc = await znp.nvram.osal_read(
         OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc

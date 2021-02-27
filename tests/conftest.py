@@ -21,6 +21,7 @@ from zigpy_znp.uart import ZnpMtProtocol
 from zigpy_znp.nvram import NVRAMHelper
 from zigpy_znp.znp.nib import NIB, NwkState
 from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds, is_secure_nvid
+from zigpy_znp.tools.energy_scan import channels_from_channel_mask
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
@@ -586,10 +587,13 @@ class BaseZStack1CC2531(BaseZStackDevice):
                 nib.channelList, _ = t.Channels.deserialize(
                     self._nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
                 )
-                nib.nwkLogicalChannel = 15
+                nib.nwkLogicalChannel = list(
+                    channels_from_channel_mask(nib.channelList)
+                )[0]
                 nib.nwkPanId, _ = t.NWK.deserialize(
                     self._nvram[ExNvIds.LEGACY][OsalNvIds.PANID]
                 )
+                nib.nwkKeyLoaded = t.Bool(True)
 
                 self.nib = nib
 
@@ -663,6 +667,63 @@ class BaseZStack3Device(BaseZStackDevice):
         self._new_channel = None
         self._first_connection = True
 
+    def _default_nib(self):
+        return NIB(
+            SequenceNum=0,
+            PassiveAckTimeout=5,
+            MaxBroadcastRetries=2,
+            MaxChildren=0,
+            MaxDepth=20,
+            MaxRouters=0,
+            dummyNeighborTable=0,
+            BroadcastDeliveryTime=30,
+            ReportConstantCost=0,
+            RouteDiscRetries=0,
+            dummyRoutingTable=0,
+            SecureAllFrames=1,
+            SecurityLevel=5,
+            SymLink=1,
+            CapabilityFlags=143,
+            TransactionPersistenceTime=7,
+            nwkProtocolVersion=2,
+            RouteDiscoveryTime=5,
+            RouteExpiryTime=30,
+            nwkDevAddress=0xFFFE,
+            nwkLogicalChannel=0,
+            nwkCoordAddress=0xFFFE,
+            nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+            nwkPanId=0xFFFF,
+            nwkState=NwkState.NWK_INIT,
+            channelList=t.Channels.NO_CHANNELS,
+            beaconOrder=15,
+            superFrameOrder=15,
+            scanDuration=0,
+            battLifeExt=0,
+            allocatedRouterAddresses=0,
+            allocatedEndDeviceAddresses=0,
+            nodeDepth=0,
+            extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+            nwkKeyLoaded=t.Bool.false,
+            spare1=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            ),
+            spare2=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            ),
+            spare3=0,
+            spare4=0,
+            nwkLinkStatusPeriod=60,
+            nwkRouterAgeLimit=3,
+            nwkUseMultiCast=t.Bool.false,
+            nwkIsConcentrator=t.Bool.true,
+            nwkConcentratorDiscoveryTime=120,
+            nwkConcentratorRadius=10,
+            nwkAllFresh=1,
+            nwkManagerAddr=0x0000,
+            nwkTotalTransmissions=0,
+            nwkUpdateId=0,
+        )
+
     @reply_to(
         c.AppConfig.BDBSetChannel.Req(IsPrimary=False, Channel=t.Channels.NO_CHANNELS)
     )
@@ -718,10 +779,18 @@ class BaseZStack3Device(BaseZStackDevice):
                 nib = self.nib
 
                 if self._new_channel is not None:
-                    self.nib.channelList = self._new_channel
+                    nib.channelList = self._new_channel
                     self._new_channel = None
 
-                nib.nwkLogicalChannel = 15
+                nib.nwkLogicalChannel = list(
+                    channels_from_channel_mask(nib.channelList)
+                )[0]
+                nib.nwkState = NwkState.NWK_ROUTER
+                nib.nwkPanId, _ = t.NWK.deserialize(
+                    self._nvram[ExNvIds.LEGACY][OsalNvIds.PANID]
+                )
+                nib.nwkKeyLoaded = t.Bool(True)
+
                 self.nib = nib
 
                 self._nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] = b"\x01"
@@ -835,63 +904,6 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             BootloaderRevision=0xFFFFFFFF,
         )
 
-    def _default_nib(self):
-        return NIB(
-            SequenceNum=0,
-            PassiveAckTimeout=5,
-            MaxBroadcastRetries=2,
-            MaxChildren=0,
-            MaxDepth=20,
-            MaxRouters=0,
-            dummyNeighborTable=0,
-            BroadcastDeliveryTime=30,
-            ReportConstantCost=0,
-            RouteDiscRetries=0,
-            dummyRoutingTable=0,
-            SecureAllFrames=1,
-            SecurityLevel=5,
-            SymLink=1,
-            CapabilityFlags=143,
-            TransactionPersistenceTime=7,
-            nwkProtocolVersion=2,
-            RouteDiscoveryTime=5,
-            RouteExpiryTime=30,
-            nwkDevAddress=0xFFFE,
-            nwkLogicalChannel=0,
-            nwkCoordAddress=0xFFFE,
-            nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
-            nwkPanId=0xFFFF,
-            nwkState=NwkState.NWK_INIT,
-            channelList=t.Channels.NO_CHANNELS,
-            beaconOrder=15,
-            superFrameOrder=15,
-            scanDuration=0,
-            battLifeExt=0,
-            allocatedRouterAddresses=0,
-            allocatedEndDeviceAddresses=0,
-            nodeDepth=0,
-            extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
-            nwkKeyLoaded=t.Bool.false,
-            spare1=t.NwkKeyDesc(
-                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            ),
-            spare2=t.NwkKeyDesc(
-                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            ),
-            spare3=0,
-            spare4=0,
-            nwkLinkStatusPeriod=60,
-            nwkRouterAgeLimit=3,
-            nwkUseMultiCast=t.Bool.false,
-            nwkIsConcentrator=t.Bool.true,
-            nwkConcentratorDiscoveryTime=120,
-            nwkConcentratorRadius=10,
-            nwkAllFresh=1,
-            nwkManagerAddr=0x0000,
-            nwkTotalTransmissions=0,
-            nwkUpdateId=0,
-        )
-
     @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
     def node_desc_responder(self, req):
         if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
@@ -939,63 +951,6 @@ class BaseZStack3CC2531(BaseZStack3Device):
             CodeRevision=20190425,
             BootloaderBuildType=c.sys.BootloaderBuildType.BUILT_AS_BIN,
             BootloaderRevision=0,
-        )
-
-    def _default_nib(self):
-        return NIB(
-            SequenceNum=0,
-            PassiveAckTimeout=5,
-            MaxBroadcastRetries=2,
-            MaxChildren=0,
-            MaxDepth=20,
-            MaxRouters=0,
-            dummyNeighborTable=0,
-            BroadcastDeliveryTime=30,
-            ReportConstantCost=0,
-            RouteDiscRetries=0,
-            dummyRoutingTable=0,
-            SecureAllFrames=1,
-            SecurityLevel=5,
-            SymLink=1,
-            CapabilityFlags=143,
-            TransactionPersistenceTime=7,
-            nwkProtocolVersion=2,
-            RouteDiscoveryTime=5,
-            RouteExpiryTime=30,
-            nwkDevAddress=0xFFFE,
-            nwkLogicalChannel=0,
-            nwkCoordAddress=0xFFFE,
-            nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
-            nwkPanId=0xFFFF,
-            nwkState=NwkState.NWK_INIT,
-            channelList=t.Channels.NO_CHANNELS,
-            beaconOrder=15,
-            superFrameOrder=15,
-            scanDuration=0,
-            battLifeExt=0,
-            allocatedRouterAddresses=0,
-            allocatedEndDeviceAddresses=0,
-            nodeDepth=0,
-            extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
-            nwkKeyLoaded=t.Bool.false,
-            spare1=t.NwkKeyDesc(
-                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            ),
-            spare2=t.NwkKeyDesc(
-                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            ),
-            spare3=0,
-            spare4=0,
-            nwkLinkStatusPeriod=60,
-            nwkRouterAgeLimit=3,
-            nwkUseMultiCast=t.Bool.false,
-            nwkIsConcentrator=t.Bool.true,
-            nwkConcentratorDiscoveryTime=120,
-            nwkConcentratorRadius=10,
-            nwkAllFresh=1,
-            nwkManagerAddr=0x0000,
-            nwkTotalTransmissions=0,
-            nwkUpdateId=0,
         )
 
     node_desc_responder = BaseZStack1CC2531.node_desc_responder
