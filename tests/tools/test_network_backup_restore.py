@@ -5,7 +5,6 @@ import pytest
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp.nib import NIB
 from zigpy_znp.znp.utils import NetworkInfo
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.znp.security import StoredDevice
@@ -184,7 +183,7 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
 
     # The NIB should contain correct values
     nib = znp_server.nvram_deserialize(
-        znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB
+        znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.NIB], t.NIB
     )
     assert nib.channelList == t.Channels.from_channel_list([15, 20, 25])
     assert nib.nwkUpdateId == 2

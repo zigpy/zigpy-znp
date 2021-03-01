@@ -7,7 +7,6 @@ import argparse
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
-from zigpy_znp.znp.nib import NIB
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.znp.security import StoredDevice, write_devices, write_tc_frame_counter
@@ -67,7 +66,7 @@ async def restore_network(
 
     await znp.nvram.osal_write(OsalNvIds.EXTADDR, coordinator_ieee)
 
-    nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
+    nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
     nib.channelList = t.Channels.from_channel_list(backup["channel_mask"])
     nib.nwkUpdateId = backup["nwk_update_id"]
     nib.SecurityLevel = backup["security_level"]
