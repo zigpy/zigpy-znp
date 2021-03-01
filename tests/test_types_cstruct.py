@@ -1,6 +1,7 @@
 import pytest
 
 import zigpy_znp.types as t
+from zigpy_znp.znp.nib import NIB, NwkState
 
 
 def test_struct_fields():
@@ -133,11 +134,15 @@ def test_struct_aligned_serialization_deserialization():
 
 def test_struct_aligned_nested_serialization_deserialization():
     class Inner(t.CStruct):
+        _padding_byte = b"\xCD"
+
         c: t.uint8_t
         d: t.uint32_t
         e: t.uint8_t
 
     class TestStruct(t.CStruct):
+        _padding_byte = b"\xAB"
+
         a: t.uint8_t
         b: Inner
         f: t.uint16_t
@@ -146,13 +151,13 @@ def test_struct_aligned_nested_serialization_deserialization():
     expected += t.uint8_t(1).serialize()
 
     # Inner struct
-    expected += b"\xFF\xFF\xFF" + t.uint8_t(2).serialize()
-    expected += b"\xFF\xFF\xFF" + t.uint32_t(3).serialize()
+    expected += b"\xAB\xAB\xAB" + t.uint8_t(2).serialize()
+    expected += b"\xCD\xCD\xCD" + t.uint32_t(3).serialize()
     expected += t.uint8_t(4).serialize()
-    expected += b"\xFF\xFF\xFF"  # Aligned to 4 bytes
+    expected += b"\xCD\xCD\xCD"  # Aligned to 4 bytes
 
     expected += t.uint16_t(5).serialize()
-    expected += b"\xFF\xFF"  # Also aligned to 4 bytes due to inner struct
+    expected += b"\xAB\xAB"  # Also aligned to 4 bytes due to inner struct
 
     struct = TestStruct(a=1, b=Inner(c=2, d=3, e=4), f=5)
     assert struct.serialize(align=True) == expected
@@ -259,3 +264,145 @@ def test_struct_incomplete_serialization():
 
     with pytest.raises(ValueError):
         struct.serialize()
+
+
+def test_old_nib_deserialize():
+    PaddingByte = t.uint8_t
+
+    class NwkState16(t.enum_uint16):
+        NWK_INIT = 0
+        NWK_JOINING_ORPHAN = 1
+        NWK_DISC = 2
+        NWK_JOINING = 3
+        NWK_ENDDEVICE = 4
+        PAN_CHNL_SELECTION = 5
+        PAN_CHNL_VERIFY = 6
+        PAN_STARTING = 7
+        NWK_ROUTER = 8
+        NWK_REJOINING = 9
+
+    class OldNIB(t.CStruct):
+        SequenceNum: t.uint8_t
+        PassiveAckTimeout: t.uint8_t
+        MaxBroadcastRetries: t.uint8_t
+        MaxChildren: t.uint8_t
+        MaxDepth: t.uint8_t
+        MaxRouters: t.uint8_t
+        dummyNeighborTable: t.uint8_t
+        BroadcastDeliveryTime: t.uint8_t
+        ReportConstantCost: t.uint8_t
+        RouteDiscRetries: t.uint8_t
+        dummyRoutingTable: t.uint8_t
+        SecureAllFrames: t.uint8_t
+        SecurityLevel: t.uint8_t
+        SymLink: t.uint8_t
+        CapabilityFlags: t.uint8_t
+        PaddingByte0: PaddingByte
+        TransactionPersistenceTime: t.uint16_t
+        nwkProtocolVersion: t.uint8_t
+        RouteDiscoveryTime: t.uint8_t
+        RouteExpiryTime: t.uint8_t
+        PaddingByte1: PaddingByte
+        nwkDevAddress: t.NWK
+        nwkLogicalChannel: t.uint8_t
+        PaddingByte2: PaddingByte
+        nwkCoordAddress: t.NWK
+        nwkCoordExtAddress: t.EUI64
+        nwkPanId: t.uint16_t
+        nwkState: NwkState16
+        channelList: t.Channels
+        beaconOrder: t.uint8_t
+        superFrameOrder: t.uint8_t
+        scanDuration: t.uint8_t
+        battLifeExt: t.uint8_t
+        allocatedRouterAddresses: t.uint32_t
+        allocatedEndDeviceAddresses: t.uint32_t
+        nodeDepth: t.uint8_t
+        extendedPANID: t.EUI64
+        nwkKeyLoaded: t.Bool
+        spare1: t.NwkKeyDesc
+        spare2: t.NwkKeyDesc
+        spare3: t.uint8_t
+        spare4: t.uint8_t
+        nwkLinkStatusPeriod: t.uint8_t
+        nwkRouterAgeLimit: t.uint8_t
+        nwkUseMultiCast: t.Bool
+        nwkIsConcentrator: t.Bool
+        nwkConcentratorDiscoveryTime: t.uint8_t
+        nwkConcentratorRadius: t.uint8_t
+        nwkAllFresh: t.uint8_t
+        PaddingByte3: PaddingByte
+        nwkManagerAddr: t.NWK
+        nwkTotalTransmissions: t.uint16_t
+        nwkUpdateId: t.uint8_t
+        PaddingByte4: PaddingByte
+
+    nib = NIB(
+        SequenceNum=54,
+        PassiveAckTimeout=5,
+        MaxBroadcastRetries=2,
+        MaxChildren=51,
+        MaxDepth=15,
+        MaxRouters=51,
+        dummyNeighborTable=0,
+        BroadcastDeliveryTime=30,
+        ReportConstantCost=0,
+        RouteDiscRetries=0,
+        dummyRoutingTable=0,
+        SecureAllFrames=1,
+        SecurityLevel=5,
+        SymLink=1,
+        CapabilityFlags=143,
+        TransactionPersistenceTime=7,
+        nwkProtocolVersion=2,
+        RouteDiscoveryTime=13,
+        RouteExpiryTime=30,
+        nwkDevAddress=0x0000,
+        nwkLogicalChannel=25,
+        nwkCoordAddress=0x0000,
+        nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+        nwkPanId=0xABCD,
+        nwkState=NwkState.NWK_ROUTER,
+        channelList=t.Channels.CHANNEL_25,
+        beaconOrder=15,
+        superFrameOrder=15,
+        scanDuration=4,
+        battLifeExt=0,
+        allocatedRouterAddresses=1,
+        allocatedEndDeviceAddresses=1,
+        nodeDepth=0,
+        extendedPANID=t.EUI64.convert("AA:BB:CC:DD:EE:FF:00:11"),
+        nwkKeyLoaded=t.Bool(True),
+        spare1=t.NwkKeyDesc(KeySeqNum=0, Key=16 * [0]),
+        spare2=t.NwkKeyDesc(KeySeqNum=0, Key=16 * [0]),
+        spare3=0,
+        spare4=0,
+        nwkLinkStatusPeriod=15,
+        nwkRouterAgeLimit=5,
+        nwkUseMultiCast=t.Bool(False),
+        nwkIsConcentrator=t.Bool(True),
+        nwkConcentratorDiscoveryTime=120,
+        nwkConcentratorRadius=10,
+        nwkAllFresh=1,
+        nwkManagerAddr=0x0000,
+        nwkTotalTransmissions=39020,
+        nwkUpdateId=0,
+    )
+
+    # Make sure all the same fields exist
+    assert [f.name for f in NIB.fields] == [
+        f.name for f in OldNIB.fields if not f.name.startswith("PaddingByte")
+    ]
+
+    # Make sure the new NIB can be deserialized by the new NIB struct
+    old_nib, remaining = OldNIB.deserialize(nib.serialize(align=True))
+    assert not remaining
+
+    # And vice versa
+    new_nib, remaining = NIB.deserialize(old_nib.serialize(), align=True)
+    assert not remaining
+    assert new_nib == nib
+
+    # And they are deserialized correctly
+    for field in nib.fields:
+        assert getattr(nib, field.name) == getattr(old_nib, field.name)

@@ -15,6 +15,10 @@ class NwkState(t.enum_uint8):
 
 
 class NIB(t.CStruct):
+    # NwkState is 16 bits on newer platforms but we cheat a little and make it 8, since
+    # its max value is 8. However, we can't allow values like 0xFF08 to be serialized.
+    _padding_byte = b"\x00"
+
     SequenceNum: t.uint8_t
     PassiveAckTimeout: t.uint8_t
     MaxBroadcastRetries: t.uint8_t
@@ -44,6 +48,8 @@ class NIB(t.CStruct):
     nwkCoordAddress: t.NWK
     nwkCoordExtAddress: t.EUI64
     nwkPanId: t.uint16_t
+
+    # XXX: this is really a uint16_t but we pad with zeroes so it works out in the end
     nwkState: NwkState
     channelList: t.Channels
 

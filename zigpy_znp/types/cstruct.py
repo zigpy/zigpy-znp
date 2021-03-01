@@ -13,6 +13,8 @@ class ListSubclass(list):
 
 
 class CStruct:
+    _padding_byte = b"\xFF"
+
     def __init_subclass__(cls):
         super().__init_subclass__()
 
@@ -138,7 +140,7 @@ class CStruct:
                     f" {type(value)} to {field.type}"
                 ) from e
 
-            result += b"\xFF" * padding
+            result += self._padding_byte * padding
 
             if isinstance(value, CStruct):
                 result += value.serialize(align=align)
@@ -146,7 +148,7 @@ class CStruct:
                 result += value.serialize()
 
         # Pad the result to our final length
-        return result.ljust(self.get_size(align=align), b"\xFF")
+        return result.ljust(self.get_size(align=align), self._padding_byte)
 
     @classmethod
     def deserialize(cls, data: bytes, *, align=False) -> typing.Tuple["CStruct", bytes]:
