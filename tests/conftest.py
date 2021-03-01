@@ -19,7 +19,6 @@ import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.uart import ZnpMtProtocol
 from zigpy_znp.nvram import NVRAMHelper
-from zigpy_znp.znp.nib import NIB, NwkState
 from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds, is_secure_nvid
 from zigpy_znp.tools.energy_scan import channels_from_channel_mask
 from zigpy_znp.zigbee.application import ControllerApplication
@@ -451,7 +450,9 @@ class BaseZStackDevice(BaseServerZNP):
     @property
     def nib(self):
         try:
-            v = self.nvram_deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB], NIB)
+            v = self.nvram_deserialize(
+                self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB], t.NIB
+            )
         except KeyError:
             v = self._default_nib()
 
@@ -459,7 +460,7 @@ class BaseZStackDevice(BaseServerZNP):
 
     @nib.setter
     def nib(self, nib):
-        assert isinstance(nib, NIB)
+        assert isinstance(nib, t.NIB)
         self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB] = self.nvram_serialize(nib)
 
     @reply_to(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
@@ -568,13 +569,13 @@ class BaseZStack1CC2531(BaseZStackDevice):
         )
 
     def _default_nib(self):
-        return NIB.deserialize(
+        return t.NIB.deserialize(
             load_nvram_json("CC2531-ZStack1.reset.json")[ExNvIds.LEGACY][OsalNvIds.NIB]
         )[0]
 
     @reply_to(c.ZDO.StartupFromApp.Req(partial=True))
     def startup_from_app(self, req):
-        if self.nib.nwkState == NwkState.NWK_ROUTER:
+        if self.nib.nwkState == t.NwkState.NWK_ROUTER:
             return [
                 c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.RestoredNetworkState),
                 self.update_device_state(t.DeviceState.StartedAsCoordinator),
@@ -583,7 +584,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
 
             def update_logical_channel(req):
                 nib = self.nib
-                nib.nwkState = NwkState.NWK_ROUTER
+                nib.nwkState = t.NwkState.NWK_ROUTER
                 nib.channelList, _ = t.Channels.deserialize(
                     self._nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
                 )
@@ -668,7 +669,7 @@ class BaseZStack3Device(BaseZStackDevice):
         self._first_connection = True
 
     def _default_nib(self):
-        return NIB(
+        return t.NIB(
             SequenceNum=0,
             PassiveAckTimeout=5,
             MaxBroadcastRetries=2,
@@ -693,7 +694,7 @@ class BaseZStack3Device(BaseZStackDevice):
             nwkCoordAddress=0xFFFE,
             nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
             nwkPanId=0xFFFF,
-            nwkState=NwkState.NWK_INIT,
+            nwkState=t.NwkState.NWK_INIT,
             channelList=t.Channels.NO_CHANNELS,
             beaconOrder=15,
             superFrameOrder=15,
@@ -785,7 +786,7 @@ class BaseZStack3Device(BaseZStackDevice):
                 nib.nwkLogicalChannel = list(
                     channels_from_channel_mask(nib.channelList)
                 )[0]
-                nib.nwkState = NwkState.NWK_ROUTER
+                nib.nwkState = t.NwkState.NWK_ROUTER
                 nib.nwkPanId, _ = t.NWK.deserialize(
                     self._nvram[ExNvIds.LEGACY][OsalNvIds.PANID]
                 )

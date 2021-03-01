@@ -1,7 +1,6 @@
 import pytest
 
 import zigpy_znp.types as t
-from zigpy_znp.znp.nib import NIB, NwkState
 
 
 def test_struct_fields():
@@ -337,7 +336,7 @@ def test_old_nib_deserialize():
         nwkUpdateId: t.uint8_t
         PaddingByte4: PaddingByte
 
-    nib = NIB(
+    nib = t.NIB(
         SequenceNum=54,
         PassiveAckTimeout=5,
         MaxBroadcastRetries=2,
@@ -362,7 +361,7 @@ def test_old_nib_deserialize():
         nwkCoordAddress=0x0000,
         nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
         nwkPanId=0xABCD,
-        nwkState=NwkState.NWK_ROUTER,
+        nwkState=t.NwkState.NWK_ROUTER,
         channelList=t.Channels.CHANNEL_25,
         beaconOrder=15,
         superFrameOrder=15,
@@ -390,7 +389,7 @@ def test_old_nib_deserialize():
     )
 
     # Make sure all the same fields exist
-    assert [f.name for f in NIB.fields] == [
+    assert [f.name for f in t.NIB.fields] == [
         f.name for f in OldNIB.fields if not f.name.startswith("PaddingByte")
     ]
 
@@ -399,7 +398,7 @@ def test_old_nib_deserialize():
     assert not remaining
 
     # And vice versa
-    new_nib, remaining = NIB.deserialize(old_nib.serialize(), align=True)
+    new_nib, remaining = t.NIB.deserialize(old_nib.serialize(), align=True)
     assert not remaining
     assert new_nib == nib
 

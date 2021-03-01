@@ -25,7 +25,6 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp.nib import NIB
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
@@ -405,7 +404,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.reset()
 
-        nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
+        nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
         nib.nwkPanId = pan_id
 
         await self._znp.nvram.osal_write(OsalNvIds.NIB, nib)
@@ -546,7 +545,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # not appear to be any user-facing MT command to read this information.
         while True:
             try:
-                nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
+                nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
 
                 LOGGER.debug("Current NIB is %s", nib)
 

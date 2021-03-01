@@ -3,9 +3,21 @@ import typing
 import logging
 import dataclasses
 
-from zigpy.types import NWK, EUI64, PanId, KeyData, ClusterId, ExtendedPanId
+from zigpy.types import (  # noqa: F401
+    NWK,
+    EUI64,
+    Bool,
+    PanId,
+    Struct,
+    KeyData,
+    Channels,
+    ClusterId,
+    ExtendedPanId,
+    CharacterString,
+)
+from zigpy.zdo.types import Status as ZDOStatus  # noqa: F401
 
-from . import basic, cstruct
+from . import basic
 
 LOGGER = logging.getLogger(__name__)
 
@@ -122,23 +134,6 @@ class AddrModeAddress:
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(mode={self.mode!r}, address={self.address!r})"
-
-
-class Beacon(cstruct.CStruct):
-    """Beacon message."""
-
-    Src: NWK
-    PanId: PanId
-    Channel: basic.uint8_t
-    PermitJoining: basic.uint8_t
-    RouterCapacity: basic.uint8_t
-    DeviceCapacity: basic.uint8_t
-    ProtocolVersion: basic.uint8_t
-    StackProfile: basic.uint8_t
-    LQI: basic.uint8_t
-    Depth: basic.uint8_t
-    UpdateId: basic.uint8_t
-    ExtendedPanId: ExtendedPanId
 
 
 class GroupId(basic.uint16_t, hex_repr=True):
@@ -439,125 +434,4 @@ class ClusterIdList(basic.LVList, item_type=ClusterId, length_type=basic.uint8_t
 
 
 class NWKList(basic.LVList, item_type=NWK, length_type=basic.uint8_t):
-    pass
-
-
-class TCLinkKey(cstruct.CStruct):
-    ExtAddr: EUI64
-    Key: KeyData
-    TxFrameCounter: basic.uint32_t
-    RxFrameCounter: basic.uint32_t
-
-
-class NwkKeyDesc(cstruct.CStruct):
-    KeySeqNum: basic.uint8_t
-    Key: KeyData
-
-
-class NwkActiveKeyItems(cstruct.CStruct):
-    Active: NwkKeyDesc
-    FrameCounter: basic.uint32_t
-
-
-class KeyType(MissingEnumMixin, basic.enum_uint8):
-    NONE = 0
-
-    # Standard Network Key
-    NWK = 1
-    # Application Master Key
-    APP_MASTER = 2
-    # Application Link Key
-    APP_LINK = 3
-    # Trust Center Link Key
-    TC_LINK = 4
-
-    # XXX: just "6" in the Z-Stack source
-    UNKNOWN_6 = 6
-
-
-class KeyAttributes(basic.enum_uint8):
-    # Used for IC derived keys
-    PROVISIONAL_KEY = 0x00
-    # Unique key that is not verified
-    UNVERIFIED_KEY = 0x01
-    # Unique key that got verified by ZC
-    VERIFIED_KEY = 0x02
-
-    # Internal definitions
-
-    # Use default key to join
-    DISTRIBUTED_DEFAULT_KEY = 0xFC
-    # Joined a network which is not R21 nwk, so TCLK process finished.
-    NON_R21_NWK_JOINED = 0xFD
-    # Unique key that got verified by Joining device.
-    # This means that key is stored as plain text (not seed hashed)
-    VERIFIED_KEY_JOINING_DEV = 0xFE
-    # Entry using default key
-    DEFAULT_KEY = 0xFF
-
-
-class TCLKDevEntry(cstruct.CStruct):
-    txFrmCntr: basic.uint32_t
-    rxFrmCntr: basic.uint32_t
-
-    extAddr: EUI64
-    keyAttributes: KeyAttributes
-    keyType: KeyType
-
-    # For Unique key this is the number of shifts
-    # for IC this is the offset on the NvId index
-    SeedShift_IcIndex: basic.uint8_t
-
-
-class NwkSecMaterialDesc(cstruct.CStruct):
-    FrameCounter: basic.uint32_t
-    ExtendedPanID: EUI64
-
-
-class AddrMgrUserType(basic.enum_flag_uint8):
-    Default = 0x00
-    Assoc = 0x01
-    Security = 0x02
-    Binding = 0x04
-    Private1 = 0x08
-
-
-class AddrMgrEntry(cstruct.CStruct):
-    type: AddrMgrUserType
-    nwkAddr: NWK
-    extAddr: EUI64
-
-
-EMPTY_ADDR_MGR_ENTRY = AddrMgrEntry(
-    type=AddrMgrUserType(0xFF),
-    nwkAddr=0xFFFF,
-    extAddr=EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
-)
-
-
-class AddressManagerTable(basic.CompleteList, item_type=AddrMgrEntry):
-    pass
-
-
-class AuthenticationOption(basic.enum_uint8):
-    NotAuthenticated = 0x00
-    AuthenticatedCBCK = 0x01
-    AuthenticatedEA = 0x02
-
-
-class APSKeyDataTableEntry(cstruct.CStruct):
-    Key: KeyData
-    TxFrameCounter: basic.uint32_t
-    RxFrameCounter: basic.uint32_t
-
-
-class APSLinkKeyTableEntry(cstruct.CStruct):
-    AddressManagerIndex: basic.uint16_t
-    LinkKeyNvId: basic.uint16_t
-    AuthenticationState: AuthenticationOption
-
-
-class APSLinkKeyTable(
-    basic.LVList, length_type=basic.uint16_t, item_type=APSLinkKeyTableEntry
-):
     pass

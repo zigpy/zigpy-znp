@@ -1,7 +1,6 @@
 import dataclasses
 
 import zigpy_znp.types as t
-from zigpy_znp.znp.nib import NIB
 from zigpy_znp.exceptions import CommandNotRecognized
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
@@ -40,7 +39,7 @@ async def load_network_info(znp) -> NetworkInfo:
             is_on_network = False
 
     try:
-        nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=NIB)
+        nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
         is_on_network = nib.nwkLogicalChannel != 0 and nib.nwkKeyLoaded
     except KeyError:
         is_on_network = False
