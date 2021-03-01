@@ -2,7 +2,6 @@ import sys
 import json
 import typing
 import asyncio
-import logging
 import argparse
 
 import zigpy_znp.types as t
@@ -12,7 +11,7 @@ from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.znp.security import StoredDevice, write_devices, write_tc_frame_counter
 from zigpy_znp.zigbee.application import ControllerApplication
 
-LOGGER = logging.getLogger(__name__)
+BACKUP_VERSION = 1
 
 
 async def restore_network(
@@ -20,7 +19,14 @@ async def restore_network(
     backup: typing.Dict[str, typing.Any],
     counter_increment: int,
 ):
-    LOGGER.info("Starting up zigpy-znp")
+    backup_format = backup.get("metadata", {}).get("format")
+    backup_version = backup.get("metadata", {}).get("version")
+
+    if backup_format != "zigpy/open-coordinator-backup":
+        raise ValueError(f"Backup format not recognized: {backup_format!r}")
+
+    if backup_version != BACKUP_VERSION:
+        raise ValueError(f"Backup format version is not compatible: {backup_version}")
 
     pan_id, _ = t.NWK.deserialize(bytes.fromhex(backup["pan_id"])[::-1])
     extended_pan_id, _ = t.EUI64.deserialize(

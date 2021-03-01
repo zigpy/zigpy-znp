@@ -93,7 +93,7 @@ async def read_tc_frame_counter(znp: ZNP) -> t.uint32_t:
             global_entry = entry
 
     if global_entry is None:
-        raise RuntimeError("No security material entry was found for this network")
+        raise ValueError("No security material entry was found for this network")
 
     return global_entry.FrameCounter
 
@@ -109,9 +109,6 @@ async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t):
 
         return
 
-    best_entry = None
-    best_address = None
-
     if znp.version == 3.0:
         address = OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START
         entries = znp.nvram.osal_read_table(
@@ -126,6 +123,9 @@ async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t):
             item_type=t.NwkSecMaterialDesc,
         )
 
+    best_entry = None
+    best_address = None
+
     async for entry in entries:
         if entry.ExtendedPanID == znp.network_info.extended_pan_id:
             best_entry = entry
@@ -138,8 +138,9 @@ async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t):
             best_address = address
 
         address += 0x0001
-    else:
-        raise RuntimeError("Failed to find open slot for security material entry")
+
+    if best_entry is None:
+        raise ValueError("Failed to find open slot for security material entry")
 
     best_entry.FrameCounter = counter
 
@@ -172,7 +173,7 @@ async def read_addr_mgr_entries(znp: ZNP):
     return entries
 
 
-async def read_hashed_link_keys(znp, tclk_seed):
+async def read_hashed_link_keys(znp: ZNP, tclk_seed: bytes):
     if tclk_seed is None:
         return
 
@@ -204,7 +205,9 @@ async def read_hashed_link_keys(znp, tclk_seed):
         yield entry.extAddr, entry.txFrmCntr, entry.rxFrmCntr, link_key
 
 
-async def read_unhashed_link_keys(znp, addr_mgr_entries):
+async def read_unhashed_link_keys(
+    znp: ZNP, addr_mgr_entries: typing.List[t.AddrMgrEntry]
+):
     if znp.version == 3.30:
         link_key_offset_base = 0x0000
         table = znp.nvram.read_table(
@@ -332,9 +335,9 @@ async def write_addr_manager_entries(znp: ZNP, devices):
 
 async def write_devices(
     znp: ZNP,
-    devices: typing.Iterable[typing.Dict],
+    devices: typing.Sequence[StoredDevice],
     counter_increment: t.uint32_t = 2500,
-    seed=None,
+    seed: bytes = None,
 ):
     # Make sure we prioritize the devices with keys if there is no room
     # devices = sorted(devices, key=lambda e: e.get("link_key") is None)
