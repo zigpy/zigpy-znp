@@ -18,6 +18,9 @@ class NetworkInfo:
     network_key: t.KeyData
     network_key_seq: t.uint8_t
 
+    def replace(self, **kwargs):
+        return dataclasses.replace(self, **kwargs)
+
 
 async def load_network_info(znp) -> NetworkInfo:
     """

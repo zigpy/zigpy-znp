@@ -140,6 +140,39 @@ async def make_znp_server(mocker):
     yield inner
 
 
+@pytest.fixture
+def make_connected_znp(make_znp_server, mocker):
+    async def inner(server_cls):
+        config = conf.CONFIG_SCHEMA(
+            {
+                conf.CONF_DEVICE: {conf.CONF_DEVICE_PATH: FAKE_SERIAL_PORT},
+                conf.CONF_ZNP_CONFIG: {conf.CONF_SKIP_BOOTLOADER: False},
+            }
+        )
+
+        mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0)
+
+        znp = ZNP(config)
+        znp_server = make_znp_server(server_cls=server_cls)
+
+        await znp.connect(test_port=False)
+
+        znp.nvram.align_structs = server_cls.align_structs
+        znp.version = server_cls.version
+        znp.capabilities = t.MTCapabilities(0)
+
+        return znp, znp_server
+
+    return inner
+
+
+@pytest.fixture
+def connected_znp(event_loop, make_connected_znp):
+    znp, znp_server = event_loop.run_until_complete(make_connected_znp(BaseServerZNP))
+    yield znp, znp_server
+    znp.close()
+
+
 def simple_deepcopy(d):
     if not hasattr(d, "copy"):
         return d
@@ -204,6 +237,7 @@ def make_application(make_znp_server):
 
 class BaseServerZNP(ZNP):
     align_structs = False
+    version = None
 
     def _flatten_responses(self, request, responses):
         if responses is None:
@@ -519,6 +553,7 @@ class BaseZStackDevice(BaseServerZNP):
 
 class BaseZStack1CC2531(BaseZStackDevice):
     align_structs = False
+    version = 1.2
 
     @reply_to(c.SYS.OSALNVRead.Req(partial=True))
     @reply_to(c.SYS.OSALNVReadExt.Req(partial=True))
@@ -845,6 +880,7 @@ class BaseZStack3Device(BaseZStackDevice):
 
 
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):
+    version = 3.30
     align_structs = True
 
     @reply_to(c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, partial=True))
@@ -939,6 +975,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
 
 class BaseZStack3CC2531(BaseZStack3Device):
+    version = 3.0
     align_structs = False
 
     @reply_to(c.SYS.Version.Req())

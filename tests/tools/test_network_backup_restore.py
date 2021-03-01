@@ -5,9 +5,9 @@ import pytest
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 from zigpy_znp.api import ZNP
+from zigpy_znp.znp import security
 from zigpy_znp.znp.utils import NetworkInfo
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
-from zigpy_znp.znp.security import StoredDevice
 from zigpy_znp.tools.energy_scan import channels_from_channel_mask
 from zigpy_znp.zigbee.application import ControllerApplication
 from zigpy_znp.tools.network_backup import main as network_backup
@@ -19,9 +19,24 @@ from ..conftest import (
     FORMED_DEVICES,
     CoroutineMock,
     BaseZStack1CC2531,
+    BaseZStack3CC2531,
+    BaseLaunchpadCC26X2R1,
 )
 
 pytestmark = [pytest.mark.asyncio]
+
+BARE_NETWORK_INFO = NetworkInfo(
+    extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
+    ieee=None,
+    nwk=None,
+    channel=None,
+    channels=None,
+    pan_id=None,
+    nwk_update_id=None,
+    security_level=None,
+    network_key=None,
+    network_key_seq=None,
+)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -155,20 +170,7 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
 
     load_nwk_info_mock = mocker.patch(
         "zigpy_znp.api.load_network_info",
-        new=CoroutineMock(
-            return_value=NetworkInfo(
-                extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
-                ieee=None,
-                nwk=None,
-                channel=None,
-                channels=None,
-                pan_id=None,
-                nwk_update_id=None,
-                security_level=None,
-                network_key=None,
-                network_key_seq=None,
-            )
-        ),
+        new=CoroutineMock(return_value=BARE_NETWORK_INFO),
     )
 
     write_tc_counter_mock = mocker.patch(
@@ -211,7 +213,7 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
         )
 
     assert sorted(write_devices_call[1][1], key=lambda d: d.nwk) == [
-        StoredDevice(
+        security.StoredDevice(
             ieee=t.EUI64.convert("00:0b:57:ff:fe:38:b2:12"),
             nwk=0x9672,
             aps_link_key=t.KeyData.deserialize(
@@ -220,7 +222,7 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
             rx_counter=123,
             tx_counter=456,
         ),
-        StoredDevice(
+        security.StoredDevice(
             ieee=t.EUI64.convert("aa:bb:cc:dd:ee:ff:00:11"),
             nwk=0xABCD,
             aps_link_key=t.KeyData.deserialize(
@@ -229,8 +231,102 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
             rx_counter=112233,
             tx_counter=445566,
         ),
-        StoredDevice(
+        security.StoredDevice(
             ieee=t.EUI64.convert("00:0b:57:ff:fe:36:b9:a0"),
             nwk=0xF319,
         ),
     ]
+
+
+async def test_tc_frame_counter_zstack1(make_connected_znp):
+    znp, znp_server = await make_connected_znp(BaseZStack1CC2531)
+    znp_server._nvram[ExNvIds.LEGACY] = {
+        OsalNvIds.NWKKEY: b"\x01" + b"\xAB" * 16 + b"\x78\x56\x34\x12"
+    }
+
+    assert (await security.read_tc_frame_counter(znp)) == 0x12345678
+
+    await security.write_tc_frame_counter(znp, 0xAABBCCDD)
+    assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
+
+
+async def test_tc_frame_counter_zstack30(make_connected_znp):
+    znp, znp_server = await make_connected_znp(BaseZStack3CC2531)
+    znp.network_info = BARE_NETWORK_INFO
+    znp_server._nvram[ExNvIds.LEGACY] = {
+        # This value is ignored
+        OsalNvIds.NWKKEY: b"\x01" + b"\xAB" * 16 + b"\x78\x56\x34\x12",
+        # Wrong EPID, ignored
+        OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START: bytes.fromhex(
+            "0f000000058eea0f004b1200"
+        ),
+        # Exact EPID match, used
+        (OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START + 1): bytes.fromhex("01000000")
+        + BARE_NETWORK_INFO.extended_pan_id.serialize(),
+        # Generic EPID but ignored since EPID matches
+        (OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START + 2): bytes.fromhex("02000000")
+        + b"\xFF" * 8,
+    }
+
+    assert (await security.read_tc_frame_counter(znp)) == 0x00000001
+
+    # If we change the EPID, the generic entry will be used
+    old_nwk_info = znp.network_info
+    znp.network_info = znp.network_info.replace(
+        extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
+    )
+    assert (await security.read_tc_frame_counter(znp)) == 0x00000002
+
+    # Changing the frame counter will always change the global entry in this case
+    await security.write_tc_frame_counter(znp, 0xAABBCCDD)
+    assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
+    assert znp_server._nvram[ExNvIds.LEGACY][
+        OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START + 2
+    ].startswith(t.uint32_t(0xAABBCCDD).serialize())
+
+    # Global entry is ignored if the EPID matches
+    znp.network_info = old_nwk_info
+    assert (await security.read_tc_frame_counter(znp)) == 0x00000001
+    await security.write_tc_frame_counter(znp, 0xABCDABCD)
+    assert znp_server._nvram[ExNvIds.LEGACY][
+        OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START + 1
+    ].startswith(t.uint32_t(0xABCDABCD).serialize())
+
+
+async def test_tc_frame_counter_zstack33(make_connected_znp):
+    znp, znp_server = await make_connected_znp(BaseLaunchpadCC26X2R1)
+    znp.network_info = BARE_NETWORK_INFO
+    znp_server._nvram = {
+        ExNvIds.LEGACY: {
+            # This value is ignored
+            OsalNvIds.NWKKEY: bytes.fromhex(
+                "00c927e9ce1544c9aa42340e4d5dc4c257e4010001000000"
+            )
+        },
+        ExNvIds.NWK_SEC_MATERIAL_TABLE: {
+            # Wrong EPID, ignored
+            0x0000: bytes.fromhex("0100000037a7479777d7a224"),
+            # Right EPID, used
+            0x0001: bytes.fromhex("02000000")
+            + BARE_NETWORK_INFO.extended_pan_id.serialize(),
+        },
+    }
+
+    assert (await security.read_tc_frame_counter(znp)) == 0x00000002
+
+    # If we change the EPID, the generic entry will be used. It doesn't exist.
+    old_nwk_info = znp.network_info
+    znp.network_info = znp.network_info.replace(
+        extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
+    )
+
+    with pytest.raises(ValueError):
+        await security.read_tc_frame_counter(znp)
+
+    # The correct entry will be updated
+    znp.network_info = old_nwk_info
+    assert (await security.read_tc_frame_counter(znp)) == 0x00000002
+    await security.write_tc_frame_counter(znp, 0xABCDABCD)
+    assert znp_server._nvram[ExNvIds.NWK_SEC_MATERIAL_TABLE][0x0001].startswith(
+        t.uint32_t(0xABCDABCD).serialize()
+    )
