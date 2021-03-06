@@ -83,6 +83,7 @@ async def detect_zstack_version(znp) -> float:
         await znp.nvram.read(
             item_id=ExNvIds.TCLK_TABLE,
             sub_id=0x0000,
+            item_type=t.Bytes,
         )
         return 3.30
     except KeyError:

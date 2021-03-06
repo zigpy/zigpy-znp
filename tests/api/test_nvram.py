@@ -162,7 +162,7 @@ async def test_osal_read_success(connected_znp, nvid, value):
         responses=[c.SYS.OSALNVReadExt.Rsp(Status=t.Status.SUCCESS, Value=value)],
     )
 
-    result = await znp.nvram.osal_read(nvid)
+    result = await znp.nvram.osal_read(nvid, item_type=t.Bytes)
     await length_rsp
     await read_rsp
 
@@ -189,7 +189,7 @@ async def test_osal_read_long_success(connected_znp, nvid, value):
         responses=[c.SYS.OSALNVReadExt.Rsp(Status=t.Status.SUCCESS, Value=b"x")],
     )
 
-    result = await znp.nvram.osal_read(nvid)
+    result = await znp.nvram.osal_read(nvid, item_type=t.Bytes)
     await length_rsp
     await read_rsp1
     await read_rsp2
@@ -207,7 +207,7 @@ async def test_osal_read_failure(connected_znp, nvid):
     )
 
     with pytest.raises(KeyError):
-        await znp.nvram.osal_read(nvid)
+        await znp.nvram.osal_read(nvid, item_type=t.Bytes)
 
     await length_rsp
 
@@ -258,7 +258,7 @@ async def test_osal_read_security_bypass(connected_znp, nvid, value):
             ],
         )
 
-        result = await znp.nvram.osal_read(nvid)
+        result = await znp.nvram.osal_read(nvid, item_type=t.Bytes)
         assert result == value
 
         await length_rsp
@@ -266,7 +266,7 @@ async def test_osal_read_security_bypass(connected_znp, nvid, value):
         await sapi_read_rsp
     else:
         with pytest.raises(SecurityError):
-            await znp.nvram.osal_read(nvid)
+            await znp.nvram.osal_read(nvid, item_type=t.Bytes)
 
         await length_rsp
         await read_rsp
@@ -283,7 +283,7 @@ async def test_osal_read_proxied(connected_znp, nvid, value):
         responses=[c.SYS.OSALNVRead.Rsp(Status=t.Status.SUCCESS, Value=value)],
     )
 
-    result = await znp.nvram.osal_read(nvid)
+    result = await znp.nvram.osal_read(nvid, item_type=t.Bytes)
     await read_rsp
 
     assert result == value

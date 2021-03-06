@@ -229,7 +229,9 @@ async def read_unhashed_link_keys(
         return
 
     # The link key table's size is dynamic so it has junk at the end
-    link_key_table_raw = await znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
+    link_key_table_raw = await znp.nvram.osal_read(
+        OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
+    )
     link_key_table = znp.nvram.deserialize(
         link_key_table_raw, item_type=t.APSLinkKeyTable, allow_trailing=True
     )
@@ -399,7 +401,9 @@ async def write_devices(
     # Make sure the new table is the same size as the old table. Because this type is
     # prefixed by the number of entries, the trailing table bytes are not kept track of
     # but still necessary, as the table has a static maximum capacity.
-    old_link_key_table = await znp.nvram.osal_read(OsalNvIds.APS_LINK_KEY_TABLE)
+    old_link_key_table = await znp.nvram.osal_read(
+        OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
+    )
     unpadded_link_key_table = znp.nvram.serialize(link_key_table)
     new_link_key_table_value = unpadded_link_key_table.ljust(
         len(old_link_key_table), b"\x00"

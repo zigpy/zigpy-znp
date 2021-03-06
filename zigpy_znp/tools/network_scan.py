@@ -47,12 +47,14 @@ async def network_scan(
     # state in the NIB, which we have to temporarily delete in order for the scan to be
     # possible.
     if znp.version == 1.2:
-        previous_nib = await znp.nvram.osal_read(OsalNvIds.NIB)
+        previous_nib = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
         await znp.nvram.osal_delete(OsalNvIds.NIB)
     else:
         previous_nib = None
 
-    previous_channels = await znp.nvram.osal_read(OsalNvIds.CHANLIST)
+    previous_channels = await znp.nvram.osal_read(
+        OsalNvIds.CHANLIST, item_type=t.Channels
+    )
     await znp.nvram.osal_write(OsalNvIds.CHANLIST, t.Channels.ALL_CHANNELS)
 
     try:

@@ -4,6 +4,7 @@ import asyncio
 import logging
 import argparse
 
+import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
@@ -34,7 +35,9 @@ async def backup(radio_path: str):
                 key = f"{nwk_nvid.name}+{offset}"
 
                 try:
-                    value = await znp.nvram.osal_read(nwk_nvid + offset)
+                    value = await znp.nvram.osal_read(
+                        nwk_nvid + offset, item_type=t.Bytes
+                    )
                 except SecurityError:
                     LOGGER.error("Read not allowed for %s", key)
                     continue
@@ -45,7 +48,7 @@ async def backup(radio_path: str):
                 data["LEGACY"][key] = value.hex()
         else:
             try:
-                value = await znp.nvram.osal_read(nwk_nvid)
+                value = await znp.nvram.osal_read(nwk_nvid, item_type=t.Bytes)
             except KeyError:
                 LOGGER.warning("Read failed for %s", nwk_nvid)
                 continue
@@ -63,7 +66,9 @@ async def backup(radio_path: str):
 
         for sub_id in range(2 ** 16):
             try:
-                value = await znp.nvram.read(item_id=nvid, sub_id=sub_id)
+                value = await znp.nvram.read(
+                    item_id=nvid, sub_id=sub_id, item_type=t.Bytes
+                )
             except CommandNotRecognized:
                 # CC2531 only supports the legacy NVRAM interface, even on Z-Stack 3
                 return data

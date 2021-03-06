@@ -32,7 +32,7 @@ class NVRAMHelper:
         # NWKKEY is almost always present, regardless of adapter state.
         # It is an 8-bit sequence number, a 16 byte key, and a 32-bit frame counter.
         # This is at least 1 + 16 + 4 = 21 bytes, or 24 if you have to 32-bit align.
-        value = await self.osal_read(nvids.OsalNvIds.NWKKEY)
+        value = await self.osal_read(nvids.OsalNvIds.NWKKEY, item_type=t.Bytes)
 
         if len(value) == 24:
             self.align_structs = True
@@ -150,7 +150,7 @@ class NVRAMHelper:
                 RspStatus=t.Status.SUCCESS,
             )
 
-    async def osal_read(self, nv_id: t.uint16_t, item_type=t.Bytes):
+    async def osal_read(self, nv_id: t.uint16_t, *, item_type):
         """
         Reads a complete value from NVRAM.
 
@@ -303,7 +303,7 @@ class NVRAMHelper:
         sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
         item_id: t.uint16_t,
         sub_id: t.uint16_t,
-        item_type=t.Bytes,
+        item_type,
     ) -> bytes:
         """
         Reads a value from NVRAM for the specified subsystem, item, and subitem.
@@ -354,36 +354,38 @@ class NVRAMHelper:
         sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
         item_id: t.uint16_t,
         values,
-        fill_value=None,
+        fill_value,
     ):
-        """"""
-
         for sub_id, value in itertools.zip_longest(
             range(0x0000, 0xFFFF + 1), values, fillvalue=fill_value
         ):
+            value = self.serialize(value)
+
             try:
                 await self.write(
                     sys_id=sys_id,
                     item_id=item_id,
                     sub_id=sub_id,
-                    value=self.serialize(value),
+                    value=value,
                     create=False,
                 )
             except KeyError:
                 break
 
     async def osal_write_table(
-        self, start_nvid: t.uint16_t, end_nvid: t.uint16_t, values, *, fill_value=None
+        self, start_nvid: t.uint16_t, end_nvid: t.uint16_t, values, *, fill_value
     ):
         values = list(values)
 
         for nvid, value in itertools.zip_longest(
             range(start_nvid, end_nvid + 1), values, fillvalue=fill_value
         ):
+            value = self.serialize(value)
+
             try:
                 await self.osal_write(
                     nv_id=nvid,
-                    value=self.serialize(value),
+                    value=value,
                     create=False,
                 )
             except KeyError:
