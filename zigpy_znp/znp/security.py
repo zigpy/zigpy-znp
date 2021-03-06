@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 import logging
 import dataclasses
@@ -6,6 +8,8 @@ import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.exceptions import SecurityError
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
+
+KeyInfo = tuple[t.EUI64, t.uint32_t, t.uint32_t, t.KeyData]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,36 +25,38 @@ class StoredDevice:
     tx_counter: t.uint32_t = None
     rx_counter: t.uint32_t = None
 
-    def replace(self, **kwargs):
+    def replace(self, **kwargs) -> StoredDevice:
         return dataclasses.replace(self, **kwargs)
 
 
-def rotate(lst, n):
+def rotate(lst: typing.Sequence, n: int) -> typing.Sequence:
     return lst[n:] + lst[:n]
 
 
-def compute_key(ieee, seed, shift):
-    rotated_seed = rotate(seed, n=shift)
-    return t.KeyData([a ^ b for a, b in zip(rotated_seed, 2 * ieee.serialize())])
+def compute_key(ieee: t.EUI64, tclk_seed: bytes, shift: int) -> t.KeyData:
+    rotated_tclk_seed = rotate(tclk_seed, n=shift)
+    return t.KeyData([a ^ b for a, b in zip(rotated_tclk_seed, 2 * ieee.serialize())])
 
 
-def compute_seed(ieee, key, shift):
-    rotated_seed = bytes(a ^ b for a, b in zip(key, 2 * ieee.serialize()))
-    return rotate(rotated_seed, n=-shift)
+def compute_tclk_seed(ieee: t.EUI64, key: t.KeyData, shift: int) -> bytes:
+    rotated_tclk_seed = bytes(a ^ b for a, b in zip(key, 2 * ieee.serialize()))
+    return rotate(rotated_tclk_seed, n=-shift)
 
 
-def find_key_shift(ieee, key, seed):
+def find_key_shift(ieee: t.EUI64, key: t.KeyData, tclk_seed: bytes) -> int | None:
     for shift in range(0x00, 0x0F + 1):
-        if seed == compute_seed(ieee, key, shift):
+        if tclk_seed == compute_tclk_seed(ieee, key, shift):
             return shift
 
     return None
 
 
-def iter_seed_candidates(ieees_and_keys):
+def iter_seed_candidates(
+    ieees_and_keys: typing.Sequence[tuple[t.EUI64, t.KeyData]]
+) -> typing.Iterable[tuple[int, t.KeyData]]:
     for ieee, key in ieees_and_keys:
         # Derive a seed from each candidate
-        seed = compute_seed(ieee, key, 0)
+        seed = compute_tclk_seed(ieee, key, 0)
 
         # And see how many other keys share this same seed
         count = sum(find_key_shift(i, k, seed) is not None for i, k in ieees_and_keys)
@@ -98,7 +104,7 @@ async def read_tc_frame_counter(znp: ZNP) -> t.uint32_t:
     return global_entry.FrameCounter
 
 
-async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t):
+async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t) -> None:
     if znp.version == 1.2:
         key_info = await znp.nvram.osal_read(
             OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
@@ -154,7 +160,7 @@ async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t):
         )
 
 
-async def read_addr_mgr_entries(znp: ZNP):
+async def read_addr_mgr_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]:
     if znp.version >= 3.30:
         entries = [
             entry
@@ -173,11 +179,8 @@ async def read_addr_mgr_entries(znp: ZNP):
     return entries
 
 
-async def read_hashed_link_keys(znp: ZNP, tclk_seed: bytes):
-    if tclk_seed is None:
-        return
-
-    if znp.version == 3.30:
+async def read_hashed_link_keys(znp: ZNP, tclk_seed: bytes) -> typing.Iterable[KeyInfo]:
+    if znp.version >= 3.30:
         entries = znp.nvram.read_table(
             item_id=ExNvIds.TCLK_TABLE,
             item_type=t.TCLKDevEntry,
@@ -197,17 +200,17 @@ async def read_hashed_link_keys(znp: ZNP, tclk_seed: bytes):
         # assert entry.keyType == t.KeyType.NWK
         # assert entry.keyType == t.KeyType.NONE
 
-        ieee = entry.extAddr.serialize()
-        rotated_seed = rotate(tclk_seed, n=entry.SeedShift_IcIndex)
-        link_key_data = bytes(a ^ b for a, b in zip(rotated_seed, ieee + ieee))
-        link_key, _ = t.KeyData.deserialize(link_key_data)
-
-        yield entry.extAddr, entry.txFrmCntr, entry.rxFrmCntr, link_key
+        yield (
+            entry.extAddr,
+            entry.txFrmCntr,
+            entry.rxFrmCntr,
+            compute_key(entry.extAddr, tclk_seed, entry.SeedShift_IcIndex),
+        )
 
 
 async def read_unhashed_link_keys(
-    znp: ZNP, addr_mgr_entries: typing.List[t.AddrMgrEntry]
-):
+    znp: ZNP, addr_mgr_entries: typing.Sequence[t.AddrMgrEntry]
+) -> typing.Iterable[KeyInfo]:
     if znp.version == 3.30:
         link_key_offset_base = 0x0000
         table = znp.nvram.read_table(
@@ -239,7 +242,7 @@ async def read_unhashed_link_keys(
     LOGGER.debug("Read APS link key table: %s", link_key_table)
 
     for entry in link_key_table:
-        if not entry.AuthenticationState == t.AuthenticationOption.AuthenticatedCBCK:
+        if entry.AuthenticationState != t.AuthenticationOption.AuthenticatedCBCK:
             continue
 
         key_table_entry = aps_key_data_table[entry.LinkKeyNvId - link_key_offset_base]
@@ -255,7 +258,7 @@ async def read_unhashed_link_keys(
         )
 
 
-async def read_devices(znp: ZNP):
+async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
     tclk_seed = None
 
     if znp.version > 1.2:
@@ -300,7 +303,9 @@ async def read_devices(znp: ZNP):
     return list(devices.values())
 
 
-async def write_addr_manager_entries(znp: ZNP, devices):
+async def write_addr_manager_entries(
+    znp: ZNP, devices: typing.Sequence[StoredDevice]
+) -> None:
     entries = [
         t.AddrMgrEntry(
             type=(
@@ -329,6 +334,7 @@ async def write_addr_manager_entries(znp: ZNP, devices):
     )
     new_entries = len(old_entries) * [t.EMPTY_ADDR_MGR_ENTRY]
 
+    # Purposefully throw an `IndexError` if we are trying to write too many entries
     for index, entry in enumerate(entries):
         new_entries[index] = entry
 
@@ -339,16 +345,25 @@ async def write_devices(
     znp: ZNP,
     devices: typing.Sequence[StoredDevice],
     counter_increment: t.uint32_t = 2500,
-    seed: bytes = None,
-):
-    # Make sure we prioritize the devices with keys if there is no room
-    # devices = sorted(devices, key=lambda e: e.get("link_key") is None)
-
+    tclk_seed: bytes = None,
+) -> None:
     ieees_and_keys = [(d.ieee, d.aps_link_key) for d in devices if d.aps_link_key]
 
-    # Find the seed that maximizes the number of keys that can be derived from it
-    if seed is None and ieees_and_keys:
-        _, seed = max(iter_seed_candidates(ieees_and_keys))
+    # Find the tclk_seed that maximizes the number of keys that can be derived from it
+    if ieees_and_keys:
+        candidates = iter_seed_candidates(ieees_and_keys)
+
+        # Ensure the provided tclk_seed is picked over others (if it is optimal)
+        _, best_seed = max(candidates, key=lambda p: (p, p[1] == tclk_seed))
+
+        if tclk_seed is not None and tclk_seed != best_seed:
+            LOGGER.warning(
+                "Provided TCLK seed %s is not optimal. Picking %s instead.",
+                tclk_seed,
+                best_seed,
+            )
+
+        tclk_seed = best_seed
 
     hashed_link_key_table = []
     aps_key_data_table = []
@@ -358,7 +373,7 @@ async def write_devices(
         if not device.aps_link_key:
             continue
 
-        shift = find_key_shift(device.ieee, device.aps_link_key, seed)
+        shift = find_key_shift(device.ieee, device.aps_link_key, tclk_seed)
 
         if shift is not None:
             # Hashed link keys can be written into the TCLK table
@@ -382,7 +397,7 @@ async def write_devices(
                 )
             )
 
-            if znp.version > 3.0:
+            if znp.version >= 3.30:
                 start = 0x0000
             else:
                 start = OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START
