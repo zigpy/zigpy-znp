@@ -9,7 +9,7 @@ from zigpy_znp.api import ZNP
 from zigpy_znp.exceptions import SecurityError
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
-KeyInfo = tuple[t.EUI64, t.uint32_t, t.uint32_t, t.KeyData]
+KeyInfo = typing.Tuple[t.EUI64, t.uint32_t, t.uint32_t, t.KeyData]
 
 LOGGER = logging.getLogger(__name__)
 
