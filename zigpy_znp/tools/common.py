@@ -1,15 +1,117 @@
+from __future__ import annotations
+
+import typing
 import logging
 import argparse
 
+import jsonschema
 import coloredlogs
 
 import zigpy_znp.logger as log
 
 LOG_LEVELS = [logging.INFO, logging.DEBUG, log._TRACE]
+OPEN_COORDINATOR_BACKUP_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/zigpy/open-coordinator-backup/schema.json",
+    "type": "object",
+    "properties": {
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "format": {
+                    "type": "string",
+                    "pattern": "^zigpy/open-coordinator-backup$",
+                },
+                "version": {"type": "integer", "minimum": 1, "maximum": 1},
+                "source": {"type": "string", "pattern": "^(.*?)+@(.*?)$"},
+                "internal": {"type": "object"},
+            },
+            "required": ["version", "source"],
+        },
+        "stack_specific": {
+            "type": "object",
+            "properties": {
+                "zstack": {
+                    "type": "object",
+                    "properties": {
+                        "tclk_seed": {"type": "string", "pattern": "[a-fA-F0-9]{32}"}
+                    },
+                }
+            },
+        },
+        "coordinator_ieee": {"type": "string", "pattern": "[a-fA-F0-9]{16}"},
+        "pan_id": {"type": "string", "pattern": "[a-fA-F0-9]{4}"},
+        "extended_pan_id": {"type": "string", "pattern": "[a-fA-F0-9]{16}"},
+        "nwk_update_id": {"type": "integer", "minimum": 0, "maximum": 255},
+        "security_level": {"type": "integer", "minimum": 0, "maximum": 7},
+        "channel": {"type": "integer", "minimum": 11, "maximum": 26},
+        "channel_mask": {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 11, "maximum": 26},
+        },
+        "network_key": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "pattern": "[a-fA-F0-9]{32}"},
+                "sequence_number": {"type": "integer", "minimum": 0, "maximum": 255},
+                "frame_counter": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295,
+                },
+            },
+            "required": ["key", "sequence_number", "frame_counter"],
+        },
+        "devices": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "nwk_address": {"type": "string", "pattern": "[a-fA-F0-9]{4}"},
+                    "ieee_address": {"type": "string", "pattern": "[a-fA-F0-9]{16}"},
+                    "link_key": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string", "pattern": "[a-fA-F0-9]{16}"},
+                            "tx_counter": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 4294967295,
+                            },
+                            "rx_counter": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 4294967295,
+                            },
+                        },
+                        "required": ["key", "tx_counter", "rx_counter"],
+                    },
+                },
+                "required": ["nwk_address", "ieee_address"],
+            },
+        },
+    },
+    "required": [
+        "metadata",
+        "coordinator_ieee",
+        "pan_id",
+        "extended_pan_id",
+        "nwk_update_id",
+        "security_level",
+        "channel",
+        "channel_mask",
+        "network_key",
+        "devices",
+    ],
+}
+
+
+def validate_backup_json(backup: dict[str, typing.Any]) -> None:
+    jsonschema.validate(backup, schema=OPEN_COORDINATOR_BACKUP_SCHEMA)
 
 
 class CustomArgumentParser(argparse.ArgumentParser):
-    def parse_args(self, args=None, namespace=None):
+    def parse_args(self, args: list[str] = None, namespace=None):
         args = super().parse_args(args, namespace)
 
         # Since we're running as a CLI tool, install our own log level and color logger

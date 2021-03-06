@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import json
 import typing
@@ -7,27 +9,16 @@ import argparse
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 from zigpy_znp.types.nvids import OsalNvIds
-from zigpy_znp.tools.common import setup_parser
+from zigpy_znp.tools.common import setup_parser, validate_backup_json
 from zigpy_znp.znp.security import StoredDevice, write_devices, write_tc_frame_counter
 from zigpy_znp.zigbee.application import ControllerApplication
-
-BACKUP_VERSION = 1
 
 
 async def restore_network(
     radio_path: str,
-    backup: typing.Dict[str, typing.Any],
+    backup: dict[str, typing.Any],
     counter_increment: int,
-):
-    backup_format = backup.get("metadata", {}).get("format")
-    backup_version = backup.get("metadata", {}).get("version")
-
-    if backup_format != "zigpy/open-coordinator-backup":
-        raise ValueError(f"Backup format not recognized: {backup_format!r}")
-
-    if backup_version != BACKUP_VERSION:
-        raise ValueError(f"Backup format version is not compatible: {backup_version}")
-
+) -> None:
     pan_id, _ = t.NWK.deserialize(bytes.fromhex(backup["pan_id"])[::-1])
     extended_pan_id, _ = t.EUI64.deserialize(
         bytes.fromhex(backup["extended_pan_id"])[::-1]
@@ -110,7 +101,7 @@ async def restore_network(
     znp.close()
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Restore adapter network settings")
     parser.add_argument(
         "--input", "-i", type=argparse.FileType("r"), help="Input file", required=True
@@ -125,6 +116,7 @@ async def main(argv):
     args = parser.parse_args(argv)
 
     backup = json.load(args.input)
+    validate_backup_json(backup)
 
     await restore_network(
         radio_path=args.serial,

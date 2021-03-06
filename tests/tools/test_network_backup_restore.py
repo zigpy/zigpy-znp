@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from jsonschema import ValidationError
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -8,6 +9,7 @@ from zigpy_znp.api import ZNP
 from zigpy_znp.znp import security
 from zigpy_znp.znp.utils import NetworkInfo
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
+from zigpy_znp.tools.common import validate_backup_json
 from zigpy_znp.tools.energy_scan import channels_from_channel_mask
 from zigpy_znp.zigbee.application import ControllerApplication
 from zigpy_znp.tools.network_backup import main as network_backup
@@ -23,8 +25,6 @@ from ..conftest import (
     BaseLaunchpadCC26X2R1,
 )
 
-pytestmark = [pytest.mark.asyncio]
-
 BARE_NETWORK_INFO = NetworkInfo(
     extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
     ieee=None,
@@ -39,7 +39,78 @@ BARE_NETWORK_INFO = NetworkInfo(
 )
 
 
+@pytest.fixture
+def backup_json():
+    return {
+        "metadata": {
+            "format": "zigpy/open-coordinator-backup",
+            "internal": {
+                "creation_time": "2021-02-16T22:29:28+00:00",
+                "zstack": {"version": 3.3},
+            },
+            "source": "zigpy-znp@0.3.0",
+            "version": 1,
+        },
+        "stack_specific": {"zstack": {"tclk_seed": "c04884427c8a1ed7bb8412815ccce7aa"}},
+        "channel": 25,
+        "channel_mask": [15, 20, 25],
+        "pan_id": "feed",
+        "extended_pan_id": "abdefabcdefabcde",
+        "coordinator_ieee": "0123456780123456",
+        "nwk_update_id": 2,
+        "security_level": 5,
+        "network_key": {
+            "frame_counter": 66781,
+            "key": "37668fd64e35e03342e5ef9f35ccf4ab",
+            "sequence_number": 1,
+        },
+        "devices": [
+            {"ieee_address": "000b57fffe36b9a0", "nwk_address": "f319"},  # No key
+            {
+                "ieee_address": "000b57fffe38b212",
+                "link_key": {
+                    "key": "d2fabcbc83dd15d7a9362a7fa39becaa",  # Derived from seed
+                    "rx_counter": 123,
+                    "tx_counter": 456,
+                },
+                "nwk_address": "9672",
+            },
+            {
+                "ieee_address": "aabbccddeeff0011",
+                "link_key": {
+                    "key": "01234567801234567801234567801234",  # Not derived from seed
+                    "rx_counter": 112233,
+                    "tx_counter": 445566,
+                },
+                "nwk_address": "abcd",
+            },
+        ],
+    }
+
+
+def test_schema_validation(backup_json):
+    validate_backup_json(backup_json)
+
+
+def test_schema_validation_counters(backup_json):
+    backup_json["devices"][1]["link_key"]["tx_counter"] = 0xFFFFFFFF
+    validate_backup_json(backup_json)
+    backup_json["devices"][1]["link_key"]["tx_counter"] = 0xFFFFFFFF + 1
+
+    with pytest.raises(ValidationError):
+        validate_backup_json(backup_json)
+
+
+def test_schema_validation_device_key_info(backup_json):
+    validate_backup_json(backup_json)
+    backup_json["devices"][1]["link_key"]["key"] = None
+
+    with pytest.raises(ValidationError):
+        validate_backup_json(backup_json)
+
+
 @pytest.mark.parametrize("device", FORMED_DEVICES)
+@pytest.mark.asyncio
 async def test_network_backup_formed(device, make_znp_server, tmp_path):
     znp_server = make_znp_server(server_cls=device)
 
@@ -71,6 +142,7 @@ async def test_network_backup_formed(device, make_znp_server, tmp_path):
 
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
+@pytest.mark.asyncio
 async def test_network_backup_empty(device, make_znp_server):
     znp_server = make_znp_server(server_cls=device)
 
@@ -78,57 +150,11 @@ async def test_network_backup_empty(device, make_znp_server):
         await network_backup([znp_server._port_path, "-o", "-"])
 
 
-TEST_BACKUP = {
-    "metadata": {
-        "format": "zigpy/open-coordinator-backup",
-        "internal": {
-            "creation_time": "2021-02-16T22:29:28+00:00",
-            "zstack": {"version": 3.3},
-        },
-        "source": "zigpy-znp@0.3.0",
-        "version": 1,
-    },
-    "stack_specific": {"zstack": {"tclk_seed": "c04884427c8a1ed7bb8412815ccce7aa"}},
-    "channel": 25,
-    "channel_mask": [15, 20, 25],
-    "pan_id": "feed",
-    "extended_pan_id": "abdefabcdefabcde",
-    "coordinator_ieee": "0123456780123456",
-    "nwk_update_id": 2,
-    "security_level": 5,
-    "network_key": {
-        "frame_counter": 66781,
-        "key": "37668fd64e35e03342e5ef9f35ccf4ab",
-        "sequence_number": 1,
-    },
-    "devices": [
-        {"ieee_address": "000b57fffe36b9a0", "nwk_address": "f319"},  # No key
-        {
-            "ieee_address": "000b57fffe38b212",
-            "link_key": {
-                "key": "d2fabcbc83dd15d7a9362a7fa39becaa",  # Derived from seed
-                "rx_counter": 123,
-                "tx_counter": 456,
-            },
-            "nwk_address": "9672",
-        },
-        {
-            "ieee_address": "aabbccddeeff0011",
-            "link_key": {
-                "key": "01234567801234567801234567801234",  # Not derived from seed
-                "rx_counter": 112233,
-                "tx_counter": 445566,
-            },
-            "nwk_address": "abcd",
-        },
-    ],
-}
-
-
 @pytest.mark.parametrize("device", ALL_DEVICES)
-async def test_network_restore(device, make_znp_server, tmp_path, mocker):
+@pytest.mark.asyncio
+async def test_network_restore(device, make_znp_server, backup_json, tmp_path, mocker):
     backup_file = tmp_path / "backup.json"
-    backup_file.write_text(json.dumps(TEST_BACKUP))
+    backup_file.write_text(json.dumps(backup_json))
 
     znp_server = make_znp_server(server_cls=device)
 
@@ -238,6 +264,7 @@ async def test_network_restore(device, make_znp_server, tmp_path, mocker):
     ]
 
 
+@pytest.mark.asyncio
 async def test_tc_frame_counter_zstack1(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack1CC2531)
     znp_server._nvram[ExNvIds.LEGACY] = {
@@ -250,6 +277,7 @@ async def test_tc_frame_counter_zstack1(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
 
 
+@pytest.mark.asyncio
 async def test_tc_frame_counter_zstack30(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack3CC2531)
     znp.network_info = BARE_NETWORK_INFO
@@ -293,6 +321,7 @@ async def test_tc_frame_counter_zstack30(make_connected_znp):
     ].startswith(t.uint32_t(0xABCDABCD).serialize())
 
 
+@pytest.mark.asyncio
 async def test_tc_frame_counter_zstack33(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseLaunchpadCC26X2R1)
     znp.network_info = BARE_NETWORK_INFO
