@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import json
 import typing
@@ -10,7 +12,7 @@ import zigpy_znp
 import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import OsalNvIds
-from zigpy_znp.tools.common import setup_parser
+from zigpy_znp.tools.common import setup_parser, validate_backup_json
 from zigpy_znp.znp.security import read_devices, read_tc_frame_counter
 from zigpy_znp.tools.energy_scan import channels_from_channel_mask
 from zigpy_znp.zigbee.application import ControllerApplication
@@ -18,7 +20,7 @@ from zigpy_znp.zigbee.application import ControllerApplication
 LOGGER = logging.getLogger(__name__)
 
 
-async def backup_network(radio_path: str) -> typing.Dict[str, typing.Any]:
+async def backup_network(radio_path: str) -> dict[str, typing.Any]:
     znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": radio_path}}))
     await znp.connect()
 
@@ -83,10 +85,13 @@ async def backup_network(radio_path: str) -> typing.Dict[str, typing.Any]:
 
     znp.close()
 
+    # Ensure our generated backup is valid
+    validate_backup_json(obj)
+
     return obj
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Backup adapter network settings")
     parser.add_argument(
         "--output", "-o", type=argparse.FileType("w"), help="Output file", default="-"

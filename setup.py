@@ -25,6 +25,7 @@ setup(
         "async_timeout",
         "voluptuous",
         "coloredlogs",
+        "jsonschema",
     ],
     extras_require={
         "testing": [
