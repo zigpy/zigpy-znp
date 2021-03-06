@@ -7,6 +7,7 @@ import argparse
 import datetime
 
 import zigpy_znp
+import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.tools.common import setup_parser
@@ -75,7 +76,7 @@ async def backup_network(radio_path: str) -> typing.Dict[str, typing.Any]:
     }
 
     if znp.version > 1.2:
-        tclk_seed = await znp.nvram.osal_read(OsalNvIds.TCLK_SEED)
+        tclk_seed = await znp.nvram.osal_read(OsalNvIds.TCLK_SEED, item_type=t.Bytes)
         LOGGER.info("TCLK seed: %s", tclk_seed.hex())
 
         obj["stack_specific"] = {"zstack": {"tclk_seed": tclk_seed.hex()}}

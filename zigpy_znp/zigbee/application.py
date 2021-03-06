@@ -76,7 +76,7 @@ DEFAULT_TC_LINK_KEY = t.TCLinkKey(
     TxFrameCounter=0,
     RxFrameCounter=0,
 )
-ZSTACK_CONFIGURE_SUCCESS = b"\x55"
+ZSTACK_CONFIGURE_SUCCESS = t.uint8_t(0x55)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -224,7 +224,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK3
 
         try:
-            configured_value = await self._znp.nvram.osal_read(configured_nv_item)
+            configured_value = await self._znp.nvram.osal_read(
+                configured_nv_item, item_type=t.uint8_t
+            )
             is_configured = configured_value == ZSTACK_CONFIGURE_SUCCESS
         except KeyError:
             is_configured = False
