@@ -93,7 +93,7 @@ async def restore_network(
     await write_tc_frame_counter(znp, nwk_frame_counter)
 
     await write_devices(
-        znp, devices, seed=tclk_seed, counter_increment=counter_increment
+        znp, devices, tclk_seed=tclk_seed, counter_increment=counter_increment
     )
 
     await znp.reset()
