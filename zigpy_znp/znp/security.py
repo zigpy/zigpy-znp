@@ -51,21 +51,23 @@ def find_key_shift(ieee: t.EUI64, key: t.KeyData, tclk_seed: bytes) -> int | Non
     return None
 
 
+def count_seed_matches(
+    ieees_and_keys: typing.Sequence[tuple[t.EUI64, t.KeyData]], tclk_seed: bytes
+) -> int:
+    return sum(find_key_shift(i, k, tclk_seed) is not None for i, k in ieees_and_keys)
+
+
 def iter_seed_candidates(
     ieees_and_keys: typing.Sequence[tuple[t.EUI64, t.KeyData]]
 ) -> typing.Iterable[tuple[int, t.KeyData]]:
     for ieee, key in ieees_and_keys:
-        # Derive a seed from each candidate
-        seed = compute_tclk_seed(ieee, key, 0)
+        # Derive a seed from each candidate. All rotations of a seed are equivalent.
+        tclk_seed = compute_tclk_seed(ieee, key, 0)
 
         # And see how many other keys share this same seed
-        count = sum(find_key_shift(i, k, seed) is not None for i, k in ieees_and_keys)
+        count = count_seed_matches(ieees_and_keys, tclk_seed)
 
-        yield count, seed
-
-        # If all of the keys are derived from this seed, we can stop searching
-        if count == len(ieees_and_keys):
-            break
+        yield count, tclk_seed
 
 
 async def read_tc_frame_counter(znp: ZNP) -> t.uint32_t:
@@ -351,17 +353,24 @@ async def write_devices(
 
     # Find the tclk_seed that maximizes the number of keys that can be derived from it
     if ieees_and_keys:
-        candidates = iter_seed_candidates(ieees_and_keys)
+        best_count, best_seed = max(iter_seed_candidates(ieees_and_keys))
 
-        # Ensure the provided tclk_seed is picked over others (if it is optimal)
-        _, best_seed = max(candidates, key=lambda p: (p, p[1] == tclk_seed))
+        # Check to see if the provided tclk_seed is also optimal
+        if tclk_seed is not None:
+            tclk_count = count_seed_matches(ieees_and_keys, tclk_seed)
+            assert tclk_count <= best_count
 
-        if tclk_seed is not None and tclk_seed != best_seed:
-            LOGGER.warning(
-                "Provided TCLK seed %s is not optimal. Picking %s instead.",
-                tclk_seed,
-                best_seed,
-            )
+            if tclk_count < best_count:
+                LOGGER.warning(
+                    "Provided TCLK seed %s only generates %d keys, but computed seed"
+                    " %s generates %d keys. Picking computed seed.",
+                    tclk_seed,
+                    tclk_count,
+                    best_seed,
+                    best_count,
+                )
+            else:
+                best_seed = tclk_seed
 
         tclk_seed = best_seed
 
