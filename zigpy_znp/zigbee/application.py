@@ -460,18 +460,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._write_stack_settings(reset_if_changed=False)
 
-        # Ignore the user's PAN ID for now and just let Z-Stack pick one that works
-        await self._znp.nvram.osal_write(
-            OsalNvIds.PANID, t.uint16_t(0xFFFF), create=True
-        )
-        await self._znp.nvram.osal_write(
-            OsalNvIds.APS_USE_EXT_PANID, extended_pan_id, create=True
-        )
-        await self._znp.nvram.osal_write(OsalNvIds.PRECFGKEY, network_key, create=True)
-        await self._znp.nvram.osal_write(
-            OsalNvIds.PRECFGKEYS_ENABLE, t.Bool(True), create=True
-        )
-        await self._znp.nvram.osal_write(OsalNvIds.CHANLIST, channels, create=True)
+        for item, value in {
+            # Ignore the user's PAN ID for now and just let Z-Stack pick one that works
+            OsalNvIds.PANID: t.uint16_t(0xFFFF),
+            OsalNvIds.APS_USE_EXT_PANID: extended_pan_id,
+            # XXX: Z2M incorrectly uses this NVRAM item, APS_USE_EXT_PANID is correct
+            OsalNvIds.EXTENDED_PAN_ID: extended_pan_id,
+            OsalNvIds.PRECFGKEY: network_key,
+            # XXX: Z2M requires this item to be False
+            OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),
+            OsalNvIds.CHANLIST: channels,
+        }.items():
+            await self._znp.nvram.osal_write(item, value, create=True)
 
         # Z-Stack Home 1.2 doesn't have the BDB subsystem
         if self._znp.version > 1.2:
