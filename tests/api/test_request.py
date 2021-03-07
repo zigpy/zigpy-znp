@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import pytest
 import async_timeout
@@ -6,6 +7,7 @@ import async_timeout
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
+from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 pytestmark = [pytest.mark.asyncio]
@@ -228,3 +230,18 @@ async def test_znp_sreq_srsp(connected_znp, event_loop):
     event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
 
     await znp.request(c.SYS.Ping.Req())
+
+
+async def test_znp_unknown_frame(connected_znp, caplog):
+    znp, _ = connected_znp
+
+    frame = GeneralFrame(
+        header=t.CommandHeader(0xFFFF),
+        data=b"Frame Data",
+    )
+
+    caplog.set_level(logging.ERROR)
+    znp.frame_received(frame)
+
+    # Unknown frames are logged in their entirety but an error is not thrown
+    assert repr(frame) in caplog.text

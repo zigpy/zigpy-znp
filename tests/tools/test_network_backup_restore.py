@@ -232,9 +232,9 @@ async def test_network_restore(device, make_znp_server, backup_json, tmp_path, m
     assert write_devices_call[2]["counter_increment"] == 2500
 
     if issubclass(device, BaseZStack1CC2531):
-        assert write_devices_call[2]["seed"] is None
+        assert write_devices_call[2]["tclk_seed"] is None
     else:
-        assert write_devices_call[2]["seed"] == bytes.fromhex(
+        assert write_devices_call[2]["tclk_seed"] == bytes.fromhex(
             "c04884427c8a1ed7bb8412815ccce7aa"
         )
 
@@ -352,6 +352,15 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     with pytest.raises(ValueError):
         await security.read_tc_frame_counter(znp)
 
+    # Writes similarly will fail
+    old_nvram_state = repr(znp_server._nvram)
+
+    with pytest.raises(ValueError):
+        await security.write_tc_frame_counter(znp, 0x98765432)
+
+    # And the NVRAM will be untouched
+    assert repr(znp_server._nvram) == old_nvram_state
+
     # The correct entry will be updated
     znp.network_info = old_nwk_info
     assert (await security.read_tc_frame_counter(znp)) == 0x00000002
@@ -359,3 +368,72 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     assert znp_server._nvram[ExNvIds.NWK_SEC_MATERIAL_TABLE][0x0001].startswith(
         t.uint32_t(0xABCDABCD).serialize()
     )
+
+
+def ieee_and_key(text):
+    ieee, key = text.replace(":", "").split("|")
+
+    return t.EUI64(bytes.fromhex(ieee)[::-1]), t.KeyData(bytes.fromhex(key))
+
+
+def test_seed_candidate_finding_simple():
+    ieee1, key1 = ieee_and_key("0011223344556677|000102030405060708090a0b0c0d0e0f")
+    ieee2, key2 = ieee_and_key("1111223344556677|101112131415161718191a1b1c1d1e1f")
+
+    (c1, s1), (c2, s2) = security.iter_seed_candidates([(ieee1, key1), (ieee2, key2)])
+
+    assert c1 == c2 == 1
+
+    sh1 = security.find_key_shift(ieee1, key1, s1)
+    sh2 = security.find_key_shift(ieee2, key2, s2)
+    assert sh1 is not None and sh2 is not None
+
+    assert security.compute_key(ieee1, s1, sh1) == key1
+    assert security.compute_key(ieee2, s2, sh2) == key2
+
+
+def min_rotate(lst):
+    return min(security.rotate(lst, i) for i in range(len(lst)))
+
+
+def test_seed_candidate_finding_complex():
+    ieees_and_keys = [
+        # Real network
+        ieee_and_key("000b57fffe36b9a0|0a797e7abd2b811e7702b2ec7e0bc7e7"),
+        ieee_and_key("000b57fffe38b212|d2fabcbc83dd15d7a9362a7fa39becaa"),
+        ieee_and_key("000b57fffe877774|360b0de028ec8f12f52b4b1955974384"),
+        ieee_and_key("000b57fffe8d4f83|9d98367aedd657cc64e54db67b15778a"),
+        ieee_and_key("000b57fffe8e8c44|c09e0fa233b0a1c00c08cc827549dcbb"),
+        ieee_and_key("000b57fffe8e92a3|ff5e69543f1f8f42df18902944d31981"),
+        ieee_and_key("000b57fffe8e935f|decf4219559743841def04e028ec8f12"),
+        ieee_and_key("000b57fffebd5ad1|8d965a543f1f8f42add0a32944d31981"),
+        ieee_and_key("000b57fffed53765|19bdcb2944d3198139fb32543f1f8f42"),
+        ieee_and_key("000b57fffedd4954|fe89957abd2b811e83f259ec7e0bc7e7"),
+        ieee_and_key("000b57fffedd50be|acd1813218fdcb483a12a174e180b084"),
+        ieee_and_key("000d6ffffe2ee3cc|b069302944eb1f81902fc9543f278942"),
+        ieee_and_key("000d6ffffe3066d5|19819a3eb7eb4f7c5f78e7457b7d8c5c"),
+        ieee_and_key("000d6ffffe7a84a9|1200687fa3a3eaaa69ccfebc83e513d7"),
+        ieee_and_key("000d6ffffe7bc266|ecdcac457b7d8c5caa25d13eb7eb4f7c"),
+        ieee_and_key("000d6ffffe7bfac1|40a6b71955af45848386f1e028d48912"),
+        ieee_and_key("000d6ffffea4f10b|ec5b64b67b2d718a15261f7aedee51cc"),
+        ieee_and_key("000d6ffffea5b793|19a972457b7d8c5c5f500f3eb7eb4f7c"),
+        ieee_and_key("000d6ffffea6117a|6890fa3218c5cd48fe53da74e1b8b684"),
+        ieee_and_key("90fd9ffffe2bbbdd|3a11ebb67bdd811ac36c907aed1ea15c"),
+        ieee_and_key("90fd9ffffe329a0b|8ac6fe19555fb51449e6b8e028247982"),
+        ieee_and_key("ccccccfffeeec02a|ea886abc8346d21b9144fc7fa3002b66"),
+        ieee_and_key("d0cf5efffeda9bbb|115b927abd2245ce6c205eec7e020337"),
+        ieee_and_key("ec1bbdfffe544f40|8007d0bc8337053bfbcb467fa371fc46"),
+        # Bogus entry
+        ieee_and_key("0011223344556677|000102030405060708090a0b0c0d0e0f"),
+    ]
+
+    candidates = list(security.iter_seed_candidates(ieees_and_keys))
+    assert len(candidates) == 24 + 1
+
+    # One seed generated all but one of the keys, so there are 24 equally valid seeds.
+    # They are all really rotations of the same seed.
+    assert [c for c, s in candidates].count(24) == 24
+    assert len({min_rotate(s) for c, s in candidates if c == 24}) == 1
+
+    # And one just for the bogus entry
+    assert [c[0] for c in candidates].count(1) == 1
