@@ -20,40 +20,36 @@ from ..conftest import (
 pytestmark = [pytest.mark.asyncio]
 
 
+# These settings were extracted from beacon requests and key exchanges in Wireshark
 @pytest.mark.parametrize(
     "device,model,channel,channels,pan_id,ext_pan_id,network_key",
     [
-        # zigpy-znp
         (
             FormedLaunchpadCC26X2R1,
             "CC13X2/CC26X2, Z-Stack 3.30.00/3.40.00/4.10.00",
             15,
             t.Channels.from_channel_list([15]),
-            0x77AE,
-            "24:a2:d7:77:97:47:a7:37",
-            t.KeyData.deserialize(bytes.fromhex("c927e9ce1544c9aa42340e4d5dc4c257"))[0],
+            0x9B21,
+            "f4:4b:c6:c8:d6:12:2e:8f",
+            t.KeyData(bytes.fromhex("121ec4cce6d6ad81c822b8e2bf707227")),
         ),
-        # Z2M/zigpy-cc
         (
             FormedZStack3CC2531,
             "CC2531, Z-Stack 3.0.1/3.0.2",
-            11,
-            t.Channels.from_channel_list([11]),
-            0x1A62,
-            # Even though Z2M uses "dd:dd:dd:dd:dd:dd:dd:dd", Wireshark confirms the NIB
-            # is correct.
-            "00:12:4b:00:0f:ea:8e:05",
-            t.KeyData.deserialize(bytes.fromhex("01030507090b0d0f00020406080a0c0d"))[0],
+            15,
+            t.Channels.from_channel_list([15]),
+            0xB6AB,
+            "62:92:32:46:3c:77:2d:b2",
+            t.KeyData(bytes.fromhex("6dde24eae28552b6de2956eb05851afa")),
         ),
-        # Z2M/zigpy-cc
         (
             FormedZStack1CC2531,
             "CC2531, Z-Stack Home 1.2",
-            11,
-            t.Channels.from_channel_list([11]),
-            0x1A62,
-            "dd:dd:dd:dd:dd:dd:dd:dd",
-            t.KeyData.deserialize(bytes.fromhex("01030507090b0d0f00020406080a0c0d"))[0],
+            15,
+            t.Channels.from_channel_list([15]),
+            0x1F1C,
+            "bf:00:dc:3b:60:4b:21:74",
+            t.KeyData(bytes.fromhex("b133fd66f718179ffd767b3cc5765a60")),
         ),
     ],
 )
