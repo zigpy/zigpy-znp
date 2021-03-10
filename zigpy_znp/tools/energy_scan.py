@@ -12,12 +12,6 @@ from zigpy_znp.zigbee.application import ControllerApplication
 LOGGER = logging.getLogger(__name__)
 
 
-def channels_from_channel_mask(channels: t.Channels):
-    for channel in range(11, 26 + 1):
-        if channels & t.Channels.from_channel_list([channel]):
-            yield channel
-
-
 async def perform_energy_scan(radio_path, num_scans=None):
     LOGGER.info("Starting up zigpy-znp")
 
@@ -53,9 +47,7 @@ async def perform_energy_scan(radio_path, num_scans=None):
             callback=c.ZDO.MgmtNWKUpdateNotify.Callback(partial=True, Src=0x0000),
         )
 
-        for channel, energy in zip(
-            channels_from_channel_mask(rsp.ScannedChannels), rsp.EnergyValues
-        ):
+        for channel, energy in zip(rsp.ScannedChannels, rsp.EnergyValues):
             energies = channel_energies[channel]
             energies.append(energy)
 

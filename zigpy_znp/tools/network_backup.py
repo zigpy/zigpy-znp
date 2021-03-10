@@ -14,7 +14,6 @@ from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.tools.common import setup_parser, validate_backup_json
 from zigpy_znp.znp.security import read_devices, read_tc_frame_counter
-from zigpy_znp.tools.energy_scan import channels_from_channel_mask
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
@@ -68,7 +67,7 @@ async def backup_network(radio_path: str) -> dict[str, typing.Any]:
         "nwk_update_id": znp.network_info.nwk_update_id,
         "security_level": znp.network_info.security_level,
         "channel": znp.network_info.channel,
-        "channel_mask": list(channels_from_channel_mask(znp.network_info.channels)),
+        "channel_mask": list(znp.network_info.channels),
         "network_key": {
             "key": znp.network_info.network_key.serialize().hex(),
             "sequence_number": znp.network_info.network_key_seq,

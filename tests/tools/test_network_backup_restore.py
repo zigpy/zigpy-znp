@@ -10,7 +10,6 @@ from zigpy_znp.znp import security
 from zigpy_znp.znp.utils import NetworkInfo
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import validate_backup_json
-from zigpy_znp.tools.energy_scan import channels_from_channel_mask
 from zigpy_znp.zigbee.application import ControllerApplication
 from zigpy_znp.tools.network_backup import main as network_backup
 from zigpy_znp.tools.network_restore import main as network_restore
@@ -24,6 +23,7 @@ from ..conftest import (
     BaseZStack3CC2531,
     BaseLaunchpadCC26X2R1,
 )
+from ..application.test_startup import DEV_NETWORK_SETTINGS
 
 BARE_NETWORK_INFO = NetworkInfo(
     extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
@@ -109,10 +109,22 @@ def test_schema_validation_device_key_info(backup_json):
         validate_backup_json(backup_json)
 
 
+@pytest.mark.parametrize("device", EMPTY_DEVICES)
+@pytest.mark.asyncio
+async def test_network_backup_empty(device, make_znp_server):
+    znp_server = make_znp_server(server_cls=device)
+
+    with pytest.raises(RuntimeError):
+        await network_backup([znp_server._port_path, "-o", "-"])
+
+
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 @pytest.mark.asyncio
 async def test_network_backup_formed(device, make_znp_server, tmp_path):
     znp_server = make_znp_server(server_cls=device)
+
+    # We verified these settings with Wireshark
+    _, channel, channels, pan_id, ext_pan_id, network_key = DEV_NETWORK_SETTINGS[device]
 
     backup_file = tmp_path / "backup.json"
     await network_backup([znp_server._port_path, "-o", str(backup_file)])
@@ -125,29 +137,22 @@ async def test_network_backup_formed(device, make_znp_server, tmp_path):
     assert backup["metadata"]["source"].startswith("zigpy-znp@")
 
     assert len(bytes.fromhex(backup["coordinator_ieee"])) == 8
-    assert len(bytes.fromhex(backup["pan_id"])) == 2
-    assert len(bytes.fromhex(backup["extended_pan_id"])) == 8
-    assert 0 <= backup["nwk_update_id"] <= 0xFF
-    assert 0 <= backup["security_level"] <= 7
-    assert backup["channel"] in list(range(11, 26 + 1))
+    assert t.NWK.deserialize(bytes.fromhex(backup["pan_id"])[::-1])[0] == pan_id
+    assert (
+        t.EUI64.deserialize(bytes.fromhex(backup["extended_pan_id"])[::-1])[0]
+        == ext_pan_id
+    )
+    assert backup["nwk_update_id"] == 0
+    assert backup["security_level"] == 5
+    assert backup["channel"] == channel
+    assert t.Channels.from_channel_list(backup["channel_mask"]) == channels
 
-    channel_mask = t.Channels.from_channel_list(backup["channel_mask"])
-    assert backup["channel"] in channels_from_channel_mask(channel_mask)
-
-    assert len(bytes.fromhex(backup["network_key"]["key"])) == 16
-    assert 0x00 <= backup["network_key"]["sequence_number"] <= 0xFF
+    assert t.KeyData(bytes.fromhex(backup["network_key"]["key"])) == network_key
+    assert backup["network_key"]["sequence_number"] == 0
     assert 0x00000000 <= backup["network_key"]["frame_counter"] <= 0xFFFFFFFF
 
     assert isinstance(backup["devices"], list)
-
-
-@pytest.mark.parametrize("device", EMPTY_DEVICES)
-@pytest.mark.asyncio
-async def test_network_backup_empty(device, make_znp_server):
-    znp_server = make_znp_server(server_cls=device)
-
-    with pytest.raises(RuntimeError):
-        await network_backup([znp_server._port_path, "-o", "-"])
+    assert len(backup["devices"]) > 1
 
 
 @pytest.mark.parametrize("device", ALL_DEVICES)

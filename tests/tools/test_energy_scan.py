@@ -4,19 +4,9 @@ import pytest
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-from zigpy_znp.tools.energy_scan import main as energy_scan, channels_from_channel_mask
+from zigpy_znp.tools.energy_scan import main as energy_scan
 
 from ..conftest import FORMED_DEVICES
-
-
-def test_channels_from_channel_mask():
-    def channel_list(channels):
-        return list(channels_from_channel_mask(channels))
-
-    assert channel_list(t.Channels.ALL_CHANNELS) == list(range(11, 26 + 1))
-    assert channel_list(t.Channels.NO_CHANNELS) == []
-    assert channel_list(t.Channels.CHANNEL_11 | t.Channels.CHANNEL_20) == [11, 20]
-    assert channel_list(t.Channels.CHANNEL_15) == [15]
 
 
 @pytest.mark.asyncio
@@ -29,7 +19,7 @@ async def test_energy_scan(device, make_znp_server, capsys):
             znp_server.send(c.ZDO.MgmtNWKUpdateReq.Rsp(Status=t.Status.SUCCESS))
 
             delay = 2 ** request.ScanDuration
-            num_channels = len(list(channels_from_channel_mask(request.Channels)))
+            num_channels = len(list(request.Channels))
 
             for i in range(request.ScanCount):
                 await asyncio.sleep(delay / 100)

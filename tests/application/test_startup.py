@@ -19,39 +19,38 @@ from ..conftest import (
 
 pytestmark = [pytest.mark.asyncio]
 
+DEV_NETWORK_SETTINGS = {
+    FormedLaunchpadCC26X2R1: (
+        "CC13X2/CC26X2, Z-Stack 3.30.00/3.40.00/4.10.00",
+        15,
+        t.Channels.from_channel_list([15]),
+        0x9B21,
+        t.EUI64.convert("f4:4b:c6:c8:d6:12:2e:8f"),
+        t.KeyData(bytes.fromhex("121ec4cce6d6ad81c822b8e2bf707227")),
+    ),
+    FormedZStack3CC2531: (
+        "CC2531, Z-Stack 3.0.1/3.0.2",
+        15,
+        t.Channels.from_channel_list([15]),
+        0xB6AB,
+        t.EUI64.convert("62:92:32:46:3c:77:2d:b2"),
+        t.KeyData(bytes.fromhex("6dde24eae28552b6de2956eb05851afa")),
+    ),
+    FormedZStack1CC2531: (
+        "CC2531, Z-Stack Home 1.2",
+        15,
+        t.Channels.from_channel_list([15]),
+        0x1F1C,
+        t.EUI64.convert("bf:00:dc:3b:60:4b:21:74"),
+        t.KeyData(bytes.fromhex("b133fd66f718179ffd767b3cc5765a60")),
+    ),
+}
+
 
 # These settings were extracted from beacon requests and key exchanges in Wireshark
 @pytest.mark.parametrize(
     "device,model,channel,channels,pan_id,ext_pan_id,network_key",
-    [
-        (
-            FormedLaunchpadCC26X2R1,
-            "CC13X2/CC26X2, Z-Stack 3.30.00/3.40.00/4.10.00",
-            15,
-            t.Channels.from_channel_list([15]),
-            0x9B21,
-            "f4:4b:c6:c8:d6:12:2e:8f",
-            t.KeyData(bytes.fromhex("121ec4cce6d6ad81c822b8e2bf707227")),
-        ),
-        (
-            FormedZStack3CC2531,
-            "CC2531, Z-Stack 3.0.1/3.0.2",
-            15,
-            t.Channels.from_channel_list([15]),
-            0xB6AB,
-            "62:92:32:46:3c:77:2d:b2",
-            t.KeyData(bytes.fromhex("6dde24eae28552b6de2956eb05851afa")),
-        ),
-        (
-            FormedZStack1CC2531,
-            "CC2531, Z-Stack Home 1.2",
-            15,
-            t.Channels.from_channel_list([15]),
-            0x1F1C,
-            "bf:00:dc:3b:60:4b:21:74",
-            t.KeyData(bytes.fromhex("b133fd66f718179ffd767b3cc5765a60")),
-        ),
-    ],
+    [(device_cls,) + settings for device_cls, settings in DEV_NETWORK_SETTINGS.items()],
 )
 async def test_info(
     device, model, channel, channels, pan_id, ext_pan_id, network_key, make_application
@@ -68,7 +67,7 @@ async def test_info(
     await app.startup(auto_form=False)
 
     assert app.pan_id == pan_id
-    assert app.extended_pan_id == t.EUI64.convert(ext_pan_id)
+    assert app.extended_pan_id == ext_pan_id
     assert app.channel == channel
     assert app.channels == channels
     assert app.network_key == network_key
