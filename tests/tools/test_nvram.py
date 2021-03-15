@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+import zigpy_znp.types as t
+import zigpy_znp.commands as c
 from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
 from zigpy_znp.tools.nvram_read import main as nvram_read
 from zigpy_znp.tools.nvram_reset import main as nvram_reset
@@ -75,6 +77,23 @@ async def test_nvram_read(device, make_znp_server, tmp_path, mocker):
 @pytest.mark.parametrize("device", ALL_DEVICES)
 async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
     znp_server = make_znp_server(server_cls=device)
+
+    # Prevent the reset from occuring so NVRAM state isn't affected during "startup"
+    version = znp_server.version_replier(None)
+    znp_server.reply_to(
+        c.SYS.ResetReq.Req(partial=True),
+        responses=[
+            c.SYS.ResetInd.Callback(
+                Reason=t.ResetReason.PowerUp,
+                TransportRev=version.TransportRev,
+                ProductId=version.ProductId,
+                MajorRel=version.MajorRel,
+                MinorRel=version.MinorRel,
+                MaintRel=version.MaintRel,
+            )
+        ],
+        override=True,
+    )
 
     # Create a dummy backup
     backup = dump_nvram(znp_server)

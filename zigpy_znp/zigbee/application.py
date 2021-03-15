@@ -445,6 +445,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Delete any existing HAS_CONFIGURED_ZSTACK* NV items. One (or both) may fail.
         await self._znp.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK1)
         await self._znp.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK3)
+        await self._znp.nvram.osal_delete(OsalNvIds.BDBNODEISONANETWORK)
 
         # Instruct Z-Stack to reset everything on the next boot
         await self._znp.nvram.osal_write(

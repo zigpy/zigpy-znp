@@ -155,6 +155,20 @@ async def test_network_backup_formed(device, make_znp_server, tmp_path):
     assert len(backup["devices"]) > 1
 
 
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+@pytest.mark.asyncio
+async def test_network_restore_full(
+    device, make_znp_server, backup_json, tmp_path, mocker
+):
+    backup_file = tmp_path / "backup.json"
+    backup_file.write_text(json.dumps(backup_json))
+
+    znp_server = make_znp_server(server_cls=device)
+
+    # Perform the "restore"
+    await network_restore([znp_server._port_path, "-i", str(backup_file), "-c", "2500"])
+
+
 @pytest.mark.parametrize("device", ALL_DEVICES)
 @pytest.mark.asyncio
 async def test_network_restore(device, make_znp_server, backup_json, tmp_path, mocker):

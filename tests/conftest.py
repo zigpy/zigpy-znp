@@ -373,6 +373,36 @@ class BaseZStackDevice(BaseServerZNP):
 
         return super().connection_lost(exc)
 
+    def _startup(self):
+        startup_option = self.nvram_deserialize(
+            self._nvram[ExNvIds.LEGACY].get(OsalNvIds.STARTUP_OPTION, b"\x00"),
+            t.StartupOptions,
+        )
+
+        if not startup_option & t.StartupOptions.ClearState:
+            return
+
+        self.nib = self._default_nib()
+
+        empty_key = t.NwkActiveKeyItems(
+            Active=t.NwkKeyDesc(
+                KeySeqNum=0,
+                Key=b"\x00" * 16,
+            ),
+            FrameCounter=0,
+        )
+
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.STARTUP_OPTION] = self.nvram_serialize(
+            t.StartupOptions.NONE
+        )
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.NWKKEY] = self.nvram_serialize(empty_key)
+        self._nvram[ExNvIds.LEGACY][
+            OsalNvIds.NWK_ACTIVE_KEY_INFO
+        ] = self.nvram_serialize(empty_key.Active)
+        self._nvram[ExNvIds.LEGACY][
+            OsalNvIds.NWK_ALTERN_KEY_INFO
+        ] = self.nvram_serialize(empty_key.Active)
+
     def update_device_state(self, state):
         self.device_state = state
 
@@ -399,6 +429,22 @@ class BaseZStackDevice(BaseServerZNP):
         nib.nwkDevAddress = 0x0000
 
         self.nib = nib
+
+        key_info = t.NwkActiveKeyItems(
+            Active=t.NwkKeyDesc(
+                KeySeqNum=0,
+                Key=self._nvram[ExNvIds.LEGACY][OsalNvIds.PRECFGKEY],
+            ),
+            FrameCounter=2500,
+        )
+
+        self._nvram[ExNvIds.LEGACY][
+            OsalNvIds.NWK_ACTIVE_KEY_INFO
+        ] = self.nvram_serialize(key_info.Active)
+        self._nvram[ExNvIds.LEGACY][
+            OsalNvIds.NWK_ALTERN_KEY_INFO
+        ] = self.nvram_serialize(key_info.Active)
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.NWKKEY] = self.nvram_serialize(key_info)
 
     def _default_nib(self):
         return t.NIB(
@@ -576,7 +622,10 @@ class BaseZStackDevice(BaseServerZNP):
         self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB] = self.nvram_serialize(nib)
 
     @reply_to(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
-    def reset_req(self, request):
+    def reset_req(self, request, *, startup=True):
+        if startup:
+            self._startup()
+
         version = self.version_replier(None)
 
         return c.SYS.ResetInd.Callback(
@@ -801,9 +850,9 @@ class BaseZStack3Device(BaseZStackDevice):
             nib.channelList = self._new_channel
             self._new_channel = None
 
-        self._nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] = b"\x01"
-
         self.nib = nib
+
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] = b"\x01"
 
     @reply_to(
         c.AppConfig.BDBStartCommissioning.Req(
@@ -811,7 +860,7 @@ class BaseZStack3Device(BaseZStackDevice):
         )
     )
     def handle_bdb_start_commissioning(self, request):
-        if self._nvram[ExNvIds.LEGACY][OsalNvIds.BDBNODEISONANETWORK] == b"\x01":
+        if self._nvram[ExNvIds.LEGACY].get(OsalNvIds.BDBNODEISONANETWORK) == b"\x01":
             return [
                 c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS),
                 self.update_device_state(t.DeviceState.StartedAsCoordinator),
@@ -870,12 +919,31 @@ class BaseZStack3Device(BaseZStackDevice):
         self._first_connection = False
 
         # Z-Stack 3 devices send a callback when they're first used
-        asyncio.get_running_loop().call_soon(self.send, self.reset_req(None))
+        asyncio.get_running_loop().call_soon(
+            self.send, self.reset_req(None, startup=False)
+        )
 
 
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):
     version = 3.30
     align_structs = True
+
+    def create_nib(self, _=None):
+        super().create_nib()
+
+        self._nvram[ExNvIds.NWK_SEC_MATERIAL_TABLE][0x0000] = self.nvram_serialize(
+            t.NwkSecMaterialDesc(
+                FrameCounter=2500,
+                ExtendedPanID=self.nib.extendedPANID,
+            )
+        )
+
+        self._nvram[ExNvIds.NWK_SEC_MATERIAL_TABLE][0x0001] = self.nvram_serialize(
+            t.NwkSecMaterialDesc(
+                FrameCounter=0xFFFFFFFF,
+                ExtendedPanID=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+            )
+        )
 
     @reply_to(c.SYS.NVLength.Req(SysId=NvSysIds.ZSTACK, partial=True))
     def nvram_length(self, req):
@@ -971,6 +1039,27 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 class BaseZStack3CC2531(BaseZStack3Device):
     version = 3.0
     align_structs = False
+
+    def create_nib(self, _=None):
+        super().create_nib()
+
+        self._nvram[ExNvIds.LEGACY][
+            OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START
+        ] = self.nvram_serialize(
+            t.NwkSecMaterialDesc(
+                FrameCounter=2500,
+                ExtendedPanID=self.nib.extendedPANID,
+            )
+        )
+
+        self._nvram[ExNvIds.LEGACY][
+            OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END
+        ] = self.nvram_serialize(
+            t.NwkSecMaterialDesc(
+                FrameCounter=0xFFFFFFFF,
+                ExtendedPanID=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+            )
+        )
 
     @reply_to(c.SYS.Version.Req())
     def version_replier(self, request):
