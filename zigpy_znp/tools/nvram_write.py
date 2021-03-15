@@ -4,8 +4,6 @@ import asyncio
 import logging
 import argparse
 
-import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
@@ -49,10 +47,7 @@ async def restore(radio_path, backup):
             )
 
     # Reset afterwards to have the new values take effect
-    await znp.request_callback_rsp(
-        request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
-        callback=c.SYS.ResetInd.Callback(partial=True),
-    )
+    await znp.reset()
 
 
 async def main(argv):

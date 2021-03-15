@@ -2,8 +2,6 @@ import sys
 import asyncio
 import logging
 
-import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.types.nvids import (
@@ -17,14 +15,9 @@ from zigpy_znp.tools.common import setup_parser
 LOGGER = logging.getLogger(__name__)
 
 
-async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
-    if clear:
-        nvids = OsalNvIds
-    else:
-        nvids = [OsalNvIds.HAS_CONFIGURED_ZSTACK1, OsalNvIds.HAS_CONFIGURED_ZSTACK3]
-
+async def nvram_reset(znp: ZNP) -> None:
     # The legacy items are shared by all Z-Stack versions
-    for nvid in nvids:
+    for nvid in OsalNvIds:
         if nvid in NWK_NVID_TABLES:
             start = nvid
             end = NWK_NVID_TABLES[nvid]
@@ -44,7 +37,7 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
             else:
                 LOGGER.debug("Item does not exist: %s", nvid)
 
-    if clear and znp.version >= 3.30:
+    if znp.version >= 3.30:
         for nvid in ExNvIds:
             # Skip the LEGACY items, we did them above
             if nvid == ExNvIds.LEGACY:
@@ -58,19 +51,8 @@ async def nvram_reset(znp: ZNP, clear: bool = False) -> None:
                     # Once a delete fails, no later reads will succeed
                     break
 
-    # Even though we cleared NVRAM, some data is inaccessible and Z-Stack needs to do it
-    LOGGER.info("Clearing config and state on next start")
-    await znp.nvram.osal_write(
-        OsalNvIds.STARTUP_OPTION,
-        t.StartupOptions.ClearConfig | t.StartupOptions.ClearState,
-        create=True,
-    )
-
     LOGGER.info("Resetting...")
-    await znp.request_callback_rsp(
-        request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
-        callback=c.SYS.ResetInd.Callback(partial=True),
-    )
+    await znp.reset()
 
 
 async def main(argv):
@@ -80,15 +62,20 @@ async def main(argv):
         "--clear",
         action="store_true",
         default=False,
-        help="Tries to delete every NVRAM value.",
+        help="Deprecated: tries to delete every NVRAM value.",
     )
-
     args = parser.parse_args(argv)
+
+    if args.clear:
+        LOGGER.warning(
+            "The -c/--clear command line argument now the default"
+            " and will be removed in a future release."
+        )
 
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
 
     await znp.connect()
-    await nvram_reset(znp, clear=args.clear)
+    await nvram_reset(znp)
 
 
 if __name__ == "__main__":
