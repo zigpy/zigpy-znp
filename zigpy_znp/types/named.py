@@ -127,8 +127,8 @@ class AddrModeAddress:
         return result
 
     def __eq__(self, other):
-        if not isinstance(self, type(other)) and not isinstance(other, type(self)):
-            return False
+        if not isinstance(other, type(self)):
+            return NotImplemented
 
         return self.mode == other.mode and self.address == other.address
 

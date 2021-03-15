@@ -185,7 +185,7 @@ class CStruct:
 
     def __eq__(self, other: "CStruct") -> bool:
         if not isinstance(self, type(other)) and not isinstance(other, type(self)):
-            return False
+            return NotImplemented
 
         return self.as_dict() == other.as_dict()
 
@@ -216,3 +216,6 @@ class CStructField:
             return 1 + 8, 1
         else:
             raise TypeError(f"Cannot get size of unknown type: {self.type!r}")
+
+    def replace(self, **kwargs):
+        return dataclasses.replace(self, **kwargs)
