@@ -44,7 +44,7 @@ Launch Home Assistant the `--skip-pip` command line option to prevent zigpy-znp 
 
 # Configuration
 Below are the defaults with the top-level Home Assistant `zha:` key.
-You probably do not need to change these options, they are provided only for reference:
+You do not need to copy this configuration, it is provided only for reference:
 
 ```yaml
 zha:
@@ -78,33 +78,68 @@ zha:
       auto_reconnect_retry_delay: 5
 ```
 
-# NVRAM
-A complete NVRAM backup and restore can be performed between similar devices and Z-Stack versions to copy your network between similar devices:
+# Tools
+All tools can be run with the `-v` or `-vv` flags for extra verbosity and accept serial
+port paths, COM devices, and serial ports exposed over TCP.
+
+## Backup and restore
+Firmware upgrades usually erase network settings so **you should perform a backup before
+upgrading**. Currently there are two formats: a high-level backup format independent of
+zigpy-znp, and a complete low-level NVRAM backup of the device.
+
+### Network backup (beta)
+A high-level and stack-agnostic backup of your device's network data using the
+[Open Coordinator Backup Format](https://github.com/zigpy/open-coordinator-backup/)
+allows you to snapshot the device state and move your network between any supported
+hardware and firmware versions.
+
+```console
+(venv) $ python -m zigpy_znp.tools.network_backup /dev/serial/by-id/old_radio -o network_backup.json
+(venv) $ python -m zigpy_znp.tools.network_restore /dev/serial/by-id/new_radio -i network_backup.json
+```
+
+For example, a network backup will allow you to migrate from a CC2531 with Z-Stack Home
+1.2 to a zzh! without re-joining any devices. The backup format is human-readable and 
+fully documented so you can fill out the appropriate information by hand to form a network
+if you are migrating from a non-Texas Instruments device.
+
+*Note: network backups are a recent addition and while they have been tested on numerous
+devices with various network configurations, they use low-level operations and may have
+bugs.*
+
+### NVRAM backup
+In contrast to the high-level coordinator backup described above, an exhaustive, low-level
+NVRAM backup can be performed to clone your entire device state. The backed up data is
+opaque and contains little human-readable information:
 
 ```console
 (venv) $ python -m zigpy_znp.tools.nvram_read /dev/serial/by-id/old_radio -o backup.json
 (venv) $ python -m zigpy_znp.tools.nvram_write /dev/serial/by-id/new_radio -i backup.json
 ```
 
-**Note**:
+Note: the NVRAM structure is device- and firmware-specific so an NVRAM backup canonly be
+restored to a device similar to the original:
 
- - Firmware upgrades usually erase all settings, including your network information.
-     Perform a backup before upgrading and restore it after to preserve your settings.
-     You will experience some routing issues while the coordinator rebuilds its routing table.
- - CC2531 backups can only be restored to CC2531 devices running similar firmware versions.
+ - CC2531 with Z-Stack Home 1.2 is only compatible with another CC2531 running Z-Stack Home 1.2.
+ - CC2531 with Z-Stack 3.0 is only compatible with another CC2531 running Z-Stack 3.0.
+ - Newer chips like the CC2652R/RB and the CC1352P (zzh!, Slaesh's stick, and the LAUNCHXL boards) are all cross-compatible.
 
-You can erase the NVRAM entries in your device and reset it by running one of the following commands:
+## NVRAM reset
+Erase your device's NVRAM entries to fully reset it:
 
 ```console
-# Erases the NVRAM items that indicate that a network has been formed
-(venv) $ python -m zigpy_znp.tools.nvram_reset /dev/serial/by-id/your-radio
-
-# Erases every single NVRAM item, resetting your stick as much as possible
 # Unplug and re-plug the adapter after doing this
-(venv) $ python -m zigpy_znp.tools.nvram_reset -c /dev/serial/by-id/your-radio
+(venv) $ python -m zigpy_znp.tools.nvram_reset /dev/serial/by-id/your-radio
 ```
 
-# Energy scan
+## Network formation
+Form a new network on the command line:
+
+```console
+(venv) $ python -m zigpy_znp.tools.form_network /dev/serial/by-id/your-radio
+```
+
+## Energy scan
 Perform an energy scan to find a quiet Zigbee channel:
 
 ```console
@@ -138,10 +173,10 @@ Channel energy (mean of 1 / 5):
 # Hardware requirements
 USB-adapters, GPIO-modules, and development-boards running TI's Z-Stack are supported. Reference hardware for this project includes:
 
- - (**STABLE**) [TI LAUNCHXL-CC26X2R1](https://www.ti.com/tool/LAUNCHXL-CC26X2R1) running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` using [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH).
- - (**STABLE**) [Electrolama zzh CC2652R](https://electrolama.com/projects/zig-a-zig-ah/) and [Slaesh CC2652R](https://slae.sh/projects/cc2652/) sticks running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` or `CC2652RB_20210120.hex` respectively using [cc2538-bsl](https://github.com/JelmerT/cc2538-bsl).
- - (**BETA**) CC2531 running [Z-Stack 3.0.1](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip). You can flash `CC2531ZNP-without-SBL.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531` if your stick already has a serial bootloader.
- - (**ALPHA**) CC2531 running [Z-Stack Home 1.2](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_Home_1.2/bin/default/CC2531_DEFAULT_20190608.zip). You can flash `CC2531ZNP-Prod.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-Prod.bin /dev/serial/by-id/YOUR-CC2531` if your stick already has a serial bootloader.
+ - [TI LAUNCHXL-CC26X2R1](https://www.ti.com/tool/LAUNCHXL-CC26X2R1) running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` using [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH).
+ - [Electrolama zzh CC2652R](https://electrolama.com/projects/zig-a-zig-ah/) and [Slaesh CC2652R](https://slae.sh/projects/cc2652/) sticks running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` or `CC2652RB_20210120.hex` respectively using [cc2538-bsl](https://github.com/JelmerT/cc2538-bsl).
+ - CC2531 running [Z-Stack 3.0.1](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip). You can flash `CC2531ZNP-without-SBL.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531` if your stick already has a serial bootloader.
+ - CC2531 running [Z-Stack Home 1.2](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_Home_1.2/bin/default/CC2531_DEFAULT_20190608.zip). You can flash `CC2531ZNP-Prod.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-Prod.bin /dev/serial/by-id/YOUR-CC2531` if your stick already has a serial bootloader.
 
 ## Texas Instruments Chip Part Numbers
 Texas Instruments (TI) has quite a few different wireless MCU chips and they are all used/mentioned in open-source Zigbee world which can be daunting if you are just starting out. Here is a quick summary of part numbers and key features.
