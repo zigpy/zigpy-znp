@@ -75,7 +75,7 @@ async def detect_zstack_version(znp) -> float:
     """
 
     # Z-Stack 1.2 does not have the AppConfig subsystem
-    if not znp.capabilities & t.MTCapabilities.CAP_APP_CNF:
+    if not znp.capabilities & t.MTCapabilities.APP_CNF:
         return 1.2
 
     try:

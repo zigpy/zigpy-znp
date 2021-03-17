@@ -542,22 +542,22 @@ class InterPanCommand(t.enum_uint8):
 
 
 class MTCapabilities(t.enum_flag_uint16):
-    CAP_SYS = 1 << 0
-    CAP_MAC = 1 << 1
-    CAP_NWK = 1 << 2
-    CAP_AF = 1 << 3
-    CAP_ZDO = 1 << 4
-    CAP_SAPI = 1 << 5
-    CAP_UTIL = 1 << 6
-    CAP_DEBUG = 1 << 7
-    CAP_APP = 1 << 8
-    CAP_GP = 1 << 9
-    CAP_APP_CNF = 1 << 10
-    CAP_UNK12 = 1 << 11
-    CAP_ZOAD = 1 << 12
-    CAP_UNK14 = 1 << 13
-    CAP_UNK15 = 1 << 14
-    CAP_UNK16 = 1 << 15
+    SYS = 1 << 0
+    MAC = 1 << 1
+    NWK = 1 << 2
+    AF = 1 << 3
+    ZDO = 1 << 4
+    SAPI = 1 << 5
+    UTIL = 1 << 6
+    DEBUG = 1 << 7
+    APP = 1 << 8
+    GP = 1 << 9
+    APP_CNF = 1 << 10
+    UNK12 = 1 << 11
+    ZOAD = 1 << 12
+    UNK14 = 1 << 13
+    UNK15 = 1 << 14
+    UNK16 = 1 << 15
 
 
 class Network(t.CStruct):

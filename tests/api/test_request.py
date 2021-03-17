@@ -155,10 +155,10 @@ async def test_znp_request_kwargs(connected_znp, event_loop):
         await znp.request(c.SYS.Ping.Req(), RspFoo=0x01)
 
     # Valid format, valid name
-    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     event_loop.call_soon(znp_server.send, ping_rsp)
     assert (
-        await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.CAP_SYS)
+        await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.SYS)
     ) == ping_rsp
 
     # Commands with no response (not an empty response!) can still be sent
@@ -171,7 +171,7 @@ async def test_znp_request_kwargs(connected_znp, event_loop):
 
     # You cannot send anything but requests
     with pytest.raises(ValueError):
-        await znp.request(c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS))
+        await znp.request(c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS))
 
     # You cannot send callbacks
     with pytest.raises(ValueError):
@@ -212,9 +212,9 @@ async def test_znp_request_wrong_params(connected_znp, event_loop):
     with pytest.raises(InvalidCommandResponse):
         event_loop.call_soon(
             znp.frame_received,
-            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS).to_frame(),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS).to_frame(),
         )
-        await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.CAP_APP)
+        await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.APP)
 
 
 async def test_znp_sreq_srsp(connected_znp, event_loop):
@@ -226,7 +226,7 @@ async def test_znp_sreq_srsp(connected_znp, event_loop):
             await znp.request(c.SYS.Ping.Req())
 
     # This will work
-    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
 
     await znp.request(c.SYS.Ping.Req())

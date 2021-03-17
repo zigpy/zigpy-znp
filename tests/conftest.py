@@ -708,12 +708,12 @@ class BaseZStack1CC2531(BaseZStackDevice):
     def ping_replier(self, request):
         return c.SYS.Ping.Rsp(
             Capabilities=(
-                t.MTCapabilities.CAP_APP
-                | t.MTCapabilities.CAP_UTIL
-                | t.MTCapabilities.CAP_SAPI
-                | t.MTCapabilities.CAP_ZDO
-                | t.MTCapabilities.CAP_AF
-                | t.MTCapabilities.CAP_SYS
+                t.MTCapabilities.APP
+                | t.MTCapabilities.UTIL
+                | t.MTCapabilities.SAPI
+                | t.MTCapabilities.ZDO
+                | t.MTCapabilities.AF
+                | t.MTCapabilities.SYS
             )
         )
 
@@ -901,12 +901,12 @@ class BaseZStack3Device(BaseZStackDevice):
     def ping_replier(self, request):
         return c.SYS.Ping.Rsp(
             Capabilities=(
-                t.MTCapabilities.CAP_APP_CNF
-                | t.MTCapabilities.CAP_GP
-                | t.MTCapabilities.CAP_UTIL
-                | t.MTCapabilities.CAP_ZDO
-                | t.MTCapabilities.CAP_AF
-                | t.MTCapabilities.CAP_SYS
+                t.MTCapabilities.APP_CNF
+                | t.MTCapabilities.GP
+                | t.MTCapabilities.UTIL
+                | t.MTCapabilities.ZDO
+                | t.MTCapabilities.AF
+                | t.MTCapabilities.SYS
             )
         )
 

@@ -19,7 +19,7 @@ async def test_responses(connected_znp):
 
     assert znp._listeners
 
-    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     znp_server.send(response)
 
     assert (await future) == response
@@ -38,7 +38,7 @@ async def test_responses_multiple(connected_znp):
     future2 = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
     future3 = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
 
-    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     znp.frame_received(response.to_frame())
 
     await future1
@@ -55,7 +55,7 @@ async def test_responses_multiple(connected_znp):
 async def test_response_timeouts(connected_znp):
     znp, _ = connected_znp
 
-    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
 
     async def send_soon(delay):
         await asyncio.sleep(delay)
@@ -225,7 +225,7 @@ async def test_command_deduplication_simple():
 async def test_command_deduplication_complex():
     result = _deduplicate_commands(
         [
-            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
             # Duplicating matching commands shouldn't do anything
             c.SYS.Ping.Rsp(partial=True),
             c.SYS.Ping.Rsp(partial=True),
@@ -283,8 +283,8 @@ async def test_response_callbacks(connected_znp, event_loop, mocker):
         await asyncio.sleep(0)
         async_callback_responses.append(response)
 
-    good_response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    good_response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
+    good_response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
+    good_response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.APP)
     good_response3 = c.Util.TimeAlive.Rsp(Seconds=12)
     bad_response1 = c.SYS.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
     bad_response2 = c.SYS.NVWrite.Req(
@@ -297,8 +297,8 @@ async def test_response_callbacks(connected_znp, event_loop, mocker):
         c.SYS.Ping.Rsp(partial=True),
         # Matching against different response types should also work
         c.Util.TimeAlive.Rsp(Seconds=12),
-        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
-        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
         c.Util.TimeAlive.Rsp(Seconds=10),
     ]
 
@@ -333,8 +333,8 @@ async def test_response_callbacks(connected_znp, event_loop, mocker):
 async def test_wait_for_responses(connected_znp, event_loop):
     znp, _ = connected_znp
 
-    response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_APP)
+    response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
+    response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.APP)
     response3 = c.Util.TimeAlive.Rsp(Seconds=12)
     response4 = c.SYS.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
     response5 = c.SYS.NVWrite.Req(
@@ -353,7 +353,7 @@ async def test_wait_for_responses(connected_znp, event_loop):
     future2 = znp.wait_for_responses(
         [
             c.Util.TimeAlive.Rsp(Seconds=12),
-            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_UTIL),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.UTIL),
         ]
     )
 
@@ -365,8 +365,8 @@ async def test_wait_for_responses(connected_znp, event_loop):
         [
             # Matching against different response types should also work
             c.Util.TimeAlive.Rsp(Seconds=12),
-            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
-            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
             c.Util.TimeAlive.Rsp(Seconds=10),
         ]
     )

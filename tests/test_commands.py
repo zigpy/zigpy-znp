@@ -172,11 +172,11 @@ def test_command_param_binding():
         c.SYS.Ping.Rsp(asd=123)
 
     # Valid param name
-    c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
 
     # Too many params, one valid
     with pytest.raises(KeyError):
-        c.SYS.Ping.Rsp(foo="asd", Capabilities=t.MTCapabilities.CAP_SYS)
+        c.SYS.Ping.Rsp(foo="asd", Capabilities=t.MTCapabilities.SYS)
 
     # Not enough params
     with pytest.raises(KeyError):
@@ -203,14 +203,14 @@ def test_command_param_binding():
         c.Util.TimeAlive.Rsp(Seconds=10 ** 20)
 
     # Integers will not be coerced to enums
-    assert t.MTCapabilities.CAP_SYS == 0x0001
+    assert t.MTCapabilities.SYS == 0x0001
 
     with pytest.raises(ValueError):
         c.SYS.Ping.Rsp(Capabilities=0x0001)
 
     # Parameters can be looked up by name
-    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
-    assert ping_rsp.Capabilities == t.MTCapabilities.CAP_SYS
+    ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
+    assert ping_rsp.Capabilities == t.MTCapabilities.SYS
 
     # Invalid ones cannot
     with pytest.raises(AttributeError):

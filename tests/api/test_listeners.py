@@ -19,7 +19,7 @@ async def test_resolve(event_loop, mocker):
     future = event_loop.create_future()
     one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
 
-    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     no_match = c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     assert callback_listener.resolve(match)
@@ -50,7 +50,7 @@ async def test_cancel(event_loop):
     one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
     one_shot_listener.cancel()
 
-    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     assert not one_shot_listener.resolve(match)
 
     with pytest.raises(asyncio.CancelledError):
@@ -66,7 +66,7 @@ async def test_multi_cancel(event_loop, mocker):
     future = event_loop.create_future()
     one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
 
-    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS)
+    match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     no_match = c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS)
 
     assert callback_listener.resolve(match)
@@ -85,11 +85,11 @@ async def test_api_cancel_listeners(connected_znp, mocker):
     callback = mocker.Mock()
 
     znp.callback_for_response(
-        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS), callback
+        c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS), callback
     )
     future = znp.wait_for_responses(
         [
-            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.CAP_SYS),
+            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
             c.SYS.OSALNVWrite.Rsp(Status=t.Status.SUCCESS),
         ]
     )
