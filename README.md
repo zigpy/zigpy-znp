@@ -81,7 +81,7 @@ zha:
 # Tools
 Various command line Zigbee utilities are a part of the zigpy-znp package and can be run
 with `python -m zigpy_znp.tools.name_of_tool`. More detailed documentation can be found
-in **[`TOOLS.md`](blob/dev/TOOLS.md)** but a brief description of each tool is included below:
+in **[`TOOLS.md`](./TOOLS.md)** but a brief description of each tool is included below:
 
  - **`energy_scan`**: Performs a continuous energy scan to check for non-Zigbee interference.
  - **`flash_read`**: For CC2531s, reads firmware from flash.
