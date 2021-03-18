@@ -37,6 +37,8 @@ def test_addr_mode_address():
     assert r.mode == t.AddrMode.IEEE
     assert r.address == t.EUI64(range(8))
     assert r.serialize() == data
+    assert t.AddrModeAddress(r) == r
+    assert r != object()
 
     # NWK
     data = b"\x02\xaa\x55\x02\x03\x04\x05\x06\x07"
@@ -46,6 +48,7 @@ def test_addr_mode_address():
     assert r.address == t.NWK(0x55AA)
     assert r.serialize()[:3] == data[:3]
     assert len(r.serialize()) == 9
+    assert t.AddrModeAddress(r) == r
 
     # Group
     data = b"\x01\xcd\xab\x02\x03\x04\x05\x06\x07"
@@ -55,6 +58,7 @@ def test_addr_mode_address():
     assert r.address == t.NWK(0xABCD)
     assert r.serialize()[:3] == data[:3]
     assert len(r.serialize()) == 9
+    assert t.AddrModeAddress(r) == r
 
     # Broadcast
     data = b"\x0f\xfe\xff\x02\x03\x04\x05\x06\x07"
@@ -64,6 +68,7 @@ def test_addr_mode_address():
     assert r.address == t.NWK(0xFFFE)
     assert r.serialize()[:3] == data[:3]
     assert len(r.serialize()) == 9
+    assert t.AddrModeAddress(r) == r
 
     with pytest.raises(ValueError):
         # 0xab is not a valid mode
