@@ -275,6 +275,8 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
         ):
             continue
+        elif entry.type == t.AddrMgrUserType.Default:
+            continue
         elif entry.type in (
             t.AddrMgrUserType.Assoc,
             t.AddrMgrUserType.Assoc | t.AddrMgrUserType.Security,
