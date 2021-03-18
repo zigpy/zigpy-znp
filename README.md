@@ -79,96 +79,20 @@ zha:
 ```
 
 # Tools
-All tools can be run with the `-v` or `-vv` flags for extra verbosity and accept serial
-port paths, COM devices, and serial ports exposed over TCP.
+Various command line Zigbee utilities are a part of the zigpy-znp package and can be run
+with `python -m zigpy_znp.tools.name_of_tool`. More detailed documentation can be found
+in **[`TOOLS.md`](blob/dev/TOOLS.md)** but a brief description of each tool is included below:
 
-## Backup and restore
-Firmware upgrades usually erase network settings so **you should perform a backup before
-upgrading**. Currently there are two formats: a high-level backup format independent of
-zigpy-znp, and a complete low-level NVRAM backup of the device.
-
-### Network backup (beta)
-A high-level and stack-agnostic backup of your device's network data using the
-[Open Coordinator Backup Format](https://github.com/zigpy/open-coordinator-backup/)
-allows you to snapshot the device state and move your network between any supported
-hardware and firmware versions.
-
-```console
-(venv) $ python -m zigpy_znp.tools.network_backup /dev/serial/by-id/old_radio -o network_backup.json
-(venv) $ python -m zigpy_znp.tools.network_restore /dev/serial/by-id/new_radio -i network_backup.json
-```
-
-For example, a network backup will allow you to migrate from a CC2531 with Z-Stack Home
-1.2 to a zzh! without re-joining any devices. The backup format is human-readable and 
-fully documented so you can fill out the appropriate information by hand to form a network
-if you are migrating from a non-Texas Instruments device.
-
-*Note: network backups are a recent addition and while they have been tested on numerous
-devices with various network configurations, they use low-level operations and may have
-bugs.*
-
-### NVRAM backup
-In contrast to the high-level coordinator backup described above, an exhaustive, low-level
-NVRAM backup can be performed to clone your entire device state. The backed up data is
-opaque and contains little human-readable information:
-
-```console
-(venv) $ python -m zigpy_znp.tools.nvram_read /dev/serial/by-id/old_radio -o backup.json
-(venv) $ python -m zigpy_znp.tools.nvram_write /dev/serial/by-id/new_radio -i backup.json
-```
-
-Note: the NVRAM structure is device- and firmware-specific so an NVRAM backup canonly be
-restored to a device similar to the original:
-
- - CC2531 with Z-Stack Home 1.2 is only compatible with another CC2531 running Z-Stack Home 1.2.
- - CC2531 with Z-Stack 3.0 is only compatible with another CC2531 running Z-Stack 3.0.
- - Newer chips like the CC2652R/RB and the CC1352P (zzh!, Slaesh's stick, and the LAUNCHXL boards) are all cross-compatible.
-
-## NVRAM reset
-Erase your device's NVRAM entries to fully reset it:
-
-```console
-# Unplug and re-plug the adapter after doing this
-(venv) $ python -m zigpy_znp.tools.nvram_reset /dev/serial/by-id/your-radio
-```
-
-## Network formation
-Form a new network on the command line:
-
-```console
-(venv) $ python -m zigpy_znp.tools.form_network /dev/serial/by-id/your-radio
-```
-
-## Energy scan
-Perform an energy scan to find a quiet Zigbee channel:
-
-```console
-$ python -m zigpy_znp.tools.energy_scan /dev/cu.usbmodem14101
-Channel energy (mean of 1 / 5):
-------------------------------------------------
- + Lower energy is better
- + Active Zigbee networks on a channel may still cause congestion
- + Using 26 in the USA may have lower TX power due to FCC regulations
- + Zigbee channels 15, 20, 25 fall between WiFi channels 1, 6, 11
- + Some Zigbee devices only join networks on channels 11, 13, 15, 20, or 25
-------------------------------------------------
- - 11    61.57%  #############################################################
- - 12    60.78%  ############################################################
- - 13    12.16%  ############
- - 14    58.43%  ##########################################################
- - 15    57.65%  #########################################################
- - 16    29.80%  #############################
- - 17    38.82%  ######################################
- - 18    47.06%  ###############################################
- - 19    36.86%  ####################################
- - 20    10.98%  ##########
- - 21    16.47%  ################
- - 22    33.73%  #################################
- - 23    30.59%  ##############################
- - 24    20.39%  ####################
- - 25     5.88%  #####
- - 26*   20.39%  ####################
-```
+ - **`energy_scan`**: Performs a continuous energy scan to check for non-Zigbee interference.
+ - **`flash_read`**: For CC2531s, reads firmware from flash.
+ - **`flash_write`**: For CC2531s, writes a firmware `.bin` to flash.
+ - **`form_network`**: Forms a network with randomized settings on channel 15.
+ - **`network_backup`**: Backs up the network data and device information into a human-readable JSON document.
+ - **`network_restore`**: Restores a JSON network backup to the adapter.
+ - **`network_scan`**: Actively sends beacon requests for network stumbling.
+ - **`nvram_read`**: Reads all possible NVRAM entries into a JSON document.
+ - **`nvram_reset`**: Deletes all possible NVRAM entries
+ - **`nvram_write`**: Writes all NVRAM entries from a JSON document.
 
 # Hardware requirements
 USB-adapters, GPIO-modules, and development-boards running TI's Z-Stack are supported. Reference hardware for this project includes:
