@@ -19,7 +19,7 @@ class NVRAMHelper:
         self.znp = znp
         self.align_structs = None
 
-    async def determine_alignment(self):
+    async def determine_alignment(self) -> None:
         """
         Automatically determine struct memory alignment. Must be called before any
         structs are read/written.
@@ -71,9 +71,6 @@ class NVRAMHelper:
         Serialize raw bytes, automatically computing struct padding based on the target
         platform.
         """
-
-        if item_type is None:
-            return data
 
         if issubclass(item_type, (t.CStruct, t.BaseListType)):
             assert self.align_structs is not None
@@ -164,7 +161,10 @@ class NVRAMHelper:
                 RspStatus=t.Status.SUCCESS,
             )
 
-            return read_rsp.Value
+            value = self.deserialize(read_rsp.Value, item_type)
+            LOGGER.debug('Read NVRAM["LEGACY"][0x%04x] = %r', nv_id, value)
+
+            return value
 
         # Every item has a length, even missing ones
         length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
@@ -234,7 +234,7 @@ class NVRAMHelper:
         sub_id: t.uint16_t,
         value,
         create: bool = True,
-    ):
+    ) -> None:
         """
         Writes a value to NVRAM for the specified subsystem, item, and subitem.
 
@@ -355,7 +355,7 @@ class NVRAMHelper:
         item_id: t.uint16_t,
         values,
         fill_value,
-    ):
+    ) -> None:
         for sub_id, value in itertools.zip_longest(
             range(0x0000, 0xFFFF + 1), values, fillvalue=fill_value
         ):
@@ -374,7 +374,7 @@ class NVRAMHelper:
 
     async def osal_write_table(
         self, start_nvid: t.uint16_t, end_nvid: t.uint16_t, values, *, fill_value
-    ):
+    ) -> None:
         values = list(values)
 
         for nvid, value in itertools.zip_longest(

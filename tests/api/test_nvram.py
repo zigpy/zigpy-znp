@@ -311,3 +311,28 @@ async def test_osal_delete(connected_znp, nvid, length):
         assert not delete_rsp.done()
     else:
         await delete_rsp
+
+
+@pytest.mark.parametrize("nvid", [nvids.OsalNvIds.NWKKEY])
+@pytest.mark.parametrize("value", [b"too short", b"too long " * 3, b"\x00" * 24])
+async def test_osal_read_unexpected_value(connected_znp, nvid, value):
+    znp, znp_server = connected_znp
+
+    length_rsp = znp_server.reply_once_to(
+        request=c.SYS.OSALNVLength.Req(Id=nvid),
+        responses=[c.SYS.OSALNVLength.Rsp(ItemLen=len(value))],
+    )
+
+    read_rsp = znp_server.reply_once_to(
+        request=c.SYS.OSALNVReadExt.Req(Id=nvid, Offset=0),
+        responses=[c.SYS.OSALNVReadExt.Rsp(Status=t.Status.SUCCESS, Value=value)],
+    )
+
+    if len(value) == b"\x00" * 24:
+        await znp.nvram.osal_read(nvid, item_type=t.NwkActiveKeyItems)
+    else:
+        with pytest.raises(ValueError):
+            await znp.nvram.osal_read(nvid, item_type=t.NwkActiveKeyItems)
+
+    await length_rsp
+    await read_rsp
