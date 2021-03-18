@@ -1444,11 +1444,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         are encountered.
         """
 
-        if dst_addr.mode == t.AddrMode.NWK:
-            device = self.get_device(nwk=dst_addr.address)
-        elif dst_addr.mode == t.AddrMode.IEEE:
-            device = self.get_device(ieee=dst_addr.address)
-        else:
+        try:
+            if dst_addr.mode == t.AddrMode.NWK:
+                device = self.get_device(nwk=dst_addr.address)
+            elif dst_addr.mode == t.AddrMode.IEEE:
+                device = self.get_device(ieee=dst_addr.address)
+            else:
+                device = None
+        except KeyError:
+            # Sometimes a request is sent to a device not in the database. This should
+            # work, the device object is only for recovery.
             device = None
 
         status = None
@@ -1508,12 +1513,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         if status not in REQUEST_RETRYABLE_ERRORS:
                             raise
 
-                        # We cannot do anything but retry if the error is transient or
-                        # we are not sending a unicast request. Retry at least once.
+                        # Just retry if:
+                        #  - this is our first failure
+                        #  - the error is transient and is not a routing issue
+                        #  - or we are not sending a unicast request
                         if (
-                            status in REQUEST_TRANSIENT_ERRORS
-                            or attempt == 0
-                            or device is None
+                            attempt == 0
+                            or status in REQUEST_TRANSIENT_ERRORS
+                            or dst_addr.mode not in (t.AddrMode.NWK, t.AddrMode.IEEE)
                         ):
                             LOGGER.debug(
                                 "Request failed (%s), retry attempt %s of %s",
@@ -1535,15 +1542,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         # to do this.
                         if (
                             status == t.Status.MAC_TRANSACTION_EXPIRED
+                            and device is not None
                             and association is None
                             and not tried_assoc_remove
                             and self._znp.version >= 3.30
                         ):
-                            # XXX: do we use NWK or IEEE?
                             association = await self._znp.request(
                                 c.Util.AssocGetWithAddress.Req(
                                     IEEE=device.ieee,
-                                    NWK=device.nwk,
+                                    NWK=0x0000,  # IEEE takes priority
                                 )
                             )
 
@@ -1570,11 +1577,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # packets backwards via this same route may work.
                             force_relays = (device.relays or [])[::-1]
                             tried_last_good_route = True
-                        elif not tried_route_discovery:
+                        elif (
+                            not tried_route_discovery
+                            and dst_addr.mode == t.AddrMode.NWK
+                        ):
                             # If that doesn't work, try re-discovering the route.
                             # While we can in theory poll and wait until it is fixed,
                             # letting the retry mechanism deal with it simpler.
-                            await self._discover_route(device.nwk)
+                            await self._discover_route(dst_addr.address)
                             tried_route_discovery = True
                         elif not tried_disable_route_discovery_suppression:
                             # Disable route discovery suppression. This appears to
@@ -1603,7 +1613,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             if tried_assoc_remove and response is None:
                 await self._znp.request(
                     c.Util.AssocAdd.Req(
-                        NWK=device.nwk,
+                        NWK=association.Device.shortAddr,
                         IEEE=device.ieee,
                         NodeRelation=association.Device.nodeRelation,
                     )
