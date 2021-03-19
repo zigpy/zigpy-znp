@@ -1186,6 +1186,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._channels = self._znp.network_info.channels
         self._pan_id = self._znp.network_info.pan_id
         self._ext_pan_id = self._znp.network_info.extended_pan_id
+        self._nwk_update_id = self._znp.network_info.nwk_update_id
         self._network_key = self._znp.network_info.network_key
         self._network_key_seq = self._znp.network_info.network_key_seq
 
