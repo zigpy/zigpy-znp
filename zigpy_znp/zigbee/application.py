@@ -3,7 +3,6 @@ import time
 import typing
 import asyncio
 import logging
-import warnings
 import itertools
 import contextlib
 
@@ -15,6 +14,7 @@ import zigpy.device
 import async_timeout
 import zigpy.endpoint
 import zigpy.profiles
+import zigpy.application
 import zigpy.zcl.foundation
 from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
@@ -28,16 +28,6 @@ from zigpy_znp.api import ZNP
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
-
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        action="ignore",
-        module="aiohttp",
-        message='"@coroutine" decorator is deprecated',
-        category=DeprecationWarning,
-    )
-    import zigpy.application
-
 
 ZDO_ENDPOINT = 0
 
