@@ -35,7 +35,7 @@ PROBE_TIMEOUT = 5  # seconds
 STARTUP_TIMEOUT = 5  # seconds
 ZDO_REQUEST_TIMEOUT = 15  # seconds
 DATA_CONFIRM_TIMEOUT = 8  # seconds
-DEVICE_JOIN_MAX_DELAY = 2  # seconds
+DEVICE_JOIN_MAX_DELAY = 5  # seconds
 NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
 WATCHDOG_PERIOD = 30  # seconds
 
