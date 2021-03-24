@@ -282,6 +282,10 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             t.AddrMgrUserType.Assoc | t.AddrMgrUserType.Security,
             t.AddrMgrUserType.Security,
         ):
+            if not 0x0000 <= entry.nwkAddr <= 0xFFF7:
+                LOGGER.warning("Ignoring invalid address manager entry: %s", entry)
+                continue
+
             devices[entry.extAddr] = StoredDevice(
                 ieee=entry.extAddr,
                 nwk=entry.nwkAddr,
@@ -290,6 +294,16 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             raise ValueError(f"Unexpected entry type: {entry.type}")
 
     async for ieee, tx_ctr, rx_ctr, key in read_hashed_link_keys(znp, tclk_seed):
+        if ieee not in devices:
+            LOGGER.warning(
+                "Skipping hashed link key %s (tx: %s, rx: %s) for unknown device %s",
+                ":".join(f"{b:02x}" for b in key),
+                tx_ctr,
+                rx_ctr,
+                ieee,
+            )
+            continue
+
         devices[ieee] = devices[ieee].replace(
             tx_counter=tx_ctr,
             rx_counter=rx_ctr,
@@ -298,6 +312,16 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
         )
 
     async for ieee, tx_ctr, rx_ctr, key in read_unhashed_link_keys(znp, addr_mgr):
+        if ieee not in devices:
+            LOGGER.warning(
+                "Skipping unhashed link key %s (tx: %s, rx: %s) for unknown device %s",
+                ":".join(f"{b:02x}" for b in key),
+                tx_ctr,
+                rx_ctr,
+                ieee,
+            )
+            continue
+
         devices[ieee] = devices[ieee].replace(
             tx_counter=tx_ctr,
             rx_counter=rx_ctr,
