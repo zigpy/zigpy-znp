@@ -31,16 +31,19 @@ from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
 
 ZDO_ENDPOINT = 0
 
-PROBE_TIMEOUT = 5  # seconds
-STARTUP_TIMEOUT = 5  # seconds
-ZDO_REQUEST_TIMEOUT = 15  # seconds
-DATA_CONFIRM_TIMEOUT = 8  # seconds
-DEVICE_JOIN_MAX_DELAY = 5  # seconds
-NETWORK_COMMISSIONING_TIMEOUT = 30  # seconds
-WATCHDOG_PERIOD = 30  # seconds
+# All of these are in seconds
+PROBE_TIMEOUT = 5
+STARTUP_TIMEOUT = 5
+ZDO_REQUEST_TIMEOUT = 15
+DATA_CONFIRM_TIMEOUT = 8
+DEVICE_JOIN_MAX_DELAY = 5
+NETWORK_COMMISSIONING_TIMEOUT = 30
+WATCHDOG_PERIOD = 30
+BROADCAST_SEND_WAIT_DURATION = 3
+MULTICAST_SEND_WAIT_DURATION = 3
 
 REQUEST_MAX_RETRIES = 5
-REQUEST_ERROR_RETRY_DELAY = 0.5  # second
+REQUEST_ERROR_RETRY_DELAY = 0.5  # seconds
 
 # Errors that go away on their own after waiting for a bit
 REQUEST_TRANSIENT_ERRORS = {
@@ -1353,17 +1356,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
         if dst_addr.mode == t.AddrMode.Broadcast:
-            # Broadcasts will not receive a confirmation but they still take time
-            # and use up concurrency slots
+            # Broadcasts will not receive a confirmation
             response = await self._znp.request(
                 request=request, RspStatus=t.Status.SUCCESS
             )
-
-            await asyncio.sleep(0.1 * 30)
         else:
             async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
-                # Shield from cancellation to prevent requests that time out
-                # in higher layers from missing expected responses
+                # Shield from cancellation to prevent requests that time out in higher
+                # layers from missing expected responses
                 response = await asyncio.shield(
                     self._znp.request_callback_rsp(
                         request=request,
@@ -1374,6 +1374,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # XXX: can this ever not match?
                             # Endpoint=src_ep,
                         ),
+                        # Multicasts eventually receive a confirmation but waiting for
+                        # it is unnecessary
+                        background=(dst_addr.mode == t.AddrMode.Group),
                     )
                 )
 

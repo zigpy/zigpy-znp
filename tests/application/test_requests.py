@@ -268,6 +268,39 @@ async def test_mrequest(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_mrequest_doesnt_block(device, make_application, event_loop):
+    app, znp_server = make_application(server_cls=device)
+
+    znp_server.reply_once_to(
+        request=c.AF.DataRequestExt.Req(
+            DstAddrModeAddress=t.AddrModeAddress(mode=t.AddrMode.Group, address=0x1234),
+            ClusterId=0x0006,
+            partial=True,
+        ),
+        responses=[
+            # Confirm the request immediately but do not send a callback response until
+            # *after* the group request is "done".
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
+    data_confirm_rsp = c.AF.DataConfirm.Callback(
+        Status=t.Status.SUCCESS, Endpoint=1, TSN=2
+    )
+
+    request_sent = event_loop.create_future()
+    request_sent.add_done_callback(lambda _: znp_server.send(data_confirm_rsp))
+
+    await app.startup(auto_form=False)
+
+    group = app.groups.add_group(0x1234, "test group")
+    await group.endpoint.on_off.on()
+    request_sent.set_result(True)
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_unimplemented_zdo_converter(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
     await app.startup()

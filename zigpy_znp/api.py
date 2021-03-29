@@ -1,3 +1,4 @@
+import time
 import typing
 import asyncio
 import logging
@@ -398,23 +399,10 @@ class ZNP:
         """
 
         queue = asyncio.Queue()
-        listener = self.callback_for_responses(responses, queue.put_nowait)
+        listener = self.callback_for_responses(responses, callback=queue.put_nowait)
 
         try:
             yield queue
-        finally:
-            self.remove_listener(listener)
-
-    @contextlib.asynccontextmanager
-    async def capture_responses_once(self, responses):
-        """
-        Captures all matched responses in a queue within the context manager.
-        """
-
-        future, listener = self.wait_for_responses(responses, context=True)
-
-        try:
-            yield future
         finally:
             self.remove_listener(listener)
 
@@ -546,7 +534,7 @@ class ZNP:
         return response
 
     async def request_callback_rsp(
-        self, *, request, callback, timeout=None, **response_params
+        self, *, request, callback, timeout=None, background=False, **response_params
     ):
         """
         Sends an SREQ, gets its SRSP confirmation, and waits for its real AREQ response.
@@ -559,12 +547,41 @@ class ZNP:
         from the UART and be handled in the same event loop step by ZNP.
         """
 
+        # Every request should have a timeout to prevent deadlocks
         if timeout is None:
             timeout = self._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT]
 
-        # The async context manager allows us to clean up resources upon cancellation
-        async with self.capture_responses_once([callback]) as callback_rsp:
-            await self.request(request, **response_params)
+        callback_rsp, listener = self.wait_for_responses([callback], context=True)
 
+        if not background:
+            try:
+                async with async_timeout.timeout(timeout):
+                    await self.request(request, **response_params)
+
+                    return await callback_rsp
+            finally:
+                self.remove_listener(listener)
+
+        start_time = time.time()
+
+        # If the SREQ/SRSP pair fails, we must cancel the AREQ listener
+        try:
             async with async_timeout.timeout(timeout):
-                return await callback_rsp
+                request_rsp = await self.request(request, **response_params)
+        except Exception:
+            self.remove_listener(listener)
+            raise
+
+        async def callback_handler(timeout):
+            try:
+                async with async_timeout.timeout(timeout):
+                    await callback_rsp
+            finally:
+                self.remove_listener(listener)
+
+        # If it succeeds, create a background task to receive the AREQ but take into
+        # account the time it took to start the SREQ to ensure we do not grossly exceed
+        # the timeout
+        asyncio.create_task(callback_handler(time.time() - start_time))
+
+        return request_rsp

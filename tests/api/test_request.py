@@ -92,7 +92,8 @@ async def test_callback_rsp_cleanup_timeout_external(connected_znp):
     assert not znp._listeners
 
 
-async def test_callback_rsp_cleanup_timeout_internal(connected_znp):
+@pytest.mark.parametrize("background", [False, True])
+async def test_callback_rsp_cleanup_timeout_internal(background, connected_znp):
     znp, znp_server = connected_znp
     znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
     znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
@@ -104,6 +105,45 @@ async def test_callback_rsp_cleanup_timeout_internal(connected_znp):
         await znp.request_callback_rsp(
             request=c.Util.TimeAlive.Req(),
             callback=c.SYS.ResetInd.Callback(partial=True),
+            background=background,
+        )
+
+    # We should be cleaned up
+    assert not znp._listeners
+
+
+async def test_callback_rsp_cleanup_background_error(connected_znp):
+    znp, znp_server = connected_znp
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
+
+    assert not znp._listeners
+
+    # This request will timeout because we didn't send anything back
+    with pytest.raises(asyncio.TimeoutError):
+        await znp.request_callback_rsp(
+            request=c.Util.TimeAlive.Req(),
+            callback=c.SYS.ResetInd.Callback(partial=True),
+            background=True,
+        )
+
+    # We should be cleaned up
+    assert not znp._listeners
+
+
+async def test_callback_rsp_cleanup_background_timeout(connected_znp):
+    znp, znp_server = connected_znp
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
+
+    assert not znp._listeners
+
+    # This request will timeout because we didn't send anything back
+    with pytest.raises(asyncio.TimeoutError):
+        await znp.request_callback_rsp(
+            request=c.Util.TimeAlive.Req(),
+            callback=c.SYS.ResetInd.Callback(partial=True),
+            background=True,
         )
 
     # We should be cleaned up
