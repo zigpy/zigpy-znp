@@ -317,6 +317,11 @@ class AF(t.CommandsBase, subsystem=t.Subsystem.AF):
             t.Param("TimeStamp", t.uint32_t, "The timestamp of the message"),
             t.Param("TSN", t.uint8_t, "Transaction Sequence Number"),
             t.Param("Data", t.LongBytes, "Data"),
+            # https://e2e.ti.com/support/wireless-connectivity/zigbee-and-thread/f/158/t/455787
+            t.Param("MacSrcAddr", t.NWK, "UNDOCUMENTED: MAC Source address"),
+            t.Param(
+                "MsgResultRadius", t.uint8_t, "UNDOCUMENTED: Messages result radius"
+            ),
         ),
     )
 
