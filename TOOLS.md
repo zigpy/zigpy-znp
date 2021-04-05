@@ -102,6 +102,9 @@ upgrading**. Currently there are two formats: a high-level backup format indepen
 zigpy-znp, and a complete low-level NVRAM backup of the device.
 
 ### Network backup (beta)
+
+**This feature is pre-release and available only in zigpy-znp installed the Git repo's `dev` branch**
+
 A high-level and stack-agnostic backup of your device's network data using the
 [Open Coordinator Backup Format](https://github.com/zigpy/open-coordinator-backup/)
 allows you to snapshot the device state and move your network between any supported
