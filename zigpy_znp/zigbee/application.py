@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import os
 import time
-import typing
 import asyncio
 import logging
 import itertools
@@ -106,7 +107,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     def __init__(self, config: conf.ConfigType):
         super().__init__(config=conf.CONFIG_SCHEMA(config))
 
-        self._znp: typing.Optional[ZNP] = None
+        self._znp: ZNP | None = None
 
         # It's simpler to work with Task objects if they're never actually None
         self._reconnect_task = asyncio.Future()
@@ -127,12 +128,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ##################################################################
 
     @property
-    def network_key(self) -> typing.Optional[t.KeyData]:
+    def network_key(self) -> t.KeyData | None:
         # This is not a standard Zigpy property
         return self._network_key
 
     @property
-    def network_key_seq(self) -> typing.Optional[t.uint8_t]:
+    def network_key_seq(self) -> t.uint8_t | None:
         # This is not a standard Zigpy property
         return self._network_key_seq
 
@@ -604,7 +605,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         data,
         expect_reply=True,
         use_ieee=False,
-    ) -> typing.Tuple[t.Status, str]:
+    ) -> tuple[t.Status, str]:
         tx_options = c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
 
         if expect_reply:
@@ -638,7 +639,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         sequence,
         data,
         broadcast_address=zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
-    ) -> typing.Tuple[t.Status, str]:
+    ) -> tuple[t.Status, str]:
         assert grpid == 0
 
         return await self._send_request(
@@ -666,7 +667,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         *,
         hops=0,
         non_member_radius=3,
-    ) -> typing.Tuple[t.Status, str]:
+    ) -> tuple[t.Status, str]:
         return await self._send_request(
             dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=group_id),
             dst_ep=src_ep,
@@ -1432,7 +1433,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         options,
         radius,
         data,
-    ) -> typing.Tuple[t.Status, str]:
+    ) -> tuple[t.Status, str]:
         """
         Fault-tolerant wrapper around `_send_request_raw` that transparently attempts to
         repair routes and contact the device through other methods when Z-Stack errors

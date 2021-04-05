@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import typing
 import logging
@@ -20,6 +22,8 @@ from zigpy.zdo.types import Status as ZDOStatus  # noqa: F401
 from . import basic
 
 LOGGER = logging.getLogger(__name__)
+
+JSONType = typing.Union[typing.Dict[str, typing.Any], typing.List[typing.Any]]
 
 
 class ADCChannel(basic.enum_uint8):
@@ -154,7 +158,7 @@ class Param:
     """Schema parameter"""
 
     name: str
-    type: typing.Any = None
+    type: type = None
     description: str = ""
     optional: bool = False
 

@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 import enum
-import typing
 
 from zigpy_znp.types.cstruct import CStruct
 
 
 class Bytes(bytes):
-    def serialize(self) -> "Bytes":
+    def serialize(self) -> Bytes:
         return self
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["Bytes", bytes]:
+    def deserialize(cls, data: bytes) -> tuple[Bytes, bytes]:
         return cls(data), b""
 
     def __repr__(self) -> str:
@@ -76,7 +77,7 @@ class FixedIntType(int):
             raise ValueError(str(e)) from e
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["FixedIntType", bytes]:
+    def deserialize(cls, data: bytes) -> tuple[FixedIntType, bytes]:
         if len(data) < cls._size:
             raise ValueError(f"Data is too short to contain {cls._size} bytes")
 
@@ -160,11 +161,11 @@ class uint64_t(uint_t, size=8):
 class ShortBytes(Bytes):
     _header = uint8_t
 
-    def serialize(self) -> "Bytes":
+    def serialize(self) -> Bytes:
         return self._header(len(self)).serialize() + self
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple[Bytes, bytes]:
+    def deserialize(cls, data: bytes) -> tuple[Bytes, bytes]:
         length, data = cls._header.deserialize(data)
         if length > len(data):
             raise ValueError(f"Data is too short to contain {length} bytes of data")
@@ -211,7 +212,7 @@ class LVList(BaseListType):
         )
 
     @classmethod
-    def deserialize(cls, data: bytes, *, align=False) -> typing.Tuple["LVList", bytes]:
+    def deserialize(cls, data: bytes, *, align=False) -> tuple[LVList, bytes]:
         length, data = cls._header.deserialize(data)
         r = cls()
         for i in range(length):
@@ -239,9 +240,7 @@ class FixedList(BaseListType):
         return b"".join([self._serialize_item(i, align=align) for i in self])
 
     @classmethod
-    def deserialize(
-        cls, data: bytes, *, align=False
-    ) -> typing.Tuple["FixedList", bytes]:
+    def deserialize(cls, data: bytes, *, align=False) -> tuple[FixedList, bytes]:
         r = cls()
         for i in range(cls._length):
             item, data = cls._deserialize_item(data, align=align)
@@ -258,9 +257,7 @@ class CompleteList(BaseListType):
         return b"".join([self._serialize_item(i, align=align) for i in self])
 
     @classmethod
-    def deserialize(
-        cls, data: bytes, *, align=False
-    ) -> typing.Tuple["CompleteList", bytes]:
+    def deserialize(cls, data: bytes, *, align=False) -> tuple[CompleteList, bytes]:
         r = cls()
         while data:
             item, data = cls._deserialize_item(data, align=align)

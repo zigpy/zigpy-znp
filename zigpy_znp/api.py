@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import time
 import typing
 import asyncio
@@ -26,7 +28,7 @@ STARTUP_DELAY = 1  # seconds
 
 def _deduplicate_commands(
     commands: typing.Iterable[t.CommandBase],
-) -> typing.Tuple[t.CommandBase]:
+) -> tuple[t.CommandBase]:
     """
     Deduplicates an iterable of commands by folding more-specific commands into less-
     specific commands. Used to avoid triggering callbacks multiple times per packet.
@@ -59,7 +61,7 @@ def _deduplicate_commands(
 
 @dataclasses.dataclass(frozen=True)
 class BaseResponseListener:
-    matching_commands: typing.Tuple[t.CommandBase]
+    matching_commands: tuple[t.CommandBase]
 
     def __post_init__(self):
         commands = _deduplicate_commands(self.matching_commands)
@@ -70,7 +72,7 @@ class BaseResponseListener:
         # We're frozen so __setattr__ is disallowed
         object.__setattr__(self, "matching_commands", commands)
 
-    def matching_headers(self) -> typing.Set[t.CommandHeader]:
+    def matching_headers(self) -> set[t.CommandHeader]:
         """
         Returns the set of Z-Stack MT command headers for all the matching commands.
         """

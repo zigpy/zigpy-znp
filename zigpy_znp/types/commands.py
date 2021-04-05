@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import enum
-import typing
 import logging
 import dataclasses
 
@@ -151,8 +152,8 @@ class CommandHeader(t.uint16_t):
 class CommandDef:
     command_type: CommandType
     command_id: t.uint8_t
-    req_schema: typing.Optional[tuple] = None
-    rsp_schema: typing.Optional[tuple] = None
+    req_schema: tuple | None = None
+    rsp_schema: tuple | None = None
 
 
 class CommandsMeta(type):

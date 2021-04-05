@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import sys
-import typing
 import asyncio
 import logging
 import argparse
@@ -38,7 +39,7 @@ def compute_crc16(data: bytes) -> int:
     return crc
 
 
-def get_firmware_crcs(firmware: bytes) -> typing.Tuple[int, int]:
+def get_firmware_crcs(firmware: bytes) -> tuple[int, int]:
     # There is room for *two* CRCs in the firmware file: the expected and the computed
     firmware_without_crcs = (
         firmware[: c.ubl.IMAGE_CRC_OFFSET]

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import typing
 import logging
 import argparse
 
 import jsonschema
 import coloredlogs
 
+import zigpy_znp.types as t
 import zigpy_znp.logger as log
 
 LOG_LEVELS = [logging.INFO, logging.DEBUG, log._TRACE]
@@ -106,7 +106,7 @@ OPEN_COORDINATOR_BACKUP_SCHEMA = {
 }
 
 
-def validate_backup_json(backup: dict[str, typing.Any]) -> None:
+def validate_backup_json(backup: t.JSONType) -> None:
     jsonschema.validate(backup, schema=OPEN_COORDINATOR_BACKUP_SCHEMA)
 
 

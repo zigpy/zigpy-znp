@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import json
-import typing
 import asyncio
 import logging
 import argparse
@@ -19,7 +18,7 @@ from zigpy_znp.zigbee.application import ControllerApplication
 LOGGER = logging.getLogger(__name__)
 
 
-async def backup_network(radio_path: str) -> dict[str, typing.Any]:
+async def backup_network(radio_path: str) -> t.JSONType:
     znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": radio_path}}))
     await znp.connect()
 

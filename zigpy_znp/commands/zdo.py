@@ -6,7 +6,7 @@ returned by the target. The response message only indicates that the command mes
 was received and executed. The result of the command execution will be conveyed to
 the tester via a callback message interface"""
 
-import typing
+from __future__ import annotations
 
 import zigpy.zdo.types
 
@@ -127,7 +127,7 @@ class ChildInfoList(t.LVList, item_type=t.EUI64, length_type=t.uint8_t):
 
 class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["NullableNodeDescriptor", bytes]:
+    def deserialize(cls, data: bytes) -> tuple[NullableNodeDescriptor, bytes]:
         if data == b"\x00":
             return cls(), b""
 

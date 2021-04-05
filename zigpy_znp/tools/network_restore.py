@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import json
-import typing
 import asyncio
 import argparse
 
@@ -16,7 +15,7 @@ from zigpy_znp.zigbee.application import ControllerApplication
 
 async def restore_network(
     radio_path: str,
-    backup: dict[str, typing.Any],
+    backup: t.JSONType,
     counter_increment: int,
 ) -> None:
     pan_id, _ = t.NWK.deserialize(bytes.fromhex(backup["pan_id"])[::-1])

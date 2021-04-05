@@ -1,4 +1,5 @@
-import typing
+from __future__ import annotations
+
 import functools
 import dataclasses
 
@@ -57,7 +58,7 @@ class TransportFrame:
     payload: GeneralFrame
 
     @classmethod
-    def deserialize(cls, data: bytes) -> typing.Tuple["TransportFrame", bytes]:
+    def deserialize(cls, data: bytes) -> tuple[TransportFrame, bytes]:
         sof, data = t.uint8_t.deserialize(data)
 
         if sof != cls.SOF:
