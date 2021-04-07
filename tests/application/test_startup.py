@@ -38,11 +38,11 @@ DEV_NETWORK_SETTINGS = {
     ),
     FormedZStack1CC2531: (
         "CC2531, Z-Stack Home 1.2",
-        15,
-        t.Channels.from_channel_list([15]),
-        0x1F1C,
-        t.EUI64.convert("bf:00:dc:3b:60:4b:21:74"),
-        t.KeyData(bytes.fromhex("b133fd66f718179ffd767b3cc5765a60")),
+        11,
+        t.Channels.from_channel_list([11]),
+        0x1A62,
+        t.EUI64.convert("dd:dd:dd:dd:dd:dd:dd:dd"),
+        t.KeyData([1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
     ),
 }
 
@@ -53,7 +53,15 @@ DEV_NETWORK_SETTINGS = {
     [(device_cls,) + settings for device_cls, settings in DEV_NETWORK_SETTINGS.items()],
 )
 async def test_info(
-    device, model, channel, channels, pan_id, ext_pan_id, network_key, make_application
+    device,
+    model,
+    channel,
+    channels,
+    pan_id,
+    ext_pan_id,
+    network_key,
+    make_application,
+    caplog,
 ):
     app, znp_server = make_application(server_cls=device)
 
@@ -65,6 +73,11 @@ async def test_info(
     assert app.network_key is None
 
     await app.startup(auto_form=False)
+
+    if network_key == t.KeyData([1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]):
+        assert "Your network is using the insecure" in caplog.text
+    else:
+        assert "Your network is using the insecure" not in caplog.text
 
     assert app.pan_id == pan_id
     assert app.extended_pan_id == ext_pan_id
