@@ -39,7 +39,7 @@ async def backup(radio_path: str):
                         nwk_nvid + offset, item_type=t.Bytes
                     )
                 except SecurityError:
-                    LOGGER.error("Read not allowed for %s", key)
+                    LOGGER.warning("Read disallowed for %s", key)
                     continue
                 except KeyError:
                     break
@@ -50,10 +50,9 @@ async def backup(radio_path: str):
             try:
                 value = await znp.nvram.osal_read(nwk_nvid, item_type=t.Bytes)
             except KeyError:
-                LOGGER.warning("Read failed for %s", nwk_nvid)
                 continue
             except SecurityError:
-                LOGGER.error("Read not allowed for %s", nwk_nvid)
+                LOGGER.warning("Read disallowed for %s", nwk_nvid)
                 continue
 
             LOGGER.info("%s = %s", nwk_nvid, value)
@@ -91,7 +90,7 @@ async def main(argv):
     args = parser.parse_args(argv)
 
     obj = await backup(args.serial)
-    args.output.write(json.dumps(obj, indent=4))
+    args.output.write(json.dumps(obj, indent=4) + "\n")
 
 
 if __name__ == "__main__":
