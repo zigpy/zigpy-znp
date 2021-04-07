@@ -69,7 +69,7 @@ class LEDMode(t.enum_uint8):
     TOGGLE = 4
 
 
-class Util(t.CommandsBase, subsystem=t.Subsystem.UTIL):
+class UTIL(t.CommandsBase, subsystem=t.Subsystem.UTIL):
     # MAC Reset command to reset MAC state machine
     GetDeviceInfo = t.CommandDef(
         t.CommandType.SREQ,

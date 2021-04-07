@@ -184,15 +184,15 @@ def test_command_param_binding():
 
     # Invalid type
     with pytest.raises(ValueError):
-        c.Util.TimeAlive.Rsp(Seconds=b"asd")
+        c.UTIL.TimeAlive.Rsp(Seconds=b"asd")
 
     # Valid type but invalid value
     with pytest.raises(ValueError):
-        c.Util.SetPreConfigKey.Req(PreConfigKey=t.KeyData([1, 2, 3]))
+        c.UTIL.SetPreConfigKey.Req(PreConfigKey=t.KeyData([1, 2, 3]))
 
     # Coerced numerical type
-    a = c.Util.TimeAlive.Rsp(Seconds=12)
-    b = c.Util.TimeAlive.Rsp(Seconds=t.uint32_t(12))
+    a = c.UTIL.TimeAlive.Rsp(Seconds=12)
+    b = c.UTIL.TimeAlive.Rsp(Seconds=t.uint32_t(12))
 
     assert a == b
     assert a.Seconds == b.Seconds
@@ -200,7 +200,7 @@ def test_command_param_binding():
 
     # Overflowing integer types
     with pytest.raises(ValueError):
-        c.Util.TimeAlive.Rsp(Seconds=10 ** 20)
+        c.UTIL.TimeAlive.Rsp(Seconds=10 ** 20)
 
     # Integers will not be coerced to enums
     assert t.MTCapabilities.SYS == 0x0001
@@ -223,7 +223,7 @@ def test_command_param_binding():
     assert isinstance(cmd.Value, t.ShortBytes)
 
     # Lists are converted to typed LVLists
-    c.Util.BindAddEntry.Req(
+    c.UTIL.BindAddEntry.Req(
         DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
         DstEndpoint=0x56,
         ClusterIdList=[0x12, 0x45],
@@ -231,7 +231,7 @@ def test_command_param_binding():
 
     # Type errors within containers are also caught
     with pytest.raises(ValueError):
-        c.Util.BindAddEntry.Req(
+        c.UTIL.BindAddEntry.Req(
             DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
             DstEndpoint=0x56,
             ClusterIdList=[0x12, 0x457890],  # 0x457890 doesn't fit into a uint8_t
@@ -372,7 +372,7 @@ def test_simple_descriptor():
 
 
 def test_command_str_repr():
-    command = c.Util.BindAddEntry.Req(
+    command = c.UTIL.BindAddEntry.Req(
         DstAddrModeAddr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234),
         DstEndpoint=0x56,
         ClusterIdList=[0x12, 0x34],

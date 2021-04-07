@@ -637,14 +637,14 @@ class BaseZStackDevice(BaseServerZNP):
             MaintRel=version.MaintRel,
         )
 
-    @reply_to(c.Util.GetDeviceInfo.Req())
+    @reply_to(c.UTIL.GetDeviceInfo.Req())
     def util_device_info(self, request):
         nwk = 0xFFFE
 
         if self.device_state == t.DeviceState.StartedAsCoordinator:
             nwk = 0x0000
 
-        return c.Util.GetDeviceInfo.Rsp(
+        return c.UTIL.GetDeviceInfo.Rsp(
             Status=t.Status.SUCCESS,
             IEEE=t.EUI64.deserialize(self._nvram[ExNvIds.LEGACY][OsalNvIds.EXTADDR])[0],
             NWK=nwk,
@@ -801,7 +801,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
             c.ZDO.PermitJoinInd.Callback(Duration=0),
         ]
 
-    @reply_to(c.Util.LEDControl.Req(partial=True))
+    @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
         return req.Rsp(Status=t.Status.SUCCESS)
 
@@ -1030,7 +1030,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             ),
         ]
 
-    @reply_to(c.Util.LEDControl.Req(partial=True))
+    @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
         # XXX: Yes, there is *no response*
         return
@@ -1076,7 +1076,7 @@ class BaseZStack3CC2531(BaseZStack3Device):
 
     node_desc_responder = BaseZStack1CC2531.node_desc_responder
 
-    @reply_to(c.Util.LEDControl.Req(partial=True))
+    @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
         return req.Rsp(Status=t.Status.SUCCESS)
 

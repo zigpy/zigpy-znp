@@ -213,7 +213,7 @@ async def test_response_callback_simple(connected_znp, event_loop, mocker):
 # being implicitly marked as "asyncio"
 async def test_command_deduplication_simple():
     c1 = c.SYS.Ping.Rsp(partial=True)
-    c2 = c.Util.TimeAlive.Rsp(Seconds=12)
+    c2 = c.UTIL.TimeAlive.Rsp(Seconds=12)
 
     assert _deduplicate_commands([]) == ()
     assert _deduplicate_commands([c1]) == (c1,)
@@ -230,8 +230,8 @@ async def test_command_deduplication_complex():
             c.SYS.Ping.Rsp(partial=True),
             c.SYS.Ping.Rsp(partial=True),
             # Matching against different command types should also work
-            c.Util.TimeAlive.Rsp(Seconds=12),
-            c.Util.TimeAlive.Rsp(Seconds=10),
+            c.UTIL.TimeAlive.Rsp(Seconds=12),
+            c.UTIL.TimeAlive.Rsp(Seconds=10),
             c.AppConfig.BDBCommissioningNotification.Callback(
                 partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
             ),
@@ -255,8 +255,8 @@ async def test_command_deduplication_complex():
 
     assert set(result) == {
         c.SYS.Ping.Rsp(partial=True),
-        c.Util.TimeAlive.Rsp(Seconds=12),
-        c.Util.TimeAlive.Rsp(Seconds=10),
+        c.UTIL.TimeAlive.Rsp(Seconds=12),
+        c.UTIL.TimeAlive.Rsp(Seconds=10),
         c.AppConfig.BDBCommissioningNotification.Callback(
             partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
         ),
@@ -285,7 +285,7 @@ async def test_response_callbacks(connected_znp, event_loop, mocker):
 
     good_response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     good_response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.APP)
-    good_response3 = c.Util.TimeAlive.Rsp(Seconds=12)
+    good_response3 = c.UTIL.TimeAlive.Rsp(Seconds=12)
     bad_response1 = c.SYS.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
     bad_response2 = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
@@ -296,16 +296,16 @@ async def test_response_callbacks(connected_znp, event_loop, mocker):
         c.SYS.Ping.Rsp(partial=True),
         c.SYS.Ping.Rsp(partial=True),
         # Matching against different response types should also work
-        c.Util.TimeAlive.Rsp(Seconds=12),
+        c.UTIL.TimeAlive.Rsp(Seconds=12),
         c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
         c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
-        c.Util.TimeAlive.Rsp(Seconds=10),
+        c.UTIL.TimeAlive.Rsp(Seconds=10),
     ]
 
     assert set(_deduplicate_commands(responses)) == {
         c.SYS.Ping.Rsp(partial=True),
-        c.Util.TimeAlive.Rsp(Seconds=12),
-        c.Util.TimeAlive.Rsp(Seconds=10),
+        c.UTIL.TimeAlive.Rsp(Seconds=12),
+        c.UTIL.TimeAlive.Rsp(Seconds=10),
     }
 
     # We shouldn't see any effects from receiving a frame early
@@ -335,7 +335,7 @@ async def test_wait_for_responses(connected_znp, event_loop):
 
     response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     response2 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.APP)
-    response3 = c.Util.TimeAlive.Rsp(Seconds=12)
+    response3 = c.UTIL.TimeAlive.Rsp(Seconds=12)
     response4 = c.SYS.SetExtAddr.Rsp(Status=t.Status.SUCCESS)
     response5 = c.SYS.NVWrite.Req(
         SysId=0x12, ItemId=0x3456, SubId=0x7890, Offset=0x00, Value=b"asdfoo"
@@ -352,22 +352,22 @@ async def test_wait_for_responses(connected_znp, event_loop):
     # Will match the first response3 and detach
     future2 = znp.wait_for_responses(
         [
-            c.Util.TimeAlive.Rsp(Seconds=12),
+            c.UTIL.TimeAlive.Rsp(Seconds=12),
             c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.UTIL),
         ]
     )
 
     # Will not match anything
-    future3 = znp.wait_for_responses([c.Util.TimeAlive.Rsp(Seconds=10)])
+    future3 = znp.wait_for_responses([c.UTIL.TimeAlive.Rsp(Seconds=10)])
 
     # Will match response1 the second time around
     future4 = znp.wait_for_responses(
         [
             # Matching against different response types should also work
-            c.Util.TimeAlive.Rsp(Seconds=12),
+            c.UTIL.TimeAlive.Rsp(Seconds=12),
             c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
             c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
-            c.Util.TimeAlive.Rsp(Seconds=10),
+            c.UTIL.TimeAlive.Rsp(Seconds=10),
         ]
     )
 
@@ -401,6 +401,6 @@ async def test_wait_for_responses(connected_znp, event_loop):
 
     await asyncio.sleep(0)
 
-    znp.frame_received(c.Util.TimeAlive.Rsp(Seconds=10).to_frame())
+    znp.frame_received(c.UTIL.TimeAlive.Rsp(Seconds=10).to_frame())
     assert future3.done()
-    assert (await future3) == c.Util.TimeAlive.Rsp(Seconds=10)
+    assert (await future3) == c.UTIL.TimeAlive.Rsp(Seconds=10)

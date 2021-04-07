@@ -1,7 +1,7 @@
 import zigpy_znp.types as t
 
 
-class App(t.CommandsBase, subsystem=t.Subsystem.APP):
+class APP(t.CommandsBase, subsystem=t.Subsystem.APP):
     # This command is sent to the target in order to test the functions defined
     # for individual applications.
     # This command sends a raw data to an application

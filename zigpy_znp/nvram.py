@@ -25,7 +25,7 @@ class NVRAMHelper:
         structs are read/written.
         """
 
-        # TODO: Figure out a way to use `c.Util.AssocFindDevice.Req(Index=0)`!
+        # TODO: Figure out a way to use `c.UTIL.AssocFindDevice.Req(Index=0)`!
         #       This is the only (known) MT command to just send a struct's in-memory
         #       representation over serial.
 

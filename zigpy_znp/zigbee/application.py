@@ -989,7 +989,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         try:
             async with async_timeout.timeout(0.3):
                 await self._znp.request(
-                    c.Util.LEDControl.Req(LED=led, Mode=mode),
+                    c.UTIL.LEDControl.Req(LED=led, Mode=mode),
                     RspStatus=t.Status.SUCCESS,
                 )
         except (asyncio.TimeoutError, CommandNotRecognized):
@@ -1544,7 +1544,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             and self._znp.version >= 3.30
                         ):
                             association = await self._znp.request(
-                                c.Util.AssocGetWithAddress.Req(
+                                c.UTIL.AssocGetWithAddress.Req(
                                     IEEE=device.ieee,
                                     NWK=0x0000,  # IEEE takes priority
                                 )
@@ -1556,7 +1556,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             ):
                                 try:
                                     await self._znp.request(
-                                        c.Util.AssocRemove.Req(IEEE=device.ieee)
+                                        c.UTIL.AssocRemove.Req(IEEE=device.ieee)
                                     )
                                     tried_assoc_remove = True
 
@@ -1608,7 +1608,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # not be able to find it again.
             if tried_assoc_remove and response is None:
                 await self._znp.request(
-                    c.Util.AssocAdd.Req(
+                    c.UTIL.AssocAdd.Req(
                         NWK=association.Device.shortAddr,
                         IEEE=device.ieee,
                         NodeRelation=association.Device.nodeRelation,

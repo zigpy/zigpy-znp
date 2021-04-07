@@ -777,12 +777,12 @@ async def test_request_recovery_assoc_remove(
 
         if assoc_device is None:
             dev, _ = c.util.Device.deserialize(b"\xFF" * 100)
-            return c.Util.AssocGetWithAddress.Rsp(Device=dev)
+            return c.UTIL.AssocGetWithAddress.Rsp(Device=dev)
 
-        return c.Util.AssocGetWithAddress.Rsp(Device=assoc_device)
+        return c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)
 
     did_assoc_get = znp_server.reply_once_to(
-        c.Util.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
+        c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
         responses=[assoc_get_with_addr],
     )
 
@@ -796,23 +796,23 @@ async def test_request_recovery_assoc_remove(
             nonlocal assoc_device
 
             if assoc_device is None:
-                return c.Util.AssocRemove.Rsp(Status=t.Status.FAILURE)
+                return c.UTIL.AssocRemove.Rsp(Status=t.Status.FAILURE)
 
             assoc_device = None
-            return c.Util.AssocRemove.Rsp(Status=t.Status.SUCCESS)
+            return c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)
 
         did_assoc_remove = znp_server.reply_once_to(
-            c.Util.AssocRemove.Req(IEEE=device.ieee),
+            c.UTIL.AssocRemove.Req(IEEE=device.ieee),
             responses=[assoc_remove],
         )
 
         did_assoc_add = znp_server.reply_once_to(
-            c.Util.AssocAdd.Req(
+            c.UTIL.AssocAdd.Req(
                 NWK=device.nwk,
                 IEEE=device.ieee,
                 NodeRelation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
             ),
-            responses=[c.Util.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
+            responses=[c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
         )
     else:
         did_assoc_remove = None

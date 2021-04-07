@@ -1,5 +1,5 @@
 from .af import AF
-from .app import App
+from .app import APP
 from .mac import MAC
 from .sys import SYS
 from .ubl import UBL
@@ -7,19 +7,19 @@ from .zdo import ZDO
 from .zgp import ZGP
 from .znp import ZNP
 from .sapi import SAPI
-from .util import Util
+from .util import UTIL
 from .rpc_error import RPCError
 from .app_config import AppConfig
 
 ALL_COMMANDS = [
     RPCError,
     AF,
-    App,
+    APP,
     AppConfig,
     MAC,
     SAPI,
     SYS,
-    Util,
+    UTIL,
     ZDO,
     ZGP,
     ZNP,

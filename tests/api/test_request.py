@@ -55,7 +55,7 @@ async def test_cleanup_timeout_internal(connected_znp):
     assert not znp._listeners
 
     with pytest.raises(asyncio.TimeoutError):
-        await znp.request(c.Util.TimeAlive.Req())
+        await znp.request(c.UTIL.TimeAlive.Req())
 
     # We should be cleaned up
     assert not znp._listeners
@@ -69,7 +69,7 @@ async def test_cleanup_timeout_external(connected_znp):
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
         async with async_timeout.timeout(0.1):
-            await znp.request(c.Util.TimeAlive.Req())
+            await znp.request(c.UTIL.TimeAlive.Req())
 
     # We should be cleaned up
     assert not znp._listeners
@@ -84,7 +84,7 @@ async def test_callback_rsp_cleanup_timeout_external(connected_znp):
     with pytest.raises(asyncio.TimeoutError):
         async with async_timeout.timeout(0.1):
             await znp.request_callback_rsp(
-                request=c.Util.TimeAlive.Req(),
+                request=c.UTIL.TimeAlive.Req(),
                 callback=c.SYS.ResetInd.Callback(partial=True),
             )
 
@@ -103,7 +103,7 @@ async def test_callback_rsp_cleanup_timeout_internal(background, connected_znp):
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
         await znp.request_callback_rsp(
-            request=c.Util.TimeAlive.Req(),
+            request=c.UTIL.TimeAlive.Req(),
             callback=c.SYS.ResetInd.Callback(partial=True),
             background=background,
         )
@@ -122,7 +122,7 @@ async def test_callback_rsp_cleanup_background_error(connected_znp):
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
         await znp.request_callback_rsp(
-            request=c.Util.TimeAlive.Req(),
+            request=c.UTIL.TimeAlive.Req(),
             callback=c.SYS.ResetInd.Callback(partial=True),
             background=True,
         )
@@ -141,7 +141,7 @@ async def test_callback_rsp_cleanup_background_timeout(connected_znp):
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
         await znp.request_callback_rsp(
-            request=c.Util.TimeAlive.Req(),
+            request=c.UTIL.TimeAlive.Req(),
             callback=c.SYS.ResetInd.Callback(partial=True),
             background=True,
         )
@@ -158,15 +158,15 @@ async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker
     assert not znp._listeners
 
     def send_responses():
-        znp_server.send(c.Util.TimeAlive.Rsp(Seconds=123))
-        znp_server.send(c.Util.TimeAlive.Rsp(Seconds=456))
+        znp_server.send(c.UTIL.TimeAlive.Rsp(Seconds=123))
+        znp_server.send(c.UTIL.TimeAlive.Rsp(Seconds=456))
         znp_server.send(c.SYS.OSALTimerExpired.Callback(Id=0xAB))
         znp_server.send(c.SYS.OSALTimerExpired.Callback(Id=0xCD))
 
     event_loop.call_soon(send_responses)
 
     callback_rsp = await znp.request_callback_rsp(
-        request=c.Util.TimeAlive.Req(),
+        request=c.UTIL.TimeAlive.Req(),
         callback=c.SYS.OSALTimerExpired.Callback(partial=True),
     )
 
@@ -178,7 +178,7 @@ async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker
     # Even though all four requests were sent in the same tick, they should be handled
     # correctly by request_callback_rsp and in the correct order
     assert znp._unhandled_command.mock_calls == [
-        mocker.call(c.Util.TimeAlive.Rsp(Seconds=456)),
+        mocker.call(c.UTIL.TimeAlive.Rsp(Seconds=456)),
         mocker.call(c.SYS.OSALTimerExpired.Callback(Id=0xCD)),
     ]
 
