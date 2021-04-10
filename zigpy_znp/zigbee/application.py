@@ -510,40 +510,49 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ),
             ]
         ):
-            if self._znp.version > 1.2:
-                # Z-Stack 3 uses the BDB subsystem
-                commissioning_rsp = await self._znp.request_callback_rsp(
-                    request=c.AppConfig.BDBStartCommissioning.Req(
-                        Mode=c.app_config.BDBCommissioningMode.NwkFormation
-                    ),
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                        partial=True,
-                        RemainingModes=c.app_config.BDBCommissioningMode.NONE,
-                    ),
-                    timeout=NETWORK_COMMISSIONING_TIMEOUT,
-                )
+            try:
+                if self._znp.version > 1.2:
+                    # Z-Stack 3 uses the BDB subsystem
+                    commissioning_rsp = await self._znp.request_callback_rsp(
+                        request=c.AppConfig.BDBStartCommissioning.Req(
+                            Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                        ),
+                        RspStatus=t.Status.SUCCESS,
+                        callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                            partial=True,
+                            RemainingModes=c.app_config.BDBCommissioningMode.NONE,
+                        ),
+                        timeout=NETWORK_COMMISSIONING_TIMEOUT,
+                    )
 
-                if (
-                    commissioning_rsp.Status
-                    != c.app_config.BDBCommissioningStatus.Success
-                ):
-                    raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
-            else:
-                await self._znp.nvram.osal_write(
-                    OsalNvIds.TCLK_SEED,
-                    value=DEFAULT_TC_LINK_KEY,
-                    create=True,
-                )
+                    if (
+                        commissioning_rsp.Status
+                        != c.app_config.BDBCommissioningStatus.Success
+                    ):
+                        raise RuntimeError(
+                            f"Network formation failed: {commissioning_rsp}"
+                        )
+                else:
+                    await self._znp.nvram.osal_write(
+                        OsalNvIds.TCLK_SEED,
+                        value=DEFAULT_TC_LINK_KEY,
+                        create=True,
+                    )
 
-                # In Z-Stack 1.2.2, StartupFromApp actually does what it says
-                await self._znp.request(
-                    c.ZDO.StartupFromApp.Req(StartDelay=100),
-                    RspState=c.zdo.StartupState.NewNetworkState,
-                )
+                    # In Z-Stack 1.2.2, StartupFromApp actually does what it says
+                    await self._znp.request(
+                        c.ZDO.StartupFromApp.Req(StartDelay=100),
+                        RspState=c.zdo.StartupState.NewNetworkState,
+                    )
 
-            # Both versions still end with this callback
-            await started_as_coordinator
+                # Both versions still end with this callback
+                await started_as_coordinator
+            except asyncio.TimeoutError as e:
+                raise RuntimeError(
+                    "Network formation refused, RF environment is likely too noisy."
+                    " Temporarily unscrew the antenna or shield the coordinator"
+                    " with metal until a network is formed."
+                ) from e
 
         LOGGER.debug("Waiting for the NIB to be populated")
 
