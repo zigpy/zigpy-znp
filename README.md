@@ -95,13 +95,15 @@ in **[`TOOLS.md`](./TOOLS.md)** but a brief description of each tool is included
  - **`nvram_write`**: Writes all NVRAM entries from a JSON document.
 
 # Hardware requirements
-USB-adapters, GPIO-modules, and development-boards running TI's Z-Stack are compatible with zigpy-znp:
+USB-adapters, GPIO-modules, and development-boards flashed with TI's Z-Stack are compatible with zigpy-znp:
 
- - [CC2652P/CC2652R/CC2652RB USB stick and dev board hardware flashed with Z-Stack firmware](https://www.zigbee2mqtt.io/information/supported_adapters)
- - [CC1352P/CC1352R USB stick and dev board hardware flashed with Z-Stack firmware](https://www.zigbee2mqtt.io/information/supported_adapters)
- - [CC2538 + CC2592 dev board hardware flashed with Z-Stack firmware](https://www.zigbee2mqtt.io/information/supported_adapters)
- - [CC2531 USB stick hardware flashed with Z-Stack firmware](https://www.zigbee2mqtt.io/information/supported_adapters)
- - [CC2530 + CC2591/CC2592 USB stick hardware flashed with Z-Stack firmware](https://www.zigbee2mqtt.io/information/supported_adapters)
+ - CC2652P/CC2652R/CC2652RB USB stick and dev board hardware
+ - CC1352P/CC1352R USB stick and dev board hardware
+ - CC2538 + CC2592 dev board hardware
+ - CC2531 USB stick hardware
+ - CC2530 + CC2591/CC2592 USB stick hardware
+
+Tip! Adapters listed as "[Texas Instruments sticks compatible with Zigbee2MQTT](https://www.zigbee2mqtt.io/information/supported_adapters)" also works with zigpy-znp.
 
 ## Reference hardware for this project
 These specific adapters are used as reference hardware for development and testing by zigpy-znp developers:
