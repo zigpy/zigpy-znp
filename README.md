@@ -95,7 +95,18 @@ in **[`TOOLS.md`](./TOOLS.md)** but a brief description of each tool is included
  - **`nvram_write`**: Writes all NVRAM entries from a JSON document.
 
 # Hardware requirements
-USB-adapters, GPIO-modules, and development-boards running TI's Z-Stack are supported. Reference hardware for this project includes:
+USB-adapters, GPIO-modules, and development-boards flashed with TI's Z-Stack are compatible with zigpy-znp:
+
+ - CC2652P/CC2652R/CC2652RB USB stick and dev board hardware
+ - CC1352P/CC1352R USB stick and dev board hardware
+ - CC2538 + CC2592 dev board hardware
+ - CC2531 USB stick hardware
+ - CC2530 + CC2591/CC2592 USB stick hardware
+
+Tip! Adapters listed as "[Texas Instruments sticks compatible with Zigbee2MQTT](https://www.zigbee2mqtt.io/information/supported_adapters)" also works with zigpy-znp.
+
+## Reference hardware for this project
+These specific adapters are used as reference hardware for development and testing by zigpy-znp developers:
 
  - [TI LAUNCHXL-CC26X2R1](https://www.ti.com/tool/LAUNCHXL-CC26X2R1) running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` using [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH).
  - [Electrolama zzh CC2652R](https://electrolama.com/projects/zig-a-zig-ah/) and [Slaesh CC2652R](https://slae.sh/projects/cc2652/) sticks running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` or `CC2652RB_20210120.hex` respectively using [cc2538-bsl](https://github.com/JelmerT/cc2538-bsl).
