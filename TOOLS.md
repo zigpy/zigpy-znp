@@ -24,6 +24,10 @@ $ sudo apt install python3 python3-virtulenv  # ensure this is Python 3.7 or abo
 ```console
 $ brew install python@3
 ```
+If you want to use virtualenv (see below), install it as well
+```console
+$ brew install virtualenv
+```
 
 ### Windows
 Download the latest release of Python 3 from the [Python homepage](https://www.python.org/downloads/).
