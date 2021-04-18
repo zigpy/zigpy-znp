@@ -160,6 +160,8 @@ class KeyAttributes(basic.enum_uint8):
 
 
 class TCLKDevEntry(cstruct.CStruct):
+    _padding_byte = b"\x00"
+
     txFrmCntr: basic.uint32_t
     rxFrmCntr: basic.uint32_t
 

@@ -470,7 +470,7 @@ async def write_devices(
         txFrmCntr=0,
         rxFrmCntr=0,
         extAddr=t.EUI64.convert("00:00:00:00:00:00:00:00"),
-        keyAttributes=t.KeyAttributes.PROVISIONAL_KEY,
+        keyAttributes=t.KeyAttributes.DEFAULT_KEY,
         keyType=t.KeyType.NONE,
         SeedShift_IcIndex=0,
     )

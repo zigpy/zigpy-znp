@@ -24,9 +24,9 @@ DEV_NETWORK_SETTINGS = {
         "CC13X2/CC26X2, Z-Stack 3.30.00/3.40.00/4.10.00",
         15,
         t.Channels.from_channel_list([15]),
-        0x9B21,
-        t.EUI64.convert("f4:4b:c6:c8:d6:12:2e:8f"),
-        t.KeyData(bytes.fromhex("121ec4cce6d6ad81c822b8e2bf707227")),
+        0x4402,
+        t.EUI64.convert("a2:ba:38:a8:b5:e6:83:a0"),
+        t.KeyData(bytes.fromhex("4c4e72b8412251799abf35251288ca83")),
     ),
     FormedZStack3CC2531: (
         "CC2531, Z-Stack 3.0.1/3.0.2",
