@@ -12,7 +12,7 @@ from zigpy_znp.tools.common import setup_parser
 LOGGER = logging.getLogger(__name__)
 
 
-async def restore(radio_path, backup):
+async def nvram_write(radio_path, backup):
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
 
     await znp.connect()
@@ -58,7 +58,7 @@ async def main(argv):
 
     args = parser.parse_args(argv)
     backup = json.load(args.input)
-    await restore(args.serial, backup)
+    await nvram_write(args.serial, backup)
 
 
 if __name__ == "__main__":

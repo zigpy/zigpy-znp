@@ -14,7 +14,7 @@ from zigpy_znp.tools.common import setup_parser
 LOGGER = logging.getLogger(__name__)
 
 
-async def backup(radio_path: str):
+async def nvram_read(radio_path: str):
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
     await znp.connect()
 
@@ -89,7 +89,7 @@ async def main(argv):
 
     args = parser.parse_args(argv)
 
-    obj = await backup(args.serial)
+    obj = await nvram_read(args.serial)
     args.output.write(json.dumps(obj, indent=4) + "\n")
 
 
