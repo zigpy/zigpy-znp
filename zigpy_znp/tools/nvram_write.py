@@ -12,11 +12,7 @@ from zigpy_znp.tools.common import setup_parser
 LOGGER = logging.getLogger(__name__)
 
 
-async def nvram_write(radio_path, backup):
-    znp = ZNP(CONFIG_SCHEMA({"device": {"path": radio_path}}))
-
-    await znp.connect()
-
+async def nvram_write(znp: ZNP, backup):
     # First write the NVRAM items common to all radios
     for nwk_nvid, value in backup["LEGACY"].items():
         if "+" in nwk_nvid:
@@ -58,7 +54,11 @@ async def main(argv):
 
     args = parser.parse_args(argv)
     backup = json.load(args.input)
-    await nvram_write(args.serial, backup)
+
+    znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
+    await znp.connect()
+
+    await nvram_write(znp, backup)
 
 
 if __name__ == "__main__":

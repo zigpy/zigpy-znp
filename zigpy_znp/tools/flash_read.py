@@ -13,16 +13,7 @@ from zigpy_znp.tools.common import setup_parser
 LOGGER = logging.getLogger(__name__)
 
 
-async def read_firmware(radio_path: str) -> bytearray:
-    znp = ZNP(
-        CONFIG_SCHEMA(
-            {"znp_config": {"skip_bootloader": False}, "device": {"path": radio_path}}
-        )
-    )
-
-    # The bootloader handshake must be the very first command
-    await znp.connect(test_port=False)
-
+async def read_firmware(znp: ZNP) -> bytearray:
     try:
         async with async_timeout.timeout(5):
             handshake_rsp = await znp.request_callback_rsp(
@@ -60,8 +51,6 @@ async def read_firmware(radio_path: str) -> bytearray:
 
         data.extend(read_rsp.Data)
 
-    znp.close()
-
     return data
 
 
@@ -76,7 +65,19 @@ async def main(argv):
     )
 
     args = parser.parse_args(argv)
-    data = await read_firmware(args.serial)
+
+    znp = ZNP(
+        CONFIG_SCHEMA(
+            {"znp_config": {"skip_bootloader": False}, "device": {"path": args.serial}}
+        )
+    )
+
+    # The bootloader handshake must be the very first command
+    await znp.connect(test_port=False)
+
+    data = await read_firmware(znp)
+    znp.close()
+
     args.output.write(data)
 
     LOGGER.info("Unplug your adapter to leave bootloader mode!")

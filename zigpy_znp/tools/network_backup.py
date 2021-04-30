@@ -18,10 +18,7 @@ from zigpy_znp.zigbee.application import ControllerApplication
 LOGGER = logging.getLogger(__name__)
 
 
-async def backup_network(radio_path: str) -> t.JSONType:
-    znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": radio_path}}))
-    await znp.connect()
-
+async def backup_network(znp: ZNP) -> t.JSONType:
     try:
         await znp.load_network_info()
     except ValueError as e:
@@ -81,8 +78,6 @@ async def backup_network(radio_path: str) -> t.JSONType:
 
         obj["stack_specific"] = {"zstack": {"tclk_seed": tclk_seed.hex()}}
 
-    znp.close()
-
     # Ensure our generated backup is valid
     validate_backup_json(obj)
 
@@ -96,9 +91,11 @@ async def main(argv: list[str]) -> None:
     )
     args = parser.parse_args(argv)
 
-    backup_obj = await backup_network(
-        radio_path=args.serial,
-    )
+    znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": args.serial}}))
+    await znp.connect()
+
+    backup_obj = await backup_network(znp)
+    znp.close()
 
     args.output.write(json.dumps(backup_obj, indent=4))
 

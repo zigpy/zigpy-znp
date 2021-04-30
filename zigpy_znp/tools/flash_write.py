@@ -55,7 +55,7 @@ def get_firmware_crcs(firmware: bytes) -> tuple[int, int]:
     return real_crc, compute_crc16(firmware_without_crcs)
 
 
-async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
+async def write_firmware(znp: ZNP, firmware: bytes, reset_nvram: bool):
     if len(firmware) != c.ubl.IMAGE_SIZE:
         raise ValueError(
             f"Firmware is the wrong size."
@@ -69,15 +69,6 @@ async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
             f"Firmware CRC is incorrect."
             f" Expected 0x{expected_crc:04X}, got 0x{computed_crc:04X}"
         )
-
-    znp = ZNP(
-        CONFIG_SCHEMA(
-            {"znp_config": {"skip_bootloader": False}, "device": {"path": radio_path}}
-        )
-    )
-
-    # The bootloader handshake must be the very first command
-    await znp.connect(test_port=False)
 
     try:
         async with async_timeout.timeout(5):
@@ -146,8 +137,6 @@ async def write_firmware(firmware: bytes, radio_path: str, reset_nvram: bool):
     else:
         LOGGER.info("Unplug your adapter to leave bootloader mode!")
 
-    znp.close()
-
 
 async def main(argv):
     parser = setup_parser("Write firmware to a radio")
@@ -168,7 +157,18 @@ async def main(argv):
 
     args = parser.parse_args(argv)
 
-    await write_firmware(args.input.read(), args.serial, args.reset)
+    znp = ZNP(
+        CONFIG_SCHEMA(
+            {"znp_config": {"skip_bootloader": False}, "device": {"path": args.serial}}
+        )
+    )
+
+    # The bootloader handshake must be the very first command
+    await znp.connect(test_port=False)
+
+    await write_firmware(znp=znp, firmware=args.input.read(), reset_nvram=args.reset)
+
+    znp.close()
 
 
 if __name__ == "__main__":

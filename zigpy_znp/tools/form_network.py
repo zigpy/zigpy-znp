@@ -14,7 +14,7 @@ async def form_network(radio_path):
     config = ControllerApplication.SCHEMA({"device": {"path": radio_path}})
     app = ControllerApplication(config)
 
-    await app.startup(auto_form=True)
+    await app.startup(force_form=True)
     await app.shutdown()
 
 
