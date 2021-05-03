@@ -3,12 +3,11 @@ from __future__ import annotations
 import sys
 import json
 import asyncio
-import argparse
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 from zigpy_znp.types.nvids import OsalNvIds
-from zigpy_znp.tools.common import setup_parser, validate_backup_json
+from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
 from zigpy_znp.znp.security import StoredDevice, write_devices, write_tc_frame_counter
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -103,7 +102,7 @@ async def restore_network(
 async def main(argv: list[str]) -> None:
     parser = setup_parser("Restore adapter network settings")
     parser.add_argument(
-        "--input", "-i", type=argparse.FileType("r"), help="Input file", required=True
+        "--input", "-i", type=ClosableFileType("r"), help="Input file", required=True
     )
     parser.add_argument(
         "--counter-increment",

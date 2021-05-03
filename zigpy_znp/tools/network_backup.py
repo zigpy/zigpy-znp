@@ -4,14 +4,13 @@ import sys
 import json
 import asyncio
 import logging
-import argparse
 import datetime
 
 import zigpy_znp
 import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import OsalNvIds
-from zigpy_znp.tools.common import setup_parser, validate_backup_json
+from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
 from zigpy_znp.znp.security import read_devices, read_tc_frame_counter
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -87,7 +86,7 @@ async def backup_network(znp: ZNP) -> t.JSONType:
 async def main(argv: list[str]) -> None:
     parser = setup_parser("Backup adapter network settings")
     parser.add_argument(
-        "--output", "-o", type=argparse.FileType("w"), help="Output file", default="-"
+        "--output", "-o", type=ClosableFileType("w"), help="Output file", default="-"
     )
     args = parser.parse_args(argv)
 
