@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import logging
 import argparse
 
@@ -140,6 +141,44 @@ class CustomArgumentParser(argparse.ArgumentParser):
         )
 
         return args
+
+
+class UnclosableFile:
+    """
+    Wraps a file object so that every operation but "close" is proxied.
+    """
+
+    def __init__(self, f):
+        self.f = f
+
+    def close(self):
+        return
+
+    def __enter__(self):
+        return
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return
+
+    def __getattr__(self, name):
+        if name in ("f", "close", "__enter__", "__exit__"):
+            return super().__getattr__(name)
+
+        return getattr(self.f, name)
+
+
+class ClosableFileType(argparse.FileType):
+    """
+    Allows `FileType` to always be closed properly, even with stdout and stdin.
+    """
+
+    def __call__(self, string):
+        f = super().__call__(string)
+
+        if f not in (sys.stdin, sys.stdout):
+            return f
+
+        return UnclosableFile(f)
 
 
 def setup_parser(description: str) -> argparse.ArgumentParser:

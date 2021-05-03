@@ -114,7 +114,9 @@ async def main(argv: list[str]) -> None:
     )
     args = parser.parse_args(argv)
 
-    backup = json.load(args.input)
+    with args.input as f:
+        backup = json.load(f)
+
     validate_backup_json(backup)
 
     await restore_network(

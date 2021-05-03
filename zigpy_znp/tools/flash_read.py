@@ -1,14 +1,13 @@
 import sys
 import asyncio
 import logging
-import argparse
 
 import async_timeout
 
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.tools.common import setup_parser
+from zigpy_znp.tools.common import ClosableFileType, setup_parser
 
 LOGGER = logging.getLogger(__name__)
 
@@ -59,28 +58,32 @@ async def main(argv):
     parser.add_argument(
         "--output",
         "-o",
-        type=argparse.FileType("wb"),
+        type=ClosableFileType("wb"),
         help="Output .bin file",
         required=True,
     )
 
     args = parser.parse_args(argv)
 
-    znp = ZNP(
-        CONFIG_SCHEMA(
-            {"znp_config": {"skip_bootloader": False}, "device": {"path": args.serial}}
+    with args.output as f:
+        znp = ZNP(
+            CONFIG_SCHEMA(
+                {
+                    "znp_config": {"skip_bootloader": False},
+                    "device": {"path": args.serial},
+                }
+            )
         )
-    )
 
-    # The bootloader handshake must be the very first command
-    await znp.connect(test_port=False)
+        # The bootloader handshake must be the very first command
+        await znp.connect(test_port=False)
 
-    data = await read_firmware(znp)
-    znp.close()
+        data = await read_firmware(znp)
+        znp.close()
 
-    args.output.write(data)
+        f.write(data)
 
-    LOGGER.info("Unplug your adapter to leave bootloader mode!")
+        LOGGER.info("Unplug your adapter to leave bootloader mode!")
 
 
 if __name__ == "__main__":

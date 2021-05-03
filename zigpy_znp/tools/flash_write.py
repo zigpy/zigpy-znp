@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 import asyncio
 import logging
-import argparse
 
 import async_timeout
 
@@ -11,7 +10,7 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.tools.common import setup_parser
+from zigpy_znp.tools.common import ClosableFileType, setup_parser
 from zigpy_znp.tools.nvram_reset import nvram_reset
 
 LOGGER = logging.getLogger(__name__)
@@ -143,7 +142,7 @@ async def main(argv):
     parser.add_argument(
         "--input",
         "-i",
-        type=argparse.FileType("rb"),
+        type=ClosableFileType("rb"),
         help="Input .bin file",
         required=True,
     )
@@ -157,6 +156,9 @@ async def main(argv):
 
     args = parser.parse_args(argv)
 
+    with args.input as f:
+        firmware = f.read()
+
     znp = ZNP(
         CONFIG_SCHEMA(
             {"znp_config": {"skip_bootloader": False}, "device": {"path": args.serial}}
@@ -166,7 +168,7 @@ async def main(argv):
     # The bootloader handshake must be the very first command
     await znp.connect(test_port=False)
 
-    await write_firmware(znp=znp, firmware=args.input.read(), reset_nvram=args.reset)
+    await write_firmware(znp=znp, firmware=firmware, reset_nvram=args.reset)
 
     znp.close()
 

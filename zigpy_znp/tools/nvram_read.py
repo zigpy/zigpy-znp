@@ -2,14 +2,13 @@ import sys
 import json
 import asyncio
 import logging
-import argparse
 
 import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
 from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
-from zigpy_znp.tools.common import setup_parser
+from zigpy_znp.tools.common import ClosableFileType, setup_parser
 
 LOGGER = logging.getLogger(__name__)
 
@@ -81,17 +80,19 @@ async def nvram_read(znp: ZNP):
 async def main(argv):
     parser = setup_parser("Backup a radio's NVRAM")
     parser.add_argument(
-        "--output", "-o", type=argparse.FileType("w"), help="Output file", default="-"
+        "--output", "-o", type=ClosableFileType("w"), help="Output file", default="-"
     )
 
     args = parser.parse_args(argv)
 
-    znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
-    await znp.connect()
+    with args.output as f:
+        znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
+        await znp.connect()
 
-    obj = await nvram_read(znp)
-    args.output.write(json.dumps(obj, indent=4) + "\n")
-    znp.close()
+        obj = await nvram_read(znp)
+        znp.close()
+
+        f.write(json.dumps(obj, indent=4) + "\n")
 
 
 if __name__ == "__main__":

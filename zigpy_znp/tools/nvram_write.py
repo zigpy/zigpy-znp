@@ -2,12 +2,11 @@ import sys
 import json
 import asyncio
 import logging
-import argparse
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
-from zigpy_znp.tools.common import setup_parser
+from zigpy_znp.tools.common import ClosableFileType, setup_parser
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,11 +48,13 @@ async def nvram_write(znp: ZNP, backup):
 async def main(argv):
     parser = setup_parser("Restore a radio's NVRAM from a previous backup")
     parser.add_argument(
-        "--input", "-i", type=argparse.FileType("r"), help="Input file", required=True
+        "--input", "-i", type=ClosableFileType("r"), help="Input file", required=True
     )
 
     args = parser.parse_args(argv)
-    backup = json.load(args.input)
+
+    with args.input as f:
+        backup = json.load(f)
 
     znp = ZNP(CONFIG_SCHEMA({"device": {"path": args.serial}}))
     await znp.connect()

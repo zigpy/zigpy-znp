@@ -91,13 +91,14 @@ async def main(argv: list[str]) -> None:
     )
     args = parser.parse_args(argv)
 
-    znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": args.serial}}))
-    await znp.connect()
+    with args.output as f:
+        znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": args.serial}}))
+        await znp.connect()
 
-    backup_obj = await backup_network(znp)
-    znp.close()
+        backup_obj = await backup_network(znp)
+        znp.close()
 
-    args.output.write(json.dumps(backup_obj, indent=4))
+        f.write(json.dumps(backup_obj, indent=4))
 
 
 if __name__ == "__main__":
