@@ -71,6 +71,9 @@ def test_command_close_stdout(tmpdir):
     with args.other as _:
         pass
 
-    assert not args.input.closed
+    # pytest patches sys.input on some platforms it seems
+    if hasattr(args.input, "closed"):
+        assert not args.input.closed
+
     assert not args.output.closed
     assert args.other.closed
