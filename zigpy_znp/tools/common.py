@@ -155,7 +155,7 @@ class UnclosableFile:
         return
 
     def __enter__(self):
-        return
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         return

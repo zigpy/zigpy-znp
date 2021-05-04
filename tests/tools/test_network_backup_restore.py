@@ -21,6 +21,7 @@ from ..conftest import (
     CoroutineMock,
     BaseZStack1CC2531,
     BaseZStack3CC2531,
+    FormedZStack1CC2531,
     BaseLaunchpadCC26X2R1,
 )
 from ..application.test_startup import DEV_NETWORK_SETTINGS
@@ -116,6 +117,17 @@ async def test_network_backup_empty(device, make_znp_server):
 
     with pytest.raises(RuntimeError):
         await network_backup([znp_server._port_path, "-o", "-"])
+
+
+@pytest.mark.parametrize("device", [FormedZStack1CC2531])
+@pytest.mark.asyncio
+async def test_network_backup_pipe(device, make_znp_server, capsys):
+    znp_server = make_znp_server(server_cls=device)
+
+    await network_backup([znp_server._port_path, "-o", "-"])
+    stdout, stderr = capsys.readouterr()
+
+    validate_backup_json(json.loads(stdout))
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
