@@ -106,9 +106,6 @@ upgrading**. Currently there are two formats: a high-level backup format indepen
 zigpy-znp, and a complete low-level NVRAM backup of the device.
 
 ### Network backup (beta)
-
-**This feature is pre-release and available only in zigpy-znp installed the Git repo's `dev` branch**
-
 A high-level and stack-agnostic backup of your device's network data using the
 [Open Coordinator Backup Format](https://github.com/zigpy/open-coordinator-backup/)
 allows you to snapshot the device state and move your network between any supported
@@ -123,10 +120,6 @@ For example, a network backup will allow you to migrate from a CC2531 with Z-Sta
 1.2 to a zzh! without re-joining any devices. The backup format is human-readable and 
 fully documented so you can fill out the appropriate information by hand to form a network
 if you are migrating from a non-Texas Instruments device.
-
-*Note: network backups are a recent addition and while they have been tested on numerous
-devices with various network configurations, they use low-level operations and may have
-bugs.*
 
 ### NVRAM backup
 In contrast to the high-level coordinator backup described above, an exhaustive, low-level
