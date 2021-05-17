@@ -39,7 +39,7 @@ disable ZHA to run any of the tools:
 2. Drop into a regular shell by running `login`.
 3. At the root shell, log into the main Home Assistant Docker container:
     ```bash
-    docker exec -it $(docker ps -f name=homeassistant -q) bash
+    docker exec -it homeassistant bash
     ```
 
 4. Since ZHA is still using your Zigbee radio, you must temporarily *disable* the ZHA
