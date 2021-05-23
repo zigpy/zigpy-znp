@@ -91,17 +91,16 @@ class ZNPCoordinator(zigpy.device.Device):
 
     @property
     def model(self):
-        if self.application._znp.version == 1.2:
-            model = "CC2531"
-            version = "Home 1.2"
-        elif self.application._znp.version == 3.0:
-            model = "CC2531"
-            version = "3.0.1/3.0.2"
+        if self.application._znp.version > 3.0:
+            model = "CC1352/CC2652"
+            version = "3.30+"
         else:
-            model = "CC13X2/CC26X2"
-            version = "3.30.00/3.40.00/4.10.00"
+            model = "CC2538" if self.application._znp.nvram.align_structs else "CC2531"
+            version = "Home 1.2" if self.application._znp.version == 1.2 else "3.0.x"
 
-        return f"{model}, Z-Stack {version}"
+        build = self.application._version_rsp.CodeRevision
+
+        return f"{model}, Z-Stack {version} (build {build})"
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
@@ -122,6 +121,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._network_key = None
         self._network_key_seq = None
+        self._version_rsp = None
         self._concurrent_requests_semaphore = None
         self._currently_waiting_requests = 0
         self._route_discovery_futures = {}
@@ -353,11 +353,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
 
-        version_rsp = await self._znp.request(c.SYS.Version.Req())
+        self._version_rsp = await self._znp.request(c.SYS.Version.Req())
 
         LOGGER.info("Network settings")
         LOGGER.info("  Z-Stack version: %s", self._znp.version)
-        LOGGER.info("  Z-Stack build id: %s", version_rsp.CodeRevision)
+        LOGGER.info("  Z-Stack build id: %s", self._version_rsp.CodeRevision)
         LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
         LOGGER.info("  Channel: %s", self.channel)
         LOGGER.info("  PAN ID: 0x%04X", self.pan_id)

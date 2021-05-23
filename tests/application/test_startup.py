@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.asyncio]
 
 DEV_NETWORK_SETTINGS = {
     FormedLaunchpadCC26X2R1: (
-        "CC13X2/CC26X2, Z-Stack 3.30.00/3.40.00/4.10.00",
+        "CC1352/CC2652, Z-Stack 3.30+ (build 20200805)",
         15,
         t.Channels.from_channel_list([15]),
         0x4402,
@@ -29,7 +29,7 @@ DEV_NETWORK_SETTINGS = {
         t.KeyData(bytes.fromhex("4c4e72b8412251799abf35251288ca83")),
     ),
     FormedZStack3CC2531: (
-        "CC2531, Z-Stack 3.0.1/3.0.2",
+        "CC2531, Z-Stack 3.0.x (build 20190425)",
         15,
         t.Channels.from_channel_list([15]),
         0xB6AB,
@@ -37,7 +37,7 @@ DEV_NETWORK_SETTINGS = {
         t.KeyData(bytes.fromhex("6dde24eae28552b6de2956eb05851afa")),
     ),
     FormedZStack1CC2531: (
-        "CC2531, Z-Stack Home 1.2",
+        "CC2531, Z-Stack Home 1.2 (build 20190608)",
         11,
         t.Channels.from_channel_list([11]),
         0x1A62,
