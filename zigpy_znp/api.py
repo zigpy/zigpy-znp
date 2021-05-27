@@ -358,7 +358,17 @@ class ZNP:
             return
 
         command_cls = c.COMMANDS_BY_ID[frame.header]
-        command = command_cls.from_frame(frame, align=self.nvram.align_structs)
+
+        try:
+            command = command_cls.from_frame(frame, align=self.nvram.align_structs)
+        except ValueError:
+            # Some commands can be received corrupted. They are not useful:
+            # https://github.com/home-assistant/core/issues/50005
+            if command_cls == c.ZDO.ParentAnnceRsp.Callback:
+                LOGGER.warning("Failed to parse broken %s as %s", frame, command_cls)
+                return
+
+            raise
 
         LOGGER.debug("Received command: %s", command)
 

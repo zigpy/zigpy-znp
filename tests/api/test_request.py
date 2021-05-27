@@ -285,3 +285,36 @@ async def test_znp_unknown_frame(connected_znp, caplog):
 
     # Unknown frames are logged in their entirety but an error is not thrown
     assert repr(frame) in caplog.text
+
+
+async def test_handling_known_bad_command_parsing(connected_znp, caplog):
+    znp, _ = connected_znp
+
+    bad_frame = GeneralFrame(
+        header=t.CommandHeader(
+            id=0x9F, subsystem=t.Subsystem.ZDO, type=t.CommandType.AREQ
+        ),
+        data=b"\x13\xDB\x84\x01\x21",
+    )
+
+    caplog.set_level(logging.WARNING)
+    znp.frame_received(bad_frame)
+
+    # The frame is expected to fail to parse so will be logged as only a warning
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+    assert repr(bad_frame) in caplog.messages[0]
+
+
+async def test_handling_unknown_bad_command_parsing(connected_znp):
+    znp, _ = connected_znp
+
+    bad_frame = GeneralFrame(
+        header=t.CommandHeader(
+            id=0xCB, subsystem=t.Subsystem.ZDO, type=t.CommandType.AREQ
+        ),
+        data=b"\x13\xDB\x84\x01\x21",
+    )
+
+    with pytest.raises(ValueError):
+        znp.frame_received(bad_frame)
