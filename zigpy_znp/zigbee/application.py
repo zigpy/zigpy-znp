@@ -4,6 +4,7 @@ import os
 import time
 import asyncio
 import logging
+import functools
 import itertools
 import contextlib
 
@@ -80,6 +81,36 @@ ZSTACK_CONFIGURE_SUCCESS = t.uint8_t(0x55)
 LOGGER = logging.getLogger(__name__)
 
 
+def combine_concurrent_calls(function):
+    """
+    Decorator that allows concurrent calls to expensive coroutines to share a result.
+    """
+
+    futures = {}
+
+    @functools.wraps(function)
+    async def replacement(*args, **kwargs):
+        key = (tuple(args), tuple([(k, v) for k, v in kwargs.items()]))
+
+        if key in futures:
+            return await futures[key]
+
+        future = futures[key] = asyncio.get_running_loop().create_future()
+
+        try:
+            result = await function(*args, **kwargs)
+        except Exception as e:
+            future.set_exception(e)
+            raise
+        else:
+            future.set_result(result)
+            return result
+        finally:
+            del futures[key]
+
+    return replacement
+
+
 class ZNPCoordinator(zigpy.device.Device):
     """
     Coordinator zigpy device that keeps track of our endpoints and clusters.
@@ -124,7 +155,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._version_rsp = None
         self._concurrent_requests_semaphore = None
         self._currently_waiting_requests = 0
-        self._route_discovery_futures = {}
+
         self._join_announce_tasks = {}
 
     ##################################################################
@@ -174,11 +205,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     def close(self):
         self._reconnect_task.cancel()
         self._watchdog_task.cancel()
-
-        for f in self._route_discovery_futures.values():
-            f.cancel()
-
-        self._route_discovery_futures.clear()
 
         # This will close the UART, which will then close the transport
         if self._znp is not None:
@@ -713,6 +739,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Always permit joins on the coordinator first.
         # This unfortunately makes it impossible to permit joins via just one router
         # alone but firmware changes can make this possible on newer hardware.
+        LOGGER.info("Permitting joins for %d seconds", time_s)
+
         response = await self._znp.request_callback_rsp(
             request=c.ZDO.MgmtPermitJoinReq.Req(
                 AddrMode=t.AddrMode.NWK,
@@ -864,18 +892,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         else:
             LOGGER.info("Coordinator is permitting joins for %d seconds", msg.Duration)
 
-    def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
+    async def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
         """
         ZDO source routing message callback
         """
 
-        LOGGER.info("ZDO device relays: %s", msg)
+        device = await self._get_or_discover_device(nwk=msg.DstAddr)
 
-        try:
-            device = self.get_device(nwk=msg.DstAddr)
-        except KeyError:
+        if device is None:
             LOGGER.warning(
-                "Received a ZDO message from an unknown device: 0x%04x", msg.DstAddr
+                "Received a ZDO message from an unknown device: %s", msg.DstAddr
             )
             return
 
@@ -894,11 +920,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._join_announce_tasks.pop(msg.IEEE).cancel()
 
         # Sometimes devices change their NWK when announcing so re-join it.
-        self.handle_join(
-            nwk=msg.NWK,
-            ieee=msg.IEEE,
-            parent_nwk=None,
-        )
+        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=None)
 
         device = self.get_device(ieee=msg.IEEE)
 
@@ -942,16 +964,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.info("ZDO device left: %s", msg)
         self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
 
-    def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
+    async def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
         """
         Handler for all non-ZDO messages.
         """
 
-        try:
-            device = self.get_device(nwk=msg.SrcAddr)
-        except KeyError:
+        device = await self._get_or_discover_device(nwk=msg.SrcAddr)
+
+        if device is None:
             LOGGER.warning(
-                "Received an AF message from an unknown device: 0x%04x", msg.SrcAddr
+                "Received an AF message from an unknown device: %s", msg.SrcAddr
             )
             return
 
@@ -1020,7 +1042,68 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
                 return
 
-    async def _set_led_mode(self, *, led, mode) -> None:
+    @combine_concurrent_calls
+    async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device | None:
+        """
+        Finds a device by its NWK address. If a device does not exist in the zigpy
+        database, attempt to look up its new NWK address. If joins are currently allowed
+        then the device will be treated as a new join if it does not exist in the zigpy
+        database.
+        """
+
+        try:
+            return self.get_device(nwk=nwk)
+        except KeyError:
+            pass
+
+        LOGGER.debug("Device with NWK 0x%04X not in database", nwk)
+
+        try:
+            # XXX: Multiple responses may arrive but we only use the first one
+            ieee_addr_rsp = await self._znp.request_callback_rsp(
+                request=c.ZDO.IEEEAddrReq.Req(
+                    NWK=nwk,
+                    RequestType=c.zdo.AddrRequestType.SINGLE,
+                    StartIndex=0,
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.ZDO.IEEEAddrRsp.Callback(
+                    partial=True,
+                    NWK=nwk,
+                ),
+                timeout=5,  # We don't want to wait forever
+            )
+        except asyncio.TimeoutError:
+            return
+
+        ieee = ieee_addr_rsp.IEEE
+
+        try:
+            device = self.get_device(ieee=ieee)
+        except KeyError:
+            if self._permit_joins_task.done():
+                LOGGER.warning("Ignoring device because joins are not permitted")
+                return
+
+            LOGGER.debug("Joins are permitted, treating unknown device as a new join")
+            self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
+
+            return self.get_device(ieee=ieee)
+
+        LOGGER.warning(
+            "Device %s changed its NWK from %s to %s",
+            device.ieee,
+            device.nwk,
+            nwk,
+        )
+
+        # Notify zigpy of the change
+        device.nwk = nwk
+        self.listener_event("raw_device_initialized", device)
+
+        return device
+
+    async def _set_led_mode(self, *, led: t.uint8_t, mode: c.util.LEDMode) -> None:
         """
         Attempts to set the provided LED's mode. A Z-Stack bug causes the underlying
         command to never receive a response if the board has no LEDs, requiring this
@@ -1433,6 +1516,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return response
 
+    @combine_concurrent_calls
     async def _discover_route(self, nwk: t.NWK) -> None:
         """
         Instructs the coordinator to re-discover routes to the provided NWK.
@@ -1444,25 +1528,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self._znp.version < 3.30:
             return
 
-        if nwk in self._route_discovery_futures:
-            return await self._route_discovery_futures[nwk]
+        await self._znp.request(
+            c.ZDO.ExtRouteDisc.Req(
+                Dst=nwk,
+                Options=c.zdo.RouteDiscoveryOptions.UNICAST,
+                Radius=30,
+            ),
+        )
 
-        future = asyncio.get_running_loop().create_future()
-        self._route_discovery_futures[nwk] = future
-
-        try:
-            await self._znp.request(
-                c.ZDO.ExtRouteDisc.Req(
-                    Dst=nwk,
-                    Options=c.zdo.RouteDiscoveryOptions.UNICAST,
-                    Radius=30,
-                ),
-            )
-
-            await asyncio.sleep(0.1 * 13)
-        finally:
-            future.set_result(True)
-            del self._route_discovery_futures[nwk]
+        await asyncio.sleep(0.1 * 13)
 
     async def _send_request(
         self,

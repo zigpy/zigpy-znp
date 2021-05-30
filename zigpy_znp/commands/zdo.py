@@ -141,6 +141,11 @@ class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
         return super().serialize()
 
 
+class AddrRequestType(t.enum_uint8):
+    SINGLE = 0x00
+    EXTENDED = 0x01
+
+
 class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
     # send a "Network Address Request". This message sends a broadcast message looking
     # for a 16 bit address with a known 64 bit IEEE address. You must subscribe to
@@ -156,7 +161,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             ),
             t.Param(
                 "RequestType",
-                t.uint8_t,
+                AddrRequestType,
                 "0x00 -- single device request, 0x01 -- Extended",
             ),
             t.Param(
@@ -174,7 +179,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             t.Param("NWK", t.NWK, "Short address of the device"),
             t.Param(
                 "RequestType",
-                t.uint8_t,
+                AddrRequestType,
                 "0x00 -- single device request, 0x01 -- Extended",
             ),
             t.Param(
