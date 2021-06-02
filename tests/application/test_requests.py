@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 import zigpy.zdo
+import zigpy.endpoint
 from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
 from zigpy.exceptions import DeliveryError
 
@@ -74,6 +75,7 @@ async def test_zigpy_request(device, make_application):
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     ep = device.add_endpoint(1)
+    ep.status = zigpy.endpoint.Status.ZDO_INIT
     ep.profile_id = 260
     ep.add_input_cluster(6)
 
@@ -488,6 +490,7 @@ async def test_nonstandard_profile(device, make_application):
     device.node_desc, _ = device.node_desc.deserialize(bytes(14))
 
     ep = device.add_endpoint(2)
+    ep.status = zigpy.endpoint.Status.ZDO_INIT
     ep.profile_id = 0x9876  # non-standard profile
     ep.add_input_cluster(0x0006)
 

@@ -13,6 +13,9 @@ try:
 except ImportError:
     from asynctest import CoroutineMock  # noqa: F401
 
+import zigpy.endpoint
+import zigpy.zdo.types as zdo_t
+
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
@@ -220,10 +223,40 @@ def make_application(make_znp_server):
         def add_initialized_device(self, *args, **kwargs):
             device = self.add_device(*args, **kwargs)
             device.status = zigpy.device.Status.ENDPOINTS_INIT
+            device.model = "Model"
+            device.manufacturer = "Manufacturer"
 
-            # Newer Zigpy releases don't need this
-            if not hasattr(device, "_init_handle"):
-                device.initializing = False
+            try:
+                device.node_desc = zdo_t.NodeDescriptor(
+                    logical_type=zdo_t.LogicalType.Router,
+                    complex_descriptor_available=0,
+                    user_descriptor_available=0,
+                    reserved=0,
+                    aps_flags=0,
+                    frequency_band=zdo_t.NodeDescriptor.FrequencyBand.Freq2400MHz,
+                    mac_capability_flags=142,
+                    manufacturer_code=4476,
+                    maximum_buffer_size=82,
+                    maximum_incoming_transfer_size=82,
+                    server_mask=11264,
+                    maximum_outgoing_transfer_size=82,
+                    descriptor_capability_field=0,
+                )
+            except AttributeError:
+                device.node_desc = zdo_t.NodeDescriptor(
+                    byte1=1,
+                    byte2=64,
+                    mac_capability_flags=142,
+                    manufacturer_code=4476,
+                    maximum_buffer_size=82,
+                    maximum_incoming_transfer_size=82,
+                    server_mask=11264,
+                    maximum_outgoing_transfer_size=82,
+                    descriptor_capability_field=0,
+                )
+
+            ep = device.add_endpoint(1)
+            ep.status = zigpy.endpoint.Status.ZDO_INIT
 
             return device
 
@@ -756,18 +789,13 @@ class BaseZStack1CC2531(BaseZStackDevice):
 
     @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
     def node_desc_responder(self, req):
-        if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
-            new_node_desc = c.zdo.NullableNodeDescriptor.old_new
-        else:
-            new_node_desc = c.zdo.NullableNodeDescriptor
-
         return [
             c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.NodeDescRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=0x0000,
-                NodeDescriptor=new_node_desc(
+                NodeDescriptor=c.zdo.NullableNodeDescriptor(
                     byte1=0,
                     byte2=64,
                     mac_capability_flags=143,
@@ -1005,18 +1033,13 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
     @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
     def node_desc_responder(self, req):
-        if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
-            new_node_desc = c.zdo.NullableNodeDescriptor.old_new
-        else:
-            new_node_desc = c.zdo.NullableNodeDescriptor
-
         return [
             c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.NodeDescRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=0x0000,
-                NodeDescriptor=new_node_desc(
+                NodeDescriptor=c.zdo.NullableNodeDescriptor(
                     byte1=0,
                     byte2=64,
                     mac_capability_flags=143,

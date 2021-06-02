@@ -284,23 +284,30 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
         ],
     )
 
-    if hasattr(c.zdo.NullableNodeDescriptor, "old_new"):
-        node_desc = c.zdo.NullableNodeDescriptor.old_new(
-            2, 64, 128, 4107, 89, 63, 0, 63, 0
+    node_desc = c.zdo.NullableNodeDescriptor(2, 64, 128, 4107, 89, 63, 0, 63, 0)
+
+    num_node_desc_reqs = 0
+
+    # Some devices join once, wait a bit, and re-join again
+    def poorly_timed_announce_replier(req):
+        nonlocal num_node_desc_reqs
+        num_node_desc_reqs += 1
+
+        if num_node_desc_reqs > 1:
+            return
+
+        return c.ZDO.EndDeviceAnnceInd.Callback(
+            Src=nwk,
+            NWK=nwk,
+            IEEE=ieee,
+            Capabilities=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
         )
-    else:
-        node_desc = c.zdo.NullableNodeDescriptor(2, 64, 128, 4107, 89, 63, 0, 63, 0)
 
     znp_server.reply_to(
         request=c.ZDO.NodeDescReq.Req(DstAddr=nwk, NWKAddrOfInterest=nwk),
         responses=[
             c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.EndDeviceAnnceInd.Callback(
-                Src=nwk,
-                NWK=nwk,
-                IEEE=ieee,
-                Capabilities=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
-            ),
+            poorly_timed_announce_replier,
             c.ZDO.NodeDescRsp.Callback(
                 Src=nwk, Status=t.ZDOStatus.SUCCESS, NWK=nwk, NodeDescriptor=node_desc
             ),
