@@ -1081,11 +1081,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         try:
             device = self.get_device(ieee=ieee)
         except KeyError:
-            if self._permit_joins_task.done():
-                LOGGER.warning("Ignoring device because joins are not permitted")
-                return
-
-            LOGGER.debug("Joins are permitted, treating unknown device as a new join")
+            LOGGER.debug("Treating unknown device as a new join")
             self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
 
             return self.get_device(ieee=ieee)
