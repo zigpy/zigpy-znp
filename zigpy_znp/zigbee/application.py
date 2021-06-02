@@ -1575,8 +1575,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         tried_assoc_remove = False
         tried_route_discovery = False
-        tried_disable_route_discovery_suppression = False
         tried_last_good_route = False
+        tried_ieee_address = False
 
         # Don't release the concurrency-limiting semaphore until we are done trying.
         # There is no point in allowing requests to take turns getting buffer errors.
@@ -1698,11 +1698,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             # letting the retry mechanism deal with it simpler.
                             await self._discover_route(dst_addr.address)
                             tried_route_discovery = True
-                        elif not tried_disable_route_discovery_suppression:
-                            # Disable route discovery suppression. This appears to
-                            # generate a bit more network traffic.
-                            options &= ~c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
-                            tried_disable_route_discovery_suppression = True
+                        elif (
+                            not tried_ieee_address
+                            and device is not None
+                            and dst_addr.mode == t.AddrMode.NWK
+                        ):
+                            # Try using the device's IEEE address instead of its NWK.
+                            # If it works, the NWK will be updated when relays arrive.
+                            tried_ieee_address = True
+                            dst_addr = t.AddrModeAddress(
+                                mode=t.AddrMode.IEEE,
+                                address=device.ieee,
+                            )
 
                         LOGGER.debug(
                             "Request failed (%s), retry attempt %s of %s",
