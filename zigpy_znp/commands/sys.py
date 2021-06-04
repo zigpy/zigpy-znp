@@ -11,6 +11,77 @@ class BootloaderBuildType(t.enum_uint8):
     BUILT_AS_HEX = 2
 
 
+class ADCChannel(t.enum_uint8):
+    """The ADC channel."""
+
+    AIN0 = 0x00
+    AIN1 = 0x01
+    AIN2 = 0x02
+    AIN3 = 0x03
+    AIN4 = 0x04
+    AIN5 = 0x05
+    AIN6 = 0x06
+    AIN7 = 0x07
+    Temperature = 0x0E
+    Voltage = 0x0F
+
+
+class ADCResolution(t.enum_uint8):
+    """Resolution of the ADC channel."""
+
+    bits_8 = 0x00
+    bits_10 = 0x01
+    bits_12 = 0x02
+    bits_14 = 0x03
+
+
+class GPIOPinMode(t.enum_flag_uint8):
+    """Pin state. Any pin with an unspecified state bit is pulled up."""
+
+    Tristate0 = 0b0000_0001
+    Tristate1 = 0b0000_0010
+    Tristate2 = 0b0000_0100
+    Tristate3 = 0b0000_1000
+
+    PullDown0 = 0b0001_0000
+    PullDown1 = 0b0010_0000
+    PullDown2 = 0b0100_0000
+    PullDown3 = 0b1000_0000
+
+
+class GPIOPinDirection(t.enum_flag_uint8):
+    """Pin direction. Any pin with an unspecified direction bit is an input pin."""
+
+    Output0 = 0b0000_0001
+    Output1 = 0b0000_0010
+    Output2 = 0b0000_0100
+    Output3 = 0b0000_1000
+
+
+class GPIOOperation(t.enum_uint8):
+    """Specifies the type of operation to perform on the GPIO pins."""
+
+    SetDirection = 0x00
+    SetTristateMode = 0x01
+    Set = 0x02
+    Clear = 0x03
+    Toggle = 0x04
+    Read = 0x05
+    HiD = 0x12  # ???
+
+
+class StackTuneOperation(t.enum_uint8):
+    """The tuning operation to be executed."""
+
+    # XXX: [Value] should correspond to the valid values specified by the
+    # ZMacTransmitPower_t enumeration (0xFD - 0x16)
+    PowerLevel = 0x00
+
+    # Set RxOnWhenIdle off/on if the value of Value is 0/1;
+    # otherwise return the 0x01 current setting of RxOnWhenIdle.
+    SetRxOnWhenIdle = 0x01
+
+
 class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     # reset the target device
     ResetReq = t.CommandDef(
@@ -255,10 +326,10 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x0D,
         req_schema=(
-            t.Param("Channel", t.ADCChannel, "The channel of ADC to read"),
+            t.Param("Channel", ADCChannel, "The channel of ADC to read"),
             t.Param(
                 "Resolution",
-                t.ADCResolution,
+                ADCResolution,
                 "Resolution of the reading: 8/10/12/14 bits",
             ),
         ),
@@ -272,7 +343,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         req_schema=(
             t.Param(
                 "Operation",
-                t.GpioOperation,
+                GPIOOperation,
                 "Specifies type of operation on GPIO pins",
             ),
             t.Param("Value", t.uint8_t, "GPIO value for specified operation"),
@@ -287,7 +358,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         req_schema=(
             t.Param(
                 "Operation",
-                t.StackTuneOperation,
+                StackTuneOperation,
                 "Specifies type of operation on GPIO pins",
             ),
             t.Param("Value", t.uint8_t, "Tuning value"),
