@@ -330,26 +330,13 @@ async def test_tc_frame_counter_zstack30(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0x00000001
 
     # If we change the EPID, the generic entry will be used
-    old_nwk_info = znp.network_info
     znp.network_info = znp.network_info.replace(
         extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
     )
     assert (await security.read_tc_frame_counter(znp)) == 0x00000002
 
-    # Changing the frame counter will always change the global entry in this case
     await security.write_tc_frame_counter(znp, 0xAABBCCDD)
     assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
-    assert znp_server._nvram[ExNvIds.LEGACY][
-        OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START + 2
-    ].startswith(t.uint32_t(0xAABBCCDD).serialize())
-
-    # Global entry is ignored if the EPID matches
-    znp.network_info = old_nwk_info
-    assert (await security.read_tc_frame_counter(znp)) == 0x00000001
-    await security.write_tc_frame_counter(znp, 0xABCDABCD)
-    assert znp_server._nvram[ExNvIds.LEGACY][
-        OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START + 1
-    ].startswith(t.uint32_t(0xABCDABCD).serialize())
 
 
 @pytest.mark.asyncio
@@ -375,7 +362,6 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0x00000002
 
     # If we change the EPID, the generic entry will be used. It doesn't exist.
-    old_nwk_info = znp.network_info
     znp.network_info = znp.network_info.replace(
         extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
     )
@@ -386,19 +372,11 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     # Writes similarly will fail
     old_nvram_state = repr(znp_server._nvram)
 
-    with pytest.raises(ValueError):
-        await security.write_tc_frame_counter(znp, 0x98765432)
-
     # And the NVRAM will be untouched
     assert repr(znp_server._nvram) == old_nvram_state
 
-    # The correct entry will be updated
-    znp.network_info = old_nwk_info
-    assert (await security.read_tc_frame_counter(znp)) == 0x00000002
-    await security.write_tc_frame_counter(znp, 0xABCDABCD)
-    assert znp_server._nvram[ExNvIds.NWK_SEC_MATERIAL_TABLE][0x0001].startswith(
-        t.uint32_t(0xABCDABCD).serialize()
-    )
+    await security.write_tc_frame_counter(znp, 0x98765432)
+    assert (await security.read_tc_frame_counter(znp)) == 0x98765432
 
 
 def ieee_and_key(text):

@@ -117,48 +117,30 @@ async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t) -> None:
 
         return
 
+    entry = t.NwkSecMaterialDesc(
+        FrameCounter=counter,
+        ExtendedPanID=znp.network_info.extended_pan_id,
+    )
+
+    fill_entry = t.NwkSecMaterialDesc(
+        FrameCounter=0x00000000,
+        ExtendedPanID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+    )
+
+    # The security material tables are quite small (4 values) so it's simpler to just
+    # write them completely when updating the frame counter.
     if znp.version == 3.0:
-        address = OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START
-        entries = znp.nvram.osal_read_table(
+        await znp.nvram.osal_write_table(
             start_nvid=OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START,
             end_nvid=OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END,
-            item_type=t.NwkSecMaterialDesc,
+            values=[entry],
+            fill_value=fill_entry,
         )
     else:
-        address = 0x0000
-        entries = znp.nvram.read_table(
+        await znp.nvram.write_table(
             item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
-            item_type=t.NwkSecMaterialDesc,
-        )
-
-    best_entry = None
-    best_address = None
-
-    async for entry in entries:
-        if entry.ExtendedPanID == znp.network_info.extended_pan_id:
-            best_entry = entry
-            best_address = address
-            break
-        elif best_entry is None and entry.ExtendedPanID == t.EUI64.convert(
-            "FF:FF:FF:FF:FF:FF:FF:FF"
-        ):
-            best_entry = entry
-            best_address = address
-
-        address += 0x0001
-
-    if best_entry is None:
-        raise ValueError("Failed to find open slot for security material entry")
-
-    best_entry.FrameCounter = counter
-
-    if znp.version == 3.0:
-        await znp.nvram.osal_write(best_address, best_entry)
-    else:
-        await znp.nvram.write(
-            item_id=ExNvIds.NWK_SEC_MATERIAL_TABLE,
-            sub_id=best_address,
-            value=best_entry,
+            values=[entry],
+            fill_value=fill_entry,
         )
 
 
