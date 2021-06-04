@@ -34,10 +34,9 @@ zigpy-znp is already installed by Home Assistant's ZHA component and is used to 
 with your radio. You only need to gain access to the correct Docker container and temporarily
 disable ZHA to run any of the tools:
 
-1. Install [the SSH addon](https://github.com/home-assistant/addons/blob/master/ssh/DOCS.md). 
-   Once you are logged in, you will be presented with the Home Assistant CLI.
-2. Drop into a regular shell by running `login`.
-3. At the root shell, log into the main Home Assistant Docker container:
+1. Install [community "SSH & Web Terminal" addon](https://github.com/hassio-addons/addon-ssh/blob/main/ssh/DOCS.md) (not the official "Terminal & SSH" addon!) and configure your credentials. Note: the addon will fail to start if you use an insecure password so it's better to configure it with public key authentication.
+2. Disable "Protection mode" in the addon's configuration.
+3. At the shell, log into the main Home Assistant Docker container:
     ```bash
     docker exec -it homeassistant bash
     ```
