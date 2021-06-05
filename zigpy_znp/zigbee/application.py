@@ -26,6 +26,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+from zigpy_znp.znp.utils import fix_misaligned_coordinator_nvram
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
@@ -313,7 +314,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.znp_config[conf.CONF_LED_MODE] is not None:
             await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
-        await self._load_network_info()
+        try:
+            await self._load_network_info()
+        except ValueError:
+            LOGGER.warning(
+                "Failed to read network information. Attempting to fix NVRAM.",
+                exc_info=True,
+            )
+            await fix_misaligned_coordinator_nvram(self._znp)
+            await self._load_network_info()
 
         # Add the coordinator as a zigpy device. We do this up here because
         # `self._register_endpoint()` adds endpoints to this device object.
