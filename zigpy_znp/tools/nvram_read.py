@@ -40,7 +40,7 @@ async def nvram_read(znp: ZNP):
                 except KeyError:
                     break
 
-                LOGGER.info("%s = %s", key, value)
+                LOGGER.info("%s = %r", key, value.hex())
                 data["LEGACY"][key] = value.hex()
         else:
             try:
@@ -51,7 +51,7 @@ async def nvram_read(znp: ZNP):
                 LOGGER.warning("Read disallowed for %s", nwk_nvid)
                 continue
 
-            LOGGER.info("%s = %s", nwk_nvid, value)
+            LOGGER.info("%s = %r", nwk_nvid, value.hex())
             data["LEGACY"][nwk_nvid.name] = value.hex()
 
     for nvid in ExNvIds:
@@ -71,7 +71,7 @@ async def nvram_read(znp: ZNP):
                 # Once a read fails, no later reads will succeed
                 break
 
-            LOGGER.info("%s[0x%04X] = %s", nvid.name, sub_id, value)
+            LOGGER.info("%s[0x%04X] = %r", nvid.name, sub_id, value.hex())
             data.setdefault(nvid.name, {})[f"0x{sub_id:04X}"] = value.hex()
 
     return data

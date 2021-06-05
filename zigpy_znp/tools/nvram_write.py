@@ -20,9 +20,14 @@ async def nvram_write(znp: ZNP, backup):
             nvid = OsalNvIds[nwk_nvid] + offset
         else:
             nvid = OsalNvIds[nwk_nvid]
+            offset = None
 
-        value = bytes.fromhex(value)
-        await znp.nvram.osal_write(nvid, value, create=True)
+        if offset is not None:
+            LOGGER.info("%s+%s = %r", OsalNvIds[nwk_nvid].name, offset, value)
+        else:
+            LOGGER.info("%s = %r", OsalNvIds[nwk_nvid].name, value)
+
+        await znp.nvram.osal_write(nvid, bytes.fromhex(value), create=True)
 
     for item_name, sub_ids in backup.items():
         item_id = ExNvIds[item_name]
@@ -32,12 +37,12 @@ async def nvram_write(znp: ZNP, backup):
 
         for sub_id, value in sub_ids.items():
             sub_id = int(sub_id, 16)
-            value = bytes.fromhex(value)
+            LOGGER.info("%s[0x%04X] = %r", item_id.name, sub_id, value)
 
             await znp.nvram.write(
                 item_id=item_id,
                 sub_id=sub_id,
-                value=value,
+                value=bytes.fromhex(value),
                 create=True,
             )
 
