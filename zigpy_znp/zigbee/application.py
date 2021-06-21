@@ -830,6 +830,30 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDO.PermitJoinInd.Callback(partial=True), self.on_zdo_permit_join_message
         )
 
+        # No-op handle commands that just create unnecessary WARNING logs
+        self._znp.callback_for_response(
+            c.ZDO.ParentAnnceRsp.Callback(partial=True),
+            self.on_intentionally_unhandled_message,
+        )
+
+        self._znp.callback_for_response(
+            c.ZDO.ConcentratorInd.Callback(partial=True),
+            self.on_intentionally_unhandled_message,
+        )
+
+        self._znp.callback_for_response(
+            c.ZDO.MgmtNWKUpdateNotify.Callback(partial=True),
+            self.on_intentionally_unhandled_message,
+        )
+
+    def on_intentionally_unhandled_message(self, msg: t.CommandBase) -> None:
+        """
+        Some commands are unhandled but frequently sent by devices on the network. To
+        reduce unnecessary logging messages, they are given an explicit callback.
+        """
+
+        pass
+
     def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
         """
         Coordinator join status change message. Only sent with Z-Stack 1.2 and 3.0.
