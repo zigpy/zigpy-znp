@@ -216,7 +216,7 @@ async def test_auto_form_unnecessary(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
-async def test_auto_form_necessary(device, make_application):
+async def test_auto_form_necessary(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     assert app.channel is None
@@ -236,37 +236,5 @@ async def test_auto_form_necessary(device, make_application):
 
     assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
     assert nvram[OsalNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_corrupted_nvram_startup_fixes(device, make_application, caplog):
-    app, znp_server = make_application(server_cls=device)
-
-    # NIB has a weird NWK update ID and is 110 bytes instead of 116??
-    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.NIB] = bytes.fromhex(
-        "100502330f33001e0000000105018f000700020d1e0000000b00000000000000000000005a9608"
-        "00000800000f0f04000100000001000000001dbb9f21004b120001000000000000000000000000"
-        "0000000000000000000000000000000000000000000000000f050001780a0100"
-    )
-
-    # One byte too short: should be 20 bytes, not 19
-    znp_server._nvram[ExNvIds.TCLK_TABLE][0x0000] = bytes.fromhex(
-        "21000000000000000000000000000000ff0000"
-    )
-
-    await app.startup()
-
-    assert "Correcting invalid NIB" in caplog.text
-    assert "Correcting invalid TCLK_TABLE" in caplog.text
-
-    # Correct settings are loaded from NIB. Confirmed with Wireshark.
-    assert app.nwk_update_id == 0
-    assert app.channel == 11
-    assert app.channels == t.Channels.from_channel_list([11])
-    assert app.extended_pan_id == t.EUI64.convert("00:12:4b:00:21:9f:bb:1d")
-    assert app.nwk == 0x0000
-    assert app.pan_id == 0x965A
 
     await app.shutdown()

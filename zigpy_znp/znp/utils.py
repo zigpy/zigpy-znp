@@ -1,11 +1,8 @@
-import logging
 import dataclasses
 
 import zigpy_znp.types as t
 from zigpy_znp.exceptions import CommandNotRecognized
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
-
-LOGGER = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -23,57 +20,6 @@ class NetworkInfo:
 
     def replace(self, **kwargs):
         return dataclasses.replace(self, **kwargs)
-
-
-async def fix_misaligned_coordinator_nvram(znp) -> None:
-    """
-    Some users have coordinators with broken alignment in NVRAM:
-
-        "TCLK_TABLE": {
-            "0x0000": "21000000000000000000000000000000ff0000",  <-- missing a byte??
-            "0x0001": "00000000000000000000000000000000ff000000",
-
-    These issues need to be corrected before zigpy-znp can continue working with NVRAM.
-    """
-
-    if znp.version < 3.30:
-        return
-
-    try:
-        nib_data = await znp.nvram.osal_read(OsalNvIds.NIB, item_type=t.Bytes)
-        znp.nvram.deserialize(nib_data, item_type=t.NIB)
-    except KeyError:
-        pass
-    except ValueError:
-        LOGGER.warning("Correcting invalid NIB alignment: %s", nib_data)
-
-        nib = znp.nvram.deserialize(nib_data + b"\xFF" * 6, item_type=t.NIB)
-
-        if nib.nwkUpdateId == 0xFF:
-            nib.nwkUpdateId = 0
-
-        await znp.nvram.osal_write(OsalNvIds.NIB, nib, create=True)
-
-    offset = 0
-
-    async for data in znp.nvram.read_table(
-        item_id=ExNvIds.TCLK_TABLE,
-        item_type=t.Bytes,
-    ):
-        try:
-            znp.nvram.deserialize(data, item_type=t.TCLKDevEntry)
-        except ValueError:
-            LOGGER.warning(
-                "Correcting invalid TCLK_TABLE[0x%04X] entry: %s", offset, data
-            )
-
-            entry = znp.nvram.deserialize(data + b"\x00", item_type=t.TCLKDevEntry)
-
-            await znp.nvram.write(
-                item_id=ExNvIds.TCLK_TABLE, sub_id=offset, value=entry, create=True
-            )
-
-        offset += 1
 
 
 async def load_network_info(znp) -> NetworkInfo:
