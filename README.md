@@ -30,7 +30,7 @@ Upgrade the package within your virtual environment (requires `git`):
 (venv) $ pip install git+https://github.com/zigpy/zigpy-znp/
 ```
 
-Launch Home Assistant the `--skip-pip` command line option to prevent zigpy-znp from being downgraded. Running with this option may prevent newly added integrations from installing required packages.
+Launch Home Assistant with the `--skip-pip` command line option to prevent zigpy-znp from being downgraded. Running with this option may prevent newly added integrations from installing required packages.
 
 ### Testing `dev` with Home Assistant OS
 

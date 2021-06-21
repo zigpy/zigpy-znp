@@ -157,7 +157,7 @@ For example, a network backup will allow you to migrate from a CC2531 with Z-Sta
 fully documented so you can fill out the appropriate information by hand to form a network
 if you are migrating from a non-Texas Instruments device.
 
-To get ZHA to utilize your new radio, make sure to change the coordiantor's `path` in
+To get ZHA to utilize your new radio, make sure to change the coordinator's `path` in
 `/config/.storage/core.config_entries`.
 
 ### NVRAM backup
