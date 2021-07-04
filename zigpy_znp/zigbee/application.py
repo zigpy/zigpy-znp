@@ -4,7 +4,6 @@ import os
 import time
 import asyncio
 import logging
-import functools
 import itertools
 import contextlib
 
@@ -27,6 +26,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
@@ -45,7 +45,7 @@ BROADCAST_SEND_WAIT_DURATION = 3
 MULTICAST_SEND_WAIT_DURATION = 3
 
 REQUEST_MAX_RETRIES = 5
-REQUEST_ERROR_RETRY_DELAY = 0.5  # seconds
+REQUEST_ERROR_RETRY_DELAY = 0.5
 
 # Errors that go away on their own after waiting for a bit
 REQUEST_TRANSIENT_ERRORS = {
@@ -79,36 +79,6 @@ DEFAULT_TC_LINK_KEY = t.TCLinkKey(
 ZSTACK_CONFIGURE_SUCCESS = t.uint8_t(0x55)
 
 LOGGER = logging.getLogger(__name__)
-
-
-def combine_concurrent_calls(function):
-    """
-    Decorator that allows concurrent calls to expensive coroutines to share a result.
-    """
-
-    futures = {}
-
-    @functools.wraps(function)
-    async def replacement(*args, **kwargs):
-        key = (tuple(args), tuple([(k, v) for k, v in kwargs.items()]))
-
-        if key in futures:
-            return await futures[key]
-
-        future = futures[key] = asyncio.get_running_loop().create_future()
-
-        try:
-            result = await function(*args, **kwargs)
-        except Exception as e:
-            future.set_exception(e)
-            raise
-        else:
-            future.set_result(result)
-            return result
-        finally:
-            del futures[key]
-
-    return replacement
 
 
 class ZNPCoordinator(zigpy.device.Device):

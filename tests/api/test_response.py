@@ -5,7 +5,7 @@ import async_timeout
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
-from zigpy_znp.api import _deduplicate_commands
+from zigpy_znp.utils import deduplicate_commands
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -215,15 +215,15 @@ async def test_command_deduplication_simple():
     c1 = c.SYS.Ping.Rsp(partial=True)
     c2 = c.UTIL.TimeAlive.Rsp(Seconds=12)
 
-    assert _deduplicate_commands([]) == ()
-    assert _deduplicate_commands([c1]) == (c1,)
-    assert _deduplicate_commands([c1, c1]) == (c1,)
-    assert _deduplicate_commands([c1, c2]) == (c1, c2)
-    assert _deduplicate_commands([c2, c1, c2]) == (c2, c1)
+    assert deduplicate_commands([]) == ()
+    assert deduplicate_commands([c1]) == (c1,)
+    assert deduplicate_commands([c1, c1]) == (c1,)
+    assert deduplicate_commands([c1, c2]) == (c1, c2)
+    assert deduplicate_commands([c2, c1, c2]) == (c2, c1)
 
 
 async def test_command_deduplication_complex():
-    result = _deduplicate_commands(
+    result = deduplicate_commands(
         [
             c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
             # Duplicating matching commands shouldn't do anything
@@ -302,7 +302,7 @@ async def test_response_callbacks(connected_znp, event_loop, mocker):
         c.UTIL.TimeAlive.Rsp(Seconds=10),
     ]
 
-    assert set(_deduplicate_commands(responses)) == {
+    assert set(deduplicate_commands(responses)) == {
         c.SYS.Ping.Rsp(partial=True),
         c.UTIL.TimeAlive.Rsp(Seconds=12),
         c.UTIL.TimeAlive.Rsp(Seconds=10),
