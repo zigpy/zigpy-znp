@@ -1016,9 +1016,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device | None:
         """
         Finds a device by its NWK address. If a device does not exist in the zigpy
-        database, attempt to look up its new NWK address. If joins are currently allowed
-        then the device will be treated as a new join if it does not exist in the zigpy
-        database.
+        database, attempt to look up its new NWK address. If it does not exist in the
+        zigpy database, treat the device as a new join.
         """
 
         try:
@@ -1044,7 +1043,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 timeout=5,  # We don't want to wait forever
             )
         except asyncio.TimeoutError:
-            return
+            return None
 
         ieee = ieee_addr_rsp.IEEE
 
