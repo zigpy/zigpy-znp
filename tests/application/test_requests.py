@@ -487,7 +487,6 @@ async def test_nonstandard_profile(device, make_application):
     await app.startup(auto_form=False)
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
-    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
 
     ep = device.add_endpoint(2)
     ep.status = zigpy.endpoint.Status.ZDO_INIT
@@ -605,7 +604,6 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
 
     # Fail the first time
     route_discovered = False
@@ -669,7 +667,6 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
 
     # Fail the first time
     route_discovered = False
@@ -728,6 +725,70 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
     await app.shutdown()
 
 
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_request_recovery_use_ieee_addr(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    # The data confirm timeout must be shorter than the ARSP timeout
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+
+    was_ieee_addr_used = False
+
+    def data_confirm_replier(req):
+        nonlocal was_ieee_addr_used
+
+        if req.DstAddrModeAddress.mode == t.AddrMode.IEEE:
+            status = t.Status.SUCCESS
+            was_ieee_addr_used = True
+        else:
+            status = t.Status.MAC_NO_ACK
+
+        return c.AF.DataConfirm.Callback(Status=status, Endpoint=1, TSN=1)
+
+    znp_server.reply_once_to(
+        c.ZDO.ExtRouteDisc.Req(
+            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
+        ),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
+    # Ignore the source routing request as well
+    znp_server.reply_to(
+        c.AF.DataRequestSrcRtg.Req(partial=True),
+        responses=[
+            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(Status=t.Status.MAC_NO_ACK, Endpoint=1, TSN=1),
+        ],
+    )
+
+    await app.request(
+        device=device,
+        profile=260,
+        cluster=1,
+        src_ep=1,
+        dst_ep=1,
+        sequence=1,
+        data=b"\x00",
+    )
+
+    assert was_ieee_addr_used
+
+    await app.shutdown()
+
+
 @pytest.mark.parametrize("device_cls", FORMED_DEVICES)
 @pytest.mark.parametrize("fw_assoc_remove", [True, False])
 @pytest.mark.parametrize("final_status", [t.Status.SUCCESS, t.Status.APS_NO_ACK])
@@ -744,7 +805,6 @@ async def test_request_recovery_assoc_remove(
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
 
     assoc_device, _ = c.util.Device.deserialize(b"\xFF" * 100)
     assoc_device.shortAddr = device.nwk
@@ -880,7 +940,6 @@ async def test_request_recovery_manual_source_route(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
     device.relays = relays
-    device.node_desc, _ = device.node_desc.deserialize(bytes(14))
 
     def data_confirm_replier(req):
         if isinstance(req, c.AF.DataRequestExt.Req) or not succeed:

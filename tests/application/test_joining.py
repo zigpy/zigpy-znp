@@ -508,3 +508,82 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
             await cluster.bind()
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_unknown_device_discovery(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    mocker.spy(app, "handle_join")
+
+    # Existing devices do not need to be discovered
+    existing_nwk = 0x1234
+    existing_ieee = t.EUI64(range(8))
+    device = app.add_initialized_device(ieee=existing_ieee, nwk=existing_nwk)
+
+    assert (await app._get_or_discover_device(nwk=existing_nwk)) is device
+    assert app.handle_join.call_count == 0
+
+    # If the device changes its NWK but doesn't tell zigpy, it will be re-discovered
+    did_ieee_addr_req1 = znp_server.reply_once_to(
+        request=c.ZDO.IEEEAddrReq.Req(
+            NWK=existing_nwk + 1,
+            RequestType=c.zdo.AddrRequestType.SINGLE,
+            StartIndex=0,
+        ),
+        responses=[
+            c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.IEEEAddrRsp.Callback(
+                Status=t.ZDOStatus.SUCCESS,
+                IEEE=existing_ieee,
+                NWK=existing_nwk + 1,
+                Index=0,
+                Devices=[],
+            ),
+        ],
+    )
+
+    # The same device is discovered and its NWK was updated. Handles concurrency.
+    devices = await asyncio.gather(
+        app._get_or_discover_device(nwk=existing_nwk + 1),
+        app._get_or_discover_device(nwk=existing_nwk + 1),
+        app._get_or_discover_device(nwk=existing_nwk + 1),
+        app._get_or_discover_device(nwk=existing_nwk + 1),
+        app._get_or_discover_device(nwk=existing_nwk + 1),
+    )
+
+    assert devices == [device] * 5
+
+    # Only a single request is sent, since the coroutines are grouped
+    await did_ieee_addr_req1
+    assert device.nwk == existing_nwk + 1
+    assert app.handle_join.call_count == 0
+
+    # If a completely unknown device joins the network, it will be treated as a new join
+    new_nwk = 0x5678
+    new_ieee = t.EUI64(range(1, 9))
+    did_ieee_addr_req2 = znp_server.reply_once_to(
+        request=c.ZDO.IEEEAddrReq.Req(
+            NWK=new_nwk,
+            RequestType=c.zdo.AddrRequestType.SINGLE,
+            StartIndex=0,
+        ),
+        responses=[
+            c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.IEEEAddrRsp.Callback(
+                Status=t.ZDOStatus.SUCCESS,
+                IEEE=new_ieee,
+                NWK=new_nwk,
+                Index=0,
+                Devices=[],
+            ),
+        ],
+    )
+    new_dev = await app._get_or_discover_device(nwk=new_nwk)
+    await did_ieee_addr_req2
+    assert app.handle_join.call_count == 1
+    assert new_dev.nwk == new_nwk
+    assert new_dev.ieee == new_ieee
+
+    await app.pre_shutdown()

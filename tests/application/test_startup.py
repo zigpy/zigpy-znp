@@ -71,6 +71,7 @@ async def test_info(
     assert app.channel is None
     assert app.channels is None
     assert app.network_key is None
+    assert app.network_key_seq is None
 
     await app.startup(auto_form=False)
 
@@ -84,6 +85,7 @@ async def test_info(
     assert app.channel == channel
     assert app.channels == channels
     assert app.network_key == network_key
+    assert app.network_key_seq == 0
 
     assert app.zigpy_device.manufacturer == "Texas Instruments"
     assert app.zigpy_device.model == model
