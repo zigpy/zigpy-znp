@@ -209,64 +209,6 @@ async def test_response_callback_simple(connected_znp, event_loop, mocker):
     sync_callback.assert_called_once_with(good_response)
 
 
-# These two tests are not async at all but pytest.mark.asyncio throws an error due to it
-# being implicitly marked as "asyncio"
-async def test_command_deduplication_simple():
-    c1 = c.SYS.Ping.Rsp(partial=True)
-    c2 = c.UTIL.TimeAlive.Rsp(Seconds=12)
-
-    assert deduplicate_commands([]) == ()
-    assert deduplicate_commands([c1]) == (c1,)
-    assert deduplicate_commands([c1, c1]) == (c1,)
-    assert deduplicate_commands([c1, c2]) == (c1, c2)
-    assert deduplicate_commands([c2, c1, c2]) == (c2, c1)
-
-
-async def test_command_deduplication_complex():
-    result = deduplicate_commands(
-        [
-            c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS),
-            # Duplicating matching commands shouldn't do anything
-            c.SYS.Ping.Rsp(partial=True),
-            c.SYS.Ping.Rsp(partial=True),
-            # Matching against different command types should also work
-            c.UTIL.TimeAlive.Rsp(Seconds=12),
-            c.UTIL.TimeAlive.Rsp(Seconds=10),
-            c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
-            ),
-            c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True,
-                Status=c.app_config.BDBCommissioningStatus.InProgress,
-                Mode=c.app_config.BDBCommissioningMode.NwkFormation,
-            ),
-            c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True,
-                Status=c.app_config.BDBCommissioningStatus.InProgress,
-                Mode=c.app_config.BDBCommissioningMode.NwkFormation,
-                RemainingModes=c.app_config.BDBCommissioningMode.InitiatorTouchLink,
-            ),
-            c.AppConfig.BDBCommissioningNotification.Callback(
-                partial=True,
-                RemainingModes=c.app_config.BDBCommissioningMode.InitiatorTouchLink,
-            ),
-        ]
-    )
-
-    assert set(result) == {
-        c.SYS.Ping.Rsp(partial=True),
-        c.UTIL.TimeAlive.Rsp(Seconds=12),
-        c.UTIL.TimeAlive.Rsp(Seconds=10),
-        c.AppConfig.BDBCommissioningNotification.Callback(
-            partial=True, Status=c.app_config.BDBCommissioningStatus.InProgress
-        ),
-        c.AppConfig.BDBCommissioningNotification.Callback(
-            partial=True,
-            RemainingModes=c.app_config.BDBCommissioningMode.InitiatorTouchLink,
-        ),
-    }
-
-
 async def test_response_callbacks(connected_znp, event_loop, mocker):
     znp, _ = connected_znp
 

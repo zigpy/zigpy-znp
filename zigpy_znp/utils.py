@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import typing
 import asyncio
+import inspect
 import logging
 import functools
 import dataclasses
@@ -158,11 +159,15 @@ def combine_concurrent_calls(function):
     """
 
     futures = {}
+    signature = inspect.signature(function)
 
     @functools.wraps(function)
     async def replacement(*args, **kwargs):
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+
         # XXX: all args and kwargs are assumed to be hashable
-        key = (tuple(args), tuple([(k, v) for k, v in kwargs.items()]))
+        key = tuple(bound.arguments.items())
 
         if key in futures:
             return await futures[key]
