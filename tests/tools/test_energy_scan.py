@@ -6,12 +6,21 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.tools.energy_scan import main as energy_scan
 
-from ..conftest import FORMED_DEVICES
+from ..conftest import EMPTY_DEVICES, FORMED_DEVICES
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("device", EMPTY_DEVICES)
+async def test_energy_scan_unformed(device, make_znp_server, caplog):
+    znp_server = make_znp_server(server_cls=device)
+
+    await energy_scan(["-n", "1", znp_server._port_path, "-v", "-v"])
+    assert "Form a network" in caplog.text
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_energy_scan(device, make_znp_server, capsys):
+async def test_energy_scan_formed(device, make_znp_server, capsys):
     znp_server = make_znp_server(server_cls=device)
 
     def fake_scanner(request):

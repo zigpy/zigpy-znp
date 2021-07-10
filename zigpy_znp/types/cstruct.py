@@ -37,9 +37,6 @@ class CStructField:
         else:
             raise TypeError(f"Cannot get size of unknown type: {self.type!r}")
 
-    def replace(self, **kwargs):
-        return dataclasses.replace(self, **kwargs)
-
 
 class CStruct:
     _padding_byte = b"\xFF"

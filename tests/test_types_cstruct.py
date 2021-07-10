@@ -405,3 +405,12 @@ def test_old_nib_deserialize():
     # And they are deserialized correctly
     for field in nib.fields:
         assert getattr(nib, field.name) == getattr(old_nib, field.name)
+
+
+def test_struct_addrmode_address():
+    class TestStruct(t.CStruct):
+        addr: t.AddrModeAddress
+
+    struct = TestStruct(addr=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x1234))
+    assert struct.get_size(align=False) == 1 + 8
+    assert struct.get_size(align=True) == 1 + 8

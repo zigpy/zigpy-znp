@@ -161,9 +161,6 @@ class UnclosableFile:
         return
 
     def __getattr__(self, name):
-        if name in ("f", "close", "__enter__", "__exit__"):
-            return super().__getattr__(name)
-
         return getattr(self.f, name)
 
 

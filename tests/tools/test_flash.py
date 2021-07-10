@@ -131,3 +131,23 @@ async def test_flash_write_bad_crc(make_znp_server, tmp_path, mocker):
         await flash_write([znp_server._port_path, "-i", str(firmware_file)])
 
     assert "Firmware CRC is incorrect" in str(e)
+
+
+async def test_flash_write_bad_size(make_znp_server, tmp_path, mocker):
+    znp_server = make_znp_server(server_cls=BaseServerZNP)
+
+    # It takes too long otherwise
+    mocker.patch("zigpy_znp.commands.ubl.IMAGE_SIZE", FAKE_IMAGE_SIZE)
+
+    # Add an extra byte
+    BAD_FIRMWARE = bytearray(len(FAKE_FLASH))
+    BAD_FIRMWARE += b"\xFF"
+
+    # No communication will happen because the CRC will be invalid
+    firmware_file = tmp_path / "bad-firmware.bin"
+    firmware_file.write_bytes(BAD_FIRMWARE)
+
+    with pytest.raises(ValueError) as e:
+        await flash_write([znp_server._port_path, "-i", str(firmware_file)])
+
+    assert "Firmware is the wrong size" in str(e)
