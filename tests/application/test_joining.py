@@ -558,7 +558,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
     # Only a single request is sent, since the coroutines are grouped
     await did_ieee_addr_req1
     assert device.nwk == existing_nwk + 1
-    assert app.handle_join.call_count == 0
+    assert app.handle_join.call_count == 1
 
     # If a completely unknown device joins the network, it will be treated as a new join
     new_nwk = 0x5678
@@ -582,7 +582,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
     )
     new_dev = await app._get_or_discover_device(nwk=new_nwk)
     await did_ieee_addr_req2
-    assert app.handle_join.call_count == 1
+    assert app.handle_join.call_count == 2
     assert new_dev.nwk == new_nwk
     assert new_dev.ieee == new_ieee
 

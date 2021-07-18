@@ -343,7 +343,7 @@ class ZNP:
         if type(request) is not request.Req:
             raise ValueError(f"Cannot send a command that isn't a request: {request!r}")
 
-        # Construct a partial response out of the `Rsp*` kwargs if one is provded
+        # Construct a partial response out of the `Rsp*` kwargs if one is provided
         if request.Rsp:
             renamed_response_params = {}
 

@@ -918,6 +918,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if msg.SrcIEEE in self._join_announce_tasks:
             self._join_announce_tasks.pop(msg.SrcIEEE).cancel()
 
+        # If the device already exists, immediately trigger a join to update its NWK.
+        try:
+            self.get_device(ieee=msg.SrcIEEE)
+        except KeyError:
+            pass
+        else:
+            self.handle_join(
+                nwk=msg.SrcNwk,
+                ieee=msg.SrcIEEE,
+                parent_nwk=msg.ParentNwk,
+            )
+            return
+
         # Some devices really don't like zigpy beginning its initialization process
         # before the device has announced itself. Wait a second or two before calling
         # `handle_join`, just in case the device announces itself first.
@@ -1055,6 +1068,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
             return self.get_device(ieee=ieee)
 
+        # The `Device` object could have been updated while this coroutine is running
+        if device.nwk == nwk:
+            return device
+
         LOGGER.warning(
             "Device %s changed its NWK from %s to %s",
             device.ieee,
@@ -1063,8 +1080,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         # Notify zigpy of the change
-        device.nwk = nwk
-        self.listener_event("raw_device_initialized", device)
+        self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
+
+        # `handle_join` will update the NWK
+        assert device.nwk == nwk
 
         return device
 
