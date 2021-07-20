@@ -706,21 +706,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Permit joining the network via a specific node or via all router nodes.
         """
 
-        # Always permit joins on the coordinator first.
-        # This unfortunately makes it impossible to permit joins via just one router
-        # alone but firmware changes can make this possible on newer hardware.
         LOGGER.info("Permitting joins for %d seconds", time_s)
 
-        response = await self._znp.request_callback_rsp(
-            request=c.ZDO.MgmtPermitJoinReq.Req(
-                AddrMode=t.AddrMode.NWK,
-                Dst=0x0000,
-                Duration=time_s,
-                TCSignificance=1,
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
-        )
+        if self._version_rsp.CodeRevision < 20210708:
+            # If joins were permitted through a specific router, older Z-Stack builds
+            # did not allow the key to be distributed unless the coordinator itself was
+            # also permitting joins.
+            #
+            # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
+            response = await self._znp.request_callback_rsp(
+                request=c.ZDO.MgmtPermitJoinReq.Req(
+                    AddrMode=t.AddrMode.NWK,
+                    Dst=0x0000,
+                    Duration=time_s,
+                    TCSignificance=1,
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+            )
 
         if response.Status != t.Status.SUCCESS:
             raise RuntimeError(f"Failed to permit joins on the coordinator: {response}")
