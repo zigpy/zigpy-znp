@@ -104,6 +104,32 @@ You can erase the NVRAM entries in your device and reset it by running one of th
 (venv) $ python -m zigpy_znp.tools.nvram_reset -c /dev/serial/by-id/your-radio
 ```
 
+# Troubleshooting
+
+For general troubleshooting please refer to https://www.zigbee2mqtt.io/information/FAQ.html
+
+Furthermore, there is a chance that resetting the coordinator might help with unexpected behaviour.
+By creating a backup, resetting the NVRAM and restoring the backup, corrupted memory could be cleared and some issues might disappear.
+
+
+```console
+# 1. Stop any application (eg Home Assistant) accessing the controller
+# 2. Backup the network
+(venv) $ python -m zigpy_znp.tools.network_backup --output /path/to/backup /dev/serial/by-id/your-radio
+
+# 3. Check if backup is valid, consider making a copy
+# 4. Take step 3. seriously
+
+# 5. Erases every single NVRAM item, resetting your stick as much as possible
+(venv) $ python -m zigpy_znp.tools.nvram_reset -c /dev/serial/by-id/your-radio
+
+# 6. Unplug and re-plug the adapter
+
+# 7. Restore the backup
+(venv) $ python -m zigpy_znp.tools.network_restore --input /path/to/backup /dev/serial/by-id/your-radio
+
+```
+
 # Energy scan
 Perform an energy scan to find a quiet Zigbee channel:
 
