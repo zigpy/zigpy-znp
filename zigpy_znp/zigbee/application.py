@@ -327,6 +327,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
 
         LOGGER.info("Network settings")
+        LOGGER.info("  Model: %s", self.zigpy_device.model)
         LOGGER.info("  Z-Stack version: %s", self._znp.version)
         LOGGER.info("  Z-Stack build id: %s", self._version_rsp.CodeRevision)
         LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
