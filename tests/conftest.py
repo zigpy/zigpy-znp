@@ -226,34 +226,21 @@ def make_application(make_znp_server):
             device.model = "Model"
             device.manufacturer = "Manufacturer"
 
-            try:
-                device.node_desc = zdo_t.NodeDescriptor(
-                    logical_type=zdo_t.LogicalType.Router,
-                    complex_descriptor_available=0,
-                    user_descriptor_available=0,
-                    reserved=0,
-                    aps_flags=0,
-                    frequency_band=zdo_t.NodeDescriptor.FrequencyBand.Freq2400MHz,
-                    mac_capability_flags=142,
-                    manufacturer_code=4476,
-                    maximum_buffer_size=82,
-                    maximum_incoming_transfer_size=82,
-                    server_mask=11264,
-                    maximum_outgoing_transfer_size=82,
-                    descriptor_capability_field=0,
-                )
-            except AttributeError:
-                device.node_desc = zdo_t.NodeDescriptor(
-                    byte1=1,
-                    byte2=64,
-                    mac_capability_flags=142,
-                    manufacturer_code=4476,
-                    maximum_buffer_size=82,
-                    maximum_incoming_transfer_size=82,
-                    server_mask=11264,
-                    maximum_outgoing_transfer_size=82,
-                    descriptor_capability_field=0,
-                )
+            device.node_desc = zdo_t.NodeDescriptor(
+                logical_type=zdo_t.LogicalType.Router,
+                complex_descriptor_available=0,
+                user_descriptor_available=0,
+                reserved=0,
+                aps_flags=0,
+                frequency_band=zdo_t.NodeDescriptor.FrequencyBand.Freq2400MHz,
+                mac_capability_flags=142,
+                manufacturer_code=4476,
+                maximum_buffer_size=82,
+                maximum_incoming_transfer_size=82,
+                server_mask=11264,
+                maximum_outgoing_transfer_size=82,
+                descriptor_capability_field=0,
+            )
 
             ep = device.add_endpoint(1)
             ep.status = zigpy.endpoint.Status.ZDO_INIT
@@ -544,26 +531,47 @@ class BaseZStackDevice(BaseServerZNP):
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=0x0000,
-                ActiveEndpoints=self.active_endpoints,
+                ActiveEndpoints=[ep.Endpoint for ep in self.active_endpoints],
             ),
         ]
 
     @reply_to(c.AF.Register.Req(partial=True))
     def on_endpoint_registration(self, req):
-        assert req.Endpoint not in self.active_endpoints
-
-        self.active_endpoints.append(req.Endpoint)
-        self.active_endpoints.sort(reverse=True)
+        self.active_endpoints.insert(0, req)
 
         return c.AF.Register.Rsp(Status=t.Status.SUCCESS)
 
     @reply_to(c.AF.Delete.Req(partial=True))
     def on_endpoint_deletion(self, req):
-        assert req.Endpoint in self.active_endpoints
-
-        self.active_endpoints.remove(req.Endpoint)
+        self.active_endpoints.remove(req)
 
         return c.AF.Delete.Rsp(Status=t.Status.SUCCESS)
+
+    @reply_to(
+        c.ZDO.SimpleDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000, partial=True)
+    )
+    def on_simple_desc_req(self, req):
+        for ep in self.active_endpoints:
+            if ep.Endpoint == req.Endpoint:
+                return [
+                    c.ZDO.SimpleDescReq.Rsp(Status=t.Status.SUCCESS),
+                    c.ZDO.SimpleDescRsp.Callback(
+                        Src=0x0000,
+                        Status=t.ZDOStatus.SUCCESS,
+                        NWK=0x0000,
+                        SimpleDescriptor=zdo_t.SizePrefixedSimpleDescriptor(
+                            endpoint=ep.Endpoint,
+                            profile=ep.ProfileId,
+                            device_type=ep.DeviceId,
+                            device_version=ep.DeviceVersion,
+                            input_clusters=ep.InputClusters,
+                            output_clusters=ep.OutputClusters,
+                        ),
+                    ),
+                ]
+
+        # Bad things happen when an invalid endpoint ID is passed in
+        pytest.fail("Simple descriptor request to an invalid endpoint breaks Z-Stack")
 
     @reply_to(c.SYS.OSALNVWrite.Req(partial=True))
     @reply_to(c.SYS.OSALNVWriteExt.Req(partial=True))

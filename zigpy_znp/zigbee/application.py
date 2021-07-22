@@ -299,6 +299,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         async with async_timeout.timeout(STARTUP_TIMEOUT):
             await started_as_coordinator
 
+        self._version_rsp = await self._znp.request(c.SYS.Version.Req())
+
         # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
         # unless they are explicitly disabled. We can't fix this but we can disable them
         # as early as possible to shrink the window of opportunity for unwanted joins.
@@ -310,36 +312,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
         await self._load_network_info()
+        await self._register_endpoints()
 
-        # Add the coordinator as a zigpy device. We do this up here because
-        # `self._register_endpoint()` adds endpoints to this device object.
+        # Setup the coordinator as a zigpy device and initialize it to request node info
         self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
-
-        # Give our Zigpy device a valid node descriptor
-        node_descriptor_rsp = await self._znp.request_callback_rsp(
-            request=c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.NodeDescRsp.Callback(Src=0x0000, NWK=0x0000, partial=True),
-        )
-        self.zigpy_device.node_desc = node_descriptor_rsp.NodeDescriptor
-
-        # Register our endpoints
-        await self._register_endpoint(
-            endpoint=1,
-            profile_id=zigpy.profiles.zha.PROFILE_ID,
-            device_id=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
-            input_clusters=[clusters.general.Ota.cluster_id],
-            output_clusters=[
-                clusters.security.IasZone.cluster_id,
-                clusters.security.IasWd.cluster_id,
-            ],
-        )
-
-        await self._register_endpoint(
-            endpoint=2,
-            profile_id=zigpy.profiles.zll.PROFILE_ID,
-            device_id=zigpy.profiles.zll.DeviceType.CONTROLLER,
-        )
+        await self.zigpy_device.schedule_initialize()
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
@@ -348,8 +325,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
         self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
-
-        self._version_rsp = await self._znp.request(c.SYS.Version.Req())
 
         LOGGER.info("Network settings")
         LOGGER.info("  Z-Stack version: %s", self._znp.version)
@@ -708,7 +683,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         LOGGER.info("Permitting joins for %d seconds", time_s)
 
-        if self._version_rsp is None or self._version_rsp.CodeRevision < 20210708:
+        if time_s == 0 or self._version_rsp.CodeRevision < 20210708:
             # If joins were permitted through a specific router, older Z-Stack builds
             # did not allow the key to be distributed unless the coordinator itself was
             # also permitting joins.
@@ -1247,45 +1222,36 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     ]
                 )
 
-    async def _register_endpoint(
-        self,
-        endpoint,
-        profile_id=zigpy.profiles.zha.PROFILE_ID,
-        device_id=zigpy.profiles.zha.DeviceType.CONFIGURATION_TOOL,
-        device_version=0b0000,
-        latency_req=c.af.LatencyReq.NoLatencyReqs,
-        input_clusters=[],
-        output_clusters=[],
-    ):
+    async def _register_endpoints(self) -> None:
         """
-        Method to register an endpoint simultaneously with both zigpy and Z-Stack.
-
-        This lets us keep track of our own endpoint information without duplicating
-        that information again, and exposing it to higher layers (e.g. Home Assistant).
+        Registers the Zigbee endpoints required to communicate with various devices.
         """
 
-        # Create a corresponding endpoint on our Zigpy device first
-        zigpy_ep = self.zigpy_device.add_endpoint(endpoint)
-        zigpy_ep.profile_id = profile_id
-        zigpy_ep.device_type = device_id
-
-        for cluster in input_clusters:
-            zigpy_ep.add_input_cluster(cluster)
-
-        for cluster in output_clusters:
-            zigpy_ep.add_output_cluster(cluster)
-
-        zigpy_ep.status = zigpy.endpoint.Status.ZDO_INIT
-
-        return await self._znp.request(
+        await self._znp.request(
             c.AF.Register.Req(
-                Endpoint=endpoint,
-                ProfileId=profile_id,
-                DeviceId=device_id,
-                DeviceVersion=device_version,
-                LatencyReq=latency_req,  # completely ignored by Z-Stack
-                InputClusters=input_clusters,
-                OutputClusters=output_clusters,
+                Endpoint=1,
+                ProfileId=zigpy.profiles.zha.PROFILE_ID,
+                DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
+                DeviceVersion=0b0000,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=[clusters.general.Ota.cluster_id],
+                OutputClusters=[
+                    clusters.security.IasZone.cluster_id,
+                    clusters.security.IasWd.cluster_id,
+                ],
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
+
+        await self._znp.request(
+            c.AF.Register.Req(
+                Endpoint=2,
+                ProfileId=zigpy.profiles.zll.PROFILE_ID,
+                DeviceId=zigpy.profiles.zll.DeviceType.CONTROLLER,
+                DeviceVersion=0b0000,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=[],
+                OutputClusters=[],
             ),
             RspStatus=t.Status.SUCCESS,
         )
