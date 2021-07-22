@@ -708,7 +708,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         LOGGER.info("Permitting joins for %d seconds", time_s)
 
-        if self._version_rsp.CodeRevision < 20210708:
+        if self._version_rsp is None or self._version_rsp.CodeRevision < 20210708:
             # If joins were permitted through a specific router, older Z-Stack builds
             # did not allow the key to be distributed unless the coordinator itself was
             # also permitting joins.
