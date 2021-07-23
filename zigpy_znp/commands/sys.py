@@ -418,10 +418,11 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         t.CommandType.SREQ,
         0x14,
         req_schema=(t.Param("TXPower", t.int8s, "Requested TX power setting, in dBm"),),
-        # While the docs say "the returned TX power is the actual setting applied to
-        # the radio - nearest characterized value for the specific radio.", the code
-        # matches the documentation.
-        rsp_schema=t.STATUS_SCHEMA,
+        # XXX: Z-Stack 3.30+ returns SUCCESS or INVALID_PARAMETER.
+        #      Z-Stack 1.2 and 3.0 return the cloest TX power setting.
+        rsp_schema=(
+            t.Param("StatusOrPower", t.int8s, "Status code or applied power setting"),
+        ),
     )
 
     # initialize the statistics table in NV memory

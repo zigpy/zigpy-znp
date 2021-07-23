@@ -4,6 +4,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
@@ -163,19 +164,46 @@ async def test_write_nvram(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_tx_power(device, make_application):
+@pytest.mark.parametrize("succeed", [True, False])
+async def test_tx_power(device, succeed, make_application):
     app, znp_server = make_application(
         server_cls=device,
         client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_TX_POWER: 19}},
     )
 
-    set_tx_power = znp_server.reply_once_to(
-        request=c.SYS.SetTxPower.Req(TXPower=19),
-        responses=[c.SYS.SetTxPower.Rsp(Status=t.Status.SUCCESS)],
-    )
+    if device.version == 3.30:
+        if succeed:
+            set_tx_power = znp_server.reply_once_to(
+                request=c.SYS.SetTxPower.Req(TXPower=19),
+                responses=[c.SYS.SetTxPower.Rsp(StatusOrPower=t.Status.SUCCESS)],
+            )
+        else:
+            set_tx_power = znp_server.reply_once_to(
+                request=c.SYS.SetTxPower.Req(TXPower=19),
+                responses=[
+                    c.SYS.SetTxPower.Rsp(StatusOrPower=t.Status.INVALID_PARAMETER)
+                ],
+            )
+    else:
+        if succeed:
+            set_tx_power = znp_server.reply_once_to(
+                request=c.SYS.SetTxPower.Req(TXPower=19),
+                responses=[c.SYS.SetTxPower.Rsp(StatusOrPower=19)],
+            )
+        else:
+            set_tx_power = znp_server.reply_once_to(
+                request=c.SYS.SetTxPower.Req(TXPower=19),
+                responses=[c.SYS.SetTxPower.Rsp(StatusOrPower=-1)],  # adjusted
+            )
 
-    await app.startup(auto_form=False)
-    await set_tx_power
+    if device.version == 3.30 and not succeed:
+        with pytest.raises(InvalidCommandResponse):
+            await app.startup(auto_form=False)
+
+        await set_tx_power
+    else:
+        await app.startup(auto_form=False)
+        await set_tx_power
 
     await app.shutdown()
 
