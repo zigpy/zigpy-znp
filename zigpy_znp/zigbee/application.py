@@ -254,11 +254,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # At this point the device state should the same, regardless of whether we just
         # formed a new network or are restoring one
         if self.znp_config[conf.CONF_TX_POWER] is not None:
-            dbm = self.znp_config[conf.CONF_TX_POWER]
-
-            await self._znp.request(
-                c.SYS.SetTxPower.Req(TXPower=dbm), RspStatus=t.Status.SUCCESS
-            )
+            await self.set_tx_power(dbm=self.znp_config[conf.CONF_TX_POWER])
 
         # Both versions of Z-Stack use this callback
         started_as_coordinator = self._znp.wait_for_response(
@@ -387,6 +383,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.nvram.osal_write(OsalNvIds.NIB, nib)
         await self._znp.nvram.osal_write(OsalNvIds.PANID, pan_id)
+
+    async def set_tx_power(self, dbm: int) -> None:
+        """
+        Sets the radio TX power.
+        """
+
+        rsp = await self._znp.request(c.SYS.SetTxPower.Req(TXPower=dbm))
+
+        if self._znp.version >= 3.30 and rsp.StatusOrPower != t.Status.SUCCESS:
+            # Z-Stack 3's response indicates success or failure
+            raise InvalidCommandResponse(
+                f"Failed to set TX power: {t.Status(rsp.StatusOrPower)!r}", rsp
+            )
+        elif self._znp.version < 3.30 and rsp.StatusOrPower != dbm:
+            # Old Z-Stack releases used the response status field to indicate the power
+            # setting that was actually applied
+            LOGGER.warning(
+                "Requested TX power %d was adjusted to %d", dbm, rsp.StatusOrPower
+            )
 
     async def form_network(self):
         """

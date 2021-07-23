@@ -63,7 +63,7 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
         vol.Optional(CONF_ZNP_CONFIG, default={}): vol.Schema(
             {
                 vol.Optional(CONF_TX_POWER, default=None): vol.Any(
-                    None, vol.All(int, vol.Range(min=-22, max=19))
+                    None, vol.All(int, vol.Range(min=-22, max=22))
                 ),
                 vol.Optional(CONF_SREQ_TIMEOUT, default=15): VolPositiveNumber,
                 vol.Optional(CONF_ARSP_TIMEOUT, default=30): VolPositiveNumber,
