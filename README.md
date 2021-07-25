@@ -54,7 +54,9 @@ zha:
       max_concurrent_requests: auto
 
       # Only if your stick has a built-in power amplifier (i.e. CC1352P and CC2592)
-      # If set, must be between -22 (low) and 19 (high)
+      # If set, must be between:
+      #  * CC1352/2652:  -22 and 19
+      #  * CC253x:       -22 and 22
       tx_power:  
 
       # Only if your stick has a controllable LED (the CC2531)
