@@ -1090,7 +1090,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # XXX: If Z-Stack is not compiled with HAL_LED, it will just not respond at all
         try:
-            async with async_timeout.timeout(0.3):
+            async with async_timeout.timeout(0.5):
                 await self._znp.request(
                     c.UTIL.LEDControl.Req(LED=led, Mode=mode),
                     RspStatus=t.Status.SUCCESS,
