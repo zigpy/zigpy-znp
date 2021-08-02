@@ -699,12 +699,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         LOGGER.info("Permitting joins for %d seconds", time_s)
 
+        # If joins were permitted through a specific router, older Z-Stack builds
+        # did not allow the key to be distributed unless the coordinator itself was
+        # also permitting joins.
+        #
+        # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
         if time_s == 0 or self._version_rsp.CodeRevision < 20210708:
-            # If joins were permitted through a specific router, older Z-Stack builds
-            # did not allow the key to be distributed unless the coordinator itself was
-            # also permitting joins.
-            #
-            # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
             response = await self._znp.request_callback_rsp(
                 request=c.ZDO.MgmtPermitJoinReq.Req(
                     AddrMode=t.AddrMode.NWK,
@@ -716,10 +716,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
             )
 
-        if response.Status != t.Status.SUCCESS:
-            raise RuntimeError(f"Failed to permit joins on the coordinator: {response}")
+            if response.Status != t.Status.SUCCESS:
+                raise RuntimeError(f"Failed to permit joins on coordinator: {response}")
 
-        return await super().permit(time_s=time_s, node=node)
+        await super().permit(time_s=time_s, node=node)
 
     async def permit_ncp(self, time_s: int) -> None:
         """

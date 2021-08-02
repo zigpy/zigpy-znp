@@ -9,36 +9,25 @@ import zigpy.zdo.types as zdo_t
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from ..conftest import FORMED_DEVICES, FORMED_ZSTACK3_DEVICES, CoroutineMock
+from ..conftest import (
+    FORMED_DEVICES,
+    FORMED_ZSTACK3_DEVICES,
+    CoroutineMock,
+    FormedLaunchpadCC26X2R1,
+)
 
 pytestmark = [pytest.mark.asyncio]
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_permit_join(device, make_application):
+@pytest.mark.parametrize(
+    "device,fixed_joining_bug",
+    [(d, False) for d in FORMED_DEVICES] + [(FormedLaunchpadCC26X2R1, True)],
+)
+async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
+    if fixed_joining_bug:
+        mocker.patch.object(device, "code_revision", 20210708)
+
     app, znp_server = make_application(server_cls=device)
-
-    # Handle the startup permit join clear
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-        override=True,
-    )
-
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-    )
 
     # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
@@ -65,8 +54,14 @@ async def test_permit_join(device, make_application):
     await app.startup(auto_form=False)
     await app.permit(time_s=10)
 
-    await permit_join_coordinator
-    await permit_join_broadcast
+    if fixed_joining_bug:
+        await permit_join_broadcast
+
+        # Joins should not have been opened on the coordinator
+        assert not permit_join_coordinator.done()
+    else:
+        await permit_join_coordinator
+        await permit_join_broadcast
 
     await app.shutdown()
 

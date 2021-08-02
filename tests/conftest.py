@@ -722,6 +722,7 @@ class BaseZStackDevice(BaseServerZNP):
 class BaseZStack1CC2531(BaseZStackDevice):
     align_structs = False
     version = 1.2
+    code_revision = 20190608
 
     @reply_to(c.SYS.OSALNVRead.Req(partial=True))
     @reply_to(c.SYS.OSALNVReadExt.Req(partial=True))
@@ -766,7 +767,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
             MajorRel=2,
             MinorRel=6,
             MaintRel=3,
-            CodeRevision=20190608,
+            CodeRevision=self.code_revision,
             BootloaderBuildType=c.sys.BootloaderBuildType.BUILT_AS_BIN,
             BootloaderRevision=0,
         )
@@ -963,6 +964,7 @@ class BaseZStack3Device(BaseZStackDevice):
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):
     version = 3.30
     align_structs = True
+    code_revision = 20200805
 
     def create_nib(self, _=None):
         super().create_nib()
@@ -1034,7 +1036,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             MajorRel=2,
             MinorRel=7,
             MaintRel=1,
-            CodeRevision=20200805,
+            CodeRevision=self.code_revision,
             BootloaderBuildType=c.sys.BootloaderBuildType.NON_BOOTLOADER_BUILD,
             BootloaderRevision=0xFFFFFFFF,
         )
@@ -1070,6 +1072,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 class BaseZStack3CC2531(BaseZStack3Device):
     version = 3.0
     align_structs = False
+    code_revision = 20190425
 
     def create_nib(self, _=None):
         super().create_nib()
@@ -1100,7 +1103,7 @@ class BaseZStack3CC2531(BaseZStack3Device):
             MajorRel=2,
             MinorRel=7,
             MaintRel=2,
-            CodeRevision=20190425,
+            CodeRevision=self.code_revision,
             BootloaderBuildType=c.sys.BootloaderBuildType.BUILT_AS_BIN,
             BootloaderRevision=0,
         )
