@@ -536,10 +536,14 @@ class DeviceState(t.enum_uint8):
 
 
 class InterPanCommand(t.enum_uint8):
-    InterPanClr = 0x00
-    InterPanSet = 0x01
-    InterPanReg = 0x02
-    InterPanChk = 0x03
+    # Switch channel back to the NIB channel
+    Clr = 0x00
+    # Set channel for inter-pan communication
+    Set = 0x01
+    # Register an endpoint as inter-pan
+    Reg = 0x02
+    # Check if an endpoint is registered as inter-pan
+    Chk = 0x03
 
 
 class MTCapabilities(t.enum_flag_uint16):
