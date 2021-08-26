@@ -67,8 +67,8 @@ async def test_info(
     app, znp_server = make_application(server_cls=device)
 
     # These should not raise any errors even if our NIB is empty
-    assert app.pan_id is None
-    assert app.extended_pan_id is None
+    assert app.pan_id == 0xFFFE  # unknown NWK ID
+    assert app.extended_pan_id == t.EUI64.convert("ff:ff:ff:ff:ff:ff:ff:ff")
     assert app.channel is None
     assert app.channels is None
     assert app.network_key is None
