@@ -121,8 +121,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._watchdog_task = asyncio.Future()
         self._watchdog_task.cancel()
 
-        self._network_key = None
-        self._network_key_seq = None
         self._version_rsp = None
         self._concurrent_requests_semaphore = None
         self._currently_waiting_requests = 0
@@ -136,12 +134,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     @property
     def network_key(self) -> t.KeyData | None:
         # This is not a standard Zigpy property
-        return self.state.network_information.network_key.key
+        if self.state.network_information.network_key:
+            return self.state.network_information.network_key.key
+        return None
 
     @property
     def network_key_seq(self) -> t.uint8_t | None:
         # This is not a standard Zigpy property
-        return self.state.network_information.network_key.seq
+        if self.state.network_information.network_key:
+            return self.state.network_information.network_key.seq
+        return None
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
