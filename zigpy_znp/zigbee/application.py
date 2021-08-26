@@ -9,6 +9,7 @@ import contextlib
 
 import zigpy.zdo
 import zigpy.util
+import zigpy.state
 import zigpy.types
 import zigpy.config
 import zigpy.device
@@ -135,12 +136,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     @property
     def network_key(self) -> t.KeyData | None:
         # This is not a standard Zigpy property
-        return self._network_key
+        return self.state.network_information.network_key.key
 
     @property
     def network_key_seq(self) -> t.uint8_t | None:
         # This is not a standard Zigpy property
-        return self._network_key_seq
+        return self.state.network_information.network_key.seq
 
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
@@ -1279,15 +1280,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.load_network_info()
 
-        self._ieee = self._znp.network_info.ieee
-        self._nwk = self._znp.network_info.nwk
-        self._channel = self._znp.network_info.channel
-        self._channels = self._znp.network_info.channels
-        self._pan_id = self._znp.network_info.pan_id
-        self._ext_pan_id = self._znp.network_info.extended_pan_id
-        self._nwk_update_id = self._znp.network_info.nwk_update_id
-        self._network_key = self._znp.network_info.network_key
-        self._network_key_seq = self._znp.network_info.network_key_seq
+        self.ieee = self._znp.network_info.ieee
+        self.nwk = self._znp.network_info.nwk
+        self.state.network_information.channel = self._znp.network_info.channel
+        self.state.network_information.channel_mask = self._znp.network_info.channels
+        self.state.network_information.pan_id = self._znp.network_info.pan_id
+        self.state.network_information.extended_pan_id = (
+            self._znp.network_info.extended_pan_id
+        )
+        self.state.network_information.nwk_update_id = (
+            self._znp.network_info.nwk_update_id
+        )
+        nwk_key = zigpy.state.Key(
+            key=self._znp.network_info.network_key,
+            seq=self._znp.network_info.network_key_seq,
+        )
+        self.state.network_information.network_key = nwk_key
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
