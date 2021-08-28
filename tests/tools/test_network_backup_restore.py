@@ -235,7 +235,7 @@ async def test_network_restore(device, make_znp_server, backup_json, tmp_path, m
         ControllerApplication, "startup", side_effect=mock_startup, autospec=True
     )
 
-    def mock_load_network_info(self, *args, **kwargs):
+    async def mock_load_network_info(self, *args, **kwargs):
         self.network_info = BARE_NETWORK_INFO
         self.node_info = BARE_NODE_INFO
 
