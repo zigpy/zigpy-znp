@@ -7,7 +7,9 @@ import itertools
 import contextlib
 from collections import Counter, defaultdict
 
+import zigpy.state
 import async_timeout
+import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -21,8 +23,8 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.znp.utils import NetworkInfo, load_network_info, detect_zstack_version
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
 AFTER_CONNECT_DELAY = 1  # seconds
@@ -42,14 +44,126 @@ class ZNP:
         self.version = None
 
         self.nvram = NVRAMHelper(self)
-        self.network_info: NetworkInfo = None
+        self.network_info: zigpy.state.NetworkInformation = None
+        self.node_info: zigpy.state.NodeInfo = None
 
     def set_application(self, app):
         assert self._app is None
         self._app = app
 
-    async def load_network_info(self):
-        self.network_info = await load_network_info(self)
+    async def detect_zstack_version(self) -> float:
+        """
+        Feature detects the major version of Z-Stack running on the device.
+        """
+
+        # Z-Stack 1.2 does not have the AppConfig subsystem
+        if not self.capabilities & t.MTCapabilities.APP_CNF:
+            return 1.2
+
+        try:
+            # Only Z-Stack 3.30+ has the new NVRAM system
+            await self.nvram.read(
+                item_id=ExNvIds.TCLK_TABLE,
+                sub_id=0x0000,
+                item_type=t.Bytes,
+            )
+            return 3.30
+        except KeyError:
+            return 3.30
+        except CommandNotRecognized:
+            return 3.0
+
+    async def load_network_info(self, *, load_keys=False):
+        """
+        Loads low-level network information from NVRAM.
+        Loading key data greatly increases the runtime so it not enabled by default.
+        """
+
+        from zigpy_znp.znp import security
+
+        is_on_network = None
+        nib = None
+
+        try:
+            nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
+            is_on_network = nib.nwkLogicalChannel != 0 and nib.nwkKeyLoaded
+        except KeyError:
+            is_on_network = False
+        else:
+            if is_on_network and self.version >= 3.0:
+                # This NVRAM item is the very first thing initialized in `zgInit`
+                is_on_network = (
+                    await self.nvram.osal_read(
+                        OsalNvIds.BDBNODEISONANETWORK, item_type=t.uint8_t
+                    )
+                    == 1
+                )
+
+        if not is_on_network:
+            raise ValueError("Device is not a part of a network")
+
+        key_desc = await self.nvram.osal_read(
+            OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
+        )
+
+        tclk_seed = None
+
+        if self.version > 1.2:
+            tclk_seed = await self.nvram.osal_read(
+                OsalNvIds.TCLK_SEED, item_type=t.KeyData
+            )
+
+        tc_frame_counter = await security.read_tc_frame_counter(
+            self, ext_pan_id=nib.extendedPANID
+        )
+
+        network_info = zigpy.state.NetworkInformation(
+            extended_pan_id=nib.extendedPANID,
+            pan_id=nib.nwkPanId,
+            nwk_update_id=nib.nwkUpdateId,
+            channel=nib.nwkLogicalChannel,
+            channel_mask=nib.channelList,
+            security_level=nib.SecurityLevel,
+            network_key=zigpy.state.Key(
+                key=key_desc.Key,
+                seq=key_desc.KeySeqNum,
+                tx_counter=tc_frame_counter,
+                rx_counter=None,
+                partner_ieee=None,
+            ),
+            tc_link_key=None,
+            key_table=[],
+            stack_specific={
+                "TCLK_SEED": tclk_seed,
+            },
+        )
+
+        # This takes a few seconds
+        if load_keys:
+            for device in await security.read_devices(self):
+                network_info.key_table.append(
+                    zigpy.state.Key(
+                        key=device.aps_link_key,
+                        seq=0,
+                        tx_counter=device.tx_counter,
+                        rx_counter=device.rx_counter,
+                        partner_ieee=device.ieee,
+                    )
+                )
+
+        ieee = await self.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
+        logical_type = await self.nvram.osal_read(
+            OsalNvIds.LOGICAL_TYPE, item_type=t.DeviceLogicalType
+        )
+
+        node_info = zigpy.state.NodeInfo(
+            ieee=ieee,
+            nwk=nib.nwkDevAddress,
+            logical_type=zdo_t.LogicalType(logical_type),
+        )
+
+        self.network_info = network_info
+        self.node_info = node_info
 
     async def reset(self) -> None:
         """
@@ -117,7 +231,7 @@ class ZNP:
 
                 # We need to know how structs are packed to deserialize frames corectly
                 await self.nvram.determine_alignment()
-                self.version = await detect_zstack_version(self)
+                self.version = await self.detect_zstack_version()
 
                 LOGGER.debug("Detected Z-Stack %s", self.version)
         except (Exception, asyncio.CancelledError):

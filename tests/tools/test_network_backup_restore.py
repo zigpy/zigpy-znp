@@ -1,13 +1,14 @@
 import json
+import dataclasses
 
 import pytest
+import zigpy.state
 from jsonschema import ValidationError
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 from zigpy_znp.api import ZNP
 from zigpy_znp.znp import security
-from zigpy_znp.znp.utils import NetworkInfo
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import validate_backup_json
 from zigpy_znp.zigbee.application import ControllerApplication
@@ -26,17 +27,26 @@ from ..conftest import (
 )
 from ..application.test_startup import DEV_NETWORK_SETTINGS
 
-BARE_NETWORK_INFO = NetworkInfo(
+BARE_NETWORK_INFO = zigpy.state.NetworkInformation(
     extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
-    ieee=None,
-    nwk=None,
     channel=None,
-    channels=None,
+    channel_mask=None,
     pan_id=None,
     nwk_update_id=None,
     security_level=None,
-    network_key=None,
-    network_key_seq=None,
+    network_key=zigpy.state.Key(
+        key=None,
+        seq=None,
+        tx_counter=None,
+        rx_counter=None,
+        partner_ieee=None,
+    ),
+)
+
+BARE_NODE_INFO = zigpy.state.NodeInfo(
+    ieee=None,
+    nwk=None,
+    logical_type=None,
 )
 
 
@@ -225,9 +235,12 @@ async def test_network_restore(device, make_znp_server, backup_json, tmp_path, m
         ControllerApplication, "startup", side_effect=mock_startup, autospec=True
     )
 
-    load_nwk_info_mock = mocker.patch(
-        "zigpy_znp.api.load_network_info",
-        new=CoroutineMock(return_value=BARE_NETWORK_INFO),
+    def mock_load_network_info(self, *args, **kwargs):
+        self.network_info = BARE_NETWORK_INFO
+        self.node_info = BARE_NODE_INFO
+
+    load_nwk_info_mock = mocker.patch.object(
+        ZNP, "load_network_info", side_effect=mock_load_network_info, autospec=True
     )
 
     write_tc_counter_mock = mocker.patch(
@@ -312,6 +325,7 @@ async def test_tc_frame_counter_zstack1(make_connected_znp):
 async def test_tc_frame_counter_zstack30(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack3CC2531)
     znp.network_info = BARE_NETWORK_INFO
+    znp.node_info = BARE_NODE_INFO
     znp_server._nvram[ExNvIds.LEGACY] = {
         # This value is ignored
         OsalNvIds.NWKKEY: b"\x01" + b"\xAB" * 16 + b"\x78\x56\x34\x12",
@@ -330,8 +344,8 @@ async def test_tc_frame_counter_zstack30(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0x00000001
 
     # If we change the EPID, the generic entry will be used
-    znp.network_info = znp.network_info.replace(
-        extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
+    znp.network_info = dataclasses.replace(
+        znp.network_info, extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
     )
     assert (await security.read_tc_frame_counter(znp)) == 0x00000002
 
@@ -343,6 +357,7 @@ async def test_tc_frame_counter_zstack30(make_connected_znp):
 async def test_tc_frame_counter_zstack33(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseLaunchpadCC26X2R1)
     znp.network_info = BARE_NETWORK_INFO
+    znp.node_info = BARE_NODE_INFO
     znp_server._nvram = {
         ExNvIds.LEGACY: {
             # This value is ignored
@@ -362,8 +377,8 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0x00000002
 
     # If we change the EPID, the generic entry will be used. It doesn't exist.
-    znp.network_info = znp.network_info.replace(
-        extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
+    znp.network_info = dataclasses.replace(
+        znp.network_info, extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
     )
 
     with pytest.raises(ValueError):
