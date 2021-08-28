@@ -70,7 +70,10 @@ def iter_seed_candidates(
         yield count, tclk_seed
 
 
-async def read_tc_frame_counter(znp: ZNP) -> t.uint32_t:
+async def read_tc_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.uint32_t:
+    if ext_pan_id is None and znp.network_info is not None:
+        ext_pan_id = znp.network_info.extended_pan_id
+
     if znp.version == 1.2:
         key_info = await znp.nvram.osal_read(
             OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
@@ -93,7 +96,7 @@ async def read_tc_frame_counter(znp: ZNP) -> t.uint32_t:
         )
 
     async for entry in entries:
-        if entry.ExtendedPanID == znp.network_info.extended_pan_id:
+        if entry.ExtendedPanID == ext_pan_id:
             # Always prefer the entry for our current network
             return entry.FrameCounter
         elif entry.ExtendedPanID == t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):

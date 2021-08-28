@@ -1289,22 +1289,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.load_network_info()
 
-        self.ieee = self._znp.network_info.ieee
-        self.nwk = self._znp.network_info.nwk
-        self.state.network_information.channel = self._znp.network_info.channel
-        self.state.network_information.channel_mask = self._znp.network_info.channels
-        self.state.network_information.pan_id = self._znp.network_info.pan_id
-        self.state.network_information.extended_pan_id = (
-            self._znp.network_info.extended_pan_id
-        )
-        self.state.network_information.nwk_update_id = (
-            self._znp.network_info.nwk_update_id
-        )
-        nwk_key = zigpy.state.Key(
-            key=self._znp.network_info.network_key,
-            seq=self._znp.network_info.network_key_seq,
-        )
-        self.state.network_information.network_key = nwk_key
+        self.state.node_information = self._znp.node_info
+        self.state.network_information = self._znp.network_info
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """

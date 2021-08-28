@@ -9,9 +9,8 @@ import datetime
 import zigpy_znp
 import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
-from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
-from zigpy_znp.znp.security import read_devices, read_tc_frame_counter
+from zigpy_znp.znp.security import read_devices
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
@@ -56,26 +55,23 @@ async def backup_network(znp: ZNP) -> t.JSONType:
                 },
             },
         },
-        "coordinator_ieee": znp.network_info.ieee.serialize()[::-1].hex(),
+        "coordinator_ieee": znp.node_info.ieee.serialize()[::-1].hex(),
         "pan_id": znp.network_info.pan_id.serialize()[::-1].hex(),
         "extended_pan_id": znp.network_info.extended_pan_id.serialize()[::-1].hex(),
         "nwk_update_id": znp.network_info.nwk_update_id,
         "security_level": znp.network_info.security_level,
         "channel": znp.network_info.channel,
-        "channel_mask": list(znp.network_info.channels),
+        "channel_mask": list(znp.network_info.channel_mask),
         "network_key": {
-            "key": znp.network_info.network_key.serialize().hex(),
-            "sequence_number": znp.network_info.network_key_seq,
-            "frame_counter": await read_tc_frame_counter(znp),
+            "key": znp.network_info.network_key.key.serialize().hex(),
+            "sequence_number": znp.network_info.network_key.seq,
+            "frame_counter": znp.network_info.network_key.tx_counter,
         },
         "devices": devices,
     }
 
-    if znp.version > 1.2:
-        tclk_seed = await znp.nvram.osal_read(OsalNvIds.TCLK_SEED, item_type=t.Bytes)
-        LOGGER.info("TCLK seed: %s", tclk_seed.hex())
-
-        obj["stack_specific"] = {"zstack": {"tclk_seed": tclk_seed.hex()}}
+    if znp.network_info.stack_specific:
+        obj["stack_specific"] = znp.network_info.stack_specific
 
     # Ensure our generated backup is valid
     validate_backup_json(obj)
