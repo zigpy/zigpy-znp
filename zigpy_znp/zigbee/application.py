@@ -129,20 +129,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     # Implementation of the core zigpy ControllerApplication methods #
     ##################################################################
 
-    @property
-    def network_key(self) -> t.KeyData | None:
-        # This is not a standard Zigpy property
-        if self.state.network_information.network_key:
-            return self.state.network_information.network_key.key
-        return None
-
-    @property
-    def network_key_seq(self) -> t.uint8_t | None:
-        # This is not a standard Zigpy property
-        if self.state.network_information.network_key:
-            return self.state.network_information.network_key.seq
-        return None
-
     @classmethod
     async def probe(cls, device_config: conf.ConfigType) -> bool:
         """
@@ -334,10 +320,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.info("  Device IEEE: %s", self.ieee)
         LOGGER.info("  Device NWK: 0x%04X", self.nwk)
         LOGGER.debug(
-            "  Network key: %s", ":".join(f"{c:02x}" for c in self.network_key)
+            "  Network key: %s",
+            ":".join(
+                f"{c:02x}" for c in self.state.network_information.network_key.key
+            ),
         )
 
-        if self.network_key == Z2M_NETWORK_KEY:
+        if self.state.network_information.network_key.key == Z2M_NETWORK_KEY:
             LOGGER.warning(
                 "Your network is using the insecure Zigbee2MQTT network key!"
             )

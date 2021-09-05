@@ -71,8 +71,7 @@ async def test_info(
     assert app.extended_pan_id == t.EUI64.convert("ff:ff:ff:ff:ff:ff:ff:ff")
     assert app.channel is None
     assert app.channels is None
-    assert app.network_key is None
-    assert app.network_key_seq is None
+    assert app.state.network_information.network_key is None
 
     await app.startup(auto_form=False)
 
@@ -85,8 +84,8 @@ async def test_info(
     assert app.extended_pan_id == ext_pan_id
     assert app.channel == channel
     assert app.channels == channels
-    assert app.network_key == network_key
-    assert app.network_key_seq == 0
+    assert app.state.network_information.network_key.key == network_key
+    assert app.state.network_information.network_key.seq == 0
 
     assert app.zigpy_device.manufacturer == "Texas Instruments"
     assert app.zigpy_device.model == model
