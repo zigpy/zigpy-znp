@@ -66,6 +66,29 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
     await app.shutdown()
 
 
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_join_coordinator(device, make_application):
+    app, znp_server = make_application(server_cls=device)
+
+    # Handle us opening joins on the coordinator
+    permit_join_coordinator = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=60, partial=True
+        ),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+        ],
+    )
+
+    await app.startup(auto_form=False)
+    await app.permit(node=app.ieee)
+
+    await permit_join_coordinator
+
+    await app.shutdown()
+
+
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 @pytest.mark.parametrize("permit_result", [None, asyncio.TimeoutError()])
 async def test_permit_join_with_key(device, permit_result, make_application, mocker):

@@ -100,9 +100,7 @@ class ZNPCoordinator(zigpy.device.Device):
             model = "CC2538" if self.application._znp.nvram.align_structs else "CC2531"
             version = "Home 1.2" if self.application._znp.version == 1.2 else "3.0.x"
 
-        build = self.application._version_rsp.CodeRevision
-
-        return f"{model}, Z-Stack {version} (build {build})"
+        return f"{model}, Z-Stack {version} (build {self.application._zstack_build_id})"
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
@@ -328,7 +326,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.info("Network settings")
         LOGGER.info("  Model: %s", self.zigpy_device.model)
         LOGGER.info("  Z-Stack version: %s", self._znp.version)
-        LOGGER.info("  Z-Stack build id: %s", self._version_rsp.CodeRevision)
+        LOGGER.info("  Z-Stack build id: %s", self._zstack_build_id)
         LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
         LOGGER.info("  Channel: %s", self.channel)
         LOGGER.info("  PAN ID: 0x%04X", self.pan_id)
@@ -704,10 +702,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # If joins were permitted through a specific router, older Z-Stack builds
         # did not allow the key to be distributed unless the coordinator itself was
-        # also permitting joins.
+        # also permitting joins. This also needs to happen if we're permitting joins
+        # through the coordinator itself.
         #
         # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
-        if time_s == 0 or self._version_rsp.CodeRevision < 20210708:
+        if time_s == 0 or self._zstack_build_id < 20210708 or node == self.ieee:
             response = await self._znp.request_callback_rsp(
                 request=c.ZDO.MgmtPermitJoinReq.Req(
                     AddrMode=t.AddrMode.NWK,
@@ -978,6 +977,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ####################
     # Internal methods #
     ####################
+
+    @property
+    def _zstack_build_id(self) -> t.uint32_t:
+        """
+        Z-Stack build ID, more recently the build date.
+        """
+
+        return self._version_rsp.CodeRevision
 
     @property
     def zigpy_device(self) -> zigpy.device.Device:
