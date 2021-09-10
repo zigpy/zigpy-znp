@@ -102,8 +102,8 @@ USB-adapters, GPIO-modules, and development-boards flashed with TI's Z-Stack are
  - CC2652P/CC2652R/CC2652RB USB stick and dev board hardware
  - CC1352P/CC1352R USB stick and dev board hardware
  - CC2538 + CC2592 dev board hardware
- - CC2531 USB stick hardware
- - CC2530 + CC2591/CC2592 USB stick hardware
+ - CC2531 USB stick hardware (not recommended for Zigbee networks with more than 20 devices)
+ - CC2530 + CC2591/CC2592 USB stick hardware (not recommended for Zigbee networks with more than 20 devices)
 
 Tip! Adapters listed as "[Texas Instruments sticks compatible with Zigbee2MQTT](https://www.zigbee2mqtt.io/information/supported_adapters)" also works with zigpy-znp.
 
