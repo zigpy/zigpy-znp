@@ -86,10 +86,11 @@ class ZNP:
 
         try:
             nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
-            is_on_network = nib.nwkLogicalChannel != 0 and nib.nwkKeyLoaded
         except KeyError:
             is_on_network = False
         else:
+            is_on_network = nib.nwkLogicalChannel != 0 and nib.nwkKeyLoaded
+
             if is_on_network and self.version >= 3.0:
                 # This NVRAM item is the very first thing initialized in `zgInit`
                 is_on_network = (
@@ -133,10 +134,15 @@ class ZNP:
             ),
             tc_link_key=None,
             key_table=[],
-            stack_specific={
-                "TCLK_SEED": tclk_seed,
-            },
+            stack_specific=None,
         )
+
+        if tclk_seed is not None:
+            network_info.stack_specific = {
+                "zstack": {
+                    "tclk_seed": tclk_seed.serialize().hex(),
+                }
+            }
 
         # This takes a few seconds
         if load_keys:

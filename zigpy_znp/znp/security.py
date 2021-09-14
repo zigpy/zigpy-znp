@@ -25,6 +25,8 @@ class StoredDevice:
     tx_counter: t.uint32_t = None
     rx_counter: t.uint32_t = None
 
+    is_child: bool = False
+
     def replace(self, **kwargs) -> StoredDevice:
         return dataclasses.replace(self, **kwargs)
 
@@ -109,7 +111,9 @@ async def read_tc_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.ui
     return global_entry.FrameCounter
 
 
-async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t) -> None:
+async def write_tc_frame_counter(
+    znp: ZNP, counter: t.uint32_t, *, ext_pan_id: t.EUI64 = None
+) -> None:
     if znp.version == 1.2:
         key_info = await znp.nvram.osal_read(
             OsalNvIds.NWKKEY, item_type=t.NwkActiveKeyItems
@@ -120,9 +124,12 @@ async def write_tc_frame_counter(znp: ZNP, counter: t.uint32_t) -> None:
 
         return
 
+    if ext_pan_id is None:
+        ext_pan_id = znp.network_info.extended_pan_id
+
     entry = t.NwkSecMaterialDesc(
         FrameCounter=counter,
-        ExtendedPanID=znp.network_info.extended_pan_id,
+        ExtendedPanID=ext_pan_id,
     )
 
     fill_entry = t.NwkSecMaterialDesc(
@@ -274,6 +281,7 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             devices[entry.extAddr] = StoredDevice(
                 ieee=entry.extAddr,
                 nwk=entry.nwkAddr,
+                is_child=bool(entry.type & t.AddrMgrUserType.Assoc),
             )
         else:
             raise ValueError(f"Unexpected entry type: {entry.type}")
@@ -319,18 +327,22 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
 async def write_addr_manager_entries(
     znp: ZNP, devices: typing.Sequence[StoredDevice]
 ) -> None:
-    entries = [
-        t.AddrMgrEntry(
-            type=(
-                t.AddrMgrUserType.Security
-                if d.aps_link_key
-                else t.AddrMgrUserType.Assoc
-            ),
-            nwkAddr=d.nwk,
-            extAddr=d.ieee,
+    entries = []
+
+    for dev in devices:
+        entry = t.AddrMgrEntry(
+            type=t.AddrMgrUserType.Default,
+            nwkAddr=dev.nwk,
+            extAddr=dev.ieee,
         )
-        for d in devices
-    ]
+
+        if dev.aps_link_key:
+            entry.type |= t.AddrMgrUserType.Security
+
+        if dev.is_child:
+            entry.type |= t.AddrMgrUserType.Assoc
+
+        entries.append(entry)
 
     if znp.version >= 3.30:
         await znp.nvram.write_table(
@@ -436,19 +448,27 @@ async def write_devices(
     # Make sure the new table is the same size as the old table. Because this type is
     # prefixed by the number of entries, the trailing table bytes are not kept track of
     # but still necessary, as the table has a static maximum capacity.
-    old_link_key_table = await znp.nvram.osal_read(
-        OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
-    )
-    unpadded_link_key_table = znp.nvram.serialize(link_key_table)
-    new_link_key_table_value = unpadded_link_key_table.ljust(
-        len(old_link_key_table), b"\x00"
-    )
+    try:
+        old_link_key_table = await znp.nvram.osal_read(
+            OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
+        )
+    except KeyError:
+        old_link_key_table = None
+    else:
+        unpadded_link_key_table = znp.nvram.serialize(link_key_table)
+        new_link_key_table_value = unpadded_link_key_table.ljust(
+            len(old_link_key_table), b"\x00"
+        )
 
-    if len(new_link_key_table_value) > len(old_link_key_table):
-        raise RuntimeError("New link key table is larger than the current one")
+        if len(new_link_key_table_value) > len(old_link_key_table):
+            raise RuntimeError("New link key table is larger than the current one")
 
     # Postpone writes until all of the table entries have been created
     await write_addr_manager_entries(znp, devices)
+
+    if old_link_key_table is None:
+        return
+
     await znp.nvram.osal_write(OsalNvIds.APS_LINK_KEY_TABLE, new_link_key_table_value)
 
     tclk_fill_value = t.TCLKDevEntry(

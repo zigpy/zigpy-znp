@@ -393,15 +393,7 @@ class BaseZStackDevice(BaseServerZNP):
 
         return super().connection_lost(exc)
 
-    def _startup(self):
-        startup_option = self.nvram_deserialize(
-            self._nvram[ExNvIds.LEGACY].get(OsalNvIds.STARTUP_OPTION, b"\x00"),
-            t.StartupOptions,
-        )
-
-        if not startup_option & t.StartupOptions.ClearState:
-            return
-
+    def _create_network_nvram(self):
         self.nib = self._default_nib()
 
         empty_key = t.NwkActiveKeyItems(
@@ -663,10 +655,7 @@ class BaseZStackDevice(BaseServerZNP):
         self._nvram[ExNvIds.LEGACY][OsalNvIds.NIB] = self.nvram_serialize(nib)
 
     @reply_to(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
-    def reset_req(self, request, *, startup=True):
-        if startup:
-            self._startup()
-
+    def reset_req(self, request):
         version = self.version_replier(None)
 
         return c.SYS.ResetInd.Callback(
@@ -787,6 +776,8 @@ class BaseZStack1CC2531(BaseZStackDevice):
                 self.update_device_state(t.DeviceState.StartedAsCoordinator),
             ]
         else:
+            self._create_network_nvram()
+
             return [
                 c.ZDO.StartupFromApp.Rsp(State=c.zdo.StartupState.NewNetworkState),
                 self.update_device_state(t.DeviceState.StartingAsCoordinator),
@@ -913,6 +904,8 @@ class BaseZStack3Device(BaseZStackDevice):
                 ),
             ]
         else:
+            self._create_network_nvram()
+
             return [
                 c.AppConfig.BDBStartCommissioning.Rsp(Status=t.Status.SUCCESS),
                 self.update_device_state(t.DeviceState.StartingAsCoordinator),
@@ -956,9 +949,7 @@ class BaseZStack3Device(BaseZStackDevice):
         self._first_connection = False
 
         # Z-Stack 3 devices send a callback when they're first used
-        asyncio.get_running_loop().call_soon(
-            self.send, self.reset_req(None, startup=False)
-        )
+        asyncio.get_running_loop().call_soon(self.send, self.reset_req(None))
 
 
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):
@@ -1113,6 +1104,21 @@ class BaseZStack3CC2531(BaseZStack3Device):
     @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
         return req.Rsp(Status=t.Status.SUCCESS)
+
+    @reply_to(
+        c.AppConfig.BDBStartCommissioning.Req(
+            Mode=c.app_config.BDBCommissioningMode.NwkFormation
+        )
+    )
+    def handle_bdb_start_commissioning(self, request):
+        result = super().handle_bdb_start_commissioning(request)
+
+        # This item is only created after a network is formed
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.ADDRMGR] = 124 * self.nvram_serialize(
+            t.EMPTY_ADDR_MGR_ENTRY
+        )
+
+        return result
 
 
 class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
