@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+import random
 import asyncio
 import logging
 import itertools
@@ -16,6 +17,7 @@ import zigpy.device
 import async_timeout
 import zigpy.endpoint
 import zigpy.profiles
+import zigpy.zdo.types as zdo_t
 import zigpy.application
 import zigpy.zcl.foundation
 from zigpy.zcl import clusters
@@ -27,6 +29,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+from zigpy_znp.znp import security
 from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
@@ -209,9 +212,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             configured_value = await self._znp.nvram.osal_read(
                 configured_nv_item, item_type=t.uint8_t
             )
-            is_configured = configured_value == ZSTACK_CONFIGURE_SUCCESS
         except KeyError:
             is_configured = False
+        else:
+            is_configured = configured_value == ZSTACK_CONFIGURE_SUCCESS
 
         if force_form:
             LOGGER.info("Forming a new network")
@@ -248,7 +252,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
         )
 
-        # The AUTOSTART startup NV item doesn't do anything.
         if self._znp.version == 1.2:
             # Z-Stack Home 1.2 has a simple startup sequence
             await self._znp.request(
@@ -393,6 +396,154 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 "Requested TX power %d was adjusted to %d", dbm, rsp.StatusOrPower
             )
 
+    async def update_network_settings(self, *, network_info, node_info):
+        # The default NIB structure is identical for all Z-Stack versions
+        nib = t.NIB(
+            SequenceNum=0,
+            PassiveAckTimeout=5,
+            MaxBroadcastRetries=2,
+            MaxChildren=0,
+            MaxDepth=20,
+            MaxRouters=0,
+            dummyNeighborTable=0,
+            BroadcastDeliveryTime=30,
+            ReportConstantCost=0,
+            RouteDiscRetries=0,
+            dummyRoutingTable=0,
+            SecureAllFrames=1,
+            SecurityLevel=5,
+            SymLink=1,
+            CapabilityFlags=143,
+            TransactionPersistenceTime=7,
+            nwkProtocolVersion=2,
+            RouteDiscoveryTime=5,
+            RouteExpiryTime=30,
+            nwkDevAddress=0xFFFE,
+            nwkLogicalChannel=0,
+            nwkCoordAddress=0xFFFE,
+            nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+            nwkPanId=0xFFFF,
+            nwkState=t.NwkState.NWK_INIT,
+            channelList=t.Channels.NO_CHANNELS,
+            beaconOrder=15,
+            superFrameOrder=15,
+            scanDuration=0,
+            battLifeExt=0,
+            allocatedRouterAddresses=0,
+            allocatedEndDeviceAddresses=0,
+            nodeDepth=0,
+            extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
+            nwkKeyLoaded=False,
+            spare1=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            ),
+            spare2=t.NwkKeyDesc(
+                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            ),
+            spare3=0,
+            spare4=0,
+            nwkLinkStatusPeriod=60,
+            nwkRouterAgeLimit=3,
+            nwkUseMultiCast=False,
+            nwkIsConcentrator=True,
+            nwkConcentratorDiscoveryTime=120,
+            nwkConcentratorRadius=10,
+            nwkAllFresh=1,
+            nwkManagerAddr=0x0000,
+            nwkTotalTransmissions=0,
+            nwkUpdateId=0,
+        )
+
+        nib.nwkDevAddress = node_info.nwk
+        nib.nwkPanId = network_info.pan_id
+        nib.extendedPANID = network_info.extended_pan_id
+        nib.nwkUpdateId = network_info.nwk_update_id
+        nib.nwkLogicalChannel = network_info.channel
+        nib.channelList = network_info.channel_mask
+        nib.SecurityLevel = network_info.security_level
+        nib.nwkManagerAddr = network_info.nwk_manager_id
+        nib.nwkState = t.NwkState.NWK_ROUTER
+        nib.nwkKeyLoaded = True
+        nib.nwkCoordAddress = 0x0000
+
+        nvram = {
+            OsalNvIds.NIB: nib,
+            OsalNvIds.EXTADDR: node_info.ieee,
+            OsalNvIds.APS_USE_EXT_PANID: network_info.extended_pan_id,
+            OsalNvIds.CHANLIST: network_info.channel_mask,
+            # XXX: Z2M requires this item to be False
+            OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),
+            OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType(node_info.logical_type),
+            OsalNvIds.NWK_ACTIVE_KEY_INFO: t.NwkKeyDesc(
+                Key=network_info.network_key.key,
+                KeySeqNum=network_info.network_key.seq,
+            ),
+        }
+
+        if self._znp.version == 1.2:
+            nvram[OsalNvIds.TCLK_SEED] = DEFAULT_TC_LINK_KEY
+            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK1] = ZSTACK_CONFIGURE_SUCCESS
+        else:
+            nvram[OsalNvIds.BDBNODEISONANETWORK] = t.Bool(True)
+            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK3] = ZSTACK_CONFIGURE_SUCCESS
+
+        tclk_seed = None
+
+        if (
+            network_info.stack_specific is not None
+            and "tclk_seed" in network_info.stack_specific.get("zstack", {})
+        ):
+            tclk_seed, _ = t.KeyData.deserialize(
+                bytes.fromhex(network_info.stack_specific["zstack"]["tclk_seed"])
+            )
+            nvram[OsalNvIds.TCLK_SEED] = tclk_seed
+
+        for key, value in nvram.items():
+            await self._znp.nvram.osal_write(key, value, create=True)
+
+        await security.write_tc_frame_counter(
+            self._znp,
+            network_info.network_key.tx_counter,
+            ext_pan_id=network_info.extended_pan_id,
+        )
+
+        devices = {}
+
+        for neighbor in network_info.neighbor_table or []:
+            devices[neighbor.ieee] = security.StoredDevice(
+                nwk=neighbor.nwk,
+                ieee=neighbor.ieee,
+                is_child=True,
+            )
+
+        for key in network_info.key_table or []:
+            devices[key.partner_ieee] = devices[key.partner_ieee].replace(
+                aps_link_key=key.key,
+                tx_counter=key.tx_counter,
+                rx_counter=key.rx_counter,
+            )
+
+        # ADDRMGR table is only created in Z-Stack 3.0 when a network is formed
+        if self._znp.version == 3.0:
+            await self._znp.request_callback_rsp(
+                request=c.AppConfig.BDBStartCommissioning.Req(
+                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True,
+                    RemainingModes=c.app_config.BDBCommissioningMode.NONE,
+                ),
+                timeout=NETWORK_COMMISSIONING_TIMEOUT,
+            )
+
+        await security.write_devices(
+            znp=self._znp,
+            devices=devices,
+            tclk_seed=tclk_seed,
+            counter_increment=0,
+        )
+
     async def form_network(self):
         """
         Clears the current config and forms a new network with a random network key,
@@ -407,13 +558,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         network_key = self.config[conf.CONF_NWK][conf.CONF_NWK_KEY]
 
         if pan_id is None:
-            # Let Z-Stack pick one at random, hopefully not conflicting with others
-            pan_id = t.uint16_t(0xFFFF)
+            pan_id = random.SystemRandom().randint(0x0000, 0xFFFE + 1)
 
         if extended_pan_id is None:
-            # It's not documented whether or not Z-Stack will pick this randomly as well
-            # if a value of 00:00:00:00:00:00:00:00 is provided but the chances of a
-            # collision using `os.urandom` are astronomically small
             extended_pan_id = ExtendedPanId(os.urandom(8))
 
         if network_key is None:
@@ -423,150 +570,37 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if channel is not None:
             channels = t.Channels.from_channel_list([channel])
 
-        # Delete any existing HAS_CONFIGURED_ZSTACK* NV items. One (or both) may fail.
-        await self._znp.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK1)
-        await self._znp.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK3)
-        await self._znp.nvram.osal_delete(OsalNvIds.BDBNODEISONANETWORK)
-
-        # Instruct Z-Stack to reset everything on the next boot
-        await self._znp.nvram.osal_write(
-            OsalNvIds.STARTUP_OPTION,
-            t.StartupOptions.ClearState | t.StartupOptions.ClearConfig,
+        network_info = zigpy.state.NetworkInformation(
+            extended_pan_id=extended_pan_id,
+            pan_id=pan_id,
+            nwk_update_id=self.config[conf.CONF_NWK][conf.CONF_NWK_UPDATE_ID],
+            nwk_manager_id=0x0000,
+            channel=channel,
+            channel_mask=channels,
+            security_level=5,
+            network_key=zigpy.state.Key(
+                key=network_key,
+                tx_counter=0,
+                rx_counter=0,
+                seq=0,
+                partner_ieee=None,
+            ),
+            tc_link_key=None,
+            key_table=None,
+            neighbor_table=None,
+            stack_specific=None,
         )
 
-        # And reset to clear everything
-        await self._znp.reset()
-
-        # Now that we've cleared everything, write back our Z-Stack settings
-        LOGGER.debug("Updating network settings")
+        node_info = zigpy.state.NodeInfo(
+            nwk=0x0000,
+            ieee=None,
+            logical_type=zdo_t.LogicalType.Coordinator,
+        )
 
         await self._write_stack_settings(reset_if_changed=False)
-
-        for item, value in {
-            # Ignore the user's PAN ID for now and just let Z-Stack pick one that works
-            OsalNvIds.PANID: t.uint16_t(0xFFFF),
-            OsalNvIds.APS_USE_EXT_PANID: extended_pan_id,
-            # XXX: Z2M incorrectly uses this NVRAM item, APS_USE_EXT_PANID is correct
-            OsalNvIds.EXTENDED_PAN_ID: extended_pan_id,
-            OsalNvIds.PRECFGKEY: network_key,
-            # XXX: Z2M requires this item to be False
-            OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),
-            OsalNvIds.CHANLIST: channels,
-        }.items():
-            await self._znp.nvram.osal_write(item, value, create=True)
-
-        # Z-Stack Home 1.2 doesn't have the BDB subsystem
-        if self._znp.version > 1.2:
-            await self._znp.request(
-                c.AppConfig.BDBSetChannel.Req(IsPrimary=True, Channel=channels),
-                RspStatus=t.Status.SUCCESS,
-            )
-            await self._znp.request(
-                c.AppConfig.BDBSetChannel.Req(
-                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-
-        # Finally, form the network
-        LOGGER.debug("Forming the network")
-
-        started_as_coordinator = self._znp.wait_for_response(
-            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
+        await self.update_network_settings(
+            network_info=network_info, node_info=node_info
         )
-
-        # Handle the startup progress messages
-        async with self._znp.capture_responses(
-            [
-                c.ZDO.StateChangeInd.Callback(
-                    State=t.DeviceState.StartingAsCoordinator
-                ),
-                c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True,
-                    Status=c.app_config.BDBCommissioningStatus.InProgress,
-                ),
-            ]
-        ):
-            try:
-                if self._znp.version > 1.2:
-                    # Z-Stack 3 uses the BDB subsystem
-                    commissioning_rsp = await self._znp.request_callback_rsp(
-                        request=c.AppConfig.BDBStartCommissioning.Req(
-                            Mode=c.app_config.BDBCommissioningMode.NwkFormation
-                        ),
-                        RspStatus=t.Status.SUCCESS,
-                        callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                            partial=True,
-                            RemainingModes=c.app_config.BDBCommissioningMode.NONE,
-                        ),
-                        timeout=NETWORK_COMMISSIONING_TIMEOUT,
-                    )
-
-                    if (
-                        commissioning_rsp.Status
-                        != c.app_config.BDBCommissioningStatus.Success
-                    ):
-                        raise RuntimeError(
-                            f"Network formation failed: {commissioning_rsp}"
-                        )
-                else:
-                    await self._znp.nvram.osal_write(
-                        OsalNvIds.TCLK_SEED,
-                        value=DEFAULT_TC_LINK_KEY,
-                        create=True,
-                    )
-
-                    # In Z-Stack 1.2.2, StartupFromApp actually does what it says
-                    await self._znp.request(
-                        c.ZDO.StartupFromApp.Req(StartDelay=100),
-                        RspState=c.zdo.StartupState.NewNetworkState,
-                    )
-
-                # Both versions still end with this callback
-                await started_as_coordinator
-            except asyncio.TimeoutError as e:
-                raise RuntimeError(
-                    "Network formation refused, RF environment is likely too noisy."
-                    " Temporarily unscrew the antenna or shield the coordinator"
-                    " with metal until a network is formed."
-                ) from e
-
-        LOGGER.debug("Waiting for the NIB to be populated")
-
-        # Even though the device says it is "ready" at this point, it takes a few more
-        # seconds for `_NIB.nwkState` to switch from `NwkState.NWK_INIT`. There does
-        # not appear to be any user-facing MT command to read this information.
-        while True:
-            try:
-                nib = await self._znp.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
-
-                LOGGER.debug("Current NIB is %s", nib)
-
-                # Usually this works after the first attempt
-                if nib.nwkLogicalChannel != 0 and nib.nwkPanId != 0xFFFE:
-                    break
-            except KeyError:
-                pass
-
-            await asyncio.sleep(1)
-
-        if pan_id != 0xFFFF:
-            # Update the PAN ID at runtime after the network has formed to make sure
-            # Z-Stack does not complain about collisions on Z-Stack 3.
-            await self.update_pan_id(pan_id)
-
-        # Create the NV item that keeps track of whether or not we're fully configured.
-        if self._znp.version == 1.2:
-            configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK1
-        else:
-            configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK3
-
-        await self._znp.nvram.osal_write(
-            configured_nv_item, ZSTACK_CONFIGURE_SUCCESS, create=True
-        )
-
-        # Finally, reset once more to reset the device back to a "normal" state so that
-        # we can continue the normal application startup sequence.
         await self._znp.reset()
 
     def get_dst_address(self, cluster):

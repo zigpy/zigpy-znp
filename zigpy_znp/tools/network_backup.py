@@ -70,8 +70,12 @@ async def backup_network(znp: ZNP) -> t.JSONType:
         "devices": devices,
     }
 
-    if znp.network_info.stack_specific:
-        obj["stack_specific"] = znp.network_info.stack_specific
+    if znp.network_info.stack_specific.get("zstack", {}).get("tclk_seed"):
+        obj["stack_specific"] = {
+            "zstack": {
+                "tclk_seed": znp.network_info.stack_specific["zstack"]["tclk_seed"]
+            }
+        }
 
     # Ensure our generated backup is valid
     validate_backup_json(obj)
