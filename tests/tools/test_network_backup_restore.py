@@ -6,12 +6,9 @@ import zigpy.state
 from jsonschema import ValidationError
 
 import zigpy_znp.types as t
-import zigpy_znp.config as conf
-from zigpy_znp.api import ZNP
 from zigpy_znp.znp import security
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import validate_backup_json
-from zigpy_znp.zigbee.application import ControllerApplication
 from zigpy_znp.tools.network_backup import main as network_backup
 from zigpy_znp.tools.network_restore import main as network_restore
 
@@ -19,7 +16,6 @@ from ..conftest import (
     ALL_DEVICES,
     EMPTY_DEVICES,
     FORMED_DEVICES,
-    CoroutineMock,
     BaseZStack1CC2531,
     BaseZStack3CC2531,
     FormedZStack1CC2531,
@@ -177,135 +173,41 @@ async def test_network_backup_formed(device, make_znp_server, tmp_path):
     assert len(backup["devices"]) > 1
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
+@pytest.mark.parametrize("device", ALL_DEVICES)
 @pytest.mark.asyncio
-async def test_network_restore_full(
-    device, make_znp_server, backup_json, tmp_path, mocker
+async def test_network_restore_and_backup(
+    device, make_znp_server, backup_json, tmp_path
 ):
     backup_file = tmp_path / "backup.json"
     backup_file.write_text(json.dumps(backup_json))
 
     znp_server = make_znp_server(server_cls=device)
 
-    # Perform the "restore"
+    # Restore our backup on top of an existing network (or onto an empty device)
     await network_restore([znp_server._port_path, "-i", str(backup_file), "-c", "2500"])
 
+    # And then back that restored device up
+    backup_file2 = tmp_path / "backup2.json"
+    await network_backup([znp_server._port_path, "-o", str(backup_file2)])
 
-@pytest.mark.parametrize("device", ALL_DEVICES)
-@pytest.mark.asyncio
-async def test_network_restore(device, make_znp_server, backup_json, tmp_path, mocker):
-    backup_file = tmp_path / "backup.json"
-    backup_file.write_text(json.dumps(backup_json))
+    backup_json2 = json.loads(backup_file2.read_text())
 
-    znp_server = make_znp_server(server_cls=device)
-
-    async def mock_startup(self, *, force_form):
-        assert force_form
-
-        config = self.config[conf.CONF_NWK]
-
-        assert config[conf.CONF_NWK_KEY] == t.KeyData(
-            bytes.fromhex("37668fd64e35e03342e5ef9f35ccf4ab")
-        )
-        assert config[conf.CONF_NWK_PAN_ID] == 0xFEED
-        assert config[conf.CONF_NWK_CHANNEL] == 25
-        assert config[conf.CONF_NWK_EXTENDED_PAN_ID] == t.EUI64.convert(
-            "ab:de:fa:bc:de:fa:bc:de"
-        )
-
-        znp = ZNP(self.config)
-        await znp.connect()
-
-        if OsalNvIds.APS_LINK_KEY_TABLE not in znp_server._nvram[ExNvIds.LEGACY]:
-            znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = (
-                b"\x00" * 1000
-            )
-
-        if OsalNvIds.NIB not in znp_server._nvram[ExNvIds.LEGACY]:
-            znp_server._nvram[ExNvIds.LEGACY][
-                OsalNvIds.NIB
-            ] = znp_server.nvram_serialize(znp_server._default_nib())
-
-        self._znp = znp
-        self._znp.set_application(self)
-
-        self._bind_callbacks()
-
-    startup_mock = mocker.patch.object(
-        ControllerApplication, "startup", side_effect=mock_startup, autospec=True
-    )
-
-    async def mock_load_network_info(self, *args, **kwargs):
-        self.network_info = BARE_NETWORK_INFO
-        self.node_info = BARE_NODE_INFO
-
-    load_nwk_info_mock = mocker.patch.object(
-        ZNP, "load_network_info", side_effect=mock_load_network_info, autospec=True
-    )
-
-    write_tc_counter_mock = mocker.patch(
-        "zigpy_znp.tools.network_restore.write_tc_frame_counter", new=CoroutineMock()
-    )
-    write_devices_mock = mocker.patch(
-        "zigpy_znp.tools.network_restore.write_devices", new=CoroutineMock()
-    )
-
-    # Perform the "restore"
-    await network_restore([znp_server._port_path, "-i", str(backup_file), "-c", "2500"])
-
-    # The NIB should contain correct values
-    nib = znp_server.nvram_deserialize(
-        znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.NIB], t.NIB
-    )
-    assert nib.channelList == t.Channels.from_channel_list([15, 20, 25])
-    assert nib.nwkUpdateId == 2
-    assert nib.SecurityLevel == 5
-
-    # And validate that the low-level functions were called appropriately
-    assert startup_mock.call_count == 1
-    assert startup_mock.mock_calls[0][2]["force_form"] is True
-
-    assert load_nwk_info_mock.call_count == 1
-
-    assert write_tc_counter_mock.call_count == 1
-    assert write_tc_counter_mock.mock_calls[0][1][1] == 66781 + 2500
-
-    assert write_devices_mock.call_count == 1
-    write_devices_call = write_devices_mock.mock_calls[0]
-
-    assert write_devices_call[2]["counter_increment"] == 2500
+    # Fix up some inconsequential metadata
+    backup_json2["metadata"]["internal"] = backup_json["metadata"]["internal"]
+    backup_json2["metadata"]["source"] = backup_json["metadata"]["source"]
+    backup_json2["network_key"]["frame_counter"] -= 2500
 
     if issubclass(device, BaseZStack1CC2531):
-        assert write_devices_call[2]["tclk_seed"] is None
-    else:
-        assert write_devices_call[2]["tclk_seed"] == bytes.fromhex(
-            "c04884427c8a1ed7bb8412815ccce7aa"
-        )
+        del backup_json["stack_specific"]["zstack"]["tclk_seed"]
 
-    assert sorted(write_devices_call[1][1], key=lambda d: d.nwk) == [
-        security.StoredDevice(
-            ieee=t.EUI64.convert("00:0b:57:ff:fe:38:b2:12"),
-            nwk=0x9672,
-            aps_link_key=t.KeyData.deserialize(
-                bytes.fromhex("d2fabcbc83dd15d7a9362a7fa39becaa")
-            )[0],
-            rx_counter=123,
-            tx_counter=456,
-        ),
-        security.StoredDevice(
-            ieee=t.EUI64.convert("aa:bb:cc:dd:ee:ff:00:11"),
-            nwk=0xABCD,
-            aps_link_key=t.KeyData.deserialize(
-                bytes.fromhex("01234567801234567801234567801234")
-            )[0],
-            rx_counter=112233,
-            tx_counter=445566,
-        ),
-        security.StoredDevice(
-            ieee=t.EUI64.convert("00:0b:57:ff:fe:36:b9:a0"),
-            nwk=0xF319,
-        ),
-    ]
+        if not backup_json["stack_specific"]["zstack"]:
+            del backup_json["stack_specific"]
+
+        for device in backup_json["devices"]:
+            if "link_key" in device:
+                del device["link_key"]
+
+    assert backup_json == backup_json2
 
 
 @pytest.mark.asyncio

@@ -394,3 +394,9 @@ class ClusterIdList(basic.LVList, item_type=ClusterId, length_type=basic.uint8_t
 
 class NWKList(basic.LVList, item_type=NWK, length_type=basic.uint8_t):
     pass
+
+
+class NwkMode(basic.enum_uint8):
+    Star = 0
+    Tree = 1
+    Mesh = 2

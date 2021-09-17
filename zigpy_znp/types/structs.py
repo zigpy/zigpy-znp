@@ -1,5 +1,3 @@
-import zigpy_znp.types as t
-
 from . import basic, named, cstruct
 
 
@@ -191,13 +189,6 @@ class AddrMgrEntry(cstruct.CStruct):
     type: AddrMgrUserType
     nwkAddr: named.NWK
     extAddr: named.EUI64
-
-
-EMPTY_ADDR_MGR_ENTRY = AddrMgrEntry(
-    type=AddrMgrUserType(0xFF),
-    nwkAddr=0xFFFF,
-    extAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
-)
 
 
 class AddressManagerTable(basic.CompleteList, item_type=AddrMgrEntry):
