@@ -4,12 +4,12 @@ import typing
 import logging
 import dataclasses
 
+import zigpy.state
+
+import zigpy_znp.const as const
 import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
-from zigpy_znp.exceptions import SecurityError
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
-
-KeyInfo = typing.Tuple[t.EUI64, t.uint32_t, t.uint32_t, t.KeyData]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,6 @@ class StoredDevice:
     ieee: t.EUI64
     nwk: t.NWK
 
-    hashed_link_key_shift: t.uint8_t = None
     aps_link_key: t.KeyData = None
 
     tx_counter: t.uint32_t = None
@@ -173,7 +172,9 @@ async def read_addr_mgr_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]:
     return entries
 
 
-async def read_hashed_link_keys(znp: ZNP, tclk_seed: bytes) -> typing.Iterable[KeyInfo]:
+async def read_hashed_link_keys(
+    znp: ZNP, tclk_seed: bytes
+) -> typing.Iterable[zigpy.state.Key]:
     if znp.version >= 3.30:
         entries = znp.nvram.read_table(
             item_id=ExNvIds.TCLK_TABLE,
@@ -194,36 +195,35 @@ async def read_hashed_link_keys(znp: ZNP, tclk_seed: bytes) -> typing.Iterable[K
         # assert entry.keyType == t.KeyType.NWK
         # assert entry.keyType == t.KeyType.NONE
 
-        yield (
-            entry.extAddr,
-            entry.txFrmCntr,
-            entry.rxFrmCntr,
-            compute_key(entry.extAddr, tclk_seed, entry.SeedShift_IcIndex),
+        yield zigpy.state.Key(
+            key=compute_key(entry.extAddr, tclk_seed, entry.SeedShift_IcIndex),
+            tx_counter=entry.txFrmCntr,
+            rx_counter=entry.rxFrmCntr,
+            partner_ieee=entry.extAddr,
+            seq=0,
         )
 
 
 async def read_unhashed_link_keys(
     znp: ZNP, addr_mgr_entries: typing.Sequence[t.AddrMgrEntry]
-) -> typing.Iterable[KeyInfo]:
+) -> typing.Iterable[zigpy.state.Key]:
     if znp.version == 3.30:
         link_key_offset_base = 0x0000
         table = znp.nvram.read_table(
             item_id=ExNvIds.APS_KEY_DATA_TABLE,
             item_type=t.APSKeyDataTableEntry,
         )
-    else:
+    elif znp.version == 3.0:
         link_key_offset_base = OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START
         table = znp.nvram.osal_read_table(
             start_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START,
             end_nvid=OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END,
             item_type=t.APSKeyDataTableEntry,
         )
-
-    try:
-        aps_key_data_table = [entry async for entry in table]
-    except SecurityError:
-        # CC2531 with Z-Stack Home 1.2 just doesn't let you read this data out
+    else:
         return
+
+    aps_key_data_table = [entry async for entry in table]
 
     # The link key table's size is dynamic so it has junk at the end
     link_key_table_raw = await znp.nvram.osal_read(
@@ -244,11 +244,12 @@ async def read_unhashed_link_keys(
 
         assert addr_mgr_entry.type & t.AddrMgrUserType.Security
 
-        yield (
-            addr_mgr_entry.extAddr,
-            key_table_entry.TxFrameCounter,
-            key_table_entry.RxFrameCounter,
-            key_table_entry.Key,
+        yield zigpy.state.Key(
+            partner_ieee=addr_mgr_entry.extAddr,
+            key=key_table_entry.Key,
+            tx_counter=key_table_entry.TxFrameCounter,
+            rx_counter=key_table_entry.RxFrameCounter,
+            seq=0,
         )
 
 
@@ -286,39 +287,38 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
         else:
             raise ValueError(f"Unexpected entry type: {entry.type}")
 
-    async for ieee, tx_ctr, rx_ctr, key in read_hashed_link_keys(znp, tclk_seed):
-        if ieee not in devices:
+    async for key in read_hashed_link_keys(znp, tclk_seed):
+        if key.partner_ieee not in devices:
             LOGGER.warning(
                 "Skipping hashed link key %s (tx: %s, rx: %s) for unknown device %s",
-                ":".join(f"{b:02x}" for b in key),
-                tx_ctr,
-                rx_ctr,
-                ieee,
+                ":".join(f"{b:02x}" for b in key.key),
+                key.tx_counter,
+                key.rx_counter,
+                key.partner_ieee,
             )
             continue
 
-        devices[ieee] = devices[ieee].replace(
-            tx_counter=tx_ctr,
-            rx_counter=rx_ctr,
-            aps_link_key=key,
-            hashed_link_key_shift=find_key_shift(ieee, key, tclk_seed),
+        devices[key.partner_ieee] = devices[key.partner_ieee].replace(
+            tx_counter=key.tx_counter,
+            rx_counter=key.rx_counter,
+            aps_link_key=key.key,
         )
 
-    async for ieee, tx_ctr, rx_ctr, key in read_unhashed_link_keys(znp, addr_mgr):
-        if ieee not in devices:
+    async for key in read_unhashed_link_keys(znp, addr_mgr):
+        if key.partner_ieee not in devices:
             LOGGER.warning(
                 "Skipping unhashed link key %s (tx: %s, rx: %s) for unknown device %s",
-                ":".join(f"{b:02x}" for b in key),
-                tx_ctr,
-                rx_ctr,
-                ieee,
+                ":".join(f"{b:02x}" for b in key.key),
+                key.tx_counter,
+                key.rx_counter,
+                key.partner_ieee,
             )
             continue
 
-        devices[ieee] = devices[ieee].replace(
-            tx_counter=tx_ctr,
-            rx_counter=rx_ctr,
-            aps_link_key=key,
+        devices[key.partner_ieee] = devices[key.partner_ieee].replace(
+            tx_counter=key.tx_counter,
+            rx_counter=key.rx_counter,
+            aps_link_key=key.key,
         )
 
     return list(devices.values())
@@ -348,7 +348,7 @@ async def write_addr_manager_entries(
         await znp.nvram.write_table(
             item_id=ExNvIds.ADDRMGR,
             values=entries,
-            fill_value=t.EMPTY_ADDR_MGR_ENTRY,
+            fill_value=const.EMPTY_ADDR_MGR_ENTRY,
         )
         return
 
@@ -357,7 +357,7 @@ async def write_addr_manager_entries(
     old_entries = await znp.nvram.osal_read(
         OsalNvIds.ADDRMGR, item_type=t.AddressManagerTable
     )
-    new_entries = len(old_entries) * [t.EMPTY_ADDR_MGR_ENTRY]
+    new_entries = len(old_entries) * [const.EMPTY_ADDR_MGR_ENTRY]
 
     # Purposefully throw an `IndexError` if we are trying to write too many entries
     for index, entry in enumerate(entries):

@@ -16,6 +16,7 @@ except ImportError:
 import zigpy.endpoint
 import zigpy.zdo.types as zdo_t
 
+import zigpy_znp.const as const
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
@@ -404,16 +405,11 @@ class BaseZStackDevice(BaseServerZNP):
             FrameCounter=0,
         )
 
-        self._nvram[ExNvIds.LEGACY][OsalNvIds.STARTUP_OPTION] = self.nvram_serialize(
-            t.StartupOptions.NONE
-        )
-        self._nvram[ExNvIds.LEGACY][OsalNvIds.NWKKEY] = self.nvram_serialize(empty_key)
-        self._nvram[ExNvIds.LEGACY][
-            OsalNvIds.NWK_ACTIVE_KEY_INFO
-        ] = self.nvram_serialize(empty_key.Active)
-        self._nvram[ExNvIds.LEGACY][
-            OsalNvIds.NWK_ALTERN_KEY_INFO
-        ] = self.nvram_serialize(empty_key.Active)
+        legacy = self._nvram[ExNvIds.LEGACY]
+        legacy[OsalNvIds.STARTUP_OPTION] = self.nvram_serialize(t.StartupOptions.NONE)
+        legacy[OsalNvIds.NWKKEY] = self.nvram_serialize(empty_key)
+        legacy[OsalNvIds.NWK_ACTIVE_KEY_INFO] = self.nvram_serialize(empty_key.Active)
+        legacy[OsalNvIds.NWK_ALTERN_KEY_INFO] = self.nvram_serialize(empty_key.Active)
 
     def update_device_state(self, state):
         self.device_state = state
@@ -426,7 +422,7 @@ class BaseZStackDevice(BaseServerZNP):
         nib.channelList, _ = t.Channels.deserialize(
             self._nvram[ExNvIds.LEGACY][OsalNvIds.CHANLIST]
         )
-        nib.nwkLogicalChannel = list(nib.channelList)[0]
+        nib.nwkLogicalChannel = (list(nib.channelList) + [11])[0]
 
         if OsalNvIds.APS_USE_EXT_PANID in self._nvram[ExNvIds.LEGACY]:
             epid = self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_USE_EXT_PANID]
@@ -459,61 +455,7 @@ class BaseZStackDevice(BaseServerZNP):
         self._nvram[ExNvIds.LEGACY][OsalNvIds.NWKKEY] = self.nvram_serialize(key_info)
 
     def _default_nib(self):
-        return t.NIB(
-            SequenceNum=0,
-            PassiveAckTimeout=5,
-            MaxBroadcastRetries=2,
-            MaxChildren=0,
-            MaxDepth=20,
-            MaxRouters=0,
-            dummyNeighborTable=0,
-            BroadcastDeliveryTime=30,
-            ReportConstantCost=0,
-            RouteDiscRetries=0,
-            dummyRoutingTable=0,
-            SecureAllFrames=1,
-            SecurityLevel=5,
-            SymLink=1,
-            CapabilityFlags=143,
-            TransactionPersistenceTime=7,
-            nwkProtocolVersion=2,
-            RouteDiscoveryTime=5,
-            RouteExpiryTime=30,
-            nwkDevAddress=0xFFFE,
-            nwkLogicalChannel=0,
-            nwkCoordAddress=0xFFFE,
-            nwkCoordExtAddress=t.EUI64.convert("00:00:00:00:00:00:00:00"),
-            nwkPanId=0xFFFF,
-            nwkState=t.NwkState.NWK_INIT,
-            channelList=t.Channels.NO_CHANNELS,
-            beaconOrder=15,
-            superFrameOrder=15,
-            scanDuration=0,
-            battLifeExt=0,
-            allocatedRouterAddresses=0,
-            allocatedEndDeviceAddresses=0,
-            nodeDepth=0,
-            extendedPANID=t.EUI64.convert("00:00:00:00:00:00:00:00"),
-            nwkKeyLoaded=t.Bool.false,
-            spare1=t.NwkKeyDesc(
-                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            ),
-            spare2=t.NwkKeyDesc(
-                KeySeqNum=0, Key=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            ),
-            spare3=0,
-            spare4=0,
-            nwkLinkStatusPeriod=60,
-            nwkRouterAgeLimit=3,
-            nwkUseMultiCast=t.Bool.false,
-            nwkIsConcentrator=t.Bool.true,
-            nwkConcentratorDiscoveryTime=120,
-            nwkConcentratorRadius=10,
-            nwkAllFresh=1,
-            nwkManagerAddr=0x0000,
-            nwkTotalTransmissions=0,
-            nwkUpdateId=0,
-        )
+        return const.DEFAULT_NIB.replace()
 
     @reply_to(c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
     def active_endpoints_request(self, req):
@@ -898,7 +840,7 @@ class BaseZStack3Device(BaseZStackDevice):
                     RemainingModes=c.app_config.BDBCommissioningMode.NwkFormation,
                 ),
                 c.AppConfig.BDBCommissioningNotification.Callback(
-                    Status=c.app_config.BDBCommissioningStatus.FormationFailure,
+                    Status=c.app_config.BDBCommissioningStatus.Success,
                     Mode=c.app_config.BDBCommissioningMode.NwkFormation,
                     RemainingModes=c.app_config.BDBCommissioningMode.NONE,
                 ),
@@ -956,6 +898,14 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
     version = 3.30
     align_structs = True
     code_revision = 20200805
+
+    def _create_network_nvram(self):
+        super()._create_network_nvram()
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xFF" * 20
+        self._nvram[ExNvIds.ADDRMGR] = {
+            addr: self.nvram_serialize(const.EMPTY_ADDR_MGR_ENTRY)
+            for addr in range(0x0000, 0x0100 + 1)
+        }
 
     def create_nib(self, _=None):
         super().create_nib()
@@ -1065,6 +1015,13 @@ class BaseZStack3CC2531(BaseZStack3Device):
     align_structs = False
     code_revision = 20190425
 
+    def _create_network_nvram(self):
+        super()._create_network_nvram()
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xFF" * 17
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.ADDRMGR] = 124 * self.nvram_serialize(
+            const.EMPTY_ADDR_MGR_ENTRY
+        )
+
     def create_nib(self, _=None):
         super().create_nib()
 
@@ -1104,21 +1061,6 @@ class BaseZStack3CC2531(BaseZStack3Device):
     @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
         return req.Rsp(Status=t.Status.SUCCESS)
-
-    @reply_to(
-        c.AppConfig.BDBStartCommissioning.Req(
-            Mode=c.app_config.BDBCommissioningMode.NwkFormation
-        )
-    )
-    def handle_bdb_start_commissioning(self, request):
-        result = super().handle_bdb_start_commissioning(request)
-
-        # This item is only created after a network is formed
-        self._nvram[ExNvIds.LEGACY][OsalNvIds.ADDRMGR] = 124 * self.nvram_serialize(
-            t.EMPTY_ADDR_MGR_ENTRY
-        )
-
-        return result
 
 
 class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
