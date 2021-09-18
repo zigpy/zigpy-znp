@@ -245,13 +245,13 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
 
     did_load_info = asyncio.get_running_loop().create_future()
 
-    async def patched_load_network_info(*, old_load=app._load_network_info):
+    async def patched_load_network_info(*, old_load=app.load_network_info):
         try:
             return await old_load()
         finally:
             did_load_info.set_result(True)
 
-    with swap_attribute(app, "_load_network_info", patched_load_network_info):
+    with swap_attribute(app, "load_network_info", patched_load_network_info):
         # "Drop" the connection like PySerial
         app._znp._uart.connection_lost(exc=None)
 

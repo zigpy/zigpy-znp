@@ -30,7 +30,6 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp import security
 from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
@@ -44,7 +43,6 @@ STARTUP_TIMEOUT = 5
 ZDO_REQUEST_TIMEOUT = 15
 DATA_CONFIRM_TIMEOUT = 8
 DEVICE_JOIN_MAX_DELAY = 5
-NETWORK_COMMISSIONING_TIMEOUT = 30
 WATCHDOG_PERIOD = 30
 BROADCAST_SEND_WAIT_DURATION = 3
 MULTICAST_SEND_WAIT_DURATION = 3
@@ -286,7 +284,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.znp_config[conf.CONF_LED_MODE] is not None:
             await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
-        await self._load_network_info()
+        await self.load_network_info()
         await self._register_endpoints()
 
         # Setup the coordinator as a zigpy device and initialize it to request node info
@@ -344,153 +342,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 "Requested TX power %d was adjusted to %d", dbm, rsp.StatusOrPower
             )
 
-    async def update_network_settings(self, *, network_info, node_info):
-        """
-        Writes network and node state to NVRAM.
-        """
-
-        # The default NIB structure is identical for all Z-Stack versions
-        nib = const.DEFAULT_NIB.replace(
-            SequenceNum=0,
-            MaxChildren=21,
-            MaxRouters=21,
-            scanDuration=5,
-            allocatedRouterAddresses=1,
-            allocatedEndDeviceAddresses=1,
-            nwkTotalTransmissions=1,
-            nwkDevAddress=node_info.nwk,
-            nwkPanId=network_info.pan_id,
-            extendedPANID=network_info.extended_pan_id,
-            nwkUpdateId=network_info.nwk_update_id,
-            nwkLogicalChannel=network_info.channel,
-            channelList=network_info.channel_mask,
-            SecurityLevel=network_info.security_level,
-            nwkManagerAddr=network_info.nwk_manager_id,
-            nwkState=t.NwkState.NWK_ROUTER,
-            nwkKeyLoaded=True,
-            nwkCoordAddress=0x0000,
-        )
-
-        key_info = t.NwkActiveKeyItems(
-            Active=t.NwkKeyDesc(
-                KeySeqNum=network_info.network_key.seq,
-                Key=network_info.network_key.key,
-            ),
-            FrameCounter=network_info.network_key.tx_counter,
-        )
-
-        nvram = {
-            OsalNvIds.STARTUP_OPTION: t.StartupOptions.NONE,
-            OsalNvIds.PANID: t.uint16_t(network_info.pan_id),
-            OsalNvIds.APS_USE_EXT_PANID: network_info.extended_pan_id,
-            OsalNvIds.EXTENDED_PAN_ID: network_info.extended_pan_id,
-            OsalNvIds.PRECFGKEY: key_info.Active,
-            OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),  # Required by Z2M
-            OsalNvIds.CHANLIST: network_info.channel_mask,
-            OsalNvIds.NIB: nib,
-            OsalNvIds.EXTADDR: node_info.ieee,
-            OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType(node_info.logical_type),
-            OsalNvIds.NWK_ACTIVE_KEY_INFO: key_info.Active,
-            OsalNvIds.NWK_ALTERN_KEY_INFO: key_info.Active,
-        }
-
-        if self._znp.version == 1.2:
-            nvram[OsalNvIds.TCLK_SEED] = const.DEFAULT_TC_LINK_KEY
-            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK1] = const.ZSTACK_CONFIGURE_SUCCESS
-        else:
-            nvram[OsalNvIds.BDBNODEISONANETWORK] = t.Bool(True)
-            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK3] = const.ZSTACK_CONFIGURE_SUCCESS
-
-        tclk_seed = None
-
-        if (
-            network_info.stack_specific is not None
-            and "tclk_seed" in network_info.stack_specific.get("zstack", {})
-        ):
-            tclk_seed, _ = t.KeyData.deserialize(
-                bytes.fromhex(network_info.stack_specific["zstack"]["tclk_seed"])
-            )
-            nvram[OsalNvIds.TCLK_SEED] = tclk_seed
-
-        try:
-            # Some NVRAM entries are only created when a network is formed.
-            # We cannot know in advance the compile-time sizes of the arrays so we have
-            # to actually form a network when configuring a newly-flashed device.
-            if self._znp.version > 1.2:
-                await self._znp.nvram.osal_read(OsalNvIds.ADDRMGR, item_type=t.Bytes)
-                await self._znp.nvram.osal_read(
-                    OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
-                )
-        except KeyError:
-            await self._znp.reset()
-
-            await self._znp.request(
-                c.AppConfig.BDBSetChannel.Req(
-                    IsPrimary=True, Channel=t.Channels.ALL_CHANNELS
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-            await self._znp.request(
-                c.AppConfig.BDBSetChannel.Req(
-                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-
-            started_as_coordinator = self._znp.wait_for_response(
-                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
-            )
-
-            commissioning_rsp = await self._znp.request_callback_rsp(
-                request=c.AppConfig.BDBStartCommissioning.Req(
-                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True,
-                    RemainingModes=c.app_config.BDBCommissioningMode.NONE,
-                ),
-                timeout=NETWORK_COMMISSIONING_TIMEOUT,
-            )
-
-            if commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
-                raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
-
-            await started_as_coordinator
-            await self._znp.reset()
-
-        for key, value in nvram.items():
-            await self._znp.nvram.osal_write(key, value, create=True)
-
-        await security.write_tc_frame_counter(
-            self._znp,
-            network_info.network_key.tx_counter,
-            ext_pan_id=network_info.extended_pan_id,
-        )
-
-        devices = {}
-
-        for neighbor in network_info.neighbor_table or []:
-            devices[neighbor.ieee] = security.StoredDevice(
-                nwk=neighbor.nwk,
-                ieee=neighbor.ieee,
-                is_child=True,
-            )
-
-        for key in network_info.key_table or []:
-            devices[key.partner_ieee] = devices[key.partner_ieee].replace(
-                aps_link_key=key.key,
-                tx_counter=key.tx_counter,
-                rx_counter=key.rx_counter,
-            )
-
-        await security.write_devices(
-            znp=self._znp,
-            devices=list(devices.values()),
-            tclk_seed=tclk_seed,
-            counter_increment=0,
-        )
-
     async def form_network(self):
         """
         Clears the current config and forms a new network with a random network key,
@@ -545,9 +396,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         await self._write_stack_settings(reset_if_changed=False)
-        await self.update_network_settings(
-            network_info=network_info, node_info=node_info
-        )
+        await self.write_network_info(network_info=network_info, node_info=node_info)
         await self._znp.reset()
 
     def get_dst_address(self, cluster):
@@ -1252,15 +1101,29 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.SUCCESS,
         )
 
-    async def _load_network_info(self) -> None:
+    async def load_network_info(self) -> None:
         """
-        Loads low-level network information from NVRAM.
+        Loads network information from NVRAM.
         """
 
         await self._znp.load_network_info()
 
         self.state.node_information = self._znp.node_info
         self.state.network_information = self._znp.network_info
+
+    async def write_network_info(
+        self,
+        *,
+        network_info: zigpy.state.NetworkInformation,
+        node_info: zigpy.state.NodeInfo,
+    ) -> None:
+        """
+        Writes network and node state to NVRAM.
+        """
+
+        return await self._znp.write_network_info(
+            network_info=network_info, node_info=node_info
+        )
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
