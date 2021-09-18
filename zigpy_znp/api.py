@@ -11,6 +11,7 @@ import zigpy.state
 import async_timeout
 import zigpy.zdo.types as zdo_t
 
+import zigpy_znp.const as const
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.logger as log
@@ -27,8 +28,11 @@ from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
-AFTER_CONNECT_DELAY = 1  # seconds
-STARTUP_DELAY = 1  # seconds
+
+# All of these are in seconds
+AFTER_CONNECT_DELAY = 1
+STARTUP_DELAY = 1
+NETWORK_COMMISSIONING_TIMEOUT = 30
 
 
 class ZNP:
@@ -170,6 +174,160 @@ class ZNP:
 
         self.network_info = network_info
         self.node_info = node_info
+
+    async def write_network_info(
+        self,
+        *,
+        network_info: zigpy.state.NetworkInformation,
+        node_info: zigpy.state.NodeInfo,
+    ) -> None:
+        """
+        Writes network and node state to NVRAM.
+        """
+
+        from zigpy_znp.znp import security
+
+        # The default NIB structure is identical for all Z-Stack versions
+        nib = const.DEFAULT_NIB.replace(
+            SequenceNum=0,
+            MaxChildren=21,
+            MaxRouters=21,
+            scanDuration=5,
+            allocatedRouterAddresses=1,
+            allocatedEndDeviceAddresses=1,
+            nwkTotalTransmissions=1,
+            nwkDevAddress=node_info.nwk,
+            nwkPanId=network_info.pan_id,
+            extendedPANID=network_info.extended_pan_id,
+            nwkUpdateId=network_info.nwk_update_id,
+            nwkLogicalChannel=network_info.channel,
+            channelList=network_info.channel_mask,
+            SecurityLevel=network_info.security_level,
+            nwkManagerAddr=network_info.nwk_manager_id,
+            nwkState=t.NwkState.NWK_ROUTER,
+            nwkKeyLoaded=True,
+            nwkCoordAddress=0x0000,
+        )
+
+        key_info = t.NwkActiveKeyItems(
+            Active=t.NwkKeyDesc(
+                KeySeqNum=network_info.network_key.seq,
+                Key=network_info.network_key.key,
+            ),
+            FrameCounter=network_info.network_key.tx_counter,
+        )
+
+        nvram = {
+            OsalNvIds.STARTUP_OPTION: t.StartupOptions.NONE,
+            OsalNvIds.PANID: t.uint16_t(network_info.pan_id),
+            OsalNvIds.APS_USE_EXT_PANID: network_info.extended_pan_id,
+            OsalNvIds.EXTENDED_PAN_ID: network_info.extended_pan_id,
+            OsalNvIds.PRECFGKEY: key_info.Active,
+            OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),  # Required by Z2M
+            OsalNvIds.CHANLIST: network_info.channel_mask,
+            OsalNvIds.NIB: nib,
+            OsalNvIds.EXTADDR: node_info.ieee,
+            OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType(node_info.logical_type),
+            OsalNvIds.NWK_ACTIVE_KEY_INFO: key_info.Active,
+            OsalNvIds.NWK_ALTERN_KEY_INFO: key_info.Active,
+        }
+
+        if self.version == 1.2:
+            nvram[OsalNvIds.TCLK_SEED] = const.DEFAULT_TC_LINK_KEY
+            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK1] = const.ZSTACK_CONFIGURE_SUCCESS
+        else:
+            nvram[OsalNvIds.BDBNODEISONANETWORK] = t.Bool(True)
+            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK3] = const.ZSTACK_CONFIGURE_SUCCESS
+
+        tclk_seed = None
+
+        if (
+            network_info.stack_specific is not None
+            and "tclk_seed" in network_info.stack_specific.get("zstack", {})
+        ):
+            tclk_seed, _ = t.KeyData.deserialize(
+                bytes.fromhex(network_info.stack_specific["zstack"]["tclk_seed"])
+            )
+            nvram[OsalNvIds.TCLK_SEED] = tclk_seed
+
+        try:
+            # Some NVRAM entries are only created when a network is formed.
+            # We cannot know in advance the compile-time sizes of the arrays so we have
+            # to actually form a network when configuring a newly-flashed device.
+            if self.version > 1.2:
+                await self.nvram.osal_read(OsalNvIds.ADDRMGR, item_type=t.Bytes)
+                await self.nvram.osal_read(
+                    OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
+                )
+        except KeyError:
+            await self.reset()
+
+            await self.request(
+                c.AppConfig.BDBSetChannel.Req(
+                    IsPrimary=True, Channel=t.Channels.ALL_CHANNELS
+                ),
+                RspStatus=t.Status.SUCCESS,
+            )
+            await self.request(
+                c.AppConfig.BDBSetChannel.Req(
+                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
+                ),
+                RspStatus=t.Status.SUCCESS,
+            )
+
+            started_as_coordinator = self.wait_for_response(
+                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
+            )
+
+            commissioning_rsp = await self.request_callback_rsp(
+                request=c.AppConfig.BDBStartCommissioning.Req(
+                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True,
+                    RemainingModes=c.app_config.BDBCommissioningMode.NONE,
+                ),
+                timeout=NETWORK_COMMISSIONING_TIMEOUT,
+            )
+
+            if commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
+                raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
+
+            await started_as_coordinator
+            await self.reset()
+
+        for key, value in nvram.items():
+            await self.nvram.osal_write(key, value, create=True)
+
+        await security.write_tc_frame_counter(
+            self,
+            network_info.network_key.tx_counter,
+            ext_pan_id=network_info.extended_pan_id,
+        )
+
+        devices = {}
+
+        for neighbor in network_info.neighbor_table or []:
+            devices[neighbor.ieee] = security.StoredDevice(
+                nwk=neighbor.nwk,
+                ieee=neighbor.ieee,
+                is_child=True,
+            )
+
+        for key in network_info.key_table or []:
+            devices[key.partner_ieee] = devices[key.partner_ieee].replace(
+                aps_link_key=key.key,
+                tx_counter=key.tx_counter,
+                rx_counter=key.rx_counter,
+            )
+
+        await security.write_devices(
+            znp=self,
+            devices=list(devices.values()),
+            tclk_seed=tclk_seed,
+            counter_increment=0,
+        )
 
     async def reset(self) -> None:
         """

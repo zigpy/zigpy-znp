@@ -84,7 +84,7 @@ async def restore_network(
     app = ControllerApplication(config)
 
     await app.startup(force_form=True)
-    await app.update_network_settings(network_info=network_info, node_info=node_info)
+    await app.write_network_info(network_info=network_info, node_info=node_info)
 
     await app.pre_shutdown()
 
