@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 import asyncio
 import logging
@@ -24,7 +25,11 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.exceptions import (
+    SecurityError,
+    CommandNotRecognized,
+    InvalidCommandResponse,
+)
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
@@ -107,9 +112,17 @@ class ZNP:
         if not is_on_network:
             raise ValueError("Device is not a part of a network")
 
-        key_desc = await self.nvram.osal_read(
-            OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
-        )
+        try:
+            key_desc = await self.nvram.osal_read(
+                OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
+            )
+        except SecurityError:
+            # XXX: Z-Stack 1 has no way to read some key info
+            key = await self.nvram.osal_read(OsalNvIds.PRECFGKEY, item_type=t.KeyData)
+            key_desc = t.NwkKeyDesc(
+                KeySeqNum=0,
+                Key=key,
+            )
 
         tclk_seed = None
 
@@ -187,15 +200,129 @@ class ZNP:
 
         from zigpy_znp.znp import security
 
-        # The default NIB structure is identical for all Z-Stack versions
-        nib = const.DEFAULT_NIB.replace(
-            SequenceNum=0,
-            MaxChildren=21,
-            MaxRouters=21,
-            scanDuration=5,
-            allocatedRouterAddresses=1,
-            allocatedEndDeviceAddresses=1,
-            nwkTotalTransmissions=1,
+        # Delete any existing HAS_CONFIGURED_ZSTACK* NV items. One (or both) may fail.
+        await self.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK1)
+        await self.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK3)
+        await self.nvram.osal_delete(OsalNvIds.BDBNODEISONANETWORK)
+
+        # Instruct Z-Stack to reset everything on the next boot
+        await self.nvram.osal_write(
+            OsalNvIds.STARTUP_OPTION,
+            t.StartupOptions.ClearState | t.StartupOptions.ClearConfig,
+        )
+
+        await self.reset()
+
+        # Form a network with completely random settings to get NVRAM to a known state
+        for item, value in {
+            OsalNvIds.PANID: t.uint16_t(0xFFFF),
+            OsalNvIds.APS_USE_EXT_PANID: t.EUI64(os.urandom(8)),
+            OsalNvIds.PRECFGKEY: os.urandom(16),
+            # XXX: Z2M requires this item to be False
+            OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),
+            # Z-Stack will scan all of thse channels during formation
+            OsalNvIds.CHANLIST: const.STARTUP_CHANNELS,
+        }.items():
+            await self.nvram.osal_write(item, value, create=True)
+
+        # Z-Stack 3+ ignores `CHANLIST`
+        if self.version > 1.2:
+            await self.request(
+                c.AppConfig.BDBSetChannel.Req(
+                    IsPrimary=True, Channel=const.STARTUP_CHANNELS
+                ),
+                RspStatus=t.Status.SUCCESS,
+            )
+            await self.request(
+                c.AppConfig.BDBSetChannel.Req(
+                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
+                ),
+                RspStatus=t.Status.SUCCESS,
+            )
+
+        # Both startup sequences end with the same callback
+        started_as_coordinator = self.wait_for_response(
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
+        )
+
+        LOGGER.debug("Forming temporary network")
+
+        # Handle the startup progress messages
+        async with self.capture_responses(
+            [
+                c.ZDO.StateChangeInd.Callback(
+                    State=t.DeviceState.StartingAsCoordinator
+                ),
+                c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True,
+                    Status=c.app_config.BDBCommissioningStatus.InProgress,
+                ),
+            ]
+        ):
+            try:
+                if self.version > 1.2:
+                    # Z-Stack 3 uses the BDB subsystem
+                    commissioning_rsp = await self.request_callback_rsp(
+                        request=c.AppConfig.BDBStartCommissioning.Req(
+                            Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                        ),
+                        RspStatus=t.Status.SUCCESS,
+                        callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                            partial=True,
+                            RemainingModes=c.app_config.BDBCommissioningMode.NONE,
+                        ),
+                        timeout=NETWORK_COMMISSIONING_TIMEOUT,
+                    )
+
+                    if (
+                        commissioning_rsp.Status
+                        != c.app_config.BDBCommissioningStatus.Success
+                    ):
+                        raise RuntimeError(
+                            f"Network formation failed: {commissioning_rsp}"
+                        )
+                else:
+                    # In Z-Stack 1.2.2, StartupFromApp actually does what it says
+                    await self.request(
+                        c.ZDO.StartupFromApp.Req(StartDelay=100),
+                        RspState=c.zdo.StartupState.NewNetworkState,
+                    )
+
+                # Both versions still end with this callback
+                await started_as_coordinator
+            except asyncio.TimeoutError as e:
+                raise RuntimeError(
+                    "Network formation refused, RF environment is likely too noisy."
+                    " Temporarily unscrew the antenna or shield the coordinator"
+                    " with metal until a network is formed."
+                ) from e
+
+        LOGGER.debug("Waiting for NIB to stabilize")
+
+        # Even though the device says it is "ready" at this point, it takes a few more
+        # seconds for `_NIB.nwkState` to switch from `NwkState.NWK_INIT`. There does
+        # not appear to be any user-facing MT command to read this information.
+        while True:
+            try:
+                nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
+
+                LOGGER.debug("Current NIB is %s", nib)
+
+                # Usually this works after the first attempt
+                if nib.nwkLogicalChannel != 0 and nib.nwkPanId != 0xFFFE:
+                    break
+            except KeyError:
+                pass
+
+            await asyncio.sleep(1)
+
+        await self.reset()
+
+        LOGGER.debug("Writing actual network settings")
+
+        # Now that we have a formed network, update its state
+        nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
+        nib = nib.replace(
             nwkDevAddress=node_info.nwk,
             nwkPanId=network_info.pan_id,
             extendedPANID=network_info.extended_pan_id,
@@ -204,8 +331,6 @@ class ZNP:
             channelList=network_info.channel_mask,
             SecurityLevel=network_info.security_level,
             nwkManagerAddr=network_info.nwk_manager_id,
-            nwkState=t.NwkState.NWK_ROUTER,
-            nwkKeyLoaded=True,
             nwkCoordAddress=0x0000,
         )
 
@@ -218,84 +343,30 @@ class ZNP:
         )
 
         nvram = {
-            OsalNvIds.STARTUP_OPTION: t.StartupOptions.NONE,
-            OsalNvIds.PANID: t.uint16_t(network_info.pan_id),
+            OsalNvIds.NIB: nib,
             OsalNvIds.APS_USE_EXT_PANID: network_info.extended_pan_id,
             OsalNvIds.EXTENDED_PAN_ID: network_info.extended_pan_id,
-            OsalNvIds.PRECFGKEY: key_info.Active,
-            OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),  # Required by Z2M
+            OsalNvIds.PRECFGKEY: key_info.Active.Key,
             OsalNvIds.CHANLIST: network_info.channel_mask,
-            OsalNvIds.NIB: nib,
             OsalNvIds.EXTADDR: node_info.ieee,
             OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType(node_info.logical_type),
             OsalNvIds.NWK_ACTIVE_KEY_INFO: key_info.Active,
-            OsalNvIds.NWK_ALTERN_KEY_INFO: key_info.Active,
+            OsalNvIds.NWK_ALTERN_KEY_INFO: const.EMPTY_KEY,
         }
-
-        if self.version == 1.2:
-            nvram[OsalNvIds.TCLK_SEED] = const.DEFAULT_TC_LINK_KEY
-            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK1] = const.ZSTACK_CONFIGURE_SUCCESS
-        else:
-            nvram[OsalNvIds.BDBNODEISONANETWORK] = t.Bool(True)
-            nvram[OsalNvIds.HAS_CONFIGURED_ZSTACK3] = const.ZSTACK_CONFIGURE_SUCCESS
 
         tclk_seed = None
 
         if (
-            network_info.stack_specific is not None
+            self.version > 1.2
+            and network_info.stack_specific is not None
             and "tclk_seed" in network_info.stack_specific.get("zstack", {})
         ):
             tclk_seed, _ = t.KeyData.deserialize(
                 bytes.fromhex(network_info.stack_specific["zstack"]["tclk_seed"])
             )
             nvram[OsalNvIds.TCLK_SEED] = tclk_seed
-
-        try:
-            # Some NVRAM entries are only created when a network is formed.
-            # We cannot know in advance the compile-time sizes of the arrays so we have
-            # to actually form a network when configuring a newly-flashed device.
-            if self.version > 1.2:
-                await self.nvram.osal_read(OsalNvIds.ADDRMGR, item_type=t.Bytes)
-                await self.nvram.osal_read(
-                    OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
-                )
-        except KeyError:
-            await self.reset()
-
-            await self.request(
-                c.AppConfig.BDBSetChannel.Req(
-                    IsPrimary=True, Channel=t.Channels.ALL_CHANNELS
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-            await self.request(
-                c.AppConfig.BDBSetChannel.Req(
-                    IsPrimary=False, Channel=t.Channels.NO_CHANNELS
-                ),
-                RspStatus=t.Status.SUCCESS,
-            )
-
-            started_as_coordinator = self.wait_for_response(
-                c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
-            )
-
-            commissioning_rsp = await self.request_callback_rsp(
-                request=c.AppConfig.BDBStartCommissioning.Req(
-                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True,
-                    RemainingModes=c.app_config.BDBCommissioningMode.NONE,
-                ),
-                timeout=NETWORK_COMMISSIONING_TIMEOUT,
-            )
-
-            if commissioning_rsp.Status != c.app_config.BDBCommissioningStatus.Success:
-                raise RuntimeError(f"Network formation failed: {commissioning_rsp}")
-
-            await started_as_coordinator
-            await self.reset()
+        elif self.version == 1.2:
+            nvram[OsalNvIds.TCLK_SEED] = const.DEFAULT_TC_LINK_KEY
 
         for key, value in nvram.items():
             await self.nvram.osal_write(key, value, create=True)
@@ -322,12 +393,29 @@ class ZNP:
                 rx_counter=key.rx_counter,
             )
 
+        LOGGER.debug("Writing neighbors and keys")
+
         await security.write_devices(
             znp=self,
             devices=list(devices.values()),
             tclk_seed=tclk_seed,
             counter_increment=0,
         )
+
+        if self.version == 1.2:
+            await self.nvram.osal_write(
+                OsalNvIds.HAS_CONFIGURED_ZSTACK1,
+                const.ZSTACK_CONFIGURE_SUCCESS,
+                create=True,
+            )
+        else:
+            await self.nvram.osal_write(
+                OsalNvIds.HAS_CONFIGURED_ZSTACK3,
+                const.ZSTACK_CONFIGURE_SUCCESS,
+                create=True,
+            )
+
+        LOGGER.debug("Done!")
 
     async def reset(self) -> None:
         """
