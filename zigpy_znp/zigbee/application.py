@@ -395,8 +395,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             logical_type=zdo_t.LogicalType.Coordinator,
         )
 
-        await self._write_stack_settings(reset_if_changed=False)
         await self.write_network_info(network_info=network_info, node_info=node_info)
+        await self._write_stack_settings(reset_if_changed=False)
         await self._znp.reset()
 
     def get_dst_address(self, cluster):
