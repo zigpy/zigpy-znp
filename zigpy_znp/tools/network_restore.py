@@ -51,13 +51,16 @@ def json_backup_to_zigpy_state(
     network_info.key_table = []
     network_info.neighbor_table = []
 
+    children = backup["stack_specific"].get("zstack", {}).get("children")
+
     for obj in backup["devices"]:
         node = zigpy.state.NodeInfo()
         node.nwk, _ = t.NWK.deserialize(bytes.fromhex(obj["nwk_address"])[::-1])
         node.ieee, _ = t.EUI64.deserialize(bytes.fromhex(obj["ieee_address"])[::-1])
         node.logical_type = None
 
-        network_info.neighbor_table.append(node)
+        if children is None or obj["ieee_address"] in children:
+            network_info.neighbor_table.append(node)
 
         if "link_key" in obj:
             key = zigpy.state.Key()
