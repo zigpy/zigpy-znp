@@ -54,6 +54,7 @@ def backup_json():
             "internal": {
                 "creation_time": "2021-02-16T22:29:28+00:00",
                 "zstack": {"version": 3.3},
+                "children": ["000b57fffe38b212"],
             },
             "source": "zigpy-znp@0.3.0",
             "version": 1,

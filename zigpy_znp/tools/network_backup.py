@@ -53,6 +53,10 @@ async def backup_network(znp: ZNP) -> t.JSONType:
                 "zstack": {
                     "version": znp.version,
                 },
+                "children": [
+                    neighbor.ieee.serialize()[::-1].hex()
+                    for neighbor in znp.network_info.neighbor_table
+                ],
             },
         },
         "coordinator_ieee": znp.node_info.ieee.serialize()[::-1].hex(),
@@ -71,11 +75,9 @@ async def backup_network(znp: ZNP) -> t.JSONType:
     }
 
     if znp.network_info.stack_specific.get("zstack", {}).get("tclk_seed"):
-        obj["stack_specific"] = {
-            "zstack": {
-                "tclk_seed": znp.network_info.stack_specific["zstack"]["tclk_seed"]
-            }
-        }
+        obj.setdefault("stack_specific", {}).setdefault("zstack", {})[
+            "tclk_seed"
+        ] = znp.network_info.stack_specific["zstack"]["tclk_seed"]
 
     # Ensure our generated backup is valid
     validate_backup_json(obj)
