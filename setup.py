@@ -19,8 +19,7 @@ setup(
     packages=find_packages(exclude=["tests", "tests.*"]),
     python_requires=">=3.7",
     install_requires=[
-        'pyserial-asyncio; platform_system!="Windows"',
-        'pyserial-asyncio!=0.5; platform_system=="Windows"',  # 0.5 broke writes
+        "pyserial-asyncio>=0.6",  # 0.5 is broken on Windows
         "zigpy>=0.37.0",
         "async_timeout",
         "voluptuous",
