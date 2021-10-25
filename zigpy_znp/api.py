@@ -387,7 +387,25 @@ class ZNP:
             )
 
         for key in network_info.key_table or []:
-            devices[key.partner_ieee] = devices[key.partner_ieee].replace(
+            device = devices.get(key.partner_ieee)
+
+            if device is None:
+                nwk = None
+
+                # The key table doesn't save a device's NWK address so we pick one
+                for test_nwk in range(0x0001, 0xFFFE + 1):
+                    if all(n.nwk != test_nwk for n in network_info.neighbor_table):
+                        nwk = test_nwk
+                        break
+
+                assert nwk is not None
+
+                device = security.StoredDevice(
+                    nwk=nwk,
+                    ieee=key.partner_ieee,
+                )
+
+            devices[key.partner_ieee] = device.replace(
                 aps_link_key=key.key,
                 tx_counter=key.tx_counter,
                 rx_counter=key.rx_counter,

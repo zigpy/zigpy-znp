@@ -28,6 +28,9 @@ async def backup_network(znp: ZNP) -> t.JSONType:
         obj = {
             "nwk_address": device.nwk.serialize()[::-1].hex(),
             "ieee_address": device.ieee.serialize()[::-1].hex(),
+            "is_child": any(
+                device.ieee == nbr.ieee for nbr in znp.network_info.neighbor_table
+            ),
         }
 
         if device.aps_link_key:
@@ -53,10 +56,6 @@ async def backup_network(znp: ZNP) -> t.JSONType:
                 "zstack": {
                     "version": znp.version,
                 },
-                "children": [
-                    neighbor.ieee.serialize()[::-1].hex()
-                    for neighbor in znp.network_info.neighbor_table
-                ],
             },
         },
         "coordinator_ieee": znp.node_info.ieee.serialize()[::-1].hex(),
