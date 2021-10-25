@@ -54,7 +54,6 @@ def backup_json():
             "internal": {
                 "creation_time": "2021-02-16T22:29:28+00:00",
                 "zstack": {"version": 3.3},
-                "children": ["000b57fffe38b212"],
             },
             "source": "zigpy-znp@0.3.0",
             "version": 1,
@@ -73,7 +72,12 @@ def backup_json():
             "sequence_number": 1,
         },
         "devices": [
-            {"ieee_address": "000b57fffe36b9a0", "nwk_address": "f319"},  # No key
+            {
+                # No key
+                "ieee_address": "000b57fffe36b9a0",
+                "nwk_address": "f319",
+                "is_child": True,
+            },
             {
                 "ieee_address": "000b57fffe38b212",
                 "link_key": {
@@ -82,6 +86,7 @@ def backup_json():
                     "tx_counter": 456,
                 },
                 "nwk_address": "9672",
+                "is_child": True,
             },
             {
                 "ieee_address": "aabbccddeeff0011",
@@ -91,6 +96,7 @@ def backup_json():
                     "tx_counter": 445566,
                 },
                 "nwk_address": "abcd",
+                "is_child": False,
             },
         ],
     }
