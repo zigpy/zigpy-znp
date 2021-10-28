@@ -48,8 +48,8 @@ def json_backup_to_zigpy_state(
     network_info.network_key.partner_ieee = None
     network_info.network_key.seq = backup["network_key"]["sequence_number"]
 
-    network_info.key_table = []
-    network_info.neighbor_table = []
+    network_info.children = []
+    network_info.nwk_addresses = {}
 
     for obj in backup["devices"]:
         node = zigpy.state.NodeInfo()
@@ -57,9 +57,11 @@ def json_backup_to_zigpy_state(
         node.ieee, _ = t.EUI64.deserialize(bytes.fromhex(obj["ieee_address"])[::-1])
         node.logical_type = None
 
-        # The `is_child` key is optional. If it is missing, preserve the old behavior
-        if obj["is_child"] if "is_child" in obj else ("link_key" not in obj):
-            network_info.neighbor_table.append(node)
+        # The `is_child` key is currently optional
+        if obj.get("is_child", True):
+            network_info.children.append(node)
+        else:
+            network_info.nwk_addresses[node.ieee] = node.nwk
 
         if "link_key" in obj:
             key = zigpy.state.Key()

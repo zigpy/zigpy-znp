@@ -82,7 +82,7 @@ class ZNP:
         except CommandNotRecognized:
             return 3.0
 
-    async def load_network_info(self, *, load_keys=False):
+    async def load_network_info(self, *, load_devices=False):
         """
         Loads low-level network information from NVRAM.
         Loading key data greatly increases the runtime so it not enabled by default.
@@ -150,6 +150,8 @@ class ZNP:
                 partner_ieee=None,
             ),
             tc_link_key=None,
+            children=[],
+            nwk_addresses={},
             key_table=[],
             stack_specific=None,
         )
@@ -162,17 +164,29 @@ class ZNP:
             }
 
         # This takes a few seconds
-        if load_keys:
+        if load_devices:
             for device in await security.read_devices(self):
-                network_info.key_table.append(
-                    zigpy.state.Key(
-                        key=device.aps_link_key,
-                        seq=0,
-                        tx_counter=device.tx_counter,
-                        rx_counter=device.rx_counter,
-                        partner_ieee=device.ieee,
+                if device.is_child:
+                    network_info.children.append(
+                        zigpy.state.NodeInfo(
+                            ieee=device.ieee,
+                            nwk=device.nwk,
+                            logical_type=zdo_t.LogicalType.EndDevice,
+                        )
                     )
-                )
+                else:
+                    network_info.nwk_addresses[device.ieee] = device.nwk
+
+                if device.aps_link_key is not None:
+                    network_info.key_table.append(
+                        zigpy.state.Key(
+                            key=device.aps_link_key,
+                            seq=0,
+                            tx_counter=device.tx_counter,
+                            rx_counter=device.rx_counter,
+                            partner_ieee=device.ieee,
+                        )
+                    )
 
         ieee = await self.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
         logical_type = await self.nvram.osal_read(
@@ -379,10 +393,10 @@ class ZNP:
 
         devices = {}
 
-        for neighbor in network_info.neighbor_table or []:
-            devices[neighbor.ieee] = security.StoredDevice(
-                nwk=neighbor.nwk,
-                ieee=neighbor.ieee,
+        for child in network_info.children or []:
+            devices[child.ieee] = security.StoredDevice(
+                nwk=child.nwk if child.nwk is not None else 0xFFFE,
+                ieee=child.ieee,
                 is_child=True,
             )
 
@@ -390,19 +404,10 @@ class ZNP:
             device = devices.get(key.partner_ieee)
 
             if device is None:
-                nwk = None
-
-                # The key table doesn't save a device's NWK address so we pick one
-                for test_nwk in range(0x0001, 0xFFFE + 1):
-                    if all(n.nwk != test_nwk for n in network_info.neighbor_table):
-                        nwk = test_nwk
-                        break
-
-                assert nwk is not None
-
                 device = security.StoredDevice(
-                    nwk=nwk,
+                    nwk=network_info.nwk_addresses.get(key.partner_ieee, 0xFFFE),
                     ieee=key.partner_ieee,
+                    is_child=False,
                 )
 
             devices[key.partner_ieee] = device.replace(
@@ -411,7 +416,7 @@ class ZNP:
                 rx_counter=key.rx_counter,
             )
 
-        LOGGER.debug("Writing neighbors and keys")
+        LOGGER.debug("Writing children and keys")
 
         await security.write_devices(
             znp=self,

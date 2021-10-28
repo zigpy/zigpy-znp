@@ -384,8 +384,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 partner_ieee=None,
             ),
             tc_link_key=None,
+            children=[],
             key_table=[],
-            neighbor_table=[],
+            nwk_addresses={},
             stack_specific={"zstack": {"tclk_seed": os.urandom(16).hex()}},
         )
 
