@@ -6,6 +6,7 @@ import asyncio
 import logging
 import itertools
 import contextlib
+import dataclasses
 from collections import Counter, defaultdict
 
 import zigpy.state
@@ -165,28 +166,14 @@ class ZNP:
 
         # This takes a few seconds
         if load_devices:
-            for device in await security.read_devices(self):
-                if device.is_child:
-                    network_info.children.append(
-                        zigpy.state.NodeInfo(
-                            ieee=device.ieee,
-                            nwk=device.nwk,
-                            logical_type=zdo_t.LogicalType.EndDevice,
-                        )
-                    )
+            for dev in await security.read_devices(self):
+                if dev.is_child:
+                    network_info.children.append(dev.node_info)
                 else:
-                    network_info.nwk_addresses[device.ieee] = device.nwk
+                    network_info.nwk_addresses[dev.node_info.ieee] = dev.node_info.nwk
 
-                if device.aps_link_key is not None:
-                    network_info.key_table.append(
-                        zigpy.state.Key(
-                            key=device.aps_link_key,
-                            seq=0,
-                            tx_counter=device.tx_counter,
-                            rx_counter=device.rx_counter,
-                            partner_ieee=device.ieee,
-                        )
-                    )
+                if dev.key is not None:
+                    network_info.key_table.append(dev.key)
 
         ieee = await self.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
         logical_type = await self.nvram.osal_read(
@@ -395,8 +382,10 @@ class ZNP:
 
         for child in network_info.children or []:
             devices[child.ieee] = security.StoredDevice(
-                nwk=child.nwk if child.nwk is not None else 0xFFFE,
-                ieee=child.ieee,
+                node_info=dataclasses.replace(
+                    child, nwk=0xFFFE if child.nwk is None else child.nwk
+                ),
+                key=None,
                 is_child=True,
             )
 
@@ -405,25 +394,29 @@ class ZNP:
 
             if device is None:
                 device = security.StoredDevice(
-                    nwk=network_info.nwk_addresses.get(key.partner_ieee, 0xFFFE),
-                    ieee=key.partner_ieee,
+                    node_info=zigpy.state.NodeInfo(
+                        nwk=network_info.nwk_addresses.get(key.partner_ieee, 0xFFFE),
+                        ieee=key.partner_ieee,
+                        logical_type=None,
+                    ),
+                    key=None,
                     is_child=False,
                 )
 
-            devices[key.partner_ieee] = device.replace(
-                aps_link_key=key.key,
-                tx_counter=key.tx_counter,
-                rx_counter=key.rx_counter,
-            )
+            devices[key.partner_ieee] = device.replace(key=key)
 
         LOGGER.debug("Writing children and keys")
 
-        await security.write_devices(
+        new_tclk_seed = await security.write_devices(
             znp=self,
             devices=list(devices.values()),
             tclk_seed=tclk_seed,
             counter_increment=0,
         )
+
+        # If the provided TCLK seed isn't optimal, overwrite it
+        if new_tclk_seed != tclk_seed:
+            await self.nvram.osal_write(OsalNvIds.TCLK_SEED, new_tclk_seed)
 
         if self.version == 1.2:
             await self.nvram.osal_write(

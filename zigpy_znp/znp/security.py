@@ -16,14 +16,8 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class StoredDevice:
-    ieee: t.EUI64
-    nwk: t.NWK
-
-    aps_link_key: t.KeyData = None
-
-    tx_counter: t.uint32_t = None
-    rx_counter: t.uint32_t = None
-
+    node_info: zigpy.state.NodeInfo
+    key: zigpy.state.Key | None
     is_child: bool = False
 
     def replace(self, **kwargs) -> StoredDevice:
@@ -63,7 +57,7 @@ def iter_seed_candidates(
 ) -> typing.Iterable[tuple[int, t.KeyData]]:
     for ieee, key in ieees_and_keys:
         # Derive a seed from each candidate. All rotations of a seed are equivalent.
-        tclk_seed = compute_tclk_seed(ieee, key, 0)
+        tclk_seed = t.KeyData(compute_tclk_seed(ieee, key, 0))
 
         # And see how many other keys share this same seed
         count = count_seed_matches(ieees_and_keys, tclk_seed)
@@ -276,8 +270,12 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             t.AddrMgrUserType.Security,
         ):
             devices[entry.extAddr] = StoredDevice(
-                ieee=entry.extAddr,
-                nwk=entry.nwkAddr,
+                node_info=zigpy.state.NodeInfo(
+                    nwk=entry.nwkAddr,
+                    ieee=entry.extAddr,
+                    logical_type=None,
+                ),
+                key=None,
                 is_child=bool(entry.type & t.AddrMgrUserType.Assoc),
             )
         else:
@@ -294,11 +292,7 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             )
             continue
 
-        devices[key.partner_ieee] = devices[key.partner_ieee].replace(
-            tx_counter=key.tx_counter,
-            rx_counter=key.rx_counter,
-            aps_link_key=key.key,
-        )
+        devices[key.partner_ieee] = devices[key.partner_ieee].replace(key=key)
 
     async for key in read_unhashed_link_keys(znp, addr_mgr):
         if key.partner_ieee not in devices:
@@ -311,11 +305,7 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             )
             continue
 
-        devices[key.partner_ieee] = devices[key.partner_ieee].replace(
-            tx_counter=key.tx_counter,
-            rx_counter=key.rx_counter,
-            aps_link_key=key.key,
-        )
+        devices[key.partner_ieee] = devices[key.partner_ieee].replace(key=key)
 
     return list(devices.values())
 
@@ -328,11 +318,11 @@ async def write_addr_manager_entries(
     for dev in devices:
         entry = t.AddrMgrEntry(
             type=t.AddrMgrUserType.Default,
-            nwkAddr=dev.nwk,
-            extAddr=dev.ieee,
+            nwkAddr=dev.node_info.nwk,
+            extAddr=dev.node_info.ieee,
         )
 
-        if dev.aps_link_key:
+        if dev.key is not None:
             entry.type |= t.AddrMgrUserType.Security
 
         if dev.is_child:
@@ -366,9 +356,9 @@ async def write_devices(
     znp: ZNP,
     devices: typing.Sequence[StoredDevice],
     counter_increment: t.uint32_t = 2500,
-    tclk_seed: bytes = None,
-) -> None:
-    ieees_and_keys = [(d.ieee, d.aps_link_key) for d in devices if d.aps_link_key]
+    tclk_seed: t.KeyData = None,
+) -> t.KeyData:
+    ieees_and_keys = [(d.node_info.ieee, d.key.key) for d in devices if d.key]
 
     # Find the tclk_seed that maximizes the number of keys that can be derived from it
     if ieees_and_keys:
@@ -397,19 +387,19 @@ async def write_devices(
     aps_key_data_table = []
     link_key_table = t.APSLinkKeyTable()
 
-    for index, device in enumerate(devices):
-        if not device.aps_link_key:
+    for index, dev in enumerate(devices):
+        if dev.key is None:
             continue
 
-        shift = find_key_shift(device.ieee, device.aps_link_key, tclk_seed)
+        shift = find_key_shift(dev.node_info.ieee, dev.key.key, tclk_seed)
 
         if shift is not None:
             # Hashed link keys can be written into the TCLK table
             hashed_link_key_table.append(
                 t.TCLKDevEntry(
-                    txFrmCntr=device.tx_counter + counter_increment,
-                    rxFrmCntr=device.rx_counter,
-                    extAddr=device.ieee,
+                    txFrmCntr=dev.key.tx_counter + counter_increment,
+                    rxFrmCntr=dev.key.rx_counter,
+                    extAddr=dev.node_info.ieee,
                     keyAttributes=t.KeyAttributes.VERIFIED_KEY,
                     keyType=t.KeyType.NONE,
                     SeedShift_IcIndex=shift,
@@ -419,9 +409,9 @@ async def write_devices(
             # Unhashed link keys are written to another table
             aps_key_data_table.append(
                 t.APSKeyDataTableEntry(
-                    Key=device.aps_link_key,
-                    TxFrameCounter=device.tx_counter + counter_increment,
-                    RxFrameCounter=device.rx_counter,
+                    Key=dev.key.key,
+                    TxFrameCounter=dev.key.tx_counter + counter_increment,
+                    RxFrameCounter=dev.key.rx_counter,
                 )
             )
 
@@ -463,7 +453,7 @@ async def write_devices(
     await write_addr_manager_entries(znp, devices)
 
     if old_link_key_table is None:
-        return
+        return tclk_seed
 
     await znp.nvram.osal_write(OsalNvIds.APS_LINK_KEY_TABLE, new_link_key_table_value)
 
@@ -508,3 +498,5 @@ async def write_devices(
             values=aps_key_data_table,
             fill_value=aps_key_data_fill_value,
         )
+
+    return tclk_seed
