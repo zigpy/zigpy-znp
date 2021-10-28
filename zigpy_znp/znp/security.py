@@ -275,10 +275,6 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
             t.AddrMgrUserType.Assoc | t.AddrMgrUserType.Security,
             t.AddrMgrUserType.Security,
         ):
-            if not 0x0000 <= entry.nwkAddr <= 0xFFF7:
-                LOGGER.warning("Ignoring invalid address manager entry: %s", entry)
-                continue
-
             devices[entry.extAddr] = StoredDevice(
                 ieee=entry.extAddr,
                 nwk=entry.nwkAddr,

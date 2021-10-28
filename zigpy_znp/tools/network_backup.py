@@ -25,12 +25,11 @@ async def backup_network(znp: ZNP) -> t.JSONType:
     devices = []
 
     for device in await read_devices(znp):
+        nwk = device.nwk if device.nwk != 0xFFFE else None
         obj = {
-            "nwk_address": device.nwk.serialize()[::-1].hex(),
+            "nwk_address": nwk.serialize()[::-1].hex(),
             "ieee_address": device.ieee.serialize()[::-1].hex(),
-            "is_child": any(
-                device.ieee == nbr.ieee for nbr in znp.network_info.neighbor_table
-            ),
+            "is_child": device.is_child,
         }
 
         if device.aps_link_key:

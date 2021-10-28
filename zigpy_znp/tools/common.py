@@ -68,7 +68,10 @@ OPEN_COORDINATOR_BACKUP_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "nwk_address": {"type": "string", "pattern": "[a-fA-F0-9]{4}"},
+                    "nwk_address": {
+                        "type": ["string", "null"],
+                        "pattern": "[a-fA-F0-9]{4}",
+                    },
                     "ieee_address": {"type": "string", "pattern": "[a-fA-F0-9]{16}"},
                     "is_child": {"type": "boolean"},
                     "link_key": {
