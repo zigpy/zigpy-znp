@@ -357,16 +357,19 @@ class ZNP:
 
         tclk_seed = None
 
-        if (
-            self.version > 1.2
-            and network_info.stack_specific is not None
-            and "tclk_seed" in network_info.stack_specific.get("zstack", {})
-        ):
-            tclk_seed, _ = t.KeyData.deserialize(
-                bytes.fromhex(network_info.stack_specific["zstack"]["tclk_seed"])
-            )
+        if self.version > 1.2:
+            if (
+                network_info.stack_specific is not None
+                and network_info.stack_specific.get("zstack", {}).get("tclk_seed")
+            ):
+                tclk_seed, _ = t.KeyData.deserialize(
+                    bytes.fromhex(network_info.stack_specific["zstack"]["tclk_seed"])
+                )
+            else:
+                tclk_seed = t.KeyData(os.urandom(16))
+
             nvram[OsalNvIds.TCLK_SEED] = tclk_seed
-        elif self.version == 1.2:
+        else:
             nvram[OsalNvIds.TCLK_SEED] = const.DEFAULT_TC_LINK_KEY
 
         for key, value in nvram.items():
@@ -407,17 +410,21 @@ class ZNP:
 
         LOGGER.debug("Writing children and keys")
 
-        optimal_tclk_seed = security.find_optimal_tclk_seed(devices.values(), tclk_seed)
-
-        if tclk_seed != optimal_tclk_seed:
-            LOGGER.warning(
-                "Provided TCLK seed %s is not optimal, using %s instead.",
-                tclk_seed,
-                optimal_tclk_seed,
+        # Recompute the TCLK if necessary
+        if self.version > 1.2:
+            optimal_tclk_seed = security.find_optimal_tclk_seed(
+                devices.values(), tclk_seed
             )
 
-            await self.nvram.osal_write(OsalNvIds.TCLK_SEED, optimal_tclk_seed)
-            tclk_seed = optimal_tclk_seed
+            if tclk_seed != optimal_tclk_seed:
+                LOGGER.warning(
+                    "Provided TCLK seed %s is not optimal, using %s instead.",
+                    tclk_seed,
+                    optimal_tclk_seed,
+                )
+
+                await self.nvram.osal_write(OsalNvIds.TCLK_SEED, optimal_tclk_seed)
+                tclk_seed = optimal_tclk_seed
 
         await security.write_devices(
             znp=self,
