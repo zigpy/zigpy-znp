@@ -407,16 +407,24 @@ class ZNP:
 
         LOGGER.debug("Writing children and keys")
 
-        new_tclk_seed = await security.write_devices(
+        optimal_tclk_seed = security.find_optimal_tclk_seed(devices.values(), tclk_seed)
+
+        if tclk_seed != optimal_tclk_seed:
+            LOGGER.warning(
+                "Provided TCLK seed %s is not optimal, using %s instead.",
+                tclk_seed,
+                optimal_tclk_seed,
+            )
+
+            await self.nvram.osal_write(OsalNvIds.TCLK_SEED, optimal_tclk_seed)
+            tclk_seed = optimal_tclk_seed
+
+        await security.write_devices(
             znp=self,
             devices=list(devices.values()),
             tclk_seed=tclk_seed,
             counter_increment=0,
         )
-
-        # If the provided TCLK seed isn't optimal, overwrite it
-        if new_tclk_seed != tclk_seed:
-            await self.nvram.osal_write(OsalNvIds.TCLK_SEED, new_tclk_seed)
 
         if self.version == 1.2:
             await self.nvram.osal_write(

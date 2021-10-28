@@ -28,17 +28,17 @@ def rotate(lst: typing.Sequence, n: int) -> typing.Sequence:
     return lst[n:] + lst[:n]
 
 
-def compute_key(ieee: t.EUI64, tclk_seed: bytes, shift: int) -> t.KeyData:
+def compute_key(ieee: t.EUI64, tclk_seed: t.KeyData, shift: int) -> t.KeyData:
     rotated_tclk_seed = rotate(tclk_seed, n=shift)
     return t.KeyData([a ^ b for a, b in zip(rotated_tclk_seed, 2 * ieee.serialize())])
 
 
-def compute_tclk_seed(ieee: t.EUI64, key: t.KeyData, shift: int) -> bytes:
+def compute_tclk_seed(ieee: t.EUI64, key: t.KeyData, shift: int) -> t.KeyData:
     rotated_tclk_seed = bytes(a ^ b for a, b in zip(key, 2 * ieee.serialize()))
-    return rotate(rotated_tclk_seed, n=-shift)
+    return t.KeyData(rotate(rotated_tclk_seed, n=-shift))
 
 
-def find_key_shift(ieee: t.EUI64, key: t.KeyData, tclk_seed: bytes) -> int | None:
+def find_key_shift(ieee: t.EUI64, key: t.KeyData, tclk_seed: t.KeyData) -> int | None:
     for shift in range(0x00, 0x0F + 1):
         if tclk_seed == compute_tclk_seed(ieee, key, shift):
             return shift
@@ -47,20 +47,26 @@ def find_key_shift(ieee: t.EUI64, key: t.KeyData, tclk_seed: bytes) -> int | Non
 
 
 def count_seed_matches(
-    ieees_and_keys: typing.Sequence[tuple[t.EUI64, t.KeyData]], tclk_seed: bytes
+    keys: typing.Sequence[zigpy.state.Key], tclk_seed: t.KeyData
 ) -> int:
-    return sum(find_key_shift(i, k, tclk_seed) is not None for i, k in ieees_and_keys)
+    count = 0
+
+    for key in keys:
+        if find_key_shift(key.partner_ieee, key.key, tclk_seed) is not None:
+            count += 1
+
+    return count
 
 
 def iter_seed_candidates(
-    ieees_and_keys: typing.Sequence[tuple[t.EUI64, t.KeyData]]
+    keys: typing.Sequence[zigpy.state.Key],
 ) -> typing.Iterable[tuple[int, t.KeyData]]:
-    for ieee, key in ieees_and_keys:
+    for key in keys:
         # Derive a seed from each candidate. All rotations of a seed are equivalent.
-        tclk_seed = t.KeyData(compute_tclk_seed(ieee, key, 0))
+        tclk_seed = compute_tclk_seed(key.partner_ieee, key.key, 0)
 
         # And see how many other keys share this same seed
-        count = count_seed_matches(ieees_and_keys, tclk_seed)
+        count = count_seed_matches(keys, tclk_seed)
 
         yield count, tclk_seed
 
@@ -167,7 +173,7 @@ async def read_addr_mgr_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]:
 
 
 async def read_hashed_link_keys(
-    znp: ZNP, tclk_seed: bytes
+    znp: ZNP, tclk_seed: t.KeyData
 ) -> typing.Iterable[zigpy.state.Key]:
     if znp.version >= 3.30:
         entries = znp.nvram.read_table(
@@ -352,37 +358,31 @@ async def write_addr_manager_entries(
     await znp.nvram.osal_write(OsalNvIds.ADDRMGR, t.AddressManagerTable(new_entries))
 
 
+def find_optimal_tclk_seed(
+    devices: typing.Sequence[StoredDevice], tclk_seed: t.KeyData
+) -> t.KeyData:
+    keys = [d.key for d in devices if d.key]
+
+    if not keys:
+        return tclk_seed
+
+    best_count, best_seed = max(iter_seed_candidates(keys))
+    tclk_count = count_seed_matches(keys, tclk_seed)
+    assert tclk_count <= best_count
+
+    # Prefer the existing TCLK seed if it's as good as the others
+    if tclk_count == best_count:
+        return tclk_seed
+
+    return best_seed
+
+
 async def write_devices(
     znp: ZNP,
     devices: typing.Sequence[StoredDevice],
     counter_increment: t.uint32_t = 2500,
     tclk_seed: t.KeyData = None,
 ) -> t.KeyData:
-    ieees_and_keys = [(d.node_info.ieee, d.key.key) for d in devices if d.key]
-
-    # Find the tclk_seed that maximizes the number of keys that can be derived from it
-    if ieees_and_keys:
-        best_count, best_seed = max(iter_seed_candidates(ieees_and_keys))
-
-        # Check to see if the provided tclk_seed is also optimal
-        if tclk_seed is not None:
-            tclk_count = count_seed_matches(ieees_and_keys, tclk_seed)
-            assert tclk_count <= best_count
-
-            if tclk_count < best_count:
-                LOGGER.warning(
-                    "Provided TCLK seed %s only generates %d keys, but computed seed"
-                    " %s generates %d keys. Picking computed seed.",
-                    tclk_seed,
-                    tclk_count,
-                    best_seed,
-                    best_count,
-                )
-            else:
-                best_seed = tclk_seed
-
-        tclk_seed = best_seed
-
     hashed_link_key_table = []
     aps_key_data_table = []
     link_key_table = t.APSLinkKeyTable()
@@ -453,7 +453,7 @@ async def write_devices(
     await write_addr_manager_entries(znp, devices)
 
     if old_link_key_table is None:
-        return tclk_seed
+        return
 
     await znp.nvram.osal_write(OsalNvIds.APS_LINK_KEY_TABLE, new_link_key_table_value)
 
@@ -498,5 +498,3 @@ async def write_devices(
             values=aps_key_data_table,
             fill_value=aps_key_data_fill_value,
         )
-
-    return tclk_seed

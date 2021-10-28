@@ -303,26 +303,29 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0x98765432
 
 
-def ieee_and_key(text):
+def ieee_and_key(text) -> zigpy.state.Key:
     ieee, key = text.replace(":", "").split("|")
 
-    return t.EUI64(bytes.fromhex(ieee)[::-1]), t.KeyData(bytes.fromhex(key))
+    return zigpy.state.Key(
+        partner_ieee=t.EUI64(bytes.fromhex(ieee)[::-1]),
+        key=t.KeyData(bytes.fromhex(key)),
+    )
 
 
 def test_seed_candidate_finding_simple():
-    ieee1, key1 = ieee_and_key("0011223344556677|000102030405060708090a0b0c0d0e0f")
-    ieee2, key2 = ieee_and_key("1111223344556677|101112131415161718191a1b1c1d1e1f")
+    k1 = ieee_and_key("0011223344556677|000102030405060708090a0b0c0d0e0f")
+    k2 = ieee_and_key("1111223344556677|101112131415161718191a1b1c1d1e1f")
 
-    (c1, s1), (c2, s2) = security.iter_seed_candidates([(ieee1, key1), (ieee2, key2)])
+    (count1, seed1), (count2, seed2) = security.iter_seed_candidates([k1, k2])
 
-    assert c1 == c2 == 1
+    assert count1 == count2 == 1
 
-    sh1 = security.find_key_shift(ieee1, key1, s1)
-    sh2 = security.find_key_shift(ieee2, key2, s2)
-    assert sh1 is not None and sh2 is not None
+    shift1 = security.find_key_shift(k1.partner_ieee, k1.key, seed1)
+    shift2 = security.find_key_shift(k2.partner_ieee, k2.key, seed2)
+    assert shift1 is not None and shift2 is not None
 
-    assert security.compute_key(ieee1, s1, sh1) == key1
-    assert security.compute_key(ieee2, s2, sh2) == key2
+    assert security.compute_key(k1.partner_ieee, seed1, shift1) == k1.key
+    assert security.compute_key(k2.partner_ieee, seed2, shift2) == k2.key
 
 
 def min_rotate(lst):
@@ -366,7 +369,7 @@ def test_seed_candidate_finding_complex():
     # One seed generated all but one of the keys, so there are 24 equally valid seeds.
     # They are all really rotations of the same seed.
     assert [c for c, s in candidates].count(24) == 24
-    assert len({min_rotate(s) for c, s in candidates if c == 24}) == 1
+    assert len({min_rotate(bytes(s)) for c, s in candidates if c == 24}) == 1
 
     # And one just for the bogus entry
     assert [c[0] for c in candidates].count(1) == 1
