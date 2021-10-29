@@ -1080,7 +1080,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
                 DeviceVersion=0b0000,
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[clusters.general.Ota.cluster_id],
+                InputClusters=[
+                    clusters.general.Basic.cluster_id,
+                    clusters.general.Ota.cluster_id,
+                ],
                 OutputClusters=[
                     clusters.security.IasZone.cluster_id,
                     clusters.security.IasWd.cluster_id,
@@ -1096,7 +1099,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 DeviceId=zigpy.profiles.zll.DeviceType.CONTROLLER,
                 DeviceVersion=0b0000,
                 LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[],
+                InputClusters=[clusters.general.Basic.cluster_id],
                 OutputClusters=[],
             ),
             RspStatus=t.Status.SUCCESS,
