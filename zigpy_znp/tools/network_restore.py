@@ -53,14 +53,19 @@ def json_backup_to_zigpy_state(
 
     for obj in backup["devices"]:
         node = zigpy.state.NodeInfo()
-        node.nwk, _ = t.NWK.deserialize(bytes.fromhex(obj["nwk_address"])[::-1])
+
+        if obj["nwk_address"] is not None:
+            node.nwk, _ = t.NWK.deserialize(bytes.fromhex(obj["nwk_address"])[::-1])
+        else:
+            node.nwk = None
+
         node.ieee, _ = t.EUI64.deserialize(bytes.fromhex(obj["ieee_address"])[::-1])
         node.logical_type = None
 
         # The `is_child` key is currently optional
         if obj.get("is_child", True):
             network_info.children.append(node)
-        else:
+        elif node.nwk is not None:
             network_info.nwk_addresses[node.ieee] = node.nwk
 
         if "link_key" in obj:
@@ -72,6 +77,9 @@ def json_backup_to_zigpy_state(
             key.seq = 0
 
             network_info.key_table.append(key)
+
+        # XXX: Devices that are not children, have no NWK address, and have no link key
+        #      are effectively ignored, since there is no place to write them
 
     return network_info, node_info
 

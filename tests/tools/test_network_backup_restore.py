@@ -20,6 +20,7 @@ from ..conftest import (
     BaseZStack3CC2531,
     FormedZStack1CC2531,
     BaseLaunchpadCC26X2R1,
+    ResetLaunchpadCC26X2R1,
 )
 from ..application.test_startup import DEV_NETWORK_SETTINGS
 
@@ -91,12 +92,22 @@ def backup_json():
             {
                 "ieee_address": "aabbccddeeff0011",
                 "link_key": {
-                    "key": "01234567801234567801234567801234",  # Not derived from seed
+                    "key": "4dcc18441d843fe86d8ae1396648a92b",  # Derived from seed
                     "rx_counter": 112233,
                     "tx_counter": 445566,
                 },
                 "nwk_address": "abcd",
                 "is_child": False,
+            },
+            {
+                "ieee_address": "abcdabcabcabcaaa",
+                "link_key": {
+                    "key": "76567876567867876718736817112312",  # Not derived from seed
+                    "rx_counter": 511223,
+                    "tx_counter": 844556,
+                },
+                "nwk_address": None,  # No known NWK address
+                "is_child": True,  # but a child
             },
         ],
     }
@@ -204,6 +215,7 @@ async def test_network_restore_and_backup(
     backup_json2["metadata"]["source"] = backup_json["metadata"]["source"]
     backup_json2["network_key"]["frame_counter"] -= 2500
 
+    # Remove things Z-Stack 1 does not preserve
     if issubclass(device, BaseZStack1CC2531):
         del backup_json["stack_specific"]["zstack"]["tclk_seed"]
 
@@ -215,6 +227,31 @@ async def test_network_restore_and_backup(
                 del device["link_key"]
 
     assert backup_json == backup_json2
+
+
+@pytest.mark.parametrize("device", [ResetLaunchpadCC26X2R1])
+@pytest.mark.asyncio
+async def test_network_restore_pick_optimal_tclk(
+    device, make_znp_server, backup_json, tmp_path
+):
+    # Pick a sub-optimal TCLK
+    old_tclk_seed = backup_json["stack_specific"]["zstack"]["tclk_seed"]
+    backup_json["stack_specific"]["zstack"]["tclk_seed"] = "ab" * 16
+
+    backup_file = tmp_path / "backup.json"
+    backup_file.write_text(json.dumps(backup_json))
+
+    znp_server = make_znp_server(server_cls=device)
+
+    await network_restore([znp_server._port_path, "-i", str(backup_file)])
+
+    backup_file2 = tmp_path / "backup2.json"
+    await network_backup([znp_server._port_path, "-o", str(backup_file2)])
+
+    backup_json2 = json.loads(backup_file2.read_text())
+
+    # Optimal TCLK is re-derived
+    assert backup_json2["stack_specific"]["zstack"]["tclk_seed"] == old_tclk_seed
 
 
 @pytest.mark.asyncio
