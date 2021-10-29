@@ -20,7 +20,7 @@ setup(
     python_requires=">=3.7",
     install_requires=[
         "pyserial-asyncio>=0.6",  # 0.5 is broken on Windows
-        "zigpy>=0.37.0",
+        "zigpy>=0.40.0",
         "async_timeout",
         "voluptuous",
         "coloredlogs",
