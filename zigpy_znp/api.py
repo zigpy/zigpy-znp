@@ -26,11 +26,7 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.exceptions import (
-    SecurityError,
-    CommandNotRecognized,
-    InvalidCommandResponse,
-)
+from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
@@ -113,24 +109,9 @@ class ZNP:
         if not is_on_network:
             raise ValueError("Device is not a part of a network")
 
-        try:
-            key_desc = await self.nvram.osal_read(
-                OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
-            )
-        except SecurityError:
-            # XXX: Z-Stack 1 has no way to read some key info
-            key = await self.nvram.osal_read(OsalNvIds.PRECFGKEY, item_type=t.KeyData)
-            key_desc = t.NwkKeyDesc(
-                KeySeqNum=0,
-                Key=key,
-            )
-
-        tclk_seed = None
-
-        if self.version > 1.2:
-            tclk_seed = await self.nvram.osal_read(
-                OsalNvIds.TCLK_SEED, item_type=t.KeyData
-            )
+        key_desc = await self.nvram.osal_read(
+            OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
+        )
 
         tc_frame_counter = await security.read_tc_frame_counter(
             self, ext_pan_id=nib.extendedPANID
@@ -157,7 +138,11 @@ class ZNP:
             stack_specific=None,
         )
 
-        if tclk_seed is not None:
+        if self.version > 1.2:
+            tclk_seed = await self.nvram.osal_read(
+                OsalNvIds.TCLK_SEED, item_type=t.KeyData
+            )
+
             network_info.stack_specific = {
                 "zstack": {
                     "tclk_seed": tclk_seed.serialize().hex(),
@@ -167,9 +152,14 @@ class ZNP:
         # This takes a few seconds
         if load_devices:
             for dev in await security.read_devices(self):
+                if dev.node_info.nwk == 0xFFFE:
+                    dev = dev.replace(
+                        node_info=dataclasses.replace(dev.node_info, nwk=None)
+                    )
+
                 if dev.is_child:
                     network_info.children.append(dev.node_info)
-                else:
+                elif dev.node_info.nwk is not None:
                     network_info.nwk_addresses[dev.node_info.ieee] = dev.node_info.nwk
 
                 if dev.key is not None:
@@ -306,14 +296,14 @@ class ZNP:
         while True:
             try:
                 nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
-
+            except KeyError:
+                pass
+            else:
                 LOGGER.debug("Current NIB is %s", nib)
 
                 # Usually this works after the first attempt
                 if nib.nwkLogicalChannel != 0 and nib.nwkPanId != 0xFFFE:
                     break
-            except KeyError:
-                pass
 
             await asyncio.sleep(1)
 

@@ -366,7 +366,7 @@ def find_optimal_tclk_seed(
     if not keys:
         return tclk_seed
 
-    best_count, best_seed = max(iter_seed_candidates(keys))
+    best_count, best_seed = max(sorted(iter_seed_candidates(keys)))
     tclk_count = count_seed_matches(keys, tclk_seed)
     assert tclk_count <= best_count
 
