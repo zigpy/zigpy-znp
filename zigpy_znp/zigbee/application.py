@@ -63,7 +63,9 @@ REQUEST_TRANSIENT_ERRORS = {
 
 REQUEST_ROUTING_ERRORS = {
     t.Status.APS_NO_ACK,
+    t.Status.APS_NOT_AUTHENTICATED,
     t.Status.NWK_NO_ROUTE,
+    t.Status.NWK_INVALID_REQUEST,
     t.Status.MAC_NO_ACK,
     t.Status.MAC_TRANSACTION_EXPIRED,
 }
@@ -1512,6 +1514,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         # there is not point in trying this more than once.
                         if tried_last_good_route and force_relays is not None:
                             force_relays = None
+
+                        # If we fail to contact the device with its IEEE address, don't
+                        # try again.
+                        if (
+                            tried_ieee_address
+                            and dst_addr.mode == t.AddrMode.IEEE
+                            and device is not None
+                        ):
+                            dst_addr = t.AddrModeAddress(
+                                mode=t.AddrMode.NWK,
+                                address=device.nwk,
+                            )
 
                         # Child aging is disabled so if a child switches parents from
                         # the coordinator to another router, we will not be able to
