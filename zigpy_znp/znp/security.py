@@ -153,7 +153,7 @@ async def write_tc_frame_counter(
         )
 
 
-async def read_addr_mgr_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]:
+async def read_addr_manager_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]:
     if znp.version >= 3.30:
         entries = [
             entry
@@ -259,7 +259,7 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
     if znp.version > 1.2:
         tclk_seed = await znp.nvram.osal_read(OsalNvIds.TCLK_SEED, item_type=t.KeyData)
 
-    addr_mgr = await read_addr_mgr_entries(znp)
+    addr_mgr = await read_addr_manager_entries(znp)
     devices = {}
 
     for entry in addr_mgr:
@@ -317,30 +317,13 @@ async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
 
 
 async def write_addr_manager_entries(
-    znp: ZNP, devices: typing.Sequence[StoredDevice]
+    znp: ZNP, entries: typing.Sequence[t.AddrMgrEntry]
 ) -> None:
-    entries = []
-
-    for dev in devices:
-        entry = t.AddrMgrEntry(
-            type=t.AddrMgrUserType.Default,
-            nwkAddr=dev.node_info.nwk,
-            extAddr=dev.node_info.ieee,
-        )
-
-        if dev.key is not None:
-            entry.type |= t.AddrMgrUserType.Security
-
-        if dev.is_child:
-            entry.type |= t.AddrMgrUserType.Assoc
-
-        entries.append(entry)
-
     if znp.version >= 3.30:
         await znp.nvram.write_table(
             item_id=ExNvIds.ADDRMGR,
             values=entries,
-            fill_value=const.EMPTY_ADDR_MGR_ENTRY,
+            fill_value=const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3,
         )
         return
 
@@ -349,7 +332,11 @@ async def write_addr_manager_entries(
     old_entries = await znp.nvram.osal_read(
         OsalNvIds.ADDRMGR, item_type=t.AddressManagerTable
     )
-    new_entries = len(old_entries) * [const.EMPTY_ADDR_MGR_ENTRY]
+
+    if znp.version >= 3.30:
+        new_entries = len(old_entries) * [const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3]
+    else:
+        new_entries = len(old_entries) * [const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1]
 
     # Purposefully throw an `IndexError` if we are trying to write too many entries
     for index, entry in enumerate(entries):
@@ -449,8 +436,25 @@ async def write_devices(
         if len(new_link_key_table_value) > len(old_link_key_table):
             raise RuntimeError("New link key table is larger than the current one")
 
+    addr_mgr_entries = []
+
+    for dev in devices:
+        entry = t.AddrMgrEntry(
+            type=t.AddrMgrUserType.Default,
+            nwkAddr=dev.node_info.nwk,
+            extAddr=dev.node_info.ieee,
+        )
+
+        if dev.key is not None:
+            entry.type |= t.AddrMgrUserType.Security
+
+        if dev.is_child:
+            entry.type |= t.AddrMgrUserType.Assoc
+
+        addr_mgr_entries.append(entry)
+
     # Postpone writes until all of the table entries have been created
-    await write_addr_manager_entries(znp, devices)
+    await write_addr_manager_entries(znp, addr_mgr_entries)
 
     if old_link_key_table is None:
         return

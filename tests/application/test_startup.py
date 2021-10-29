@@ -1,5 +1,6 @@
 import pytest
 
+import zigpy_znp.const as const
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
@@ -267,3 +268,31 @@ async def test_auto_form_necessary(device, make_application, mocker):
     assert nvram[OsalNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedZStack1CC2531, FormedZStack3CC2531])
+async def test_addrmgr_rewrite_fix(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+
+    nvram = znp_server._nvram[ExNvIds.LEGACY]
+
+    assert (
+        nvram[OsalNvIds.ADDRMGR].count(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize())
+        > 2
+    )
+    nvram[OsalNvIds.ADDRMGR] = nvram[OsalNvIds.ADDRMGR].replace(
+        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize(),
+        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3.serialize(),
+        2,
+    )
+
+    assert const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize() in nvram[OsalNvIds.ADDRMGR]
+    assert const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3.serialize() in nvram[OsalNvIds.ADDRMGR]
+
+    await app.startup()
+    await app.shutdown()
+
+    assert const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize() in nvram[OsalNvIds.ADDRMGR]
+    assert (
+        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3.serialize() not in nvram[OsalNvIds.ADDRMGR]
+    )

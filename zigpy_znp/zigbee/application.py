@@ -30,6 +30,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+from zigpy_znp.znp import security
 from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
@@ -185,6 +186,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # We only assign `self._znp` after it has successfully connected
         self._znp = znp
         self._znp.set_application(self)
+
+        if not read_only and not force_form:
+            await self._migrate_nvram()
 
         self._bind_callbacks()
 
@@ -927,6 +931,53 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 )
         except (asyncio.TimeoutError, CommandNotRecognized):
             LOGGER.info("This build of Z-Stack does not appear to support LED control")
+
+    async def _migrate_nvram(self):
+        """
+        Migrates NVRAM entries using the `ZIGPY_ZNP_MIGRATION_ID` NVRAM item.
+        """
+
+        try:
+            migration_id = await self._znp.nvram.osal_read(
+                OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, item_type=t.uint8_t
+            )
+        except KeyError:
+            migration_id = 0
+
+        initial_migration_id = migration_id
+
+        # Migration 1: empty `ADDRMGR` entries are version-dependent
+        if migration_id < 1:
+            try:
+                entries = await security.read_addr_manager_entries(self._znp)
+            except KeyError:
+                pass
+            else:
+                fixed_entries = []
+
+                for entry in entries:
+                    if entry not in (
+                        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1,
+                        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3,
+                    ):
+                        fixed_entries.append(entry)
+                    elif self._znp.version == 3.30:
+                        fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3)
+                    else:
+                        fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1)
+
+                if entries != fixed_entries:
+                    LOGGER.warning("Fixing broken address manager entries")
+                    await security.write_addr_manager_entries(self._znp, fixed_entries)
+
+            migration_id = 1
+
+        await self._znp.nvram.osal_write(
+            OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, t.uint8_t(migration_id), create=True
+        )
+
+        if initial_migration_id != migration_id:
+            await self._znp.reset()
 
     async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
         """

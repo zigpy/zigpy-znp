@@ -39,6 +39,7 @@ class OsalNvIds(BaseNvIds):
     # Introduced by zigbeer/zigbee-shepherd and now used by Zigbee2MQTT
     HAS_CONFIGURED_ZSTACK1 = 0x0F00
     HAS_CONFIGURED_ZSTACK3 = 0x0060
+    ZIGPY_ZNP_MIGRATION_ID = 0x0FEE
 
     # OSAL NV item IDs
     EXTADDR = 0x0001
