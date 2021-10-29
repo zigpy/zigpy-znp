@@ -1102,12 +1102,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.SUCCESS,
         )
 
-    async def load_network_info(self) -> None:
+    async def load_network_info(self, *, load_devices=False) -> None:
         """
         Loads network information from NVRAM.
         """
 
-        await self._znp.load_network_info()
+        await self._znp.load_network_info(load_devices=load_devices)
 
         self.state.node_information = self._znp.node_info
         self.state.network_information = self._znp.network_info
