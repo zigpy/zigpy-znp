@@ -39,7 +39,10 @@ class OsalNvIds(BaseNvIds):
     # Introduced by zigbeer/zigbee-shepherd and now used by Zigbee2MQTT
     HAS_CONFIGURED_ZSTACK1 = 0x0F00
     HAS_CONFIGURED_ZSTACK3 = 0x0060
-    ZIGPY_ZNP_MIGRATION_ID = 0x0FEE
+
+    # Although the docs say "IDs reserved for applications range from 0x0401 to 0x0FFF",
+    # no OSAL NVID beyond 0x03FF is writable with the MT interface when using Z-Stack 3.
+    ZIGPY_ZNP_MIGRATION_ID = 0x005F
 
     # OSAL NV item IDs
     EXTADDR = 0x0001
