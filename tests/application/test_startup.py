@@ -17,6 +17,7 @@ from ..conftest import (
     FormedZStack1CC2531,
     FormedZStack3CC2531,
     FormedLaunchpadCC26X2R1,
+    load_nvram_json,
 )
 
 pytestmark = [pytest.mark.asyncio]
@@ -270,29 +271,25 @@ async def test_auto_form_necessary(device, make_application, mocker):
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", [FormedZStack1CC2531, FormedZStack3CC2531])
+class BadAddrMgrZStack3CC2531(FormedZStack3CC2531):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._nvram = load_nvram_json("CC2531-ZStack3.bad_addrmgr.json")
+
+
+@pytest.mark.parametrize("device", [BadAddrMgrZStack3CC2531])
 async def test_addrmgr_rewrite_fix(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     nvram = znp_server._nvram[ExNvIds.LEGACY]
-
-    assert (
-        nvram[OsalNvIds.ADDRMGR].count(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize())
-        > 2
-    )
-    nvram[OsalNvIds.ADDRMGR] = nvram[OsalNvIds.ADDRMGR].replace(
-        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize(),
-        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3.serialize(),
-        2,
-    )
-
-    assert const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize() in nvram[OsalNvIds.ADDRMGR]
-    assert const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3.serialize() in nvram[OsalNvIds.ADDRMGR]
+    old_addrmgr = nvram[OsalNvIds.ADDRMGR]
+    assert old_addrmgr.count(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize()) == 0
 
     await app.startup()
     await app.shutdown()
 
-    assert const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize() in nvram[OsalNvIds.ADDRMGR]
-    assert (
-        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3.serialize() not in nvram[OsalNvIds.ADDRMGR]
-    )
+    new_addrmgr = nvram[OsalNvIds.ADDRMGR]
+
+    assert old_addrmgr != new_addrmgr
+    assert new_addrmgr.count(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize()) != 0

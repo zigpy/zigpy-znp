@@ -946,7 +946,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         initial_migration_id = migration_id
 
-        # Migration 1: empty `ADDRMGR` entries are version-dependent
+        # Migration 1: empty `ADDRMGR` entries are version-dependent and were improperly
+        #              written for CC253x devices.
+        #
+        #              This migration is stateless and can safely be run more than once:
+        #              the only downside is that startup times increase by 10s on newer
+        #              coordinators, which is why the migration ID is persisted.
         if migration_id < 1:
             try:
                 entries = await security.read_addr_manager_entries(self._znp)
@@ -956,10 +961,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 fixed_entries = []
 
                 for entry in entries:
-                    if entry not in (
-                        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1,
-                        const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3,
-                    ):
+                    if entry.extAddr != t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):
                         fixed_entries.append(entry)
                     elif self._znp.version == 3.30:
                         fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3)
@@ -967,16 +969,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1)
 
                 if entries != fixed_entries:
-                    LOGGER.warning("Fixing broken address manager entries")
+                    LOGGER.warning(
+                        "Repairing %d invalid empty address manager entries (total %d)",
+                        sum(i != j for i, j in zip(entries, fixed_entries)),
+                        len(entries),
+                    )
                     await security.write_addr_manager_entries(self._znp, fixed_entries)
 
             migration_id = 1
 
-        await self._znp.nvram.osal_write(
-            OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, t.uint8_t(migration_id), create=True
-        )
-
         if initial_migration_id != migration_id:
+            await self._znp.nvram.osal_write(
+                OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, t.uint8_t(migration_id), create=True
+            )
             await self._znp.reset()
 
     async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
