@@ -418,24 +418,6 @@ async def write_devices(
                 )
             )
 
-    # Make sure the new table is the same size as the old table. Because this type is
-    # prefixed by the number of entries, the trailing table bytes are not kept track of
-    # but still necessary, as the table has a static maximum capacity.
-    try:
-        old_link_key_table = await znp.nvram.osal_read(
-            OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
-        )
-    except KeyError:
-        old_link_key_table = None
-    else:
-        unpadded_link_key_table = znp.nvram.serialize(link_key_table)
-        new_link_key_table_value = unpadded_link_key_table.ljust(
-            len(old_link_key_table), b"\x00"
-        )
-
-        if len(new_link_key_table_value) > len(old_link_key_table):
-            raise RuntimeError("New link key table is larger than the current one")
-
     addr_mgr_entries = []
 
     for dev in devices:
@@ -453,11 +435,26 @@ async def write_devices(
 
         addr_mgr_entries.append(entry)
 
-    # Postpone writes until all of the table entries have been created
     await write_addr_manager_entries(znp, addr_mgr_entries)
 
-    if old_link_key_table is None:
+    # Z-Stack Home 1.2 does not store keys
+    if znp.version < 3.0:
         return
+
+    # Make sure the new table is the same size as the old table. Because this type is
+    # prefixed by the number of entries, the trailing table bytes are not kept track of
+    # but still necessary, as the table has a static maximum capacity.
+    old_link_key_table = await znp.nvram.osal_read(
+        OsalNvIds.APS_LINK_KEY_TABLE, item_type=t.Bytes
+    )
+
+    unpadded_link_key_table = znp.nvram.serialize(link_key_table)
+    new_link_key_table_value = unpadded_link_key_table.ljust(
+        len(old_link_key_table), b"\x00"
+    )
+
+    if len(new_link_key_table_value) > len(old_link_key_table):
+        raise RuntimeError("New link key table is larger than the current one")
 
     await znp.nvram.osal_write(OsalNvIds.APS_LINK_KEY_TABLE, new_link_key_table_value)
 
@@ -471,7 +468,7 @@ async def write_devices(
     )
 
     aps_key_data_fill_value = t.APSKeyDataTableEntry(
-        Key=t.KeyData([0x00] * 16),
+        Key=t.KeyData.convert("00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"),
         TxFrameCounter=0,
         RxFrameCounter=0,
     )
