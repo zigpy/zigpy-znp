@@ -20,7 +20,7 @@ $ source venv/bin/activate
 ```
 
 ## Home Assistant
-Stable releases of zigpy-znp are included with Home Assistant and zigpy-znp is currently used by all new ZHA integration setups. If you have previously setup Home Assistant's ZHA component with a TI radio, ZHA may be using the [zigpy-cc](https://github.com/zigpy/zigpy-cc/) library to communicate with the radio hardware. Navigate to the folder containing your `configuration.yaml` file, edit `.storage/core.config_entries`, and change `"radio_type": "ti_cc"` to `"radio_type": "znp"`.
+Stable releases of zigpy-znp are automatically installed when you install the ZHA component.
 
 ### Testing `dev` with Home Assistant Core
 
@@ -44,7 +44,7 @@ Launch Home Assistant with the `--skip-pip` command line option to prevent zigpy
 
 # Configuration
 Below are the defaults with the top-level Home Assistant `zha:` key.
-You do not need to copy this configuration, it is provided only for reference:
+**You do not need to copy this configuration, it is provided only for reference**:
 
 ```yaml
 zha:

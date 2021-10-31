@@ -15,7 +15,7 @@ and will work with any Texas Instruments radio previously used with ZHA or Zigbe
     + [Installing zigpy-znp](#installing-zigpy-znp)
 - [Tools](#tools)
   * [Backup and restore](#backup-and-restore)
-    + [Network backup (beta)](#network-backup-beta)
+    + [Network backup](#network-backup)
     + [NVRAM backup](#nvram-backup)
   * [NVRAM reset](#nvram-reset)
   * [Network formation](#network-formation)
@@ -141,7 +141,8 @@ Firmware upgrades usually erase network settings so **you should perform a backu
 upgrading**. Currently there are two formats: a high-level backup format independent of
 zigpy-znp, and a complete low-level NVRAM backup of the device.
 
-### Network backup (beta)
+<span id="network-backup-beta"></span> <!-- so old links still work -->
+### Network backup
 A high-level and stack-agnostic backup of your device's network data using the
 [Open Coordinator Backup Format](https://github.com/zigpy/open-coordinator-backup/)
 allows you to snapshot the device state and move your network between any supported
@@ -155,27 +156,29 @@ $ python -m zigpy_znp.tools.network_restore /dev/serial/by-id/new_radio -i netwo
 For example, a network backup will allow you to migrate from a CC2531 with Z-Stack Home
 1.2 to a zzh! without re-joining any devices. The backup format is human-readable and 
 fully documented so you can fill out the appropriate information by hand to form a network
-if you are migrating from a non-Texas Instruments device.
+if you are migrating from a coordinator that isn't currently supported.
 
-To get ZHA to utilize your new radio, make sure to change the coordinator's `path` in
-`/config/.storage/core.config_entries`.
+To get ZHA to utilize your new radio, either:
+ 1. Remove and re-add the ZHA integration. Your existing entities will not disappear.
+ 2. Directly edit `/config/.storage/core.config_entries`, update the coordinator's
+    `path`, and change the `baudrate` to `115200`.
 
 ### NVRAM backup
 In contrast to the high-level coordinator backup described above, an exhaustive, low-level
 NVRAM backup can be performed to clone your entire device state. The backed up data is
-opaque and contains little human-readable information:
+opaque and contains little human-readable information.
+
+Note: the NVRAM structure is device- and firmware-specific so **an NVRAM backup can only be
+restored to a device similar to the original**:
+
+ - CC2531 with Z-Stack Home 1.2 is **only** compatible with another CC2531 running Z-Stack Home 1.2.
+ - CC2531 with Z-Stack 3.0 is **only** compatible with another CC2531 running Z-Stack 3.0.
+ - Newer chips like the CC2652R/RB and the CC1352P (zzh!, Slaesh's stick, and the LAUNCHXL boards) **are all cross-compatible**.
 
 ```console
 $ python -m zigpy_znp.tools.nvram_read /dev/serial/by-id/old_radio -o backup.json
 $ python -m zigpy_znp.tools.nvram_write /dev/serial/by-id/new_radio -i backup.json
 ```
-
-Note: the NVRAM structure is device- and firmware-specific so an NVRAM backup can only be
-restored to a device similar to the original:
-
- - CC2531 with Z-Stack Home 1.2 is only compatible with another CC2531 running Z-Stack Home 1.2.
- - CC2531 with Z-Stack 3.0 is only compatible with another CC2531 running Z-Stack 3.0.
- - Newer chips like the CC2652R/RB and the CC1352P (zzh!, Slaesh's stick, and the LAUNCHXL boards) are all cross-compatible.
 
 ## NVRAM reset
 Erase your device's NVRAM entries to fully reset it:
