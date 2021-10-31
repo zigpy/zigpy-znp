@@ -9,9 +9,11 @@ repos:
       - id: black
         args: [--safe, --quiet]
   - repo: https://github.com/PyCQA/flake8
-    rev: 3.9.0
+    rev: 3.9.2
     hooks:
       - id: flake8
+        entry: pflake8
+        additional_dependencies: ['pyproject-flake8==0.0.1a2']
   - repo: https://github.com/PyCQA/isort
     rev: 5.8.0
     hooks:
