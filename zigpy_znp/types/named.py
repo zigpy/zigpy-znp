@@ -94,7 +94,7 @@ class AddrModeAddress:
 
 
 class GroupId(basic.uint16_t, hex_repr=True):
-    """"Group ID class"""
+    """Group ID class"""
 
     pass
 
