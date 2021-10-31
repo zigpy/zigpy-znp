@@ -36,7 +36,7 @@ def json_backup_to_zigpy_state(
     network_info.channel = backup["channel"]
     network_info.channel_mask = t.Channels.from_channel_list(backup["channel_mask"])
     network_info.security_level = backup["security_level"]
-    network_info.stack_specific = backup["stack_specific"]
+    network_info.stack_specific = backup.get("stack_specific")
     network_info.tc_link_key = None
 
     network_info.network_key = zigpy.state.Key()
