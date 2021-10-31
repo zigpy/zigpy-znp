@@ -1,6 +1,5 @@
 import pytest
 
-import zigpy_znp.const as const
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
@@ -17,7 +16,6 @@ from ..conftest import (
     FormedZStack1CC2531,
     FormedZStack3CC2531,
     FormedLaunchpadCC26X2R1,
-    load_nvram_json,
 )
 
 pytestmark = [pytest.mark.asyncio]
@@ -269,27 +267,3 @@ async def test_auto_form_necessary(device, make_application, mocker):
     assert nvram[OsalNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
 
     await app.shutdown()
-
-
-class BadAddrMgrZStack3CC2531(FormedZStack3CC2531):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self._nvram = load_nvram_json("CC2531-ZStack3.bad_addrmgr.json")
-
-
-@pytest.mark.parametrize("device", [BadAddrMgrZStack3CC2531])
-async def test_addrmgr_rewrite_fix(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
-
-    nvram = znp_server._nvram[ExNvIds.LEGACY]
-    old_addrmgr = nvram[OsalNvIds.ADDRMGR]
-    assert old_addrmgr.count(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize()) == 0
-
-    await app.startup()
-    await app.shutdown()
-
-    new_addrmgr = nvram[OsalNvIds.ADDRMGR]
-
-    assert old_addrmgr != new_addrmgr
-    assert new_addrmgr.count(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1.serialize()) != 0
