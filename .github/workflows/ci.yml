@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
         id: python
-        uses: actions/setup-python@v2.1.4
+        uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
       - name: Restore base Python virtual environment
@@ -54,7 +54,7 @@ jobs:
       - name: Check out code from GitHub
         uses: actions/checkout@v2
       - name: Set up Python ${{ env.DEFAULT_PYTHON }}
-        uses: actions/setup-python@v2.1.4
+        uses: actions/setup-python@v2
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
@@ -95,7 +95,7 @@ jobs:
       - name: Check out code from GitHub
         uses: actions/checkout@v2
       - name: Set up Python ${{ env.DEFAULT_PYTHON }}
-        uses: actions/setup-python@v2.1.4
+        uses: actions/setup-python@v2
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
@@ -138,7 +138,7 @@ jobs:
       - name: Check out code from GitHub
         uses: actions/checkout@v2
       - name: Set up Python ${{ env.DEFAULT_PYTHON }}
-        uses: actions/setup-python@v2.1.4
+        uses: actions/setup-python@v2
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
@@ -184,7 +184,7 @@ jobs:
       - name: Check out code from GitHub
         uses: actions/checkout@v2
       - name: Set up Python ${{ env.DEFAULT_PYTHON }}
-        uses: actions/setup-python@v2.1.4
+        uses: actions/setup-python@v2
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
@@ -231,7 +231,7 @@ jobs:
       - name: Check out code from GitHub
         uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2.1.4
+        uses: actions/setup-python@v2
         id: python
         with:
           python-version: ${{ matrix.python-version }}
@@ -271,7 +271,7 @@ jobs:
             -p no:sugar \
             tests
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v2.2.0
+        uses: actions/upload-artifact@v2
         with:
           name: coverage-${{ matrix.python-version }}
           path: .coverage
@@ -285,7 +285,7 @@ jobs:
       - name: Check out code from GitHub
         uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2.1.4
+        uses: actions/setup-python@v2
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
@@ -312,4 +312,4 @@ jobs:
           coverage report --fail-under=98
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1.0.14
+        uses: codecov/codecov-action@v2
