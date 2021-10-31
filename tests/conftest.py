@@ -978,7 +978,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
         super()._create_network_nvram()
         self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xFF" * 20
         self._nvram[ExNvIds.ADDRMGR] = {
-            addr: self.nvram_serialize(const.EMPTY_ADDR_MGR_ENTRY)
+            addr: self.nvram_serialize(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3)
             for addr in range(0x0000, 0x0100 + 1)
         }
 
@@ -1094,7 +1094,7 @@ class BaseZStack3CC2531(BaseZStack3Device):
         super()._create_network_nvram()
         self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xFF" * 17
         self._nvram[ExNvIds.LEGACY][OsalNvIds.ADDRMGR] = 124 * self.nvram_serialize(
-            const.EMPTY_ADDR_MGR_ENTRY
+            const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1
         )
 
     def create_nib(self, _=None):

@@ -12,7 +12,13 @@ DEFAULT_TC_LINK_KEY = t.TCLinkKey(
 )
 ZSTACK_CONFIGURE_SUCCESS = t.uint8_t(0x55)
 
-EMPTY_ADDR_MGR_ENTRY = t.AddrMgrEntry(
+EMPTY_ADDR_MGR_ENTRY_ZSTACK1 = t.AddrMgrEntry(
+    type=t.AddrMgrUserType.Default,
+    nwkAddr=0xFFFF,
+    extAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+)
+
+EMPTY_ADDR_MGR_ENTRY_ZSTACK3 = t.AddrMgrEntry(
     type=t.AddrMgrUserType(0xFF),
     nwkAddr=0xFFFF,
     extAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),

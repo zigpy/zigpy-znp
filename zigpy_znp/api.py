@@ -191,9 +191,10 @@ class ZNP:
 
         from zigpy_znp.znp import security
 
-        # Delete any existing HAS_CONFIGURED_ZSTACK* NV items. One (or both) may fail.
+        # Delete any existing NV items that store formation state
         await self.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK1)
         await self.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK3)
+        await self.nvram.osal_delete(OsalNvIds.ZIGPY_ZNP_MIGRATION_ID)
         await self.nvram.osal_delete(OsalNvIds.BDBNODEISONANETWORK)
 
         # Instruct Z-Stack to reset everything on the next boot
