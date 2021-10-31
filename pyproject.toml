@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=34.4.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.isort]
 multi_line_output = 3
 length_sort = true
@@ -28,3 +32,29 @@ max-line-length = 88
 # E203: Whitespace before ':'
 # D202 No blank lines allowed after function docstring
 ignore = "W503,E203,D202"
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+envlist = py37, py38, py39, lint, black
+skip_missing_interpreters = True
+
+[testenv]
+setenv = PYTHONPATH = {toxinidir}
+extras = testing
+commands = py.test --cov --cov-report=html
+
+[testenv:lint]
+basepython = python3
+deps = flake8
+commands = flake8
+
+[testenv:black]
+deps =
+    black==20.8.b1
+setenv =
+    LC_ALL=C.UTF-8
+    LANG=C.UTF-8
+commands=
+    black --check --fast {toxinidir}/zigpy_znp {toxinidir}/tests {toxinidir}/setup.py
+"""
