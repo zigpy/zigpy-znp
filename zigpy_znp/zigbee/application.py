@@ -362,7 +362,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         network_key = self.config[conf.CONF_NWK][conf.CONF_NWK_KEY]
 
         if pan_id is None:
-            pan_id = random.SystemRandom().randint(0x0000, 0xFFFE + 1)
+            pan_id = random.SystemRandom().randint(0x0001, 0xFFFE + 1)
 
         if extended_pan_id is None:
             extended_pan_id = ExtendedPanId(os.urandom(8))
