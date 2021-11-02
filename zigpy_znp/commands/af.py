@@ -12,7 +12,7 @@ class TransmitOptions(t.enum_flag_uint8):
     LIMIT_CONCENTRATOR = 0x08
     ACK_REQUEST = 0x10
 
-    # Suppress Route Discovery for intermediate routes (route discovery preformed for
+    # Suppress Route Discovery for intermediate routes (route discovery performed for
     # initiating device)
     SUPPRESS_ROUTE_DISC_NETWORK = 0x20
     ENABLE_SECURITY = 0x40

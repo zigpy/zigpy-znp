@@ -30,7 +30,7 @@ class AgingEndDevice(t.CStruct):
 
 class LinkInfo(t.CStruct):
     txCounter: t.uint8_t  # Counter of transmission success/failures
-    txCost: t.uint8_t  # Average of sending rssi values if link staus is enabled
+    txCost: t.uint8_t  # Average of sending rssi values if link status is enabled
     #   i.e. NWK_LINK_STATUS_PERIOD is defined as non zero
     rxLqi: t.uint8_t  # average of received rssi values
     # needs to be converted to link cost (1-7) before used
@@ -328,7 +328,7 @@ class UTIL(t.CommandsBase, subsystem=t.Subsystem.UTIL):
                 "IEEE", t.EUI64, "Extended address of the device to lookup the NWK"
             ),
         ),
-        rsp_schema=(t.Param("NWK", t.NWK, "NWK address of the device fo"),),
+        rsp_schema=(t.Param("NWK", t.NWK, "NWK address of the device"),),
     )
 
     # a proxy call to the AddrMgrEntryLookupNwk() function

@@ -78,7 +78,7 @@ async def test_response_timeouts(connected_znp):
                 await znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
             ) == response
 
-    # Our future still completed, albeit unsuccesfully.
+    # Our future still completed, albeit unsuccessfully.
     # We should have no leaked listeners here.
     assert not znp._listeners
 

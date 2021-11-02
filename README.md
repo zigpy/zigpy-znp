@@ -135,7 +135,7 @@ Texas Instruments (TI) has quite a few different wireless MCU chips and they are
 - CC2530: 2.4GHz Zigbee and IEEE 802.15.4 wireless MCU. Intel 8051 core, 256 Flash, only has 8kB RAM.
 
 ### Auxiliary TI chips
-- CC2591 and CC2592: 2.4 GHz range extenders. These are not wireless MCUs, just auxillary PA (Power Amplifier) and LNA (Low Noise Amplifier) in the same package to improve RF (Radio Frequency) range of any 2.4 GHz radio chip.
+- CC2591 and CC2592: 2.4 GHz range extenders. These are not wireless MCUs, just auxiliary PA (Power Amplifier) and LNA (Low Noise Amplifier) in the same package to improve RF (Radio Frequency) range of any 2.4 GHz radio chip.
 
 # Releases via PyPI
 

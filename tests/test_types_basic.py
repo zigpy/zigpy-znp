@@ -18,7 +18,7 @@ def test_serialize_list():
 
 
 def test_enum_uint():
-    class TE(t.enum_flag_uint16):
+    class TestEnum(t.enum_flag_uint16):
         ALL = 0xFFFF
         CH_1 = 0x0001
         CH_2 = 0x0002
@@ -30,13 +30,13 @@ def test_enum_uint():
     extra = b"The rest of the data\x55\xaa"
     data = b"\x12\x80"
 
-    r, rest = TE.deserialize(data + extra)
+    r, rest = TestEnum.deserialize(data + extra)
     assert rest == extra
     assert r == 0x8012
-    assert r == (TE.CH_2 | TE.CH_6 | TE.CH_Z)
+    assert r == (TestEnum.CH_2 | TestEnum.CH_6 | TestEnum.CH_Z)
 
     assert r.serialize() == data
-    assert TE(0x8012).serialize() == data
+    assert TestEnum(0x8012).serialize() == data
 
 
 def test_abstract_ints():

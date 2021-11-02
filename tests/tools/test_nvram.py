@@ -79,7 +79,7 @@ async def test_nvram_read(device, make_znp_server, tmp_path, mocker):
 async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
     znp_server = make_znp_server(server_cls=device)
 
-    # Prevent the reset from occuring so NVRAM state isn't affected during "startup"
+    # Prevent the reset from occurring so NVRAM state isn't affected during "startup"
     version = znp_server.version_replier(None)
     znp_server.reply_to(
         c.SYS.ResetReq.Req(partial=True),

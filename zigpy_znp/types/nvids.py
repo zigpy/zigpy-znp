@@ -203,7 +203,7 @@ class OsalNvIds(BaseNvIds):
     TCLK_DEFAULT = 0x0103  # Not accually a Nv Item but Id used by SecMgr
 
     LEGACY_TCLK_IC_TABLE_START = 0x0104  # Deprecated. Refer to EX_TCLK_IC_TABLE
-    LEGACY_TCLK_IC_TABLE_END = 0x0110  # IC keys, refered with shift byte
+    LEGACY_TCLK_IC_TABLE_END = 0x0110  # IC keys, referred with shift byte
 
     LEGACY_TCLK_TABLE_START = 0x0111  # Deprecated. Refer to EX_TCLK_TABLE
     LEGACY_TCLK_TABLE_END = 0x01FF

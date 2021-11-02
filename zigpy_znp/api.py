@@ -503,7 +503,7 @@ class ZNP:
                 # Make sure that our port works
                 self.capabilities = (await self.request(c.SYS.Ping.Req())).Capabilities
 
-                # We need to know how structs are packed to deserialize frames corectly
+                # We need to know how structs are packed to deserialize frames correctly
                 await self.nvram.determine_alignment()
                 self.version = await self.detect_zstack_version()
 

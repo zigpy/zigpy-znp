@@ -764,7 +764,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # handle the ZDO route check extension messags
+    # handle the ZDO route check extension messages
     ExtRouteChk = t.CommandDef(
         t.CommandType.SREQ,
         0x46,
@@ -927,7 +927,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             t.Param(
                 "Cmd",
                 t.uint8_t,
-                "A valid Cluser ID command as specified by profile",
+                "A valid Cluster ID command as specified by profile",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,
