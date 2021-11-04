@@ -51,7 +51,7 @@ disable ZHA to run any of the tools:
 For Ubuntu 20.04:
 
 ```console
-$ sudo apt install python3 python3-virtulenv  # ensure this is Python 3.7 or above
+$ sudo apt install python3 python3-virtualenv  # ensure this is Python 3.7 or above
 ```
 
 #### macOS
