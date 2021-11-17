@@ -102,6 +102,36 @@ ZDO_CONVERTERS = {
         (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, {"Status": rsp.Status})),
     ),
+    ZDOCmd.Mgmt_NWK_Update_req: (
+        (
+            lambda addr, NwkUpdate: c.ZDO.MgmtNWKUpdateReq.Req(
+                Dst=addr.address,
+                DstAddrMode=addr.mode,
+                Channels=NwkUpdate.ScanChannels,
+                ScanDuration=NwkUpdate.ScanDuration,
+                ScanCount=NwkUpdate.ScanCount,
+                # XXX: nwkUpdateId is hard-coded to `_NIB.nwkUpdateId + 1`
+                NwkManagerAddr=NwkUpdate.nwkManagerAddr,
+            )
+        ),
+        (
+            lambda addr: c.ZDO.MgmtNWKUpdateNotify.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
+        (
+            lambda rsp: (
+                ZDOCmd.Mgmt_NWK_Update_rsp,
+                {
+                    "Status": rsp.Status,
+                    "ScannedChannels": rsp.ScannedChannels,
+                    "TotalTransmissions": rsp.TotalTransmissions,
+                    "TransmissionFailures": rsp.TransmissionFailures,
+                    "EnergyValues": rsp.EnergyValues,
+                },
+            )
+        ),
+    ),
     ZDOCmd.Bind_req: (
         (
             lambda addr, SrcAddress, SrcEndpoint, ClusterID, DstAddress: (
