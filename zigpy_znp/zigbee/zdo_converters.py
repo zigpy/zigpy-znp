@@ -111,7 +111,7 @@ ZDO_CONVERTERS = {
                 ScanDuration=NwkUpdate.ScanDuration,
                 ScanCount=NwkUpdate.ScanCount,
                 # XXX: nwkUpdateId is hard-coded to `_NIB.nwkUpdateId + 1`
-                NwkManagerAddr=NwkUpdate.nwkManagerAddr,
+                NwkManagerAddr=NwkUpdate.nwkManagerAddr or 0x0000,
             )
         ),
         (
