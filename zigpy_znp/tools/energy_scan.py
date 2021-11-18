@@ -4,8 +4,9 @@ import logging
 import itertools
 from collections import deque, defaultdict
 
+import zigpy.zdo.types as zdo_t
+
 import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -34,20 +35,17 @@ async def perform_energy_scan(radio_path, num_scans=None):
         if num_scans is not None and i > num_scans:
             break
 
-        rsp = await app._znp.request_callback_rsp(
-            request=c.ZDO.MgmtNWKUpdateReq.Req(
-                Dst=0x0000,
-                DstAddrMode=t.AddrMode.NWK,
-                Channels=t.Channels.ALL_CHANNELS,
-                ScanDuration=0x02,  # exponent
+        rsp = await app.get_device(nwk=0x0000).zdo.Mgmt_NWK_Update_req(
+            zdo_t.NwkUpdate(
+                ScanChannels=t.Channels.ALL_CHANNELS,
+                ScanDuration=0x02,
                 ScanCount=1,
-                NwkManagerAddr=0x0000,
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtNWKUpdateNotify.Callback(partial=True, Src=0x0000),
+            )
         )
 
-        for channel, energy in zip(rsp.ScannedChannels, rsp.EnergyValues):
+        _, scanned_channels, _, _, energy_values = rsp
+
+        for channel, energy in zip(scanned_channels, energy_values):
             energies = channel_energies[channel]
             energies.append(energy)
 
