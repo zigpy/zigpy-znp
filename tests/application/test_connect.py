@@ -60,7 +60,7 @@ async def test_probe_unsuccessful():
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_probe_unsuccessful_slow(device, make_znp_server, mocker):
-    znp_server = make_znp_server(server_cls=device)
+    znp_server = make_znp_server(server_cls=device, shorten_delays=False)
 
     # Don't respond to anything
     znp_server._listeners.clear()
@@ -78,7 +78,7 @@ async def test_probe_unsuccessful_slow(device, make_znp_server, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_probe_successful(device, make_znp_server):
-    znp_server = make_znp_server(server_cls=device)
+    znp_server = make_znp_server(server_cls=device, shorten_delays=False)
 
     assert await ControllerApplication.probe(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port})
@@ -89,7 +89,7 @@ async def test_probe_successful(device, make_znp_server):
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_probe_multiple(device, make_znp_server):
     # Make sure that our listeners don't get cleaned up after each probe
-    znp_server = make_znp_server(server_cls=device)
+    znp_server = make_znp_server(server_cls=device, shorten_delays=False)
     znp_server.close = lambda: None
 
     config = conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port})
@@ -112,6 +112,7 @@ async def test_reconnect(device, event_loop, make_application):
                 conf.CONF_SREQ_TIMEOUT: 0.1,
             }
         },
+        shorten_delays=False,
     )
 
     # Start up the server

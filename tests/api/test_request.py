@@ -52,19 +52,19 @@ async def test_cleanup_timeout_internal(connected_znp):
     znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
     znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
 
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     with pytest.raises(asyncio.TimeoutError):
         await znp.request(c.UTIL.TimeAlive.Req())
 
     # We should be cleaned up
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
 
 async def test_cleanup_timeout_external(connected_znp):
     znp, znp_server = connected_znp
 
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
@@ -72,13 +72,13 @@ async def test_cleanup_timeout_external(connected_znp):
             await znp.request(c.UTIL.TimeAlive.Req())
 
     # We should be cleaned up
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
 
 async def test_callback_rsp_cleanup_timeout_external(connected_znp):
     znp, znp_server = connected_znp
 
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
@@ -89,7 +89,7 @@ async def test_callback_rsp_cleanup_timeout_external(connected_znp):
             )
 
     # We should be cleaned up
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
 
 @pytest.mark.parametrize("background", [False, True])
@@ -98,7 +98,7 @@ async def test_callback_rsp_cleanup_timeout_internal(background, connected_znp):
     znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
     znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
 
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
@@ -109,7 +109,7 @@ async def test_callback_rsp_cleanup_timeout_internal(background, connected_znp):
         )
 
     # We should be cleaned up
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
 
 async def test_callback_rsp_background_timeout(connected_znp, mocker):
@@ -146,7 +146,7 @@ async def test_callback_rsp_background_timeout(connected_znp, mocker):
     await reply
 
     # We should be cleaned up
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     # Command was properly handled
     assert len(znp._unhandled_command.mock_calls) == 0
@@ -157,7 +157,7 @@ async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker
 
     mocker.spy(znp, "_unhandled_command")
 
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     def send_responses():
         znp_server.send(c.UTIL.TimeAlive.Rsp(Seconds=123))
@@ -173,7 +173,7 @@ async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker
     )
 
     # We should be cleaned up
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     assert callback_rsp == c.SYS.OSALTimerExpired.Callback(Id=0xAB)
 

@@ -153,6 +153,17 @@ class CallbackResponseListener(BaseResponseListener):
         return False
 
 
+class CatchAllResponse:
+    """
+    Response-like object that matches every request.
+    """
+
+    header = object()  # sentinel
+
+    def matches(self, other) -> bool:
+        return True
+
+
 def combine_concurrent_calls(function):
     """
     Decorator that allows concurrent calls to expensive coroutines to share a result.

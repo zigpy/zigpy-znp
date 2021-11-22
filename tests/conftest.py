@@ -81,13 +81,13 @@ def config_for_port_path(path):
 async def make_znp_server(mocker):
     transports = []
 
-    mocker.patch("zigpy_znp.api.AFTER_CONNECT_DELAY", 0.001)
-    mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0.001)
-    mocker.patch("zigpy_znp.uart.RTS_TOGGLE_DELAY", 0)
-
-    def inner(server_cls, config=None):
+    def inner(server_cls, config=None, shorten_delays=True):
         if config is None:
             config = config_for_port_path(FAKE_SERIAL_PORT)
+
+        if shorten_delays:
+            mocker.patch("zigpy_znp.api.AFTER_BOOTLOADER_SKIP_BYTE_DELAY", 0.001)
+            mocker.patch("zigpy_znp.api.RTS_TOGGLE_DELAY", 0.001)
 
         server = server_cls(config)
         server._transports = transports
@@ -154,8 +154,6 @@ def make_connected_znp(make_znp_server, mocker):
             }
         )
 
-        mocker.patch("zigpy_znp.api.STARTUP_DELAY", 0)
-
         znp = ZNP(config)
         znp_server = make_znp_server(server_cls=server_cls)
 
@@ -218,7 +216,7 @@ def swap_attribute(obj, name, value):
 
 @pytest.fixture
 def make_application(make_znp_server):
-    def inner(server_cls, client_config=None, server_config=None):
+    def inner(server_cls, client_config=None, server_config=None, **kwargs):
         default = config_for_port_path(FAKE_SERIAL_PORT)
 
         client_config = merge_dicts(default, client_config or {})
@@ -255,7 +253,9 @@ def make_application(make_znp_server):
 
         app.add_initialized_device = add_initialized_device.__get__(app)
 
-        return app, make_znp_server(server_cls=server_cls, config=server_config)
+        return app, make_znp_server(
+            server_cls=server_cls, config=server_config, **kwargs
+        )
 
     return inner
 

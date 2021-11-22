@@ -13,11 +13,11 @@ pytestmark = [pytest.mark.asyncio]
 async def test_responses(connected_znp):
     znp, znp_server = connected_znp
 
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     future = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
 
-    assert znp._listeners
+    assert any(znp._listeners.values())
 
     response = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     znp_server.send(response)
@@ -26,13 +26,13 @@ async def test_responses(connected_znp):
 
     # Our listener will have been cleaned up after a step
     await asyncio.sleep(0)
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
 
 async def test_responses_multiple(connected_znp):
     znp, _ = connected_znp
 
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     future1 = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
     future2 = znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
@@ -49,7 +49,7 @@ async def test_responses_multiple(connected_znp):
     assert not future2.done()
     assert not future3.done()
 
-    assert znp._listeners
+    assert any(znp._listeners.values())
 
 
 async def test_response_timeouts(connected_znp):
@@ -68,7 +68,7 @@ async def test_response_timeouts(connected_znp):
 
     # The response was successfully received so we should have no outstanding listeners
     await asyncio.sleep(0)
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
     asyncio.create_task(send_soon(0.6))
 
@@ -80,7 +80,7 @@ async def test_response_timeouts(connected_znp):
 
     # Our future still completed, albeit unsuccessfully.
     # We should have no leaked listeners here.
-    assert not znp._listeners
+    assert not any(znp._listeners.values())
 
 
 async def test_response_matching_partial(connected_znp):
