@@ -21,6 +21,7 @@ import zigpy_znp.commands as c
 from zigpy_znp import uart
 from zigpy_znp.nvram import NVRAMHelper
 from zigpy_znp.utils import (
+    CatchAllResponse,
     BaseResponseListener,
     OneShotResponseListener,
     CallbackResponseListener,
@@ -31,10 +32,13 @@ from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
 
+
 # All of these are in seconds
-AFTER_CONNECT_DELAY = 1
-STARTUP_DELAY = 1
+AFTER_BOOTLOADER_SKIP_BYTE_DELAY = 2.5
 NETWORK_COMMISSIONING_TIMEOUT = 30
+RTS_TOGGLE_DELAY = 0.15
+CONNECT_PING_TIMEOUT = 0.50
+CONNECT_PROBE_TIMEOUT = 5.0
 
 
 class ZNP:
@@ -454,6 +458,73 @@ class ZNP:
     def _port_path(self) -> str:
         return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
+    async def _skip_bootloader(self) -> c.SYS.Ping.Rsp:
+        """
+        Attempt to skip the bootloader and return the ping response.
+        """
+
+        async def ping_task():
+            # First, just try pinging
+            try:
+                async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
+                    return await self.request(c.SYS.Ping.Req())
+            except asyncio.TimeoutError:
+                pass
+
+            # If that doesn't work, send the bootloader skip bytes and try again
+            self._uart.write(256 * bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
+
+            await asyncio.sleep(AFTER_BOOTLOADER_SKIP_BYTE_DELAY)
+
+            try:
+                async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
+                    return await self.request(c.SYS.Ping.Req())
+            except asyncio.TimeoutError:
+                pass
+
+            # Finally, toggle the RTS pin to skip Slaesh's bootloader
+            LOGGER.debug("Toggling RTS pin to skip CC2652R bootloader")
+
+            self._uart.set_dtr_rts(dtr=False, rts=False)
+            await asyncio.sleep(RTS_TOGGLE_DELAY)
+            self._uart.set_dtr_rts(dtr=False, rts=True)
+            await asyncio.sleep(RTS_TOGGLE_DELAY)
+            self._uart.set_dtr_rts(dtr=False, rts=False)
+            await asyncio.sleep(RTS_TOGGLE_DELAY)
+
+            # At this point we have nothing else to try, don't catch the timeout
+            async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
+                return await self.request(c.SYS.Ping.Req())
+
+        async with self.capture_responses([CatchAllResponse()]) as responses:
+            ping_task = asyncio.create_task(ping_task())
+
+            try:
+                async with async_timeout.timeout(CONNECT_PROBE_TIMEOUT):
+                    result = await responses.get()
+            except Exception:
+                ping_task.cancel()
+                raise
+            else:
+                LOGGER.debug("Radio is alive: %s", result)
+
+            # Give the ping task a little bit extra time to finish. Radios often queue
+            # requests so when the reset indication is received, they will all be
+            # immediately answered
+            if not ping_task.done():
+                LOGGER.debug("Giving ping task %0.2fs to finish", CONNECT_PING_TIMEOUT)
+
+                try:
+                    async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
+                        result = await ping_task
+                except asyncio.TimeoutError:
+                    ping_task.cancel()
+
+        if isinstance(result, c.SYS.Ping.Rsp):
+            return result
+
+        return await self.request(c.SYS.Ping.Req())
+
     async def connect(self, *, test_port=True) -> None:
         """
         Connects to the device specified by the "device" section of the config dict.
@@ -468,40 +539,11 @@ class ZNP:
         try:
             self._uart = await uart.connect(self._config[conf.CONF_DEVICE], self)
 
-            LOGGER.debug("Waiting %ss before sending anything", AFTER_CONNECT_DELAY)
-            await asyncio.sleep(AFTER_CONNECT_DELAY)
-
-            if self._config[conf.CONF_ZNP_CONFIG][conf.CONF_SKIP_BOOTLOADER]:
-                LOGGER.debug("Sending bootloader skip byte")
-
-                # XXX: Z-Stack locks up if other radios try probing it first.
-                #      Writing the bootloader skip byte a bunch of times (at least 167)
-                #      appears to reset it.
-                skip = bytes([c.ubl.BootloaderRunMode.FORCE_RUN])
-                self._uart._transport_write(skip * 256)
-
-            # We have to disable all non-bootloader commands to enter the serial
-            # bootloader upon connecting to the UART.
+            # To allow the ZNP interface to be used for bootloader commands, we have to
+            # prevent any data from being sent
             if test_port:
-                # Some Z-Stack 3 devices don't like you sending data immediately after
-                # opening the serial port. A small delay helps, but they also sometimes
-                # send a reset indication message when they're ready.
-                LOGGER.debug(
-                    "Waiting %ss or until a reset indication is received", STARTUP_DELAY
-                )
-
-                try:
-                    async with async_timeout.timeout(STARTUP_DELAY):
-                        await self.wait_for_response(
-                            c.SYS.ResetInd.Callback(partial=True)
-                        )
-                except asyncio.TimeoutError:
-                    pass
-
-                LOGGER.debug("Testing connection to %s", self._port_path)
-
-                # Make sure that our port works
-                self.capabilities = (await self.request(c.SYS.Ping.Req())).Capabilities
+                # The reset indication callback is sent when some sticks start up
+                self.capabilities = (await self._skip_bootloader()).Capabilities
 
                 # We need to know how structs are packed to deserialize frames correctly
                 await self.nvram.determine_alignment()
@@ -513,11 +555,7 @@ class ZNP:
             self.close()
             raise
 
-        LOGGER.debug(
-            "Connected to %s at %s baud",
-            self._uart._transport.serial.name,
-            self._uart._transport.serial.baudrate,
-        )
+        LOGGER.debug("Connected to %s at %s baud", self._uart.name, self._uart.baudrate)
 
     def connection_made(self) -> None:
         """
@@ -625,7 +663,9 @@ class ZNP:
         matched = False
         one_shot_matched = False
 
-        for listener in self._listeners[command.header]:
+        for listener in (
+            self._listeners[command.header] + self._listeners[CatchAllResponse.header]
+        ):
             # XXX: A single response should *not* resolve multiple one-shot listeners!
             #      `future.add_done_callback` doesn't remove our listeners synchronously
             #      so doesn't prevent this from happening.

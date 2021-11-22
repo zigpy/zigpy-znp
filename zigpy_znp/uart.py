@@ -22,7 +22,6 @@ with warnings.catch_warnings():
 
 
 LOGGER = logging.getLogger(__name__)
-RTS_TOGGLE_DELAY = 0.15  # seconds
 
 
 class BufferTooShort(Exception):
@@ -87,11 +86,28 @@ class ZnpMtProtocol(asyncio.Protocol):
 
     def send(self, payload: frames.GeneralFrame) -> None:
         """Sends data taking care of framing."""
-        self._transport_write(frames.TransportFrame(payload).serialize())
+        self.write(frames.TransportFrame(payload).serialize())
 
-    def _transport_write(self, data: bytes) -> None:
+    def write(self, data: bytes) -> None:
+        """
+        Writes raw bytes to the transport. This method should be used instead of
+        directly writing to the transport with `transport.write`.
+        """
+
         LOGGER.log(log.TRACE, "Sending data: %s", Bytes.__repr__(data))
         self._transport.write(data)
+
+    def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
+        self._transport.serial.dtr = dtr
+        self._transport.serial.rts = rts
+
+    @property
+    def name(self) -> str:
+        return self._transport.serial.name
+
+    @property
+    def baudrate(self) -> int:
+        return self._transport.serial.baudrate
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""
@@ -143,10 +159,16 @@ class ZnpMtProtocol(asyncio.Protocol):
         return frame
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} for {self._api}>"
+        return (
+            f"<"
+            f"{type(self).__name__} connected to {self.name!r}"
+            f" at {self.baudrate} baud"
+            f" (api: {self._api})"
+            f">"
+        )
 
 
-async def connect(config: conf.ConfigType, api, *, toggle_rts=True) -> ZnpMtProtocol:
+async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     loop = asyncio.get_running_loop()
 
     port = config[conf.CONF_DEVICE_PATH]
@@ -155,7 +177,7 @@ async def connect(config: conf.ConfigType, api, *, toggle_rts=True) -> ZnpMtProt
 
     LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
 
-    transport, protocol = await serial_asyncio.create_serial_connection(
+    _, protocol = await serial_asyncio.create_serial_connection(
         loop=loop,
         protocol_factory=lambda: ZnpMtProtocol(api),
         url=port,
@@ -167,24 +189,6 @@ async def connect(config: conf.ConfigType, api, *, toggle_rts=True) -> ZnpMtProt
     )
 
     await protocol._connected_event.wait()
-
-    # Skips the bootloader on slaesh's CC2652R USB stick
-    if toggle_rts:
-        LOGGER.debug("Toggling RTS/CTS to skip CC2652R bootloader")
-        transport.serial.dtr = False
-        transport.serial.rts = False
-
-        await asyncio.sleep(RTS_TOGGLE_DELAY)
-
-        transport.serial.dtr = False
-        transport.serial.rts = True
-
-        await asyncio.sleep(RTS_TOGGLE_DELAY)
-
-        transport.serial.dtr = False
-        transport.serial.rts = False
-
-        await asyncio.sleep(RTS_TOGGLE_DELAY)
 
     LOGGER.debug("Connected to %s at %s baud", port, baudrate)
 

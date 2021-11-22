@@ -2,40 +2,98 @@ import asyncio
 
 import pytest
 
+import zigpy_znp.types as t
+import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 
-from ..conftest import FAKE_SERIAL_PORT, BaseServerZNP, config_for_port_path
+from ..conftest import BaseServerZNP, CoroutineMock, config_for_port_path
 
 pytestmark = [pytest.mark.asyncio]
 
 
-async def test_connect_no_communication(connected_znp):
-    znp, znp_server = connected_znp
-
-    assert znp_server._uart.data_received.call_count == 0
-
-
-async def test_connect_skip_bootloader(make_znp_server):
+async def test_connect_no_test(make_znp_server):
     znp_server = make_znp_server(server_cls=BaseServerZNP)
-    znp = ZNP(config_for_port_path(FAKE_SERIAL_PORT))
+    znp = ZNP(config_for_port_path(znp_server.port_path))
 
     await znp.connect(test_port=False)
 
-    # Nothing should have been sent except for bootloader skip bytes
-    # NOTE: `c[-2][0]` is `c.args[0]`, just compatible with all Python versions
-    data_written = b"".join(c[-2][0] for c in znp_server._uart.data_received.mock_calls)
-    assert set(data_written) == {0xEF}
-    assert len(data_written) >= 167
+    # Nothing will be sent
+    assert znp_server._uart.data_received.call_count == 0
 
     znp.close()
 
 
-async def wait_for_spy(spy):
-    while True:
-        if spy.called:
-            return
+@pytest.mark.parametrize("work_after_attempt", [1, 2, 3])
+async def test_connect_skip_bootloader(make_znp_server, mocker, work_after_attempt):
+    znp_server = make_znp_server(server_cls=BaseServerZNP)
+    znp = ZNP(config_for_port_path(znp_server.port_path))
 
-        await asyncio.sleep(0.01)
+    mocker.patch.object(znp.nvram, "determine_alignment", new=CoroutineMock())
+    mocker.patch.object(znp, "detect_zstack_version", new=CoroutineMock())
+
+    num_pings = 0
+
+    def ping_rsp(req):
+        nonlocal num_pings
+        num_pings += 1
+
+        # Ignore the first few pings
+        if num_pings >= work_after_attempt:
+            return c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
+
+    znp_server.reply_to(c.SYS.Ping.Req(), responses=[ping_rsp])
+
+    await znp.connect(test_port=True)
+
+    znp.close()
+
+
+async def test_connect_skip_bootloader_batched_rsp(make_znp_server, mocker):
+    znp_server = make_znp_server(server_cls=BaseServerZNP)
+    znp = ZNP(config_for_port_path(znp_server.port_path))
+
+    mocker.patch.object(znp.nvram, "determine_alignment", new=CoroutineMock())
+    mocker.patch.object(znp, "detect_zstack_version", new=CoroutineMock())
+
+    num_pings = 0
+
+    def ping_rsp(req):
+        nonlocal num_pings
+        num_pings += 1
+
+        if num_pings == 3:
+            # CC253x radios sometimes buffer requests until they send a `ResetInd`
+            return (
+                [
+                    c.SYS.ResetInd.Callback(
+                        Reason=t.ResetReason.PowerUp,
+                        TransportRev=0x00,
+                        ProductId=0x12,
+                        MajorRel=0x01,
+                        MinorRel=0x02,
+                        MaintRel=0x03,
+                    )
+                ]
+                + [c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)] * num_pings,
+            )
+        elif num_pings >= 3:
+            return c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
+
+    znp_server.reply_to(c.SYS.Ping.Req(), responses=[ping_rsp])
+
+    await znp.connect(test_port=True)
+
+    znp.close()
+
+
+async def test_connect_skip_bootloader_failure(make_znp_server, mocker):
+    znp_server = make_znp_server(server_cls=BaseServerZNP)
+    znp = ZNP(config_for_port_path(znp_server.port_path))
+
+    with pytest.raises(asyncio.TimeoutError):
+        await znp.connect(test_port=True)
+
+    znp.close()
 
 
 async def test_api_close(connected_znp, mocker):
