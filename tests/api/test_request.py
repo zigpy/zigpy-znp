@@ -112,42 +112,44 @@ async def test_callback_rsp_cleanup_timeout_internal(background, connected_znp):
     assert not znp._listeners
 
 
-async def test_callback_rsp_cleanup_background_error(connected_znp):
+async def test_callback_rsp_background_timeout(connected_znp, mocker):
     znp, znp_server = connected_znp
     znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
-    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1.0
 
-    assert not znp._listeners
+    mocker.spy(znp, "_unhandled_command")
 
-    # This request will timeout because we didn't send anything back
-    with pytest.raises(asyncio.TimeoutError):
-        await znp.request_callback_rsp(
-            request=c.UTIL.TimeAlive.Req(),
-            callback=c.SYS.ResetInd.Callback(partial=True),
-            background=True,
+    async def replier(req):
+        # SREQ reply works
+        await asyncio.sleep(0.05)
+        yield c.UTIL.TimeAlive.Rsp(Seconds=123)
+
+        # And the callback will arrive before the AREQ timeout
+        await asyncio.sleep(0.9)
+        yield c.SYS.ResetInd.Callback(
+            Reason=t.ResetReason.PowerUp,
+            TransportRev=0x00,
+            ProductId=0x12,
+            MajorRel=0x01,
+            MinorRel=0x02,
+            MaintRel=0x03,
         )
+
+    reply = znp_server.reply_once_to(c.UTIL.TimeAlive.Req(), responses=replier)
+
+    await znp.request_callback_rsp(
+        request=c.UTIL.TimeAlive.Req(),
+        callback=c.SYS.ResetInd.Callback(partial=True),
+        background=True,
+    )
+
+    await reply
 
     # We should be cleaned up
     assert not znp._listeners
 
-
-async def test_callback_rsp_cleanup_background_timeout(connected_znp):
-    znp, znp_server = connected_znp
-    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
-    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
-
-    assert not znp._listeners
-
-    # This request will timeout because we didn't send anything back
-    with pytest.raises(asyncio.TimeoutError):
-        await znp.request_callback_rsp(
-            request=c.UTIL.TimeAlive.Req(),
-            callback=c.SYS.ResetInd.Callback(partial=True),
-            background=True,
-        )
-
-    # We should be cleaned up
-    assert not znp._listeners
+    # Command was properly handled
+    assert len(znp._unhandled_command.mock_calls) == 0
 
 
 async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker):
