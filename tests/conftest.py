@@ -1,5 +1,6 @@
 import json
 import asyncio
+import inspect
 import logging
 import pathlib
 import contextlib
@@ -263,37 +264,44 @@ class BaseServerZNP(ZNP):
     align_structs = False
     version = None
 
-    def _flatten_responses(self, request, responses):
+    async def _flatten_responses(self, request, responses):
         if responses is None:
             return
         elif isinstance(responses, t.CommandBase):
             yield responses
+        elif inspect.iscoroutinefunction(responses):
+            async for rsp in responses(request):
+                yield rsp
+        elif inspect.isasyncgen(responses):
+            async for rsp in responses:
+                yield rsp
         elif callable(responses):
-            yield from self._flatten_responses(request, responses(request))
+            async for rsp in self._flatten_responses(request, responses(request)):
+                yield rsp
         else:
             for response in responses:
-                yield from self._flatten_responses(request, response)
+                async for rsp in self._flatten_responses(request, response):
+                    yield rsp
+
+    async def _send_responses(self, request, responses):
+        async for response in self._flatten_responses(request, responses):
+            await asyncio.sleep(0.001)
+            LOGGER.debug("Replying to %s with %s", request, response)
+            self.send(response)
 
     def reply_once_to(self, request, responses, *, override=False):
         if override:
             self._listeners[request.header].clear()
 
-        future = self.wait_for_response(request)
-        called_future = asyncio.get_running_loop().create_future()
+        request_future = self.wait_for_response(request)
 
         async def replier():
-            request = await future
+            request = await request_future
+            await self._send_responses(request, responses)
 
-            for response in self._flatten_responses(request, responses):
-                await asyncio.sleep(0.001)
-                LOGGER.debug("Replying to %s with %s", request, response)
-                self.send(response)
+            return request
 
-            called_future.set_result(request)
-
-        asyncio.create_task(replier())
-
-        return called_future
+        return asyncio.create_task(replier())
 
     def reply_to(self, request, responses, *, override=False):
         if override:
@@ -301,11 +309,7 @@ class BaseServerZNP(ZNP):
 
         async def callback(request):
             callback.call_count += 1
-
-            for response in self._flatten_responses(request, responses):
-                await asyncio.sleep(0.001)
-                LOGGER.debug("Replying to %s with %s", request, response)
-                self.send(response)
+            await self._send_responses(request, responses)
 
         callback.call_count = 0
 

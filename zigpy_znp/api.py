@@ -815,6 +815,7 @@ class ZNP:
 
         callback_rsp, listener = self.wait_for_responses([callback], context=True)
 
+        # Typical request/response/callbacks are not backgrounded
         if not background:
             try:
                 async with async_timeout.timeout(timeout):
@@ -824,26 +825,28 @@ class ZNP:
             finally:
                 self.remove_listener(listener)
 
-        start_time = time.time()
+        # Backgrounded callback handlers need to respect the provided timeout
+        start_time = time.monotonic()
 
-        # If the SREQ/SRSP pair fails, we must cancel the AREQ listener
         try:
             async with async_timeout.timeout(timeout):
                 request_rsp = await self.request(request, **response_params)
         except Exception:
+            # If the SREQ/SRSP pair fails, we must cancel the AREQ listener
             self.remove_listener(listener)
             raise
 
-        async def callback_handler(timeout):
+        # If it succeeds, create a background task to receive the AREQ but take into
+        # account the time it took to start the SREQ to ensure we do not grossly exceed
+        # the timeout
+        async def callback_catcher(timeout):
             try:
                 async with async_timeout.timeout(timeout):
                     await callback_rsp
             finally:
                 self.remove_listener(listener)
 
-        # If it succeeds, create a background task to receive the AREQ but take into
-        # account the time it took to start the SREQ to ensure we do not grossly exceed
-        # the timeout
-        asyncio.create_task(callback_handler(time.time() - start_time))
+        callback_timeout = max(0, timeout - (time.monotonic() - start_time))
+        asyncio.create_task(callback_catcher(callback_timeout))
 
         return request_rsp
