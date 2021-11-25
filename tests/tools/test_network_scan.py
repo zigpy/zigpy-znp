@@ -8,8 +8,6 @@ from zigpy_znp.tools.network_scan import main as network_scan
 
 from ..conftest import FormedZStack1CC2531, FormedLaunchpadCC26X2R1
 
-pytestmark = [pytest.mark.asyncio]
-
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_network_scan(device, make_znp_server, capsys):

@@ -8,8 +8,6 @@ from zigpy_znp.zigbee.application import ControllerApplication
 
 from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1, swap_attribute
 
-pytestmark = [pytest.mark.asyncio]
-
 
 async def test_no_double_connect(make_znp_server, mocker):
     znp_server = make_znp_server(server_cls=FormedLaunchpadCC26X2R1)

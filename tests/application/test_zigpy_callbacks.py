@@ -9,8 +9,6 @@ import zigpy_znp.commands as c
 
 from ..conftest import FORMED_DEVICES, CoroutineMock
 
-pytestmark = [pytest.mark.asyncio]
-
 
 def awaitable_mock(return_value):
     mock_called = asyncio.get_running_loop().create_future()

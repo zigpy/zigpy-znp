@@ -135,7 +135,6 @@ def test_schema_validation_device_key_info(backup_json):
 
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
-@pytest.mark.asyncio
 async def test_network_backup_empty(device, make_znp_server):
     znp_server = make_znp_server(server_cls=device)
 
@@ -144,7 +143,6 @@ async def test_network_backup_empty(device, make_znp_server):
 
 
 @pytest.mark.parametrize("device", [FormedZStack1CC2531])
-@pytest.mark.asyncio
 async def test_network_backup_pipe(device, make_znp_server, capsys):
     znp_server = make_znp_server(server_cls=device)
 
@@ -155,7 +153,6 @@ async def test_network_backup_pipe(device, make_znp_server, capsys):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-@pytest.mark.asyncio
 async def test_network_backup_formed(device, make_znp_server, tmp_path):
     znp_server = make_znp_server(server_cls=device)
 
@@ -192,7 +189,6 @@ async def test_network_backup_formed(device, make_znp_server, tmp_path):
 
 
 @pytest.mark.parametrize("device", ALL_DEVICES)
-@pytest.mark.asyncio
 async def test_network_restore_and_backup(
     device, make_znp_server, backup_json, tmp_path
 ):
@@ -230,7 +226,6 @@ async def test_network_restore_and_backup(
 
 
 @pytest.mark.parametrize("device", [ResetLaunchpadCC26X2R1])
-@pytest.mark.asyncio
 async def test_network_restore_pick_optimal_tclk(
     device, make_znp_server, backup_json, tmp_path
 ):
@@ -254,7 +249,6 @@ async def test_network_restore_pick_optimal_tclk(
     assert backup_json2["stack_specific"]["zstack"]["tclk_seed"] == old_tclk_seed
 
 
-@pytest.mark.asyncio
 async def test_tc_frame_counter_zstack1(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack1CC2531)
     znp_server._nvram[ExNvIds.LEGACY] = {
@@ -267,7 +261,6 @@ async def test_tc_frame_counter_zstack1(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
 
 
-@pytest.mark.asyncio
 async def test_tc_frame_counter_zstack30(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack3CC2531)
     znp.network_info = BARE_NETWORK_INFO
@@ -299,7 +292,6 @@ async def test_tc_frame_counter_zstack30(make_connected_znp):
     assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
 
 
-@pytest.mark.asyncio
 async def test_tc_frame_counter_zstack33(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseLaunchpadCC26X2R1)
     znp.network_info = BARE_NETWORK_INFO

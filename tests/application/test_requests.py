@@ -13,8 +13,6 @@ from zigpy_znp.exceptions import InvalidCommandResponse
 
 from ..conftest import FORMED_DEVICES, CoroutineMock, FormedLaunchpadCC26X2R1
 
-pytestmark = [pytest.mark.asyncio]
-
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_zdo_request_interception(device, make_application):

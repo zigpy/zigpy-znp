@@ -5,8 +5,6 @@ import zigpy_znp.commands as c
 from zigpy_znp.types import nvids
 from zigpy_znp.exceptions import SecurityError
 
-pytestmark = [pytest.mark.asyncio]
-
 
 async def test_osal_writes_invalid(connected_znp):
     znp, _ = connected_znp

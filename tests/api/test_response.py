@@ -7,8 +7,6 @@ import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.utils import deduplicate_commands
 
-pytestmark = [pytest.mark.asyncio]
-
 
 async def test_responses(connected_znp):
     znp, znp_server = connected_znp

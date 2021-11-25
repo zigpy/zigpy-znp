@@ -4,8 +4,6 @@ import pytest
 
 from ..conftest import ALL_DEVICES, FORMED_DEVICES, BaseZStack1CC2531
 
-pytestmark = [pytest.mark.asyncio]
-
 
 @pytest.mark.parametrize("to_device", ALL_DEVICES)
 @pytest.mark.parametrize("from_device", FORMED_DEVICES)

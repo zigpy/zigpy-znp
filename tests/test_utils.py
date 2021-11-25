@@ -63,7 +63,6 @@ def test_command_deduplication_complex():
     }
 
 
-@pytest.mark.asyncio
 async def test_combine_concurrent_calls():
     class TestFuncs:
         def __init__(self):

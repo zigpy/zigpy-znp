@@ -12,8 +12,6 @@ from zigpy_znp.tools.nvram_write import main as nvram_write
 
 from ..conftest import ALL_DEVICES, BaseZStack1CC2531, FormedLaunchpadCC26X2R1
 
-pytestmark = [pytest.mark.asyncio]
-
 
 def dump_nvram(znp):
     obj = {}

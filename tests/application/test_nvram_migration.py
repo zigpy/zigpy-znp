@@ -7,8 +7,6 @@ from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import FORMED_DEVICES, FormedZStack3CC2531
 
-pytestmark = [pytest.mark.asyncio]
-
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_addrmgr_empty_entries(make_connected_znp, device):
