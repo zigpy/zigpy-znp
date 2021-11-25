@@ -10,8 +10,6 @@ import zigpy_znp.commands as c
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
-pytestmark = [pytest.mark.asyncio]
-
 
 async def test_callback_rsp(connected_znp, event_loop):
     znp, znp_server = connected_znp

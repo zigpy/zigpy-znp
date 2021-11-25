@@ -9,8 +9,6 @@ from zigpy_znp.api import ZNP
 
 from ..conftest import BaseServerZNP, CoroutineMock, config_for_port_path
 
-pytestmark = [pytest.mark.asyncio]
-
 
 async def test_connect_no_test(make_znp_server):
     znp_server = make_znp_server(server_cls=BaseServerZNP)

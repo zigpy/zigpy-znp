@@ -33,6 +33,16 @@ LOGGER = logging.getLogger(__name__)
 FAKE_SERIAL_PORT = "/dev/ttyFAKE0"
 
 
+# Globally handle async tests and error on unawaited coroutines
+def pytest_collection_modifyitems(session, config, items):
+    for item in items:
+        item.add_marker(
+            pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
+        )
+        item.add_marker(pytest.mark.filterwarnings("error::RuntimeWarning"))
+        item.add_marker(pytest.mark.asyncio)
+
+
 class ForwardingSerialTransport:
     """
     Serial transport that hooks directly into a protocol

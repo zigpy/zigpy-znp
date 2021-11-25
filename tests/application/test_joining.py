@@ -16,8 +16,6 @@ from ..conftest import (
     FormedLaunchpadCC26X2R1,
 )
 
-pytestmark = [pytest.mark.asyncio]
-
 
 @pytest.mark.parametrize(
     "device,fixed_joining_bug",

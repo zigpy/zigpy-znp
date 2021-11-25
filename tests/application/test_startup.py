@@ -18,8 +18,6 @@ from ..conftest import (
     FormedLaunchpadCC26X2R1,
 )
 
-pytestmark = [pytest.mark.asyncio]
-
 DEV_NETWORK_SETTINGS = {
     FormedLaunchpadCC26X2R1: (
         "CC1352/CC2652, Z-Stack 3.30+ (build 20200805)",

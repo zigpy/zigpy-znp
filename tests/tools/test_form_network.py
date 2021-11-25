@@ -6,7 +6,6 @@ from zigpy_znp.tools.form_network import main as form_network
 from ..conftest import ALL_DEVICES, EMPTY_DEVICES
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("device", ALL_DEVICES)
 async def test_form_network(device, make_znp_server):
     znp_server = make_znp_server(server_cls=device)
