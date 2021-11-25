@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import call
 
 import pytest
 
@@ -86,12 +87,40 @@ async def test_connect_skip_bootloader_batched_rsp(make_znp_server, mocker):
     znp.close()
 
 
-async def test_connect_skip_bootloader_failure(make_znp_server, mocker):
+async def test_connect_skip_bootloader_failure(make_znp_server):
     znp_server = make_znp_server(server_cls=BaseServerZNP)
     znp = ZNP(config_for_port_path(znp_server.port_path))
 
     with pytest.raises(asyncio.TimeoutError):
         await znp.connect(test_port=True)
+
+    znp.close()
+
+
+async def test_connect_skip_bootloader_rts_dtr_pins(make_znp_server, mocker):
+    znp_server = make_znp_server(server_cls=BaseServerZNP)
+    znp = ZNP(config_for_port_path(znp_server.port_path))
+
+    mocker.patch.object(znp.nvram, "determine_alignment", new=CoroutineMock())
+    mocker.patch.object(znp, "detect_zstack_version", new=CoroutineMock())
+
+    num_pings = 0
+
+    def ping_rsp(req):
+        nonlocal num_pings
+        num_pings += 1
+
+        if num_pings >= 3:
+            return c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
+
+    # Ignore the first few pings so we trigger the pin toggling
+    znp_server.reply_to(c.SYS.Ping.Req(), responses=ping_rsp)
+
+    await znp.connect(test_port=True)
+
+    serial = znp._uart._transport
+    assert serial._mock_dtr_prop.mock_calls == [call(False), call(False), call(False)]
+    assert serial._mock_rts_prop.mock_calls == [call(False), call(True), call(False)]
 
     znp.close()
 
