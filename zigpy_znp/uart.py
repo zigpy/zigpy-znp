@@ -98,6 +98,8 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._transport.write(data)
 
     def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
+        LOGGER.debug("Setting serial pin states: DTR=%s, RTS=%s", dtr, rts)
+
         self._transport.serial.dtr = dtr
         self._transport.serial.rts = rts
 

@@ -4,6 +4,7 @@ import inspect
 import logging
 import pathlib
 import contextlib
+from unittest.mock import Mock, PropertyMock
 
 import pytest
 import zigpy.device
@@ -37,15 +38,16 @@ class ForwardingSerialTransport:
     Serial transport that hooks directly into a protocol
     """
 
-    class serial:
-        # so the transport has a `serial` attribute
-        name = FAKE_SERIAL_PORT
-        baudrate = 45678
-
     def __init__(self, protocol):
         self.protocol = protocol
         self._is_connected = False
         self.other = None
+
+        self.serial = Mock()
+        self.serial.name = FAKE_SERIAL_PORT
+        self.serial.baudrate = 45678
+        type(self.serial).dtr = self._mock_dtr_prop = PropertyMock(return_value=None)
+        type(self.serial).rts = self._mock_rts_prop = PropertyMock(return_value=None)
 
     def _connect(self):
         assert not self._is_connected
@@ -87,7 +89,7 @@ async def make_znp_server(mocker):
 
         if shorten_delays:
             mocker.patch("zigpy_znp.api.AFTER_BOOTLOADER_SKIP_BYTE_DELAY", 0.001)
-            mocker.patch("zigpy_znp.api.RTS_TOGGLE_DELAY", 0.001)
+            mocker.patch("zigpy_znp.api.BOOTLOADER_PIN_TOGGLE_DELAY", 0.001)
 
         server = server_cls(config)
         server._transports = transports

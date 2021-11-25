@@ -36,7 +36,7 @@ LOGGER = logging.getLogger(__name__)
 # All of these are in seconds
 AFTER_BOOTLOADER_SKIP_BYTE_DELAY = 2.5
 NETWORK_COMMISSIONING_TIMEOUT = 30
-RTS_TOGGLE_DELAY = 0.15
+BOOTLOADER_PIN_TOGGLE_DELAY = 0.15
 CONNECT_PING_TIMEOUT = 0.50
 CONNECT_PROBE_TIMEOUT = 5.0
 
@@ -458,6 +458,10 @@ class ZNP:
     def _port_path(self) -> str:
         return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
 
+    @property
+    def _znp_config(self) -> conf.ConfigType:
+        return self._config[conf.CONF_ZNP_CONFIG]
+
     async def _skip_bootloader(self) -> c.SYS.Ping.Rsp:
         """
         Attempt to skip the bootloader and return the ping response.
@@ -471,7 +475,9 @@ class ZNP:
             except asyncio.TimeoutError:
                 pass
 
-            # If that doesn't work, send the bootloader skip bytes and try again
+            # If that doesn't work, send the bootloader skip bytes and try again.
+            # Sending a bunch at a time fixes UART issues when the radio was previously
+            # probed with another library at a different baudrate.
             self._uart.write(256 * bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
 
             await asyncio.sleep(AFTER_BOOTLOADER_SKIP_BYTE_DELAY)
@@ -482,15 +488,16 @@ class ZNP:
             except asyncio.TimeoutError:
                 pass
 
-            # Finally, toggle the RTS pin to skip Slaesh's bootloader
-            LOGGER.debug("Toggling RTS pin to skip CC2652R bootloader")
+            # This is normally done just for Slaesh's CC2652RB stick
+            LOGGER.debug("Toggling RTS/DTR pins to skip bootloader or reset chip")
 
-            self._uart.set_dtr_rts(dtr=False, rts=False)
-            await asyncio.sleep(RTS_TOGGLE_DELAY)
-            self._uart.set_dtr_rts(dtr=False, rts=True)
-            await asyncio.sleep(RTS_TOGGLE_DELAY)
-            self._uart.set_dtr_rts(dtr=False, rts=False)
-            await asyncio.sleep(RTS_TOGGLE_DELAY)
+            # The default sequence is DTR=false and RTS toggling false/true/false
+            for dtr, rts in zip(
+                self._znp_config[conf.CONF_CONNECT_DTR_STATES],
+                self._znp_config[conf.CONF_CONNECT_RTS_STATES],
+            ):
+                self._uart.set_dtr_rts(dtr=dtr, rts=rts)
+                await asyncio.sleep(BOOTLOADER_PIN_TOGGLE_DELAY)
 
             # At this point we have nothing else to try, don't catch the timeout
             async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
@@ -816,9 +823,7 @@ class ZNP:
             self._uart.send(frame)
 
             # We should get a SRSP in a reasonable amount of time
-            async with async_timeout.timeout(
-                self._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT]
-            ):
+            async with async_timeout.timeout(self._znp_config[conf.CONF_SREQ_TIMEOUT]):
                 # We lock until either a sync response is seen or an error occurs
                 response = await response_future
 
@@ -851,7 +856,7 @@ class ZNP:
 
         # Every request should have a timeout to prevent deadlocks
         if timeout is None:
-            timeout = self._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT]
+            timeout = self._znp_config[conf.CONF_ARSP_TIMEOUT]
 
         callback_rsp, listener = self.wait_for_responses([callback], context=True)
 

@@ -78,6 +78,10 @@ zha:
 
       # Delay between auto-reconnect attempts in case the device gets disconnected
       auto_reconnect_retry_delay: 5
+
+      # Pin states for skipping the bootloader
+      connect_rts_pin_states: [off, on, off]
+      connect_dtr_pin_states: [off, off, off]
 ```
 
 # Tools
