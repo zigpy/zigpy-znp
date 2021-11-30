@@ -3,6 +3,7 @@ import asyncio
 import pytest
 import zigpy.zdo
 import zigpy.endpoint
+import zigpy.profiles
 from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
 from zigpy.exceptions import DeliveryError
 
@@ -59,6 +60,28 @@ async def test_zdo_request_interception(device, make_application):
 
     assert status == t.Status.SUCCESS
     await active_ep_req
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_chosen_dst_endpoint(device, make_application, mocker):
+    app, znp_server = make_application(device)
+    await app.startup(auto_form=False)
+
+    cluster = mocker.Mock()
+    cluster.endpoint.endpoint_id = 2
+    cluster.endpoint.profile_id = zigpy.profiles.zll.PROFILE_ID
+    cluster.cluster_id = 0x1234
+
+    # ZLL endpoint will be used normally
+    assert app.get_dst_address(cluster).endpoint == 2
+
+    build = mocker.patch.object(type(app), "_zstack_build_id", mocker.PropertyMock())
+    build.return_value = 20210708
+
+    # More recent builds work with everything on endpoint 1
+    assert app.get_dst_address(cluster).endpoint == 1
 
     await app.shutdown()
 
