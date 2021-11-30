@@ -7,6 +7,7 @@ import asyncio
 import zigpy.state
 import zigpy.zdo.types as zdo_t
 
+import zigpy_znp.const as const
 import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
@@ -38,7 +39,7 @@ def json_backup_to_zigpy_state(
     network_info.channel_mask = t.Channels.from_channel_list(backup["channel_mask"])
     network_info.security_level = backup["security_level"]
     network_info.stack_specific = backup.get("stack_specific")
-    network_info.tc_link_key = None
+    network_info.tc_link_key.key = const.DEFAULT_TC_LINK_KEY
 
     network_info.network_key = zigpy.state.Key()
     network_info.network_key.key, _ = t.KeyData.deserialize(

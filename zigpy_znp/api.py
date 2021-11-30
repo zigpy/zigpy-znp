@@ -151,24 +151,19 @@ class ZNP:
                 partner_ieee=node_info.ieee,
             ),
             tc_link_key=zigpy.state.Key(
-                key=None,
+                key=const.DEFAULT_TC_LINK_KEY,
                 seq=0,
                 tx_counter=0,
                 rx_counter=0,
-                partner_ieee=None,
+                partner_ieee=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
             ),
             children=[],
             nwk_addresses={},
             key_table=[],
-            stack_specific=None,
+            stack_specific={},
         )
 
-        if self.version == 1.2:
-            tc_link_key = await self.nvram.osal_read(
-                OsalNvIds.TCLK_SEED, item_type=t.TCLinkKey
-            )
-            network_info.tc_link_key.key = tc_link_key.key
-        else:
+        if self.version > 1.2:
             tclk_seed = await self.nvram.osal_read(
                 OsalNvIds.TCLK_SEED, item_type=t.KeyData
             )
@@ -378,12 +373,15 @@ class ZNP:
             # TCLK_SEED is TCLK_TABLE_START in Z-Stack 1
             nvram[OsalNvIds.TCLK_SEED] = t.TCLinkKey(
                 ExtAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),  # global
-                Key=network_info.tc_link_key.key,
+                Key=network_info.tc_link_key.key or const.DEFAULT_TC_LINK_KEY,
                 TxFrameCounter=0,
                 RxFrameCounter=0,
             )
         else:
-            if network_info.tc_link_key.key != const.DEFAULT_TC_LINK_KEY:
+            if (
+                network_info.tc_link_key is not None
+                and network_info.tc_link_key.key != const.DEFAULT_TC_LINK_KEY
+            ):
                 LOGGER.warning(
                     "TC link key is configured at build time in Z-Stack 3 and cannot be"
                     " changed at runtime: %s",
