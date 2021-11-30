@@ -115,6 +115,17 @@ class ZNP:
         if not is_on_network:
             raise NetworkNotFormed("Device is not a part of a network")
 
+        ieee = await self.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
+        logical_type = await self.nvram.osal_read(
+            OsalNvIds.LOGICAL_TYPE, item_type=t.DeviceLogicalType
+        )
+
+        node_info = zigpy.state.NodeInfo(
+            ieee=ieee,
+            nwk=nib.nwkDevAddress,
+            logical_type=zdo_t.LogicalType(logical_type),
+        )
+
         key_desc = await self.nvram.osal_read(
             OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
         )
@@ -134,17 +145,28 @@ class ZNP:
                 key=key_desc.Key,
                 seq=key_desc.KeySeqNum,
                 tx_counter=tc_frame_counter,
-                rx_counter=None,
+                rx_counter=0,
+                partner_ieee=node_info.ieee,
+            ),
+            tc_link_key=zigpy.state.Key(
+                key=None,
+                seq=0,
+                tx_counter=0,
+                rx_counter=0,
                 partner_ieee=None,
             ),
-            tc_link_key=None,
             children=[],
             nwk_addresses={},
             key_table=[],
             stack_specific=None,
         )
 
-        if self.version > 1.2:
+        if self.version == 1.2:
+            tc_link_key = await self.nvram.osal_read(
+                OsalNvIds.TCLK_SEED, item_type=t.TCLinkKey
+            )
+            network_info.tc_link_key.key = tc_link_key.key
+        else:
             tclk_seed = await self.nvram.osal_read(
                 OsalNvIds.TCLK_SEED, item_type=t.KeyData
             )
@@ -170,17 +192,6 @@ class ZNP:
 
                 if dev.key is not None:
                     network_info.key_table.append(dev.key)
-
-        ieee = await self.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
-        logical_type = await self.nvram.osal_read(
-            OsalNvIds.LOGICAL_TYPE, item_type=t.DeviceLogicalType
-        )
-
-        node_info = zigpy.state.NodeInfo(
-            ieee=ieee,
-            nwk=nib.nwkDevAddress,
-            logical_type=zdo_t.LogicalType(logical_type),
-        )
 
         self.network_info = network_info
         self.node_info = node_info
@@ -361,20 +372,33 @@ class ZNP:
 
         tclk_seed = None
 
-        if self.version > 1.2:
+        if self.version == 1.2:
+            # TCLK_SEED is TCLK_TABLE_START in Z-Stack 1
+            nvram[OsalNvIds.TCLK_SEED] = t.TCLinkKey(
+                ExtAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),  # global
+                Key=network_info.tc_link_key.key,
+                TxFrameCounter=0,
+                RxFrameCounter=0,
+            )
+        else:
+            if network_info.tc_link_key.key != const.DEFAULT_TC_LINK_KEY:
+                LOGGER.warning(
+                    "TC link key is configured at build time in Z-Stack 3 and cannot be"
+                    " changed at runtime: %s",
+                    network_info.tc_link_key.key,
+                )
+
             if (
                 network_info.stack_specific is not None
                 and network_info.stack_specific.get("zstack", {}).get("tclk_seed")
             ):
-                tclk_seed, _ = t.KeyData.deserialize(
+                tclk_seed = t.KeyData(
                     bytes.fromhex(network_info.stack_specific["zstack"]["tclk_seed"])
                 )
             else:
                 tclk_seed = t.KeyData(os.urandom(16))
 
             nvram[OsalNvIds.TCLK_SEED] = tclk_seed
-        else:
-            nvram[OsalNvIds.TCLK_SEED] = const.DEFAULT_TC_LINK_KEY
 
         for key, value in nvram.items():
             await self.nvram.osal_write(key, value, create=True)
