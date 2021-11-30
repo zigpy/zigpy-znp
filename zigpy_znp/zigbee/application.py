@@ -8,6 +8,7 @@ import logging
 import itertools
 import contextlib
 
+import zigpy.zcl
 import zigpy.zdo
 import zigpy.util
 import zigpy.state
@@ -19,7 +20,6 @@ import zigpy.endpoint
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
-import zigpy.zcl.foundation
 from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId, deserialize as list_deserialize
 from zigpy.zdo.types import CLUSTERS as ZDO_CLUSTERS, ZDOCmd, ZDOHeader, MultiAddress
@@ -37,6 +37,8 @@ from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.zdo_converters import ZDO_CONVERTERS
 
 ZDO_ENDPOINT = 0
+ZHA_ENDPOINT = 1
+ZLL_ENDPOINT = 2
 
 # All of these are in seconds
 PROBE_TIMEOUT = 5
@@ -406,7 +408,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._write_stack_settings(reset_if_changed=False)
         await self._znp.reset()
 
-    def get_dst_address(self, cluster):
+    def get_dst_address(self, cluster: zigpy.zcl.Cluster) -> MultiAddress:
         """
         Helper to get a dst address for bind/unbind operations.
 
@@ -418,7 +420,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         dst_addr.addrmode = 0x03
         dst_addr.ieee = self.ieee
         dst_addr.endpoint = self._find_endpoint(
-            dst_ep=cluster.endpoint,
+            dst_ep=cluster.endpoint.endpoint_id,
             profile=cluster.endpoint.profile_id,
             cluster=cluster.cluster_id,
         )
@@ -1133,7 +1135,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.request(
             c.AF.Register.Req(
-                Endpoint=1,
+                Endpoint=ZHA_ENDPOINT,
                 ProfileId=zigpy.profiles.zha.PROFILE_ID,
                 DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
                 DeviceVersion=0b0000,
@@ -1152,7 +1154,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.request(
             c.AF.Register.Req(
-                Endpoint=2,
+                Endpoint=ZLL_ENDPOINT,
                 ProfileId=zigpy.profiles.zll.PROFILE_ID,
                 DeviceId=zigpy.profiles.zll.DeviceType.CONTROLLER,
                 DeviceVersion=0b0000,
@@ -1190,14 +1192,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
         Zigpy defaults to sending messages with src_ep == dst_ep. This does not work
-        with Z-Stack, which requires endpoints to be registered explicitly on startup.
+        with all versions of Z-Stack, which requires endpoints to be registered
+        explicitly on startup.
         """
 
         if dst_ep == ZDO_ENDPOINT:
             return ZDO_ENDPOINT
 
+        # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
+        if self._zstack_build_id >= 20210708:
+            return ZHA_ENDPOINT
+
         # Always fall back to endpoint 1
-        candidates = [1]
+        candidates = [ZHA_ENDPOINT]
 
         for ep_id, endpoint in self.zigpy_device.endpoints.items():
             if ep_id == ZDO_ENDPOINT:
@@ -1321,7 +1328,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
         # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
-        # We pick ours based on the registered endpoints.
+        # We pick ours based on the registered endpoints when using an older firmware
         src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
 
         if relays is None:
