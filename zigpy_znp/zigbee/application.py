@@ -120,6 +120,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     # Implementation of the core zigpy ControllerApplication methods #
     ##################################################################
 
+    @classmethod
+    async def probe(cls, device_config):
+        try:
+            async with async_timeout.timeout(PROBE_TIMEOUT):
+                return await super().probe(device_config)
+        except asyncio.TimeoutError:
+            return False
+
     async def connect(self):
         assert self._znp is None
 
