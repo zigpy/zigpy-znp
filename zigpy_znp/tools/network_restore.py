@@ -8,13 +8,14 @@ import zigpy.state
 import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
+from zigpy_znp.api import ZNP
 from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
 from zigpy_znp.zigbee.application import ControllerApplication
 
 
 def json_backup_to_zigpy_state(
     backup: t.JSONType,
-) -> tuple[zigpy.state.NetworkInformation, zigpy.state.NodeInfo]:
+) -> tuple[zigpy.state.NetworkInfo, zigpy.state.NodeInfo]:
     """
     Converts a JSON backup into a zigpy network and node info tuple.
     """
@@ -26,7 +27,7 @@ def json_backup_to_zigpy_state(
         bytes.fromhex(backup["coordinator_ieee"])[::-1]
     )
 
-    network_info = zigpy.state.NetworkInformation()
+    network_info = zigpy.state.NetworkInfo()
     network_info.pan_id, _ = t.NWK.deserialize(bytes.fromhex(backup["pan_id"])[::-1])
     network_info.extended_pan_id, _ = t.EUI64.deserialize(
         bytes.fromhex(backup["extended_pan_id"])[::-1]
@@ -92,13 +93,11 @@ async def restore_network(
     network_info, node_info = json_backup_to_zigpy_state(backup)
     network_info.network_key.tx_counter += counter_increment
 
-    config = ControllerApplication.SCHEMA({"device": {"path": radio_path}})
-    app = ControllerApplication(config)
-
-    await app.startup(force_form=True)
-    await app.write_network_info(network_info=network_info, node_info=node_info)
-
-    await app.pre_shutdown()
+    znp = ZNP(ControllerApplication.SCHEMA({"device": {"path": radio_path}}))
+    await znp.connect()
+    await znp.write_network_info(network_info=network_info, node_info=node_info)
+    await znp.reset()
+    znp.close()
 
 
 async def main(argv: list[str]) -> None:

@@ -101,7 +101,7 @@ async def test_probe_multiple(device, make_znp_server):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_reconnect(device, event_loop, make_application):
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={
             # Make auto-reconnection happen really fast
@@ -143,7 +143,7 @@ async def test_reconnect(device, event_loop, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_shutdown_from_app(device, mocker, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -159,7 +159,7 @@ async def test_shutdown_from_app(device, mocker, make_application):
 
 
 async def test_clean_shutdown(make_application):
-    app, znp_server = make_application(server_cls=FormedLaunchpadCC26X2R1)
+    app, znp_server = await make_application(server_cls=FormedLaunchpadCC26X2R1)
     await app.startup(auto_form=False)
 
     # This should not throw
@@ -170,7 +170,7 @@ async def test_clean_shutdown(make_application):
 
 
 async def test_multiple_shutdown(make_application):
-    app, znp_server = make_application(server_cls=FormedLaunchpadCC26X2R1)
+    app, znp_server = await make_application(server_cls=FormedLaunchpadCC26X2R1)
     await app.startup(auto_form=False)
 
     await app.shutdown()
@@ -182,7 +182,7 @@ async def test_multiple_shutdown(make_application):
 async def test_reconnect_lockup(device, event_loop, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.WATCHDOG_PERIOD", 0.1)
 
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={
             # Make auto-reconnection happen really fast
@@ -223,7 +223,7 @@ async def test_reconnect_lockup(device, event_loop, make_application, mocker):
 async def test_reconnect_lockup_pyserial(device, event_loop, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.WATCHDOG_PERIOD", 0.1)
 
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={
             conf.CONF_ZNP_CONFIG: {
@@ -244,9 +244,9 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
 
     did_load_info = asyncio.get_running_loop().create_future()
 
-    async def patched_load_network_info(*, old_load=app.load_network_info):
+    async def patched_load_network_info(old_load=app.load_network_info, **kwargs):
         try:
-            return await old_load()
+            return await old_load(**kwargs)
         finally:
             did_load_info.set_result(True)
 

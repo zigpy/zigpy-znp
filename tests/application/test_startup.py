@@ -1,4 +1,5 @@
 import pytest
+from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -8,7 +9,6 @@ from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
-    ALL_DEVICES,
     EMPTY_DEVICES,
     FORMED_DEVICES,
     CoroutineMock,
@@ -62,14 +62,7 @@ async def test_info(
     make_application,
     caplog,
 ):
-    app, znp_server = make_application(server_cls=device)
-
-    # These should not raise any errors even if our NIB is empty
-    assert app.pan_id == 0xFFFE  # unknown NWK ID
-    assert app.extended_pan_id == t.EUI64.convert("ff:ff:ff:ff:ff:ff:ff:ff")
-    assert app.channel is None
-    assert app.channels is None
-    assert app.state.network_information.network_key is None
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -78,12 +71,12 @@ async def test_info(
     else:
         assert "Your network is using the insecure" not in caplog.text
 
-    assert app.pan_id == pan_id
-    assert app.extended_pan_id == ext_pan_id
-    assert app.channel == channel
-    assert app.channels == channels
-    assert app.state.network_information.network_key.key == network_key
-    assert app.state.network_information.network_key.seq == 0
+    assert app.state.network_info.pan_id == pan_id
+    assert app.state.network_info.extended_pan_id == ext_pan_id
+    assert app.state.network_info.channel == channel
+    assert app.state.network_info.channel_mask == channels
+    assert app.state.network_info.network_key.key == network_key
+    assert app.state.network_info.network_key.seq == 0
 
     assert app.zigpy_device.manufacturer == "Texas Instruments"
     assert app.zigpy_device.model == model
@@ -96,7 +89,7 @@ async def test_info(
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_endpoints(device, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     endpoints = []
     znp_server.callback_for_response(c.AF.Register.Req(partial=True), endpoints.append)
@@ -113,28 +106,16 @@ async def test_endpoints(device, make_application):
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
 async def test_not_configured(device, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     # We cannot start the application if Z-Stack is not configured and without auto_form
-    with pytest.raises(RuntimeError):
-        await app.startup(auto_form=False)
-
-
-@pytest.mark.parametrize("device", ALL_DEVICES)
-async def test_bad_nvram_value(device, make_application):
-    app, znp_server = make_application(server_cls=device)
-
-    # An invalid value is still bad
-    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\x00"
-    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1] = b"\x00"
-
-    with pytest.raises(RuntimeError):
+    with pytest.raises(NetworkNotFormed):
         await app.startup(auto_form=False)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_reset(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     # `_reset` should be called at least once to put the radio into a consistent state
     mocker.spy(ZNP, "reset")
@@ -146,24 +127,9 @@ async def test_reset(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_write_nvram(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
-    nvram = znp_server._nvram[ExNvIds.LEGACY]
-
-    # Change NVRAM value we should change it back
-    nvram[OsalNvIds.LOGICAL_TYPE] = t.DeviceLogicalType.EndDevice.serialize()
-
-    assert nvram[OsalNvIds.LOGICAL_TYPE] != t.DeviceLogicalType.Coordinator.serialize()
-    await app.startup()
-    assert nvram[OsalNvIds.LOGICAL_TYPE] == t.DeviceLogicalType.Coordinator.serialize()
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
 @pytest.mark.parametrize("succeed", [True, False])
 async def test_tx_power(device, succeed, make_application):
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_TX_POWER: 19}},
     )
@@ -208,7 +174,7 @@ async def test_tx_power(device, succeed, make_application):
 @pytest.mark.parametrize("led_mode", ["off", False, "on", True])
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_led_mode(device, led_mode, make_application):
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_LED_MODE: led_mode}},
     )
@@ -237,7 +203,7 @@ async def test_led_mode(device, led_mode, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_auto_form_unnecessary(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     mocker.patch.object(app, "form_network", new=CoroutineMock())
 
     await app.startup(auto_form=True)
@@ -249,15 +215,15 @@ async def test_auto_form_unnecessary(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
 async def test_auto_form_necessary(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
-    assert app.channel is None
-    assert app.channels is None
+    assert app.state.network_info.channel is None
+    assert app.state.network_info.channel_mask is None
 
     await app.startup(auto_form=True)
 
-    assert app.channel is not None
-    assert app.channels is not None
+    assert app.state.network_info.channel is not None
+    assert app.state.network_info.channel_mask is not None
 
     nvram = znp_server._nvram[ExNvIds.LEGACY]
 

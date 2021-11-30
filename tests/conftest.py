@@ -228,7 +228,14 @@ def swap_attribute(obj, name, value):
 
 @pytest.fixture
 def make_application(make_znp_server):
-    def inner(server_cls, client_config=None, server_config=None, **kwargs):
+    def inner(
+        server_cls,
+        client_config=None,
+        server_config=None,
+        *,
+        auto_connect=True,
+        **kwargs,
+    ):
         default = config_for_port_path(FAKE_SERIAL_PORT)
 
         client_config = merge_dicts(default, client_config or {})
@@ -265,9 +272,12 @@ def make_application(make_znp_server):
 
         app.add_initialized_device = add_initialized_device.__get__(app)
 
-        return app, make_znp_server(
-            server_cls=server_cls, config=server_config, **kwargs
-        )
+        server = make_znp_server(server_cls=server_cls, config=server_config, **kwargs)
+
+        if auto_connect:
+            await app.connect()
+
+        return app, server
 
     return inner
 

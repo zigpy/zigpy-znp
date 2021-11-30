@@ -60,7 +60,7 @@ async def test_addrmgr_rewrite_fix(device, make_application, mocker):
         extAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
     )
 
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     znp_server.callback_for_response(
         c.SYS.OSALNVReadExt.Req(Id=OsalNvIds.ADDRMGR, Offset=0), addrmgr_reads.append
     )
@@ -94,6 +94,7 @@ async def test_addrmgr_rewrite_fix(device, make_application, mocker):
 
     # Will not be read again
     assert len(addrmgr_reads) == 2
+    await app.connect()
     await app.startup()
     await app.shutdown()
     assert len(addrmgr_reads) == 2
@@ -104,6 +105,7 @@ async def test_addrmgr_rewrite_fix(device, make_application, mocker):
     old_addrmgr2 = nvram[OsalNvIds.ADDRMGR]
 
     assert len(addrmgr_reads) == 2
+    await app.connect()
     await app.startup()
     await app.shutdown()
     assert len(addrmgr_reads) == 3

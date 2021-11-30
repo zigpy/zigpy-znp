@@ -18,7 +18,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def zigpy_state_to_json_backup(
-    network_info: zigpy.state.NetworkInformation, node_info: zigpy.state.NodeInfo
+    network_info: zigpy.state.NetworkInfo, node_info: zigpy.state.NodeInfo
 ) -> t.JSONType:
     devices = {}
 
@@ -76,11 +76,6 @@ def zigpy_state_to_json_backup(
 
 
 async def backup_network(znp: ZNP) -> t.JSONType:
-    try:
-        await znp.load_network_info()
-    except ValueError as e:
-        raise RuntimeError("Failed to load network info") from e
-
     await znp.load_network_info(load_devices=True)
 
     obj = zigpy_state_to_json_backup(

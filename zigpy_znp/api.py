@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 import zigpy.state
 import async_timeout
 import zigpy.zdo.types as zdo_t
+from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
@@ -34,6 +35,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 # All of these are in seconds
+STARTUP_TIMEOUT = 15
 AFTER_BOOTLOADER_SKIP_BYTE_DELAY = 2.5
 NETWORK_COMMISSIONING_TIMEOUT = 30
 BOOTLOADER_PIN_TOGGLE_DELAY = 0.15
@@ -54,7 +56,7 @@ class ZNP:
         self.version = None
 
         self.nvram = NVRAMHelper(self)
-        self.network_info: zigpy.state.NetworkInformation = None
+        self.network_info: zigpy.state.NetworkInfo = None
         self.node_info: zigpy.state.NodeInfo = None
 
     def set_application(self, app):
@@ -111,7 +113,7 @@ class ZNP:
                 )
 
         if not is_on_network:
-            raise ValueError("Device is not a part of a network")
+            raise NetworkNotFormed("Device is not a part of a network")
 
         key_desc = await self.nvram.osal_read(
             OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
@@ -121,7 +123,7 @@ class ZNP:
             self, ext_pan_id=nib.extendedPANID
         )
 
-        network_info = zigpy.state.NetworkInformation(
+        network_info = zigpy.state.NetworkInfo(
             extended_pan_id=nib.extendedPANID,
             pan_id=nib.nwkPanId,
             nwk_update_id=nib.nwkUpdateId,
@@ -183,10 +185,91 @@ class ZNP:
         self.network_info = network_info
         self.node_info = node_info
 
+    async def start_network(self):
+        # Both startup sequences end with the same callback
+        started_as_coordinator = self.wait_for_response(
+            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
+        )
+
+        # Handle the startup progress messages
+        async with self.capture_responses(
+            [
+                c.ZDO.StateChangeInd.Callback(
+                    State=t.DeviceState.StartingAsCoordinator
+                ),
+                c.AppConfig.BDBCommissioningNotification.Callback(
+                    partial=True,
+                    Status=c.app_config.BDBCommissioningStatus.InProgress,
+                ),
+            ]
+        ):
+            try:
+                if self.version > 1.2:
+                    # Z-Stack 3 uses the BDB subsystem
+                    commissioning_rsp = await self.request_callback_rsp(
+                        request=c.AppConfig.BDBStartCommissioning.Req(
+                            Mode=c.app_config.BDBCommissioningMode.NwkFormation
+                        ),
+                        RspStatus=t.Status.SUCCESS,
+                        callback=c.AppConfig.BDBCommissioningNotification.Callback(
+                            partial=True,
+                            RemainingModes=c.app_config.BDBCommissioningMode.NONE,
+                        ),
+                        timeout=NETWORK_COMMISSIONING_TIMEOUT,
+                    )
+
+                    if (
+                        commissioning_rsp.Status
+                        != c.app_config.BDBCommissioningStatus.Success
+                    ):
+                        raise RuntimeError(
+                            f"Network formation failed: {commissioning_rsp}"
+                        )
+                else:
+                    # In Z-Stack 1.2.2, StartupFromApp actually does what it says
+                    rsp = await self.request(c.ZDO.StartupFromApp.Req(StartDelay=100))
+
+                    if rsp.State not in (
+                        c.zdo.StartupState.NewNetworkState,
+                        c.zdo.StartupState.RestoredNetworkState,
+                    ):
+                        raise InvalidCommandResponse(
+                            f"Invalid startup response state: {rsp.State}", rsp
+                        )
+
+                # Both versions still end with this callback
+                async with async_timeout.timeout(STARTUP_TIMEOUT):
+                    await started_as_coordinator
+            except asyncio.TimeoutError as e:
+                raise RuntimeError(
+                    "Network formation refused, RF environment is likely too noisy."
+                    " Temporarily unscrew the antenna or shield the coordinator"
+                    " with metal until a network is formed."
+                ) from e
+
+        LOGGER.debug("Waiting for NIB to stabilize")
+
+        # Even though the device says it is "ready" at this point, it takes a few more
+        # seconds for `_NIB.nwkState` to switch from `NwkState.NWK_INIT`. There does
+        # not appear to be any user-facing MT command to read this information.
+        while True:
+            try:
+                nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
+            except KeyError:
+                pass
+            else:
+                LOGGER.debug("Current NIB is %s", nib)
+
+                # Usually this works after the first attempt
+                if nib.nwkLogicalChannel != 0 and nib.nwkPanId != 0xFFFE:
+                    break
+
+            await asyncio.sleep(1)
+
     async def write_network_info(
         self,
         *,
-        network_info: zigpy.state.NetworkInformation,
+        network_info: zigpy.state.NetworkInfo,
         node_info: zigpy.state.NodeInfo,
     ) -> None:
         """
@@ -236,82 +319,8 @@ class ZNP:
                 RspStatus=t.Status.SUCCESS,
             )
 
-        # Both startup sequences end with the same callback
-        started_as_coordinator = self.wait_for_response(
-            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
-        )
-
         LOGGER.debug("Forming temporary network")
-
-        # Handle the startup progress messages
-        async with self.capture_responses(
-            [
-                c.ZDO.StateChangeInd.Callback(
-                    State=t.DeviceState.StartingAsCoordinator
-                ),
-                c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True,
-                    Status=c.app_config.BDBCommissioningStatus.InProgress,
-                ),
-            ]
-        ):
-            try:
-                if self.version > 1.2:
-                    # Z-Stack 3 uses the BDB subsystem
-                    commissioning_rsp = await self.request_callback_rsp(
-                        request=c.AppConfig.BDBStartCommissioning.Req(
-                            Mode=c.app_config.BDBCommissioningMode.NwkFormation
-                        ),
-                        RspStatus=t.Status.SUCCESS,
-                        callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                            partial=True,
-                            RemainingModes=c.app_config.BDBCommissioningMode.NONE,
-                        ),
-                        timeout=NETWORK_COMMISSIONING_TIMEOUT,
-                    )
-
-                    if (
-                        commissioning_rsp.Status
-                        != c.app_config.BDBCommissioningStatus.Success
-                    ):
-                        raise RuntimeError(
-                            f"Network formation failed: {commissioning_rsp}"
-                        )
-                else:
-                    # In Z-Stack 1.2.2, StartupFromApp actually does what it says
-                    await self.request(
-                        c.ZDO.StartupFromApp.Req(StartDelay=100),
-                        RspState=c.zdo.StartupState.NewNetworkState,
-                    )
-
-                # Both versions still end with this callback
-                await started_as_coordinator
-            except asyncio.TimeoutError as e:
-                raise RuntimeError(
-                    "Network formation refused, RF environment is likely too noisy."
-                    " Temporarily unscrew the antenna or shield the coordinator"
-                    " with metal until a network is formed."
-                ) from e
-
-        LOGGER.debug("Waiting for NIB to stabilize")
-
-        # Even though the device says it is "ready" at this point, it takes a few more
-        # seconds for `_NIB.nwkState` to switch from `NwkState.NWK_INIT`. There does
-        # not appear to be any user-facing MT command to read this information.
-        while True:
-            try:
-                nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
-            except KeyError:
-                pass
-            else:
-                LOGGER.debug("Current NIB is %s", nib)
-
-                # Usually this works after the first attempt
-                if nib.nwkLogicalChannel != 0 and nib.nwkPanId != 0xFFFE:
-                    break
-
-            await asyncio.sleep(1)
-
+        await self.start_network()
         await self.reset()
 
         LOGGER.debug("Writing actual network settings")

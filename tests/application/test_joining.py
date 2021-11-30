@@ -25,7 +25,7 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
     if fixed_joining_bug:
         mocker.patch.object(device, "code_revision", 20210708)
 
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
@@ -66,7 +66,7 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_join_coordinator(device, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
@@ -80,7 +80,7 @@ async def test_join_coordinator(device, make_application):
     )
 
     await app.startup(auto_form=False)
-    await app.permit(node=app.ieee)
+    await app.permit(node=app.state.node_info.ieee)
 
     await permit_join_coordinator
 
@@ -90,7 +90,7 @@ async def test_join_coordinator(device, make_application):
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 @pytest.mark.parametrize("permit_result", [None, asyncio.TimeoutError()])
 async def test_permit_join_with_key(device, permit_result, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     # Consciot bulb
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
@@ -112,10 +112,6 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
         ],
     )
 
-    mocker.patch.object(
-        app, "permit", new=CoroutineMock(side_effect=[None, permit_result])
-    )
-
     join_disable_install_code = znp_server.reply_once_to(
         c.AppConfig.BDBSetJoinUsesInstallCodeKey.Req(BdbJoinUsesInstallCodeKey=False),
         responses=[
@@ -125,6 +121,8 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
 
     await app.startup(auto_form=False)
 
+    mocker.patch.object(app, "permit", new=CoroutineMock(side_effect=permit_result))
+
     with contextlib.nullcontext() if permit_result is None else pytest.raises(
         asyncio.TimeoutError
     ):
@@ -132,7 +130,7 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
 
     await bdb_add_install_code
     await join_enable_install_code
-    assert app.permit.call_count == 2
+    assert app.permit.call_count == 1
 
     # The install code policy is reset right after
     await join_disable_install_code
@@ -142,7 +140,7 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
 
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 async def test_permit_join_with_invalid_key(device, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     # Consciot bulb
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
@@ -156,7 +154,7 @@ async def test_permit_join_with_invalid_key(device, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_join")
@@ -176,7 +174,7 @@ async def test_on_zdo_device_join(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_fast(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_join")
@@ -213,7 +211,7 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_slow(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_join")
@@ -251,7 +249,7 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_new_device_join_and_bind_complex(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     nwk = 0x6A7C
@@ -502,7 +500,7 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
         ep = device.endpoints[request.SrcEndpoint]
         assert cluster in ep.in_clusters or cluster in ep.out_clusters
 
-        assert request.Address.ieee == app.ieee
+        assert request.Address.ieee == app.state.node_info.ieee
         assert request.Address.addrmode == 0x03
 
         # Make sure the endpoint profiles match up
@@ -528,7 +526,7 @@ async def test_new_device_join_and_bind_complex(device, make_application, mocker
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_unknown_device_discovery(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.spy(app, "handle_join")
@@ -602,4 +600,4 @@ async def test_unknown_device_discovery(device, make_application, mocker):
     assert new_dev.nwk == new_nwk
     assert new_dev.ieee == new_ieee
 
-    await app.pre_shutdown()
+    await app.shutdown()

@@ -4,6 +4,7 @@ import dataclasses
 import pytest
 import zigpy.state
 from jsonschema import ValidationError
+from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp.types as t
 from zigpy_znp.znp import security
@@ -24,7 +25,7 @@ from ..conftest import (
 )
 from ..application.test_startup import DEV_NETWORK_SETTINGS
 
-BARE_NETWORK_INFO = zigpy.state.NetworkInformation(
+BARE_NETWORK_INFO = zigpy.state.NetworkInfo(
     extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
     channel=None,
     channel_mask=None,
@@ -138,7 +139,7 @@ def test_schema_validation_device_key_info(backup_json):
 async def test_network_backup_empty(device, make_znp_server):
     znp_server = make_znp_server(server_cls=device)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(NetworkNotFormed):
         await network_backup([znp_server._port_path, "-o", "-"])
 
 
