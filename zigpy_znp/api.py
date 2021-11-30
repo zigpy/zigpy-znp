@@ -42,6 +42,8 @@ BOOTLOADER_PIN_TOGGLE_DELAY = 0.15
 CONNECT_PING_TIMEOUT = 0.50
 CONNECT_PROBE_TIMEOUT = 10
 
+NVRAM_MIGRATION_ID = 1
+
 
 class ZNP:
     def __init__(self, config: conf.ConfigType):
@@ -461,6 +463,11 @@ class ZNP:
             counter_increment=0,
         )
 
+        # Prevent an unnecessary NVRAM migration from running
+        await self.nvram.osal_write(
+            OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, t.uint8_t(NVRAM_MIGRATION_ID), create=True
+        )
+
         if self.version == 1.2:
             await self.nvram.osal_write(
                 OsalNvIds.HAS_CONFIGURED_ZSTACK1,
@@ -475,6 +482,65 @@ class ZNP:
             )
 
         LOGGER.debug("Done!")
+
+    async def migrate_nvram(self) -> bool:
+        """
+        Migrates NVRAM entries using the `ZIGPY_ZNP_MIGRATION_ID` NVRAM item.
+        Returns `True` if a migration was performed, `False` otherwise.
+        """
+
+        from zigpy_znp.znp import security
+
+        try:
+            migration_id = await self.nvram.osal_read(
+                OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, item_type=t.uint8_t
+            )
+        except KeyError:
+            migration_id = 0
+
+        initial_migration_id = migration_id
+
+        # Migration 1: empty `ADDRMGR` entries are version-dependent and were improperly
+        #              written for CC253x devices.
+        #
+        #              This migration is stateless and can safely be run more than once:
+        #              the only downside is that startup times increase by 10s on newer
+        #              coordinators, which is why the migration ID is persisted.
+        if migration_id < 1:
+            try:
+                entries = await security.read_addr_manager_entries(self)
+            except KeyError:
+                pass
+            else:
+                fixed_entries = []
+
+                for entry in entries:
+                    if entry.extAddr != t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):
+                        fixed_entries.append(entry)
+                    elif self.version == 3.30:
+                        fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3)
+                    else:
+                        fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1)
+
+                if entries != fixed_entries:
+                    LOGGER.warning(
+                        "Repairing %d invalid empty address manager entries (total %d)",
+                        sum(i != j for i, j in zip(entries, fixed_entries)),
+                        len(entries),
+                    )
+                    await security.write_addr_manager_entries(self, fixed_entries)
+
+            migration_id = 1
+
+        if initial_migration_id == migration_id:
+            return False
+
+        await self.nvram.osal_write(
+            OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, t.uint8_t(migration_id), create=True
+        )
+        await self.reset()
+
+        return True
 
     async def reset(self) -> None:
         """

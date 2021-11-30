@@ -44,7 +44,7 @@ async def test_addrmgr_empty_entries(make_connected_znp, device):
 
 
 @pytest.mark.parametrize("device", [FormedZStack3CC2531])
-async def test_addrmgr_rewrite_fix(device, make_application, mocker):
+async def test_addrmgr_rewrite_fix(device, make_connected_znp):
     # Keep track of reads
     addrmgr_reads = []
 
@@ -60,7 +60,7 @@ async def test_addrmgr_rewrite_fix(device, make_application, mocker):
         extAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
     )
 
-    app, znp_server = await make_application(server_cls=device)
+    znp, znp_server = await make_connected_znp(server_cls=device)
     znp_server.callback_for_response(
         c.SYS.OSALNVReadExt.Req(Id=OsalNvIds.ADDRMGR, Offset=0), addrmgr_reads.append
     )
@@ -81,8 +81,7 @@ async def test_addrmgr_rewrite_fix(device, make_application, mocker):
     assert old_addrmgr != nvram[OsalNvIds.ADDRMGR]
 
     assert len(addrmgr_reads) == 0
-    await app.startup()
-    await app.shutdown()
+    await znp.migrate_nvram()
     assert len(addrmgr_reads) == 2
 
     # Bad entries have been fixed
@@ -94,9 +93,7 @@ async def test_addrmgr_rewrite_fix(device, make_application, mocker):
 
     # Will not be read again
     assert len(addrmgr_reads) == 2
-    await app.connect()
-    await app.startup()
-    await app.shutdown()
+    await znp.migrate_nvram()
     assert len(addrmgr_reads) == 2
 
     # Will be migrated again if the migration NVID is deleted
@@ -105,9 +102,7 @@ async def test_addrmgr_rewrite_fix(device, make_application, mocker):
     old_addrmgr2 = nvram[OsalNvIds.ADDRMGR]
 
     assert len(addrmgr_reads) == 2
-    await app.connect()
-    await app.startup()
-    await app.shutdown()
+    await znp.migrate_nvram()
     assert len(addrmgr_reads) == 3
 
     # But nothing will change
