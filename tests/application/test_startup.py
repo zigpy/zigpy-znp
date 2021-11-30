@@ -205,11 +205,12 @@ async def test_tx_power(device, succeed, make_application):
     await app.shutdown()
 
 
+@pytest.mark.parametrize("led_mode", ["off", False, "on", True])
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_led_mode(device, make_application):
+async def test_led_mode(device, led_mode, make_application):
     app, znp_server = make_application(
         server_cls=device,
-        client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_LED_MODE: "off"}},
+        client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_LED_MODE: led_mode}},
     )
 
     # Z-Stack just does not respond to this command if HAL_LED is not enabled
@@ -224,7 +225,11 @@ async def test_led_mode(device, make_application):
     await app.startup(auto_form=False)
     led_req = await set_led_mode
 
-    assert led_req.Mode == c.util.LEDMode.OFF
+    if led_mode in ("off", False):
+        assert led_req.Mode == c.util.LEDMode.OFF
+    else:
+        assert led_req.Mode == c.util.LEDMode.ON
+
     assert led_req.LED == 0xFF
 
     await app.shutdown()

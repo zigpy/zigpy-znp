@@ -262,7 +262,7 @@ async def test_znp_sreq_srsp(connected_znp, event_loop):
 
     # Each SREQ must have a corresponding SRSP, so this will fail
     with pytest.raises(asyncio.TimeoutError):
-        with async_timeout.timeout(0.5):
+        async with async_timeout.timeout(0.5):
             await znp.request(c.SYS.Ping.Req())
 
     # This will work

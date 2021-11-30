@@ -62,6 +62,19 @@ def keys_have_same_length(*keys):
     return validator
 
 
+def bool_to_upper_str(value: typing.Any) -> str:
+    """
+    Converts the value into an uppercase string, including unquoted YAML booleans.
+    """
+
+    if value is True:
+        return "ON"
+    elif value is False:
+        return "OFF"
+    else:
+        return str(value).upper()
+
+
 CONF_ZNP_CONFIG = "znp_config"
 CONF_TX_POWER = "tx_power"
 CONF_LED_MODE = "led_mode"
@@ -89,7 +102,7 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     ): VolPositiveNumber,
                     vol.Optional(CONF_SKIP_BOOTLOADER, default=True): cv_boolean,
                     vol.Optional(CONF_LED_MODE, default=LEDMode.OFF): vol.Any(
-                        None, EnumValue(LEDMode, lambda v: str(v).upper())
+                        None, EnumValue(LEDMode, transformer=bool_to_upper_str)
                     ),
                     vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default="auto"): vol.Any(
                         "auto", VolPositiveNumber
