@@ -132,7 +132,7 @@ class ZNP:
             OsalNvIds.NWK_ACTIVE_KEY_INFO, item_type=t.NwkKeyDesc
         )
 
-        tc_frame_counter = await security.read_tc_frame_counter(
+        nwk_frame_counter = await security.read_nwk_frame_counter(
             self, ext_pan_id=nib.extendedPANID
         )
 
@@ -146,7 +146,7 @@ class ZNP:
             network_key=zigpy.state.Key(
                 key=key_desc.Key,
                 seq=key_desc.KeySeqNum,
-                tx_counter=tc_frame_counter,
+                tx_counter=nwk_frame_counter,
                 rx_counter=0,
                 partner_ieee=node_info.ieee,
             ),
@@ -403,7 +403,7 @@ class ZNP:
         for key, value in nvram.items():
             await self.nvram.osal_write(key, value, create=True)
 
-        await security.write_tc_frame_counter(
+        await security.write_nwk_frame_counter(
             self,
             network_info.network_key.tx_counter,
             ext_pan_id=network_info.extended_pan_id,

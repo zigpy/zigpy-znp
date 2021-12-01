@@ -250,19 +250,19 @@ async def test_network_restore_pick_optimal_tclk(
     assert backup_json2["stack_specific"]["zstack"]["tclk_seed"] == old_tclk_seed
 
 
-async def test_tc_frame_counter_zstack1(make_connected_znp):
+async def test_nwk_frame_counter_zstack1(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack1CC2531)
     znp_server._nvram[ExNvIds.LEGACY] = {
         OsalNvIds.NWKKEY: b"\x01" + b"\xAB" * 16 + b"\x78\x56\x34\x12"
     }
 
-    assert (await security.read_tc_frame_counter(znp)) == 0x12345678
+    assert (await security.read_nwk_frame_counter(znp)) == 0x12345678
 
-    await security.write_tc_frame_counter(znp, 0xAABBCCDD)
-    assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
+    await security.write_nwk_frame_counter(znp, 0xAABBCCDD)
+    assert (await security.read_nwk_frame_counter(znp)) == 0xAABBCCDD
 
 
-async def test_tc_frame_counter_zstack30(make_connected_znp):
+async def test_nwk_frame_counter_zstack30(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack3CC2531)
     znp.network_info = BARE_NETWORK_INFO
     znp.node_info = BARE_NODE_INFO
@@ -281,19 +281,19 @@ async def test_tc_frame_counter_zstack30(make_connected_znp):
         + b"\xFF" * 8,
     }
 
-    assert (await security.read_tc_frame_counter(znp)) == 0x00000001
+    assert (await security.read_nwk_frame_counter(znp)) == 0x00000001
 
     # If we change the EPID, the generic entry will be used
     znp.network_info = dataclasses.replace(
         znp.network_info, extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
     )
-    assert (await security.read_tc_frame_counter(znp)) == 0x00000002
+    assert (await security.read_nwk_frame_counter(znp)) == 0x00000002
 
-    await security.write_tc_frame_counter(znp, 0xAABBCCDD)
-    assert (await security.read_tc_frame_counter(znp)) == 0xAABBCCDD
+    await security.write_nwk_frame_counter(znp, 0xAABBCCDD)
+    assert (await security.read_nwk_frame_counter(znp)) == 0xAABBCCDD
 
 
-async def test_tc_frame_counter_zstack33(make_connected_znp):
+async def test_nwk_frame_counter_zstack33(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseLaunchpadCC26X2R1)
     znp.network_info = BARE_NETWORK_INFO
     znp.node_info = BARE_NODE_INFO
@@ -313,7 +313,7 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
         },
     }
 
-    assert (await security.read_tc_frame_counter(znp)) == 0x00000002
+    assert (await security.read_nwk_frame_counter(znp)) == 0x00000002
 
     # If we change the EPID, the generic entry will be used. It doesn't exist.
     znp.network_info = dataclasses.replace(
@@ -321,7 +321,7 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     )
 
     with pytest.raises(ValueError):
-        await security.read_tc_frame_counter(znp)
+        await security.read_nwk_frame_counter(znp)
 
     # Writes similarly will fail
     old_nvram_state = repr(znp_server._nvram)
@@ -329,8 +329,8 @@ async def test_tc_frame_counter_zstack33(make_connected_znp):
     # And the NVRAM will be untouched
     assert repr(znp_server._nvram) == old_nvram_state
 
-    await security.write_tc_frame_counter(znp, 0x98765432)
-    assert (await security.read_tc_frame_counter(znp)) == 0x98765432
+    await security.write_nwk_frame_counter(znp, 0x98765432)
+    assert (await security.read_nwk_frame_counter(znp)) == 0x98765432
 
 
 def ieee_and_key(text) -> zigpy.state.Key:

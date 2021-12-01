@@ -71,7 +71,7 @@ def iter_seed_candidates(
         yield count, tclk_seed
 
 
-async def read_tc_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.uint32_t:
+async def read_nwk_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.uint32_t:
     if ext_pan_id is None and znp.network_info is not None:
         ext_pan_id = znp.network_info.extended_pan_id
 
@@ -110,7 +110,7 @@ async def read_tc_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.ui
     return global_entry.FrameCounter
 
 
-async def write_tc_frame_counter(
+async def write_nwk_frame_counter(
     znp: ZNP, counter: t.uint32_t, *, ext_pan_id: t.EUI64 = None
 ) -> None:
     if znp.version == 1.2:
