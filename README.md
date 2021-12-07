@@ -37,10 +37,11 @@ Launch Home Assistant with the `--skip-pip` command line option to prevent zigpy
  - Add https://github.com/home-assistant/hassio-addons-development as an addon repository.
  - Install the "Custom deps deployment" addon.
  - Add the following to your `configuration.yaml` file:
-	```yaml
-	pypi:
-	  - git+https://github.com/zigpy/zigpy-znp/
-	```
+   ```yaml
+   apk: []
+   pypi:
+     - git+https://github.com/zigpy/zigpy-znp/
+	 ```
 
 # Configuration
 Below are the defaults with the top-level Home Assistant `zha:` key.
