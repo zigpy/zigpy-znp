@@ -135,15 +135,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.debug("Probing %s", znp._port_path)
 
         try:
-            async with async_timeout.timeout(PROBE_TIMEOUT):
-                await znp.connect()
-
-            return True
+            # `ZNP.connect` times out on its own
+            await znp.connect()
         except Exception as e:
             LOGGER.debug(
                 "Failed to probe ZNP radio with config %s", device_config, exc_info=e
             )
             return False
+        else:
+            return True
         finally:
             znp.close()
 

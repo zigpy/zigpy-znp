@@ -38,7 +38,7 @@ AFTER_BOOTLOADER_SKIP_BYTE_DELAY = 2.5
 NETWORK_COMMISSIONING_TIMEOUT = 30
 BOOTLOADER_PIN_TOGGLE_DELAY = 0.15
 CONNECT_PING_TIMEOUT = 0.50
-CONNECT_PROBE_TIMEOUT = 5.0
+CONNECT_PROBE_TIMEOUT = 10
 
 
 class ZNP:
@@ -468,6 +468,16 @@ class ZNP:
         """
 
         async def ping_task():
+            LOGGER.debug("Toggling RTS/DTR pins to skip bootloader or reset chip")
+
+            # The default sequence is DTR=false and RTS toggling false/true/false
+            for dtr, rts in zip(
+                self._znp_config[conf.CONF_CONNECT_DTR_STATES],
+                self._znp_config[conf.CONF_CONNECT_RTS_STATES],
+            ):
+                self._uart.set_dtr_rts(dtr=dtr, rts=rts)
+                await asyncio.sleep(BOOTLOADER_PIN_TOGGLE_DELAY)
+
             # First, just try pinging
             try:
                 async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
@@ -488,20 +498,8 @@ class ZNP:
             except asyncio.TimeoutError:
                 pass
 
-            # This is normally done just for Slaesh's CC2652RB stick
-            LOGGER.debug("Toggling RTS/DTR pins to skip bootloader or reset chip")
-
-            # The default sequence is DTR=false and RTS toggling false/true/false
-            for dtr, rts in zip(
-                self._znp_config[conf.CONF_CONNECT_DTR_STATES],
-                self._znp_config[conf.CONF_CONNECT_RTS_STATES],
-            ):
-                self._uart.set_dtr_rts(dtr=dtr, rts=rts)
-                await asyncio.sleep(BOOTLOADER_PIN_TOGGLE_DELAY)
-
             # At this point we have nothing else to try, don't catch the timeout
-            async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
-                return await self.request(c.SYS.Ping.Req())
+            return await self.request(c.SYS.Ping.Req())
 
         async with self.capture_responses([CatchAllResponse()]) as responses:
             ping_task = asyncio.create_task(ping_task())
