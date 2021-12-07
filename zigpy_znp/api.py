@@ -488,18 +488,18 @@ class ZNP:
             # If that doesn't work, send the bootloader skip bytes and try again.
             # Sending a bunch at a time fixes UART issues when the radio was previously
             # probed with another library at a different baudrate.
+            LOGGER.debug("Sending CC253x bootloader skip bytes")
             self._uart.write(256 * bytes([c.ubl.BootloaderRunMode.FORCE_RUN]))
 
             await asyncio.sleep(AFTER_BOOTLOADER_SKIP_BYTE_DELAY)
 
-            try:
-                async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
-                    return await self.request(c.SYS.Ping.Req())
-            except asyncio.TimeoutError:
-                pass
-
-            # At this point we have nothing else to try, don't catch the timeout
-            return await self.request(c.SYS.Ping.Req())
+            # At this point we have nothing left to try
+            while True:
+                try:
+                    async with async_timeout.timeout(2 * CONNECT_PING_TIMEOUT):
+                        return await self.request(c.SYS.Ping.Req())
+                except asyncio.TimeoutError:
+                    pass
 
         async with self.capture_responses([CatchAllResponse()]) as responses:
             ping_task = asyncio.create_task(ping_task())
