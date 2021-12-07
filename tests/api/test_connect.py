@@ -102,17 +102,9 @@ async def test_connect_skip_bootloader_rts_dtr_pins(make_znp_server, mocker):
     mocker.patch.object(znp.nvram, "determine_alignment", new=CoroutineMock())
     mocker.patch.object(znp, "detect_zstack_version", new=CoroutineMock())
 
-    num_pings = 0
-
-    def ping_rsp(req):
-        nonlocal num_pings
-        num_pings += 1
-
-        if num_pings >= 3:
-            return c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
-
-    # Ignore the first few pings so we trigger the pin toggling
-    znp_server.reply_to(c.SYS.Ping.Req(), responses=ping_rsp)
+    znp_server.reply_to(
+        c.SYS.Ping.Req(), responses=[c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)]
+    )
 
     await znp.connect(test_port=True)
 
