@@ -696,18 +696,19 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # set rejoin backoff duration and rejoin scan duration for an end device
-    SetRejoinParams = t.CommandDef(
+    # XXX: Undocumented
+    SendData = t.CommandDef(
         t.CommandType.SREQ,
-        # in documentation CmdId=0x26 which conflict with discover req
         0x28,
         req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination"),
+            t.Param("TSN", t.uint8_t, "Transaction sequence number"),
+            t.Param("CommandId", t.uint16_t, "ZDO Command ID"),
             t.Param(
-                "BackoffDuraation",
-                t.uint32_t,
-                "Rejoin backoff  duration for end device",
+                "Data",
+                t.Bytes,
+                "Data to send",
             ),
-            t.Param("ScanDuration", t.uint32_t, "Rejoin scan duration for end device"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -1428,4 +1429,20 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         t.CommandType.AREQ,
         0xCB,
         rsp_schema=(t.Param("Duration", t.uint8_t, "Permit join duration"),),
+    )
+
+    # set rejoin backoff duration and rejoin scan duration for an end device
+    SetRejoinParams = t.CommandDef(
+        t.CommandType.SREQ,
+        # in documentation CmdId=0x26 which conflict with discover req
+        0xCC,
+        req_schema=(
+            t.Param(
+                "BackoffDuraation",
+                t.uint32_t,
+                "Rejoin backoff  duration for end device",
+            ),
+            t.Param("ScanDuration", t.uint32_t, "Rejoin scan duration for end device"),
+        ),
+        rsp_schema=t.STATUS_SCHEMA,
     )
