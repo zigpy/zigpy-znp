@@ -284,11 +284,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._version_rsp = await self._znp.request(c.SYS.Version.Req())
 
-        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
-        # unless they are explicitly disabled. We can't fix this but we can disable them
-        # as early as possible to shrink the window of opportunity for unwanted joins.
-        await self.permit(time_s=0)
-
         # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
         # before the coordinator has started.
         if self.znp_config[conf.CONF_LED_MODE] is not None:
@@ -336,6 +331,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
         self._watchdog_task = asyncio.create_task(self._watchdog_loop())
+
+        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
+        # unless they are explicitly disabled. We can't fix this but we can disable them
+        # as early as possible to shrink the window of opportunity for unwanted joins.
+        await self.permit(time_s=0)
 
     async def set_tx_power(self, dbm: int) -> None:
         """
@@ -540,19 +540,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # through the coordinator itself.
         #
         # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
-        if time_s == 0 or self._zstack_build_id < 20210708 or node == self.ieee:
-            response = await self._znp.request_callback_rsp(
-                request=c.ZDO.MgmtPermitJoinReq.Req(
-                    AddrMode=t.AddrMode.NWK,
-                    Dst=0x0000,
-                    Duration=time_s,
-                    TCSignificance=1,
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
-            )
+        if time_s == 0 or self._zstack_build_id < 20210708 or node in (None, self.ieee):
+            response = await self.zigpy_device.zdo.Mgmt_Permit_Joining_req(time_s, 1)
 
-            if response.Status != t.Status.SUCCESS:
+            if response[0] != t.Status.SUCCESS:
                 raise RuntimeError(f"Failed to permit joins on coordinator: {response}")
 
         await super().permit(time_s=time_s, node=node)
