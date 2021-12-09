@@ -22,7 +22,6 @@ import zigpy.zdo.types as zdo_t
 import zigpy.application
 from zigpy.zcl import clusters
 from zigpy.types import ExtendedPanId
-from zigpy.zdo.types import ZDOCmd, MultiAddress
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.const as const
@@ -298,6 +297,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Setup the coordinator as a zigpy device and initialize it to request node info
         self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
+        self.zigpy_device.zdo.add_listener(self)
         await self.zigpy_device.schedule_initialize()
 
         # Now that we know what device we are, set the max concurrent requests
@@ -414,7 +414,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._write_stack_settings(reset_if_changed=False)
         await self._znp.reset()
 
-    def get_dst_address(self, cluster: zigpy.zcl.Cluster) -> MultiAddress:
+    def get_dst_address(self, cluster: zigpy.zcl.Cluster) -> zdo_t.MultiAddress:
         """
         Helper to get a dst address for bind/unbind operations.
 
@@ -422,7 +422,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         on specific endpoints only.
         """
 
-        dst_addr = MultiAddress()
+        dst_addr = zdo_t.MultiAddress()
         dst_addr.addrmode = 0x03
         dst_addr.ieee = self.ieee
         dst_addr.endpoint = self._find_endpoint(
@@ -626,12 +626,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.AF.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
-        # ZDO requests need to be handled explicitly, one by one
-        self._znp.callback_for_response(
-            c.ZDO.EndDeviceAnnceInd.Callback(partial=True),
-            self.on_zdo_device_announce,
-        )
-
         self._znp.callback_for_response(
             c.ZDO.TCDevInd.Callback.Callback(partial=True),
             self.on_zdo_tc_device_join,
@@ -653,21 +647,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDO.MsgCbIncoming.Callback(partial=True), self.on_zdo_message
         )
 
-        # No-op handle commands that just create unnecessary WARNING logs
-        self._znp.callback_for_response(
-            c.ZDO.ParentAnnceRsp.Callback(partial=True),
-            self.on_intentionally_unhandled_message,
-        )
-
-        self._znp.callback_for_response(
-            c.ZDO.ConcentratorInd.Callback(partial=True),
-            self.on_intentionally_unhandled_message,
-        )
-
-        self._znp.callback_for_response(
-            c.ZDO.MgmtNWKUpdateNotify.Callback(partial=True),
-            self.on_intentionally_unhandled_message,
-        )
+        # Handle messages that we do not use to prevent unnecessary WARNINGs in logs
+        for ignored_msg in [
+            c.ZDO.EndDeviceAnnceInd,
+            c.ZDO.LeaveInd,
+            c.ZDO.PermitJoinInd,
+            c.ZDO.ParentAnnceRsp,
+            c.ZDO.ConcentratorInd,
+            c.ZDO.MgmtNWKUpdateNotify,
+            c.ZDO.MgmtPermitJoinRsp,
+            c.ZDO.NodeDescRsp,
+            c.ZDO.SimpleDescRsp,
+            c.ZDO.ActiveEpRsp,
+        ]:
+            self._znp.callback_for_response(
+                ignored_msg.Callback(partial=True),
+                self.on_intentionally_unhandled_message,
+            )
 
         # These are responses to a broadcast but we ignore all but the first
         self._znp.callback_for_response(
@@ -685,10 +681,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def on_zdo_message(self, msg: c.ZDO.MsgCbIncoming.Callback) -> None:
         """
-        Global callback for all ZDO messages
+        Global callback for all ZDO messages.
         """
 
         device = await self._get_or_discover_device(nwk=msg.Src)
+
+        if device is None:
+            LOGGER.warning("Received a ZDO message from an unknown device: %s", msg.Src)
+            return
+
+        message = t.uint8_t(msg.TSN).serialize() + msg.Data
 
         self.handle_message(
             sender=device,
@@ -696,8 +698,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             cluster=msg.ClusterId,
             src_ep=ZDO_ENDPOINT,
             dst_ep=ZDO_ENDPOINT,
-            message=t.uint8_t(msg.TSN).serialize() + msg.Data,
+            message=message,
         )
+
+        hdr, args = device.zdo.deserialize(msg.ClusterId, message)
+
+        if msg.ClusterId == zdo_t.ZDOCmd.Device_annce:
+            self.on_zdo_device_announce(*args)
 
     def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
         """
@@ -725,31 +732,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # `relays` is a property with a setter that emits an event
         device.relays = msg.Relays
 
-    def on_zdo_device_announce(self, msg: c.ZDO.EndDeviceAnnceInd.Callback) -> None:
+    def on_zdo_device_announce(self, nwk: t.NWK, ieee: t.EUI64, capabilities) -> None:
         """
         ZDO end device announcement callback
         """
 
-        LOGGER.info("ZDO device announce: %s", msg)
+        LOGGER.info(
+            "ZDO device announce: nwk=%s, ieee=%s, capabilities=%s",
+            nwk,
+            ieee,
+            capabilities,
+        )
 
         # Cancel an existing join timer so we don't double announce
-        if msg.IEEE in self._join_announce_tasks:
-            self._join_announce_tasks.pop(msg.IEEE).cancel()
+        if ieee in self._join_announce_tasks:
+            self._join_announce_tasks.pop(ieee).cancel()
 
         # Sometimes devices change their NWK when announcing so re-join it.
-        self.handle_join(nwk=msg.NWK, ieee=msg.IEEE, parent_nwk=None)
-
-        device = self.get_device(ieee=msg.IEEE)
-
-        # We turn this back into a ZDO message and let zigpy handle it
-        self._receive_zdo_message(
-            cluster=ZDOCmd.Device_annce,
-            tsn=0xFF,
-            sender=device,
-            NWKAddr=msg.NWK,
-            IEEEAddr=msg.IEEE,
-            Capability=msg.Capabilities,
-        )
+        self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
 
     def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
         """
