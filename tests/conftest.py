@@ -228,7 +228,7 @@ def swap_attribute(obj, name, value):
 
 @pytest.fixture
 def make_application(make_znp_server):
-    def inner(
+    async def inner(
         server_cls,
         client_config=None,
         server_config=None,
