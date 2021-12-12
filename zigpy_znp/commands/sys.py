@@ -164,7 +164,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
     GetExtAddr = t.CommandDef(
         t.CommandType.SREQ,
         0x04,
-        req_schema=t.STATUS_SCHEMA,
+        req_schema=(),
         rsp_schema=(t.Param("ExtAddr", t.EUI64, "The device's extended address"),),
     )
 
