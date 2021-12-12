@@ -411,10 +411,12 @@ class ZNP:
 
         devices = {}
 
-        for child in network_info.children or []:
-            devices[child.ieee] = security.StoredDevice(
-                node_info=dataclasses.replace(
-                    child, nwk=0xFFFE if child.nwk is None else child.nwk
+        for ieee in network_info.children or []:
+            devices[ieee] = security.StoredDevice(
+                node_info=zigpy.state.NodeInfo(
+                    nwk=network_info.nwk_addresses.get(ieee, 0xFFFE),
+                    ieee=ieee,
+                    logical_type=zdo_t.LogicalType.EndDevice,
                 ),
                 key=None,
                 is_child=True,
