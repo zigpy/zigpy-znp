@@ -1196,12 +1196,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
             ),
             t.Param(
-                "BindingTableEntries",
+                "BindTableEntries",
                 t.uint8_t,
                 "Total number of entries available on the device",
             ),
             t.Param("StartIndex", t.uint8_t, "Index where the response starts"),
-            t.Param("BindingTableList", BindEntryList, "list of BindEntries"),
+            t.Param("BindTableList", BindEntryList, "list of BindEntries"),
         ),
     )
 

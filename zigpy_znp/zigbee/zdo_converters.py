@@ -206,9 +206,9 @@ ZDO_CONVERTERS = {
                 ZDOCmd.Mgmt_Bind_rsp,
                 {
                     "Status": rsp.Status,
-                    "BindingTableEntries": rsp.BindingTableEntries,
+                    "BindingTableEntries": rsp.BindTableEntries,
                     "StartIndex": rsp.StartIndex,
-                    "BindingTableList": rsp.BindingTableList,
+                    "BindingTableList": rsp.BindTableList,
                 },
             )
         ),
