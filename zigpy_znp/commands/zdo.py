@@ -100,16 +100,7 @@ class GroupIdList(t.LVList, item_type=t.GroupId, length_type=t.uint8_t):
     pass
 
 
-class BindEntry(t.Struct):
-    """Bind table entry."""
-
-    Src: t.EUI64
-    SrcEp: t.uint8_t
-    ClusterId: t.ClusterId
-    DstAddr: zigpy.zdo.types.MultiAddress
-
-
-class BindEntryList(t.LVList, item_type=BindEntry, length_type=t.uint8_t):
+class BindEntryList(t.LVList, item_type=zigpy.zdo.types.Binding, length_type=t.uint8_t):
     pass
 
 
@@ -1205,12 +1196,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
             ),
             t.Param(
-                "BindTableEntries",
+                "BindingTableEntries",
                 t.uint8_t,
                 "Total number of entries available on the device",
             ),
-            t.Param("Index", t.uint8_t, "Index where the response starts"),
-            t.Param("BindTable", BindEntryList, "list of BindEntries"),
+            t.Param("StartIndex", t.uint8_t, "Index where the response starts"),
+            t.Param("BindingTableList", BindEntryList, "list of BindEntries"),
         ),
     )
 
