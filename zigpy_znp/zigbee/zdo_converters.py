@@ -191,4 +191,26 @@ ZDO_CONVERTERS = {
         (lambda addr: c.ZDO.MgmtRtgRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Mgmt_Rtg_rsp, {"Status": rsp.Status})),
     ),
+    ZDOCmd.Mgmt_Bind_req: (
+        (
+            lambda addr, StartIndex: (
+                c.ZDO.MgmtBindReq.Req(
+                    Dst=addr.address,
+                    StartIndex=StartIndex,
+                )
+            )
+        ),
+        (lambda addr: c.ZDO.MgmtBindRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda rsp: (
+                ZDOCmd.Mgmt_Bind_rsp,
+                {
+                    "Status": rsp.Status,
+                    "BindingTableEntries": rsp.BindTableEntries,
+                    "StartIndex": rsp.StartIndex,
+                    "BindingTableList": rsp.BindTableList,
+                },
+            )
+        ),
+    ),
 }
