@@ -738,6 +738,10 @@ class BaseZStackDevice(BaseServerZNP):
     def zdo_route_check(self, request):
         return c.ZDO.ExtRouteChk.Rsp(Status=c.zdo.RoutingStatus.SUCCESS)
 
+    @reply_to(c.UTIL.AssocFindDevice.Req(Index=0))
+    def assoc_find_dev_responder(self, req):
+        return req.Rsp(Device=t.Bytes(b"\xFF" * (36 if self.align_structs else 28)))
+
 
 class BaseZStack1CC2531(BaseZStackDevice):
     align_structs = False

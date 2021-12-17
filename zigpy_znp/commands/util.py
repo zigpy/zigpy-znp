@@ -399,7 +399,8 @@ class UTIL(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         req_schema=(
             t.Param("Index", t.uint8_t, "Nth active entry in the device list"),
         ),
-        rsp_schema=(t.Param("Device", Device, "associated_devices_t structure"),),
+        # XXX: The struct is not packed when sent: `write(&struct, sizeof(struct))`
+        rsp_schema=(t.Param("Device", t.Bytes, "associated_devices_t structure"),),
     )
 
     # a proxy call to the AssocGetWithAddress() function

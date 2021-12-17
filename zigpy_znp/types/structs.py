@@ -217,3 +217,46 @@ class APSLinkKeyTable(
     basic.LVList, length_type=basic.uint16_t, item_type=APSLinkKeyTableEntry
 ):
     pass
+
+
+class LinkInfo(cstruct.CStruct):
+    # Counter of transmission success/failures
+    txCounter: basic.uint8_t
+    # Average of sending rssi values if link staus is enabled
+    # i.e. NWK_LINK_STATUS_PERIOD is defined as non zero
+    txCost: basic.uint8_t
+    # average of received rssi values.
+    # needs to be converted to link cost (1-7) before use
+    rxLqi: basic.uint8_t
+    # security key sequence number
+    inKeySeqNum: basic.uint8_t
+    # security frame counter..
+    inFrmCntr: basic.uint32_t
+    # higher values indicate more failures
+    txFailure: basic.uint16_t
+
+
+class AgingEndDevice(cstruct.CStruct):
+    endDevCfg: basic.uint8_t
+    deviceTimeout: basic.uint32_t
+
+
+class BaseAssociatedDevice(cstruct.CStruct):
+    shortAddr: basic.uint16_t
+    addrIdx: basic.uint16_t
+    nodeRelation: basic.uint8_t
+    devStatus: basic.uint8_t
+    assocCnt: basic.uint8_t
+    age: basic.uint8_t
+    linkInfo: LinkInfo
+    endDev: AgingEndDevice
+    timeoutCounter: basic.uint32_t
+    keepaliveRcv: named.Bool
+
+
+class AssociatedDeviceZStack1(BaseAssociatedDevice):
+    pass
+
+
+class AssociatedDeviceZStack3(BaseAssociatedDevice):
+    ctrl: basic.uint8_t  # This member was added
