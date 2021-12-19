@@ -40,6 +40,8 @@ ZDO_ENDPOINT = 0
 ZHA_ENDPOINT = 1
 ZLL_ENDPOINT = 2
 
+ZDO_PROFILE = 0x0000
+
 # All of these are in seconds
 PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
@@ -1088,7 +1090,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self.handle_message(
             sender=sender,
-            profile=zigpy.profiles.zha.PROFILE_ID,
+            profile=ZDO_PROFILE,
             cluster=cluster,
             src_ep=ZDO_ENDPOINT,
             dst_ep=ZDO_ENDPOINT,
