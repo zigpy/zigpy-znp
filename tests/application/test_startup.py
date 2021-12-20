@@ -270,3 +270,31 @@ async def test_auto_form_necessary(device, make_application, mocker):
     assert nvram[OsalNvIds.ZDO_DIRECT_CB] == t.Bool(True).serialize()
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedZStack1CC2531])
+async def test_zstack_build_id_empty(device, make_application, mocker):
+    app, znp_server = make_application(server_cls=device)
+
+    znp_server.reply_once_to(
+        c.SYS.Version.Req(),
+        responses=c.SYS.Version.Rsp(
+            TransportRev=2,
+            ProductId=0,
+            MajorRel=2,
+            MinorRel=6,
+            MaintRel=3,
+            # These are missing
+            CodeRevision=None,
+            BootloaderBuildType=None,
+            BootloaderRevision=None,
+        ),
+        override=True,
+    )
+
+    await app.startup(auto_form=True)
+
+    assert app._zstack_build_id is not None
+    assert app._zstack_build_id == 0x00000000
+
+    await app.shutdown()
