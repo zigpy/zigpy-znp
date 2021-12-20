@@ -812,6 +812,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Z-Stack build ID, more recently the build date.
         """
 
+        # Old versions of Z-Stack do not include `CodeRevision` in the version response
+        if self._version_rsp.CodeRevision is None:
+            return 0x00000000
+
         return self._version_rsp.CodeRevision
 
     @property
