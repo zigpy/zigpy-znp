@@ -77,11 +77,9 @@ def zigpy_state_to_json_backup(
 
 async def backup_network(znp: ZNP) -> t.JSONType:
     try:
-        await znp.load_network_info()
+        await znp.load_network_info(load_devices=True)
     except ValueError as e:
         raise RuntimeError("Failed to load network info") from e
-
-    await znp.load_network_info(load_devices=True)
 
     obj = zigpy_state_to_json_backup(
         network_info=znp.network_info,
