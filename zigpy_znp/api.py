@@ -183,8 +183,9 @@ class ZNP:
                     )
 
                 if dev.is_child:
-                    network_info.children.append(dev.node_info)
-                elif dev.node_info.nwk is not None:
+                    network_info.children.append(dev.node_info.ieee)
+
+                if dev.node_info.nwk is not None:
                     network_info.nwk_addresses[dev.node_info.ieee] = dev.node_info.nwk
 
                 if dev.key is not None:
