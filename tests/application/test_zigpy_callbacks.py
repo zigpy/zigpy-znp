@@ -10,15 +10,20 @@ import zigpy_znp.commands as c
 from ..conftest import FORMED_DEVICES, CoroutineMock
 
 
-def awaitable_mock(return_value):
+def awaitable_mock(*, return_value=None, side_effect=None):
+    assert (return_value or side_effect) and not (return_value and side_effect)
+
     mock_called = asyncio.get_running_loop().create_future()
 
-    def side_effect(*args, **kwargs):
+    def side_effect_(*args, **kwargs):
         mock_called.set_result((args, kwargs))
 
-        return return_value
+        if return_value is not None:
+            return return_value
+        else:
+            raise side_effect
 
-    return mock_called, CoroutineMock(side_effect=side_effect)
+    return mock_called, CoroutineMock(side_effect=side_effect_)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -45,7 +50,7 @@ async def test_on_zdo_relays_message_callback_unknown(
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    discover_called, discover_mock = awaitable_mock(return_value=None)
+    discover_called, discover_mock = awaitable_mock(side_effect=KeyError())
     mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
 
     caplog.set_level(logging.WARNING)
@@ -183,7 +188,7 @@ async def test_on_af_message_callback(device, make_application, mocker):
     app.get_device.reset_mock()
 
     # Message from an unknown device
-    discover_called, discover_mock = awaitable_mock(return_value=None)
+    discover_called, discover_mock = awaitable_mock(side_effect=KeyError())
     mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
 
     znp_server.send(af_message)
