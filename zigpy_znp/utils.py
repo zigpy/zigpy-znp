@@ -164,12 +164,14 @@ class CatchAllResponse:
         return True
 
 
-def combine_concurrent_calls(function):
+def combine_concurrent_calls(
+    function: typing.CoroutineFunction,
+) -> typing.CoroutineFunction:
     """
     Decorator that allows concurrent calls to expensive coroutines to share a result.
     """
 
-    futures = {}
+    tasks = {}
     signature = inspect.signature(function)
 
     @functools.wraps(function)
@@ -180,20 +182,15 @@ def combine_concurrent_calls(function):
         # XXX: all args and kwargs are assumed to be hashable
         key = tuple(bound.arguments.items())
 
-        if key in futures:
-            return await futures[key]
+        if key in tasks:
+            return await tasks[key]
 
-        future = futures[key] = asyncio.get_running_loop().create_future()
+        tasks[key] = asyncio.create_task(function(*args, **kwargs))
 
         try:
-            result = await function(*args, **kwargs)
-        except Exception as e:
-            future.set_exception(e)
-            raise
-        else:
-            future.set_result(result)
-            return result
+            return await tasks[key]
         finally:
-            del futures[key]
+            assert tasks[key].done()
+            del tasks[key]
 
     return replacement

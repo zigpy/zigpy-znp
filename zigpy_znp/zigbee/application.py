@@ -47,6 +47,7 @@ PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 ZDO_REQUEST_TIMEOUT = 15
 DATA_CONFIRM_TIMEOUT = 8
+IEEE_ADDR_DISCOVERY_TIMEOUT = 5
 DEVICE_JOIN_MAX_DELAY = 5
 WATCHDOG_PERIOD = 30
 BROADCAST_SEND_WAIT_DURATION = 3
@@ -693,9 +694,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ZDO source routing message callback
         """
 
-        device = await self._get_or_discover_device(nwk=msg.DstAddr)
-
-        if device is None:
+        try:
+            device = await self._get_or_discover_device(nwk=msg.DstAddr)
+        except KeyError:
             LOGGER.warning(
                 "Received a ZDO message from an unknown device: %s", msg.DstAddr
             )
@@ -778,9 +779,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Handler for all non-ZDO messages.
         """
 
-        device = await self._get_or_discover_device(nwk=msg.SrcAddr)
-
-        if device is None:
+        try:
+            device = await self._get_or_discover_device(nwk=msg.SrcAddr)
+        except KeyError:
             LOGGER.warning(
                 "Received an AF message from an unknown device: %s", msg.SrcAddr
             )
@@ -864,7 +865,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 return
 
     @combine_concurrent_calls
-    async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device | None:
+    async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device:
         """
         Finds a device by its NWK address. If a device does not exist in the zigpy
         database, attempt to look up its new NWK address. If it does not exist in the
@@ -880,7 +881,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         try:
             # XXX: Multiple responses may arrive but we only use the first one
-            async with async_timeout.timeout(5):
+            async with async_timeout.timeout(IEEE_ADDR_DISCOVERY_TIMEOUT):
                 _, ieee, _, _, _, _ = await self.zigpy_device.zdo.IEEE_addr_req(
                     *{
                         "NWKAddrOfInterest": nwk,
@@ -889,7 +890,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     }.values()
                 )
         except asyncio.TimeoutError:
-            return None
+            raise KeyError(f"Unknown device: 0x{nwk:04X}")
 
         try:
             device = self.get_device(ieee=ieee)
