@@ -5,7 +5,7 @@ import zigpy_znp.commands as c
 """
 Zigpy expects to be able to directly send and receive ZDO commands.
 Z-Stack, however, intercepts all responses and rewrites them to use its MT command set.
-We use setup proxy functions that rewrite requests and responses based on their cluster.
+We must use proxy functions that rewrite requests and responses based on their cluster.
 """
 
 
@@ -19,13 +19,73 @@ We use setup proxy functions that rewrite requests and responses based on their 
 #
 
 ZDO_CONVERTERS = {
+    ZDOCmd.NWK_addr_req: (
+        (
+            lambda addr, IEEEAddr, RequestType, StartIndex: c.ZDO.NwkAddrReq.Req(
+                IEEE=IEEEAddr,
+                RequestType=c.zdo.AddrRequestType(RequestType),
+                StartIndex=StartIndex,
+            )
+        ),
+        (
+            lambda addr, IEEEAddr, **kwargs: c.ZDO.NwkAddrRsp.Callback(
+                partial=True, IEEE=IEEEAddr
+            )
+        ),
+        (
+            lambda rsp: (
+                ZDOCmd.NWK_addr_rsp,
+                {
+                    "Status": rsp.Status,
+                    "IEEE": rsp.IEEE,
+                    "NWKAddr": rsp.NWK,
+                    "NumAssocDev": len(rsp.Devices),
+                    "StartIndex": rsp.Index,
+                    "NWKAddrAssocDevList": rsp.Devices,
+                },
+            )
+        ),
+    ),
+    ZDOCmd.IEEE_addr_req: (
+        (
+            lambda addr, NWKAddrOfInterest, RequestType, StartIndex: (
+                c.ZDO.IEEEAddrReq.Req(
+                    NWK=NWKAddrOfInterest,
+                    RequestType=c.zdo.AddrRequestType(RequestType),
+                    StartIndex=StartIndex,
+                )
+            )
+        ),
+        (
+            lambda addr, NWKAddrOfInterest, **kwargs: c.ZDO.IEEEAddrRsp.Callback(
+                partial=True, NWK=NWKAddrOfInterest
+            )
+        ),
+        (
+            lambda rsp: (
+                ZDOCmd.IEEE_addr_rsp,
+                {
+                    "Status": rsp.Status,
+                    "IEEEAddr": rsp.IEEE,
+                    "NWKAddr": rsp.NWK,
+                    "NumAssocDev": len(rsp.Devices),
+                    "StartIndex": rsp.Index,
+                    "NWKAddrAssocDevList": rsp.Devices,
+                },
+            )
+        ),
+    ),
     ZDOCmd.Node_Desc_req: (
         (
             lambda addr, NWKAddrOfInterest: c.ZDO.NodeDescReq.Req(
                 DstAddr=addr.address, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (lambda addr: c.ZDO.NodeDescRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.NodeDescRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (
             lambda rsp: (
                 ZDOCmd.Node_Desc_rsp,
@@ -43,7 +103,11 @@ ZDO_CONVERTERS = {
                 DstAddr=addr.address, NWKAddrOfInterest=NWKAddrOfInterest
             )
         ),
-        (lambda addr: c.ZDO.ActiveEpRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.ActiveEpRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (
             lambda rsp: (
                 ZDOCmd.Active_EP_rsp,
@@ -65,7 +129,11 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.SimpleDescRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.SimpleDescRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (
             lambda rsp: (
                 ZDOCmd.Simple_Desc_rsp,
@@ -88,7 +156,11 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.MgmtPermitJoinRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.MgmtPermitJoinRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (lambda rsp: (ZDOCmd.Mgmt_Permit_Joining_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Mgmt_Leave_req: (
@@ -99,7 +171,11 @@ ZDO_CONVERTERS = {
                 RemoveChildren_Rejoin=c.zdo.LeaveOptions(Options),
             )
         ),
-        (lambda addr: c.ZDO.MgmtLeaveRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.MgmtLeaveRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (lambda rsp: (ZDOCmd.Mgmt_Leave_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Mgmt_NWK_Update_req: (
@@ -115,7 +191,7 @@ ZDO_CONVERTERS = {
             )
         ),
         (
-            lambda addr: c.ZDO.MgmtNWKUpdateNotify.Callback(
+            lambda addr, **kwargs: c.ZDO.MgmtNWKUpdateNotify.Callback(
                 partial=True, Src=addr.address
             )
         ),
@@ -144,7 +220,7 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.BindRsp.Callback(partial=True, Src=addr.address)),
+        (lambda addr, **kwargs: c.ZDO.BindRsp.Callback(partial=True, Src=addr.address)),
         (lambda rsp: (ZDOCmd.Bind_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Unbind_req: (
@@ -159,7 +235,11 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.UnBindRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.UnBindRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (lambda rsp: (ZDOCmd.Unbind_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Mgmt_Lqi_req: (
@@ -171,7 +251,11 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.MgmtLqiRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.MgmtLqiRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (
             lambda rsp: (
                 ZDOCmd.Mgmt_Lqi_rsp,
@@ -188,7 +272,11 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.MgmtRtgRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.MgmtRtgRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (lambda rsp: (ZDOCmd.Mgmt_Rtg_rsp, {"Status": rsp.Status})),
     ),
     ZDOCmd.Mgmt_Bind_req: (
@@ -200,7 +288,11 @@ ZDO_CONVERTERS = {
                 )
             )
         ),
-        (lambda addr: c.ZDO.MgmtBindRsp.Callback(partial=True, Src=addr.address)),
+        (
+            lambda addr, **kwargs: c.ZDO.MgmtBindRsp.Callback(
+                partial=True, Src=addr.address
+            )
+        ),
         (
             lambda rsp: (
                 ZDOCmd.Mgmt_Bind_rsp,

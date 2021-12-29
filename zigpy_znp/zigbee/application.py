@@ -880,23 +880,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         try:
             # XXX: Multiple responses may arrive but we only use the first one
-            ieee_addr_rsp = await self._znp.request_callback_rsp(
-                request=c.ZDO.IEEEAddrReq.Req(
-                    NWK=nwk,
-                    RequestType=c.zdo.AddrRequestType.SINGLE,
-                    StartIndex=0,
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.ZDO.IEEEAddrRsp.Callback(
-                    partial=True,
-                    NWK=nwk,
-                ),
-                timeout=5,  # We don't want to wait forever
-            )
+            async with async_timeout.timeout(5):
+                _, ieee, _, _, _, _ = await self.zigpy_device.zdo.IEEE_addr_req(
+                    *{
+                        "NWKAddrOfInterest": nwk,
+                        "RequestType": c.zdo.AddrRequestType.SINGLE,
+                        "StartIndex": 0,
+                    }.values()
+                )
         except asyncio.TimeoutError:
             return None
-
-        ieee = ieee_addr_rsp.IEEE
 
         try:
             device = self.get_device(ieee=ieee)
@@ -1276,7 +1269,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Call the converter with the ZDO request's kwargs
         req_factory, rsp_factory, zdo_rsp_factory = ZDO_CONVERTERS[cluster]
         request = req_factory(dst_addr, **zdo_kwargs)
-        callback = rsp_factory(dst_addr)
+        callback = rsp_factory(dst_addr, **zdo_kwargs)
 
         LOGGER.debug(
             "Intercepted AP ZDO request %s(%s) and replaced with %s",
