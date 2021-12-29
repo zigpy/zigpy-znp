@@ -142,10 +142,31 @@ class ZNP:
             stack_specific=None,
         )
 
+        tclk_seed = None
+
         if self.version > 1.2:
-            tclk_seed = await self.nvram.osal_read(
-                OsalNvIds.TCLK_SEED, item_type=t.KeyData
-            )
+            try:
+                tclk_seed = await self.nvram.osal_read(
+                    OsalNvIds.TCLK_SEED, item_type=t.KeyData
+                )
+            except ValueError:
+                if self.version != 3.0:
+                    raise
+
+                # CC2531s that have been cross-flashed from 1.2 -> 3.0 can have NVRAM
+                # entries from both. Ignore deserialization length errors for the
+                # trailing data to allow them to be backed up.
+                tclk_seed_value = await self.nvram.osal_read(
+                    OsalNvIds.TCLK_SEED, item_type=t.Bytes
+                )
+
+                tclk_seed = self.nvram.deserialize(
+                    tclk_seed_value, t.KeyData, allow_trailing=True
+                )
+                LOGGER.error(
+                    "Your adapter's NVRAM is inconsistent! Perform a network backup,"
+                    " re-flash its firmware, and restore the backup."
+                )
 
             network_info.stack_specific = {
                 "zstack": {
@@ -155,7 +176,7 @@ class ZNP:
 
         # This takes a few seconds
         if load_devices:
-            for dev in await security.read_devices(self):
+            for dev in await security.read_devices(self, tclk_seed=tclk_seed):
                 if dev.node_info.nwk == 0xFFFE:
                     dev = dev.replace(
                         node_info=dataclasses.replace(dev.node_info, nwk=None)
