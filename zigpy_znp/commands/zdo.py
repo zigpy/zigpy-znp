@@ -939,6 +939,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             ),
             t.Param("IEEE", t.EUI64, "Extended address of the source device"),
             t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param("NumAssoc", t.uint8_t, "Number of associated devices"),
             t.Param(
                 "Index",
                 t.uint8_t,
@@ -958,6 +959,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             ),
             t.Param("IEEE", t.EUI64, "Extended address of the source device"),
             t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param("NumAssoc", t.uint8_t, "Number of associated devices"),
             t.Param(
                 "Index",
                 t.uint8_t,

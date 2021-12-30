@@ -671,6 +671,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.on_intentionally_unhandled_message,
         )
 
+        # These are responses to a broadcast but we ignore all but the first
+        self._znp.callback_for_response(
+            c.ZDO.IEEEAddrRsp.Callback(partial=True),
+            self.on_intentionally_unhandled_message,
+        )
+
     def on_intentionally_unhandled_message(self, msg: t.CommandBase) -> None:
         """
         Some commands are unhandled but frequently sent by devices on the network. To

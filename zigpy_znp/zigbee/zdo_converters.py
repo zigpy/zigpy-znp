@@ -37,11 +37,11 @@ ZDO_CONVERTERS = {
                 ZDOCmd.NWK_addr_rsp,
                 {
                     "Status": rsp.Status,
-                    "IEEE": rsp.IEEE,
+                    "IEEEAddr": rsp.IEEE,
                     "NWKAddr": rsp.NWK,
                     "NumAssocDev": len(rsp.Devices),
                     "StartIndex": rsp.Index,
-                    "NWKAddrAssocDevList": rsp.Devices,
+                    "NWKAddressAssocDevList": rsp.Devices,  # XXX: this is inconsistent
                 },
             )
         ),
