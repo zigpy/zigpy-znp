@@ -554,6 +554,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
                 Status=t.ZDOStatus.SUCCESS,
                 IEEE=existing_ieee,
                 NWK=existing_nwk + 1,
+                NumAssoc=0,
                 Index=0,
                 Devices=[],
             ),
@@ -591,6 +592,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
                 Status=t.ZDOStatus.SUCCESS,
                 IEEE=new_ieee,
                 NWK=new_nwk,
+                NumAssoc=0,
                 Index=0,
                 Devices=[],
             ),
@@ -601,5 +603,26 @@ async def test_unknown_device_discovery(device, make_application, mocker):
     assert app.handle_join.call_count == 2
     assert new_dev.nwk == new_nwk
     assert new_dev.ieee == new_ieee
+
+    await app.pre_shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_unknown_device_discovery_failure(device, make_application, mocker):
+    mocker.patch("zigpy_znp.zigbee.application.IEEE_ADDR_DISCOVERY_TIMEOUT", new=0.1)
+
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    znp_server.reply_once_to(
+        request=c.ZDO.IEEEAddrReq.Req(partial=True),
+        responses=[
+            c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
+    # Discovery will throw an exception when the device cannot be found
+    with pytest.raises(KeyError):
+        await app._get_or_discover_device(nwk=0x3456)
 
     await app.pre_shutdown()

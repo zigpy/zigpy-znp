@@ -116,6 +116,10 @@ class ChildInfoList(t.LVList, item_type=t.EUI64, length_type=t.uint8_t):
     pass
 
 
+class NWKArray(t.CompleteList, item_type=t.NWK):
+    pass
+
+
 class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
     @classmethod
     def deserialize(cls, data: bytes) -> tuple[NullableNodeDescriptor, bytes]:
@@ -935,12 +939,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             ),
             t.Param("IEEE", t.EUI64, "Extended address of the source device"),
             t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param("NumAssoc", t.uint8_t, "Number of associated devices"),
             t.Param(
                 "Index",
                 t.uint8_t,
                 "Starting index into the list of associated devices",
             ),
-            t.Param("Devices", t.NWKList, "List of the associated devices"),
+            t.Param("Devices", NWKArray, "List of the associated devices"),
         ),
     )
 
@@ -954,12 +959,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             ),
             t.Param("IEEE", t.EUI64, "Extended address of the source device"),
             t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param("NumAssoc", t.uint8_t, "Number of associated devices"),
             t.Param(
                 "Index",
                 t.uint8_t,
                 "Starting index into the list of associated devices",
             ),
-            t.Param("Devices", t.NWKList, "List of the associated devices"),
+            t.Param("Devices", NWKArray, "List of the associated devices"),
         ),
     )
 

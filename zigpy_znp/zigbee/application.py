@@ -47,6 +47,7 @@ PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 ZDO_REQUEST_TIMEOUT = 15
 DATA_CONFIRM_TIMEOUT = 8
+IEEE_ADDR_DISCOVERY_TIMEOUT = 5
 DEVICE_JOIN_MAX_DELAY = 5
 WATCHDOG_PERIOD = 30
 BROADCAST_SEND_WAIT_DURATION = 3
@@ -670,6 +671,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.on_intentionally_unhandled_message,
         )
 
+        # These are responses to a broadcast but we ignore all but the first
+        self._znp.callback_for_response(
+            c.ZDO.IEEEAddrRsp.Callback(partial=True),
+            self.on_intentionally_unhandled_message,
+        )
+
     def on_intentionally_unhandled_message(self, msg: t.CommandBase) -> None:
         """
         Some commands are unhandled but frequently sent by devices on the network. To
@@ -693,9 +700,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ZDO source routing message callback
         """
 
-        device = await self._get_or_discover_device(nwk=msg.DstAddr)
-
-        if device is None:
+        try:
+            device = await self._get_or_discover_device(nwk=msg.DstAddr)
+        except KeyError:
             LOGGER.warning(
                 "Received a ZDO message from an unknown device: %s", msg.DstAddr
             )
@@ -778,9 +785,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Handler for all non-ZDO messages.
         """
 
-        device = await self._get_or_discover_device(nwk=msg.SrcAddr)
-
-        if device is None:
+        try:
+            device = await self._get_or_discover_device(nwk=msg.SrcAddr)
+        except KeyError:
             LOGGER.warning(
                 "Received an AF message from an unknown device: %s", msg.SrcAddr
             )
@@ -864,7 +871,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 return
 
     @combine_concurrent_calls
-    async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device | None:
+    async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device:
         """
         Finds a device by its NWK address. If a device does not exist in the zigpy
         database, attempt to look up its new NWK address. If it does not exist in the
@@ -880,23 +887,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         try:
             # XXX: Multiple responses may arrive but we only use the first one
-            ieee_addr_rsp = await self._znp.request_callback_rsp(
-                request=c.ZDO.IEEEAddrReq.Req(
-                    NWK=nwk,
-                    RequestType=c.zdo.AddrRequestType.SINGLE,
-                    StartIndex=0,
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.ZDO.IEEEAddrRsp.Callback(
-                    partial=True,
-                    NWK=nwk,
-                ),
-                timeout=5,  # We don't want to wait forever
-            )
+            async with async_timeout.timeout(IEEE_ADDR_DISCOVERY_TIMEOUT):
+                _, ieee, _, _, _, _ = await self.zigpy_device.zdo.IEEE_addr_req(
+                    *{
+                        "NWKAddrOfInterest": nwk,
+                        "RequestType": c.zdo.AddrRequestType.SINGLE,
+                        "StartIndex": 0,
+                    }.values()
+                )
         except asyncio.TimeoutError:
-            return None
-
-        ieee = ieee_addr_rsp.IEEE
+            raise KeyError(f"Unknown device: 0x{nwk:04X}")
 
         try:
             device = self.get_device(ieee=ieee)
@@ -1276,7 +1276,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Call the converter with the ZDO request's kwargs
         req_factory, rsp_factory, zdo_rsp_factory = ZDO_CONVERTERS[cluster]
         request = req_factory(dst_addr, **zdo_kwargs)
-        callback = rsp_factory(dst_addr)
+        callback = rsp_factory(dst_addr, **zdo_kwargs)
 
         LOGGER.debug(
             "Intercepted AP ZDO request %s(%s) and replaced with %s",
