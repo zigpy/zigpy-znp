@@ -4,7 +4,7 @@ import pytest
 import zigpy.zdo
 import zigpy.endpoint
 import zigpy.profiles
-from zigpy.zdo.types import ZDOCmd, SizePrefixedSimpleDescriptor
+from zigpy.zdo.types import ZDOCmd
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
@@ -13,55 +13,6 @@ import zigpy_znp.commands as c
 from zigpy_znp.exceptions import InvalidCommandResponse
 
 from ..conftest import FORMED_DEVICES, CoroutineMock, FormedLaunchpadCC26X2R1
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_zdo_request_interception(device, make_application):
-    app, znp_server = make_application(server_cls=device)
-    await app.startup(auto_form=False)
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
-
-    # Send back a request response
-    active_ep_req = znp_server.reply_once_to(
-        request=c.ZDO.SimpleDescReq.Req(
-            DstAddr=device.nwk, NWKAddrOfInterest=device.nwk, Endpoint=1
-        ),
-        responses=[
-            c.ZDO.SimpleDescReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.SimpleDescRsp.Callback(
-                Src=device.nwk,
-                Status=t.ZDOStatus.SUCCESS,
-                NWK=device.nwk,
-                SimpleDescriptor=SizePrefixedSimpleDescriptor(
-                    *dict(
-                        endpoint=1,
-                        profile=49246,
-                        device_type=256,
-                        device_version=2,
-                        input_clusters=[0, 3, 4, 5, 6, 8, 2821, 4096],
-                        output_clusters=[5, 25, 32, 4096],
-                    ).values()
-                ),
-            ),
-        ],
-    )
-
-    status, message = await app.request(
-        device=device,
-        profile=260,
-        cluster=ZDOCmd.Simple_Desc_req,
-        src_ep=0,
-        dst_ep=0,
-        sequence=1,
-        data=b"\x01\x9e\xfa\x01",
-        use_ieee=False,
-    )
-
-    assert status == t.Status.SUCCESS
-    await active_ep_req
-
-    await app.shutdown()
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -91,7 +42,7 @@ async def test_zigpy_request(device, make_application):
     app, znp_server = make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 6
+    TSN = 7
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
@@ -151,7 +102,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     app, znp_server = make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 6
+    TSN = 7
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
