@@ -185,7 +185,7 @@ ZDO_CONVERTERS = {
                 DstAddrMode=addr.mode,
                 Channels=NwkUpdate.ScanChannels,
                 ScanDuration=NwkUpdate.ScanDuration,
-                ScanCount=NwkUpdate.ScanCount,
+                ScanCount=NwkUpdate.ScanCount or 0x00,
                 # XXX: nwkUpdateId is hard-coded to `_NIB.nwkUpdateId + 1`
                 NwkManagerAddr=NwkUpdate.nwkManagerAddr or 0x0000,
             )
