@@ -273,6 +273,27 @@ def make_application(make_znp_server):
     return inner
 
 
+def zdo_request_matcher(
+    dst_addr: t.AddrModeAddress, command_id: t.uint16_t, **kwargs
+) -> c.AF.DataRequestExt.Req:
+    zdo_kwargs = {k: v for k, v in kwargs.items() if k.startswith("zdo_")}
+
+    kwargs = {k: v for k, v in kwargs.items() if not k.startswith("zdo_")}
+    kwargs.setdefault("DstEndpoint", 0x00)
+    kwargs.setdefault("DstPanId", 0x0000)
+    kwargs.setdefault("SrcEndpoint", 0x00)
+    kwargs.setdefault("Radius", None)
+    kwargs.setdefault("Options", None)
+
+    return c.AF.DataRequestExt.Req(
+        DstAddrModeAddress=dst_addr,
+        ClusterId=command_id,
+        Data=bytes([kwargs["TSN"]]) + serialize_zdo_command(command_id, **zdo_kwargs),
+        **kwargs,
+        partial=True,
+    )
+
+
 class BaseServerZNP(ZNP):
     align_structs = False
     version = None
@@ -959,7 +980,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
             return
 
         if PermitDuration != 0:
-            result = [c.ZDO.PermitJoinInd.Callback(Duration=req.Duration)] + result
+            result = [c.ZDO.PermitJoinInd.Callback(Duration=PermitDuration)] + result
 
         return result + [c.ZDO.PermitJoinInd.Callback(Duration=0)]
 

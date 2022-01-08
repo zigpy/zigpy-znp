@@ -21,7 +21,7 @@ import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
 from zigpy.zcl import clusters
-from zigpy.types import ExtendedPanId
+from zigpy.types import ExtendedPanId, deserialize as list_deserialize
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.const as const
@@ -95,6 +95,17 @@ class ZNPCoordinator(zigpy.device.Device):
         return f"{model}, Z-Stack {version} (build {self.application._zstack_build_id})"
 
 
+class InitializedDevice(zigpy.device.Device):
+    """
+    Device that does not need to be initialized, since we just need it for addressing
+    purposes.
+    """
+
+    @property
+    def is_initialized(self):
+        return True
+
+
 class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
     SCHEMA_DEVICE = conf.SCHEMA_DEVICE
@@ -116,6 +127,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._currently_waiting_requests = 0
 
         self._join_announce_tasks = {}
+        self._temp_devices = []
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
@@ -536,8 +548,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # through the coordinator itself.
         #
         # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
-        if time_s == 0 or self._zstack_build_id < 20210708 or node in (None, self.ieee):
-            response = await self.zigpy_device.zdo.Mgmt_Permit_Joining_req(time_s, 1)
+        if time_s == 0 or self._zstack_build_id < 20210708 or node == self.ieee:
+            response = await self.zigpy_device.zdo.Mgmt_Permit_Joining_req(time_s, 0)
 
             if response[0] != t.Status.SUCCESS:
                 raise RuntimeError(f"Failed to permit joins on coordinator: {response}")
@@ -680,27 +692,40 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Global callback for all ZDO messages.
         """
 
-        device = await self._get_or_discover_device(nwk=msg.Src)
+        message = t.uint8_t(msg.TSN).serialize() + msg.Data
+        hdr, data = zdo_t.ZDOHeader.deserialize(msg.ClusterId, message)
+        names, types = zdo_t.CLUSTERS[msg.ClusterId]
+        args, data = list_deserialize(data, types)
+        # kwargs = dict(zip(names, args))
+
+        if msg.ClusterId == zdo_t.ZDOCmd.Device_annce:
+            self.on_zdo_device_announce(*args)
+        elif msg.ClusterId == zdo_t.ZDOCmd.IEEE_addr_rsp:
+            device = next((d for d in self._temp_devices if d.nwk == msg.Src), None)
+        else:
+            device = await self._get_or_discover_device(nwk=msg.Src)
 
         if device is None:
             LOGGER.warning("Received a ZDO message from an unknown device: %s", msg.Src)
             return
 
-        message = t.uint8_t(msg.TSN).serialize() + msg.Data
-
-        self.handle_message(
-            sender=device,
-            profile=zigpy.profiles.zha.PROFILE_ID,
-            cluster=msg.ClusterId,
-            src_ep=ZDO_ENDPOINT,
-            dst_ep=ZDO_ENDPOINT,
-            message=message,
-        )
-
-        hdr, args = device.zdo.deserialize(msg.ClusterId, message)
-
-        if msg.ClusterId == zdo_t.ZDOCmd.Device_annce:
-            self.on_zdo_device_announce(*args)
+        if isinstance(device, InitializedDevice):
+            device.handle_message(
+                profile=ZDO_PROFILE,
+                cluster=msg.ClusterId,
+                src_ep=ZDO_ENDPOINT,
+                dst_ep=ZDO_ENDPOINT,
+                message=message,
+            )
+        else:
+            self.handle_message(
+                sender=device,
+                profile=ZDO_PROFILE,
+                cluster=msg.ClusterId,
+                src_ep=ZDO_ENDPOINT,
+                dst_ep=ZDO_ENDPOINT,
+                message=message,
+            )
 
     def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
         """
@@ -896,15 +921,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         LOGGER.debug("Device with NWK 0x%04X not in database", nwk)
 
         try:
-            # XXX: Multiple responses may arrive but we only use the first one
             async with async_timeout.timeout(IEEE_ADDR_DISCOVERY_TIMEOUT):
-                _, ieee, _, _, _, _ = await self.zigpy_device.zdo.IEEE_addr_req(
-                    *{
-                        "NWKAddrOfInterest": nwk,
-                        "RequestType": c.zdo.AddrRequestType.SINGLE,
-                        "StartIndex": 0,
-                    }.values()
-                )
+                temp_device = InitializedDevice(application=self, ieee=None, nwk=nwk)
+                self._temp_devices.append(temp_device)
+
+                try:
+                    status, ieee, *_ = await temp_device.zdo.IEEE_addr_req(
+                        *{
+                            "NWKAddrOfInterest": nwk,
+                            "RequestType": c.zdo.AddrRequestType.SINGLE,
+                            "StartIndex": 0,
+                        }.values()
+                    )
+                finally:
+                    self._temp_devices.remove(temp_device)
+
+                assert status == zdo_t.Status.SUCCESS
         except asyncio.TimeoutError:
             raise KeyError(f"Unknown device: 0x{nwk:04X}")
 
