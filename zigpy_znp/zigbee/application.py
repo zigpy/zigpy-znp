@@ -528,13 +528,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             data=data,
         )
 
-    async def force_remove(self, device: zigpy.device.Device) -> None:
-        """
-        Attempts to forcibly remove a device from the network.
-        """
-
-        LOGGER.warning("Z-Stack does not support force remove")
-
     async def permit(self, time_s=60, node=None):
         """
         Permit joining the network via a specific node or via all router nodes.
@@ -696,10 +689,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         hdr, data = zdo_t.ZDOHeader.deserialize(msg.ClusterId, message)
         names, types = zdo_t.CLUSTERS[msg.ClusterId]
         args, data = list_deserialize(data, types)
-        # kwargs = dict(zip(names, args))
+        kwargs = dict(zip(names, args))
 
         if msg.ClusterId == zdo_t.ZDOCmd.Device_annce:
             self.on_zdo_device_announce(*args)
+            device = self.get_device(ieee=kwargs["IEEEAddr"])
         elif msg.ClusterId == zdo_t.ZDOCmd.IEEE_addr_rsp:
             device = next((d for d in self._temp_devices if d.nwk == msg.Src), None)
         else:

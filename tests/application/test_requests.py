@@ -4,7 +4,7 @@ import pytest
 import zigpy.zdo
 import zigpy.endpoint
 import zigpy.profiles
-from zigpy.zdo.types import ZDOCmd
+import zigpy.zdo.types as zdo_t
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.types as t
@@ -12,7 +12,13 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.exceptions import InvalidCommandResponse
 
-from ..conftest import FORMED_DEVICES, CoroutineMock, FormedLaunchpadCC26X2R1
+from ..conftest import (
+    FORMED_DEVICES,
+    CoroutineMock,
+    FormedLaunchpadCC26X2R1,
+    zdo_request_matcher,
+    serialize_zdo_command,
+)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -178,52 +184,6 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-@pytest.mark.parametrize("status", [t.ZDOStatus.SUCCESS, t.ZDOStatus.TIMEOUT, None])
-async def test_remove(device, make_application, status, mocker):
-    app, znp_server = make_application(server_cls=device)
-    app._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 0.1
-
-    # Only zigpy>=0.29.0 has this method
-    if hasattr(app, "_remove_device"):
-        mocker.spy(app, "_remove_device")
-
-    await app.startup(auto_form=False)
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-
-    responses = [c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS)]
-
-    if status is not None:
-        responses.append(c.ZDO.MgmtLeaveRsp.Callback(Src=0x0000, Status=status))
-
-    # Normal ZDO leave must fail
-    normal_remove_req = znp_server.reply_once_to(
-        request=c.ZDO.MgmtLeaveReq.Req(
-            DstAddr=device.nwk, IEEE=device.ieee, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtLeaveReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtLeaveRsp.Callback(Src=device.nwk, Status=t.ZDOStatus.TIMEOUT),
-        ],
-    )
-
-    # Make sure the device exists
-    assert app.get_device(nwk=device.nwk) is device
-
-    await app.remove(device.ieee)
-    await normal_remove_req
-
-    if hasattr(app, "_remove_device"):
-        # Make sure the device is going to be removed
-        assert app._remove_device.call_count == 1
-    else:
-        # Make sure the device is gone
-        with pytest.raises(KeyError):
-            app.get_device(ieee=device.ieee)
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_mrequest(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
@@ -270,25 +230,6 @@ async def test_mrequest_doesnt_block(device, make_application, event_loop):
     group = app.groups.add_group(0x1234, "test group")
     await group.endpoint.on_off.on()
     request_sent.set_result(True)
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_unimplemented_zdo_converter(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
-    await app.startup()
-
-    with pytest.raises(RuntimeError):
-        await zigpy.zdo.broadcast(
-            app,
-            ZDOCmd.Remove_node_cache_req,
-            0x0000,
-            0x00,
-            t.NWK(0x1234),
-            t.EUI64.convert("11:22:33:44:55:66:77:88"),
-            broadcast_address=0xFFFC,
-        )
 
     await app.shutdown()
 
@@ -595,27 +536,45 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
         return c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)
 
     znp_server.reply_to(
-        c.ZDO.ExtRouteChk.Req(Dst=device.nwk, partial=True),
+        request=c.ZDO.ExtRouteChk.Req(Dst=device.nwk, partial=True),
         responses=[route_replier],
         override=True,
     )
 
     was_route_discovered = znp_server.reply_once_to(
-        c.ZDO.ExtRouteDisc.Req(
+        request=c.ZDO.ExtRouteDisc.Req(
             Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
         ),
         responses=[set_route_discovered],
     )
 
     zdo_req = znp_server.reply_once_to(
-        c.ZDO.ActiveEpReq.Req(DstAddr=device.nwk, NWKAddrOfInterest=device.nwk),
+        request=zdo_request_matcher(
+            dst_addr=t.AddrModeAddress(t.AddrMode.NWK, device.nwk),
+            command_id=zdo_t.ZDOCmd.Active_EP_req,
+            TSN=7,
+            zdo_NWKAddrOfInterest=device.nwk,
+        ),
         responses=[
-            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.ActiveEpRsp.Callback(
                 Src=device.nwk,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=device.nwk,
                 ActiveEndpoints=[],
+            ),
+            c.ZDO.MsgCbIncoming.Callback(
+                Src=device.nwk,
+                IsBroadcast=t.Bool.false,
+                ClusterId=zdo_t.ZDOCmd.Active_EP_rsp,
+                SecurityUse=0,
+                TSN=7,
+                MacDst=device.nwk,
+                Data=serialize_zdo_command(
+                    command_id=zdo_t.ZDOCmd.Active_EP_rsp,
+                    Status=t.ZDOStatus.SUCCESS,
+                    NWKAddrOfInterest=device.nwk,
+                    ActiveEPList=[],
+                ),
             ),
         ],
     )
