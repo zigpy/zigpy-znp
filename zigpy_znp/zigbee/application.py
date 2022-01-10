@@ -528,7 +528,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             data=data,
         )
 
-    async def permit(self, time_s=60, node=None):
+    async def permit(self, time_s: int = 60, node: t.EUI64 = None):
         """
         Permit joining the network via a specific node or via all router nodes.
         """
@@ -542,9 +542,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         #
         # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
         if time_s == 0 or self._zstack_build_id < 20210708 or node == self.ieee:
-            response = await self.zigpy_device.zdo.Mgmt_Permit_Joining_req(time_s, 0)
+            response = await self._znp.request_callback_rsp(
+                request=c.ZDO.MgmtPermitJoinReq.Req(
+                    AddrMode=t.AddrMode.NWK,
+                    Dst=0x0000,
+                    Duration=time_s,
+                    TCSignificance=1,
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+            )
 
-            if response[0] != t.Status.SUCCESS:
+            if response.Status != t.Status.SUCCESS:
                 raise RuntimeError(f"Failed to permit joins on coordinator: {response}")
 
         await super().permit(time_s=time_s, node=node)
@@ -660,6 +669,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDO.NodeDescRsp,
             c.ZDO.SimpleDescRsp,
             c.ZDO.ActiveEpRsp,
+            c.ZDO.MgmtLqiRsp,
         ]:
             self._znp.callback_for_response(
                 ignored_msg.Callback(partial=True),
@@ -1281,6 +1291,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 Radius=radius,
                 SourceRoute=relays,  # force the packet to go through specific parents
                 Data=data,
+            )
+
+        # XXX: Joins *must* be sent via a ZDO command. Otherwise, Z-Stack will not
+        #      actually permit the coordinator to send the network key.
+        if dst_ep == ZDO_ENDPOINT and cluster == zdo_t.ZDOCmd.Mgmt_Permit_Joining_req:
+            await self._znp.request_callback_rsp(
+                request=c.ZDO.MgmtPermitJoinReq.Req(
+                    AddrMode=dst_addr.mode,
+                    Dst=dst_addr.address,
+                    Duration=data[1],
+                    TCSignificance=data[2],
+                ),
+                RspStatus=t.Status.SUCCESS,
+                callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
             )
 
         if dst_addr.mode == t.AddrMode.Broadcast or dst_ep == ZDO_ENDPOINT:

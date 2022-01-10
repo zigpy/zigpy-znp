@@ -29,32 +29,37 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
 
     app, znp_server = make_application(server_cls=device)
 
-    # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
-        request=zdo_request_matcher(
-            dst_addr=t.AddrModeAddress(t.AddrMode.NWK, 0x0000),
-            command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_req,
-            TSN=7,
-            zdo_PermitDuration=10,
-            zdo_TC_Significant=0,
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=10, partial=True
         ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
 
     # Handle the ZDO broadcast sent by Zigpy
-    permit_join_broadcast = znp_server.reply_once_to(
+    permit_join_broadcast_raw = znp_server.reply_once_to(
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.Broadcast, 0xFFFC),
             command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_req,
-            TSN=8 if not fixed_joining_bug else 7,
+            TSN=6,
             zdo_PermitDuration=10,
             zdo_TC_Significant=0,
         ),
         responses=[
             c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
+    # And the duplicate one using the MT command
+    permit_join_broadcast = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=10, partial=True
+        ),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
@@ -62,14 +67,13 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
     await app.startup(auto_form=False)
     await app.permit(time_s=10)
 
-    if fixed_joining_bug:
-        await permit_join_broadcast
+    await permit_join_broadcast
+    await permit_join_broadcast_raw
 
-        # Joins should not have been opened on the coordinator
+    if fixed_joining_bug:
         assert not permit_join_coordinator.done()
     else:
-        await permit_join_coordinator
-        await permit_join_broadcast
+        assert permit_join_coordinator.done()
 
     await app.shutdown()
 
@@ -80,15 +84,11 @@ async def test_join_coordinator(device, make_application):
 
     # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
-        request=zdo_request_matcher(
-            dst_addr=t.AddrModeAddress(t.AddrMode.NWK, 0x0000),
-            command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_req,
-            TSN=7,
-            zdo_PermitDuration=60,
-            zdo_TC_Significant=0,
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=60, partial=True
         ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ],
     )
@@ -328,7 +328,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.NWK, existing_nwk + 1),
             command_id=zdo_t.ZDOCmd.IEEE_addr_req,
-            TSN=7,
+            TSN=6,
             zdo_NWKAddrOfInterest=existing_nwk + 1,
             zdo_RequestType=c.zdo.AddrRequestType.SINGLE,
             zdo_StartIndex=0,
@@ -340,7 +340,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
                 IsBroadcast=t.Bool.false,
                 ClusterId=zdo_t.ZDOCmd.IEEE_addr_rsp,
                 SecurityUse=0,
-                TSN=7,
+                TSN=6,
                 MacDst=0x0000,
                 Data=serialize_zdo_command(
                     command_id=zdo_t.ZDOCmd.IEEE_addr_rsp,
@@ -387,7 +387,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.NWK, new_nwk),
             command_id=zdo_t.ZDOCmd.IEEE_addr_req,
-            TSN=8,
+            TSN=7,
             zdo_NWKAddrOfInterest=new_nwk,
             zdo_RequestType=c.zdo.AddrRequestType.SINGLE,
             zdo_StartIndex=0,
@@ -399,7 +399,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
                 IsBroadcast=t.Bool.false,
                 ClusterId=zdo_t.ZDOCmd.IEEE_addr_rsp,
                 SecurityUse=0,
-                TSN=8,
+                TSN=7,
                 MacDst=0x0000,
                 Data=serialize_zdo_command(
                     command_id=zdo_t.ZDOCmd.IEEE_addr_rsp,

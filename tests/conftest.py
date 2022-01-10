@@ -567,6 +567,20 @@ class BaseZStackDevice(BaseServerZNP):
             nwkUpdateId=0,
         )
 
+    @reply_to(
+        c.ZDO.MgmtPermitJoinReq.Req(AddrMode=t.AddrMode.NWK, Dst=0x0000, partial=True)
+    )
+    @reply_to(
+        c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, partial=True
+        )
+    )
+    def permit_join(self, request):
+        return [
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+        ]
+
     @reply_to(c.AF.DataRequestExt.Req(partial=True, DstEndpoint=0))
     def on_zdo_request(self, req):
         kwargs = deserialize_zdo_command(req.ClusterId, req.Data[1:])
