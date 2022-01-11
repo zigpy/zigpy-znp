@@ -325,33 +325,13 @@ async def test_unknown_device_discovery(device, make_application, mocker):
 
     # If the device changes its NWK but doesn't tell zigpy, it will be re-discovered
     did_ieee_addr_req1 = znp_server.reply_once_to(
-        request=zdo_request_matcher(
-            dst_addr=t.AddrModeAddress(t.AddrMode.NWK, existing_nwk + 1),
-            command_id=zdo_t.ZDOCmd.IEEE_addr_req,
-            TSN=6,
-            zdo_NWKAddrOfInterest=existing_nwk + 1,
-            zdo_RequestType=c.zdo.AddrRequestType.SINGLE,
-            zdo_StartIndex=0,
+        request=c.ZDO.IEEEAddrReq.Req(
+            NWK=existing_nwk + 1,
+            RequestType=c.zdo.AddrRequestType.SINGLE,
+            StartIndex=0,
         ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MsgCbIncoming.Callback(
-                Src=existing_nwk + 1,
-                IsBroadcast=t.Bool.false,
-                ClusterId=zdo_t.ZDOCmd.IEEE_addr_rsp,
-                SecurityUse=0,
-                TSN=6,
-                MacDst=0x0000,
-                Data=serialize_zdo_command(
-                    command_id=zdo_t.ZDOCmd.IEEE_addr_rsp,
-                    Status=zdo_t.Status.SUCCESS,
-                    IEEEAddr=existing_ieee,
-                    NWKAddr=existing_nwk + 1,
-                    NumAssocDev=0,
-                    StartIndex=0,
-                    NWKAddrAssocDevList=[],
-                ),
-            ),
+            c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.IEEEAddrRsp.Callback(
                 Status=t.ZDOStatus.SUCCESS,
                 IEEE=existing_ieee,
@@ -384,33 +364,13 @@ async def test_unknown_device_discovery(device, make_application, mocker):
     new_ieee = t.EUI64(range(1, 9))
 
     did_ieee_addr_req2 = znp_server.reply_once_to(
-        request=zdo_request_matcher(
-            dst_addr=t.AddrModeAddress(t.AddrMode.NWK, new_nwk),
-            command_id=zdo_t.ZDOCmd.IEEE_addr_req,
-            TSN=7,
-            zdo_NWKAddrOfInterest=new_nwk,
-            zdo_RequestType=c.zdo.AddrRequestType.SINGLE,
-            zdo_StartIndex=0,
+        request=c.ZDO.IEEEAddrReq.Req(
+            NWK=new_nwk,
+            RequestType=c.zdo.AddrRequestType.SINGLE,
+            StartIndex=0,
         ),
         responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MsgCbIncoming.Callback(
-                Src=new_nwk,
-                IsBroadcast=t.Bool.false,
-                ClusterId=zdo_t.ZDOCmd.IEEE_addr_rsp,
-                SecurityUse=0,
-                TSN=7,
-                MacDst=0x0000,
-                Data=serialize_zdo_command(
-                    command_id=zdo_t.ZDOCmd.IEEE_addr_rsp,
-                    Status=zdo_t.Status.SUCCESS,
-                    IEEEAddr=new_ieee,
-                    NWKAddr=new_nwk,
-                    NumAssocDev=0,
-                    StartIndex=0,
-                    NWKAddrAssocDevList=[],
-                ),
-            ),
+            c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.IEEEAddrRsp.Callback(
                 Status=t.ZDOStatus.SUCCESS,
                 IEEE=new_ieee,
@@ -437,6 +397,13 @@ async def test_unknown_device_discovery_failure(device, make_application, mocker
 
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
+
+    znp_server.reply_once_to(
+        request=c.ZDO.IEEEAddrReq.Req(partial=True),
+        responses=[
+            c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
 
     # Discovery will throw an exception when the device cannot be found
     with pytest.raises(KeyError):

@@ -1,7 +1,6 @@
 {
     "LEGACY": {
         "HAS_CONFIGURED_ZSTACK3": "55",
-        "ZIGPY_ZNP_MIGRATION_ID": "01",
         "EXTADDR": "a8ef171e004b1200",
         "STARTUP_OPTION": "00",
         "START_DELAY": "0a",

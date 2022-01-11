@@ -95,17 +95,6 @@ class ZNPCoordinator(zigpy.device.Device):
         return f"{model}, Z-Stack {version} (build {self.application._zstack_build_id})"
 
 
-class InitializedDevice(zigpy.device.Device):
-    """
-    Device that does not need to be initialized, since we just need it for addressing
-    purposes.
-    """
-
-    @property
-    def is_initialized(self):
-        return True
-
-
 class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
     SCHEMA_DEVICE = conf.SCHEMA_DEVICE
@@ -127,7 +116,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._currently_waiting_requests = 0
 
         self._join_announce_tasks = {}
-        self._temp_devices = []
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
@@ -704,8 +692,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if msg.ClusterId == zdo_t.ZDOCmd.Device_annce:
             self.on_zdo_device_announce(*args)
             device = self.get_device(ieee=kwargs["IEEEAddr"])
-        elif msg.ClusterId == zdo_t.ZDOCmd.IEEE_addr_rsp:
-            device = next((d for d in self._temp_devices if d.nwk == msg.Src), None)
         else:
             device = await self._get_or_discover_device(nwk=msg.Src)
 
@@ -713,23 +699,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning("Received a ZDO message from an unknown device: %s", msg.Src)
             return
 
-        if isinstance(device, InitializedDevice):
-            device.handle_message(
-                profile=ZDO_PROFILE,
-                cluster=msg.ClusterId,
-                src_ep=ZDO_ENDPOINT,
-                dst_ep=ZDO_ENDPOINT,
-                message=message,
-            )
-        else:
-            self.handle_message(
-                sender=device,
-                profile=ZDO_PROFILE,
-                cluster=msg.ClusterId,
-                src_ep=ZDO_ENDPOINT,
-                dst_ep=ZDO_ENDPOINT,
-                message=message,
-            )
+        self.handle_message(
+            sender=device,
+            profile=ZDO_PROFILE,
+            cluster=msg.ClusterId,
+            src_ep=ZDO_ENDPOINT,
+            dst_ep=ZDO_ENDPOINT,
+            message=message,
+        )
 
     def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
         """
@@ -926,23 +903,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         try:
             async with async_timeout.timeout(IEEE_ADDR_DISCOVERY_TIMEOUT):
-                temp_device = InitializedDevice(application=self, ieee=None, nwk=nwk)
-                self._temp_devices.append(temp_device)
-
-                try:
-                    status, ieee, *_ = await temp_device.zdo.IEEE_addr_req(
-                        *{
-                            "NWKAddrOfInterest": nwk,
-                            "RequestType": c.zdo.AddrRequestType.SINGLE,
-                            "StartIndex": 0,
-                        }.values()
-                    )
-                finally:
-                    self._temp_devices.remove(temp_device)
-
-                assert status == zdo_t.Status.SUCCESS
+                ieee_addr_rsp = await self._znp.request_callback_rsp(
+                    request=c.ZDO.IEEEAddrReq.Req(
+                        NWK=nwk,
+                        RequestType=c.zdo.AddrRequestType.SINGLE,
+                        StartIndex=0,
+                    ),
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.ZDO.IEEEAddrRsp.Callback(partial=True, NWK=nwk),
+                )
         except asyncio.TimeoutError:
             raise KeyError(f"Unknown device: 0x{nwk:04X}")
+        else:
+            ieee = ieee_addr_rsp.IEEE
 
         try:
             device = self.get_device(ieee=ieee)
