@@ -1,7 +1,7 @@
 import asyncio
+import logging
 
 import pytest
-import zigpy.zdo
 import zigpy.endpoint
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
@@ -965,5 +965,38 @@ async def test_route_discovery_concurrency(device, make_application):
 
     assert route_discovery1.call_count == 1
     assert route_discovery2.call_count == 2
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_zdo_from_unknown(device, make_application, caplog, mocker):
+    mocker.patch("zigpy_znp.zigbee.application.IEEE_ADDR_DISCOVERY_TIMEOUT", new=0.1)
+
+    app, znp_server = make_application(server_cls=device)
+
+    znp_server.reply_once_to(
+        request=c.ZDO.IEEEAddrReq.Req(partial=True),
+        responses=[c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    await app.startup(auto_form=False)
+
+    caplog.set_level(logging.WARNING)
+
+    znp_server.send(
+        c.ZDO.MsgCbIncoming.Callback(
+            Src=0x1234,
+            IsBroadcast=t.Bool.false,
+            ClusterId=zdo_t.ZDOCmd.Mgmt_Leave_rsp,
+            SecurityUse=0,
+            TSN=123,
+            MacDst=0x0000,
+            Data=t.Bytes([123, 0x00]),
+        )
+    )
+
+    await asyncio.sleep(0.5)
+    assert "unknown device" in caplog.text
 
     await app.shutdown()

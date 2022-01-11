@@ -693,11 +693,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.on_zdo_device_announce(*args)
             device = self.get_device(ieee=kwargs["IEEEAddr"])
         else:
-            device = await self._get_or_discover_device(nwk=msg.Src)
-
-        if device is None:
-            LOGGER.warning("Received a ZDO message from an unknown device: %s", msg.Src)
-            return
+            try:
+                device = await self._get_or_discover_device(nwk=msg.Src)
+            except KeyError:
+                LOGGER.warning(
+                    "Received a ZDO message from an unknown device: %s", msg.Src
+                )
+                return
 
         self.handle_message(
             sender=device,
