@@ -658,6 +658,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             c.ZDO.SimpleDescRsp,
             c.ZDO.ActiveEpRsp,
             c.ZDO.MgmtLqiRsp,
+            c.ZDO.BindRsp,
+            c.ZDO.UnBindRsp,
         ]:
             self._znp.callback_for_response(
                 ignored_msg.Callback(partial=True),
