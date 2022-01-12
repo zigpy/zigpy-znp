@@ -71,22 +71,6 @@ REQUEST_ROUTING_ERRORS = {
 
 REQUEST_RETRYABLE_ERRORS = REQUEST_TRANSIENT_ERRORS | REQUEST_ROUTING_ERRORS
 
-IGNORED_ZDO_CALLBACKS = [
-    c.ZDO.EndDeviceAnnceInd,
-    c.ZDO.LeaveInd,
-    c.ZDO.PermitJoinInd,
-    c.ZDO.ParentAnnceRsp,
-    c.ZDO.ConcentratorInd,
-    c.ZDO.MgmtNWKUpdateNotify,
-    c.ZDO.MgmtPermitJoinRsp,
-    c.ZDO.NodeDescRsp,
-    c.ZDO.SimpleDescRsp,
-    c.ZDO.ActiveEpRsp,
-    c.ZDO.MgmtLqiRsp,
-    c.ZDO.BindRsp,
-    c.ZDO.UnBindRsp,
-]
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -660,13 +644,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._znp.callback_for_response(
             c.ZDO.MsgCbIncoming.Callback(partial=True), self.on_zdo_message
         )
-
-        # Handle messages that we do not use to prevent unnecessary WARNINGs in logs
-        for ignored_callback in IGNORED_ZDO_CALLBACKS:
-            self._znp.callback_for_response(
-                ignored_callback.Callback(partial=True),
-                self.on_intentionally_unhandled_message,
-            )
 
         # These are responses to a broadcast but we ignore all but the first
         self._znp.callback_for_response(
