@@ -269,8 +269,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Receive a callback for every known ZDO command
         for cluster_id in zdo_t.ZDOCmd:
-            # Ignore ZDO requests
-            if cluster_id < 0x8000:
+            # Ignore outgoing ZDO requests, only receive announcements and responses
+            if cluster_id.name.endswith(("_req", "_set")):
                 continue
 
             await self._znp.request(c.ZDO.MsgCallbackRegister.Req(ClusterId=cluster_id))
