@@ -33,6 +33,7 @@ from zigpy_znp.znp import security
 from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
+from zigpy_znp.zigbee.device import ZNPCoordinator
 
 ZDO_ENDPOINT = 0
 ZHA_ENDPOINT = 1
@@ -72,27 +73,6 @@ REQUEST_ROUTING_ERRORS = {
 REQUEST_RETRYABLE_ERRORS = REQUEST_TRANSIENT_ERRORS | REQUEST_ROUTING_ERRORS
 
 LOGGER = logging.getLogger(__name__)
-
-
-class ZNPCoordinator(zigpy.device.Device):
-    """
-    Coordinator zigpy device that keeps track of our endpoints and clusters.
-    """
-
-    @property
-    def manufacturer(self):
-        return "Texas Instruments"
-
-    @property
-    def model(self):
-        if self.application._znp.version > 3.0:
-            model = "CC1352/CC2652"
-            version = "3.30+"
-        else:
-            model = "CC2538" if self.application._znp.nvram.align_structs else "CC2531"
-            version = "Home 1.2" if self.application._znp.version == 1.2 else "3.0.x"
-
-        return f"{model}, Z-Stack {version} (build {self.application._zstack_build_id})"
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
@@ -289,6 +269,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Receive a callback for every known ZDO command
         for cluster_id in zdo_t.ZDOCmd:
+            # Ignore ZDO requests
+            if cluster_id < 0x8000:
+                continue
+
             await self._znp.request(c.ZDO.MsgCallbackRegister.Req(ClusterId=cluster_id))
 
         # Setup the coordinator as a zigpy device and initialize it to request node info
@@ -1261,6 +1245,33 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ),
                 RspStatus=t.Status.SUCCESS,
                 callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+            )
+        # Internally forward ZDO requests destined for the coordinator back to zigpy so
+        # we can send Z-Stack internal requests when necessary
+        elif dst_ep == ZDO_ENDPOINT and (
+            # Broadcast that will reach the device
+            (
+                dst_addr.mode == t.AddrMode.Broadcast
+                and dst_addr.address
+                in (
+                    zigpy.types.BroadcastAddress.ALL_DEVICES,
+                    zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
+                    zigpy.types.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
+                )
+            )
+            # Or a direct unicast request
+            or (
+                dst_addr.mode == t.AddrMode.NWK
+                and dst_addr.address == self.zigpy_device.nwk
+            )
+        ):
+            self.handle_message(
+                sender=self.zigpy_device,
+                profile=ZDO_PROFILE,
+                cluster=cluster,
+                src_ep=ZDO_ENDPOINT,
+                dst_ep=ZDO_ENDPOINT,
+                message=data,
             )
 
         if dst_addr.mode == t.AddrMode.Broadcast or dst_ep == ZDO_ENDPOINT:
