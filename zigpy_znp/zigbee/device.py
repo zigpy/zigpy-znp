@@ -10,6 +10,8 @@ import zigpy_znp.commands as c
 
 LOGGER = logging.getLogger(__name__)
 
+NWK_UPDATE_LOOP_DELAY = 1
+
 
 class ZNPCoordinator(zigpy.device.Device):
     """
@@ -43,24 +45,6 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
     @property
     def app(self):
         return self.device.application
-
-    def handle_mgmt_permit_joining_req(
-        self,
-        hdr: zdo_t.ZDOHeader,
-        PermitDuration: t.uint8_t,
-        TC_Significant: t.Bool,
-        *,
-        dst_addressing,
-    ):
-        """
-        Handles ZDO `Mgmt_Permit_Joining_req` sent to the coordinator.
-        """
-
-        self.create_catching_task(
-            self.async_handle_mgmt_permit_joining_req(
-                hdr, PermitDuration, TC_Significant, dst_addressing=dst_addressing
-            )
-        )
 
     async def async_handle_mgmt_permit_joining_req(
         self,
@@ -112,7 +96,7 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
             t.Channels.from_channel_list([old_network_info.channel])
             == NwkUpdate.ScanChannels
         ):
-            LOGGER.info("NWK update request is ignored when channel does not change")
+            LOGGER.warning("NWK update request is ignored when channel does not change")
             return
 
         await self.app._znp.request(
@@ -121,6 +105,7 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
                 DstAddrMode=t.AddrMode.NWK,
                 Channels=NwkUpdate.ScanChannels,
                 ScanDuration=NwkUpdate.ScanDuration,
+                # Missing fields in the request cannot be `None` in the Z-Stack command
                 ScanCount=NwkUpdate.ScanCount or 0,
                 NwkManagerAddr=NwkUpdate.nwkManagerAddr or 0x0000,
             ),
@@ -133,7 +118,7 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
             == old_network_info.nwk_update_id
         ):
             await self.app.load_network_info(load_devices=False)
-            await asyncio.sleep(1)
+            await asyncio.sleep(NWK_UPDATE_LOOP_DELAY)
 
         # Z-Stack automatically increments the NWK update ID instead of setting it
         # TODO: Directly set it once radio settings API is finalized.

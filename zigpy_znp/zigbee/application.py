@@ -1233,24 +1233,26 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 Data=data,
             )
 
-        # XXX: Joins *must* be sent via a ZDO command. Otherwise, Z-Stack will not
-        #      actually permit the coordinator to send the network key.
-        if dst_ep == ZDO_ENDPOINT and cluster == zdo_t.ZDOCmd.Mgmt_Permit_Joining_req:
-            await self._znp.request_callback_rsp(
-                request=c.ZDO.MgmtPermitJoinReq.Req(
-                    AddrMode=dst_addr.mode,
-                    Dst=dst_addr.address,
-                    Duration=data[1],
-                    TCSignificance=data[2],
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
-            )
-        # Internally forward ZDO requests destined for the coordinator back to zigpy so
-        # we can send Z-Stack internal requests when necessary
-        elif dst_ep == ZDO_ENDPOINT and (
-            # Broadcast that will reach the device
-            (
+        # Z-Stack requires special treatment when sending ZDO requests
+        if dst_ep == ZDO_ENDPOINT:
+            # XXX: Joins *must* be sent via a ZDO command, even if they are directly
+            # addressing another device. The router will receive the ZDO request and a
+            # device will try to join, but Z-Stack will never send the network key.
+            if cluster == zdo_t.ZDOCmd.Mgmt_Permit_Joining_req:
+                await self._znp.request_callback_rsp(
+                    request=c.ZDO.MgmtPermitJoinReq.Req(
+                        AddrMode=dst_addr.mode,
+                        Dst=dst_addr.address,
+                        Duration=data[1],
+                        TCSignificance=data[2],
+                    ),
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+                )
+            # Internally forward ZDO requests destined for the coordinator back to zigpy
+            # so we can send internal Z-Stack requests when necessary
+            elif (
+                # Broadcast that will reach the device
                 dst_addr.mode == t.AddrMode.Broadcast
                 and dst_addr.address
                 in (
@@ -1258,23 +1260,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
                     zigpy.types.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
                 )
-            )
-            # Or a direct unicast request
-            or (
+            ) or (
+                # Or a direct unicast request
                 dst_addr.mode == t.AddrMode.NWK
                 and dst_addr.address == self.zigpy_device.nwk
-            )
-        ):
-            self.handle_message(
-                sender=self.zigpy_device,
-                profile=ZDO_PROFILE,
-                cluster=cluster,
-                src_ep=ZDO_ENDPOINT,
-                dst_ep=ZDO_ENDPOINT,
-                message=data,
-            )
+            ):
+                self.handle_message(
+                    sender=self.zigpy_device,
+                    profile=profile,
+                    cluster=cluster,
+                    src_ep=src_ep,
+                    dst_ep=dst_ep,
+                    message=data,
+                )
 
-        if dst_addr.mode == t.AddrMode.Broadcast or dst_ep == ZDO_ENDPOINT:
+        if dst_ep == ZDO_ENDPOINT or dst_addr.mode == t.AddrMode.Broadcast:
             # Broadcasts and ZDO requests will not receive a confirmation
             response = await self._znp.request(
                 request=request, RspStatus=t.Status.SUCCESS
