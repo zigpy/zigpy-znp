@@ -101,9 +101,9 @@ USB-adapters, GPIO-modules, and development-boards flashed with TI's Z-Stack are
 
  - CC2652P/CC2652R/CC2652RB USB stick and dev board hardware
  - CC1352P/CC1352R USB stick and dev board hardware
- - CC2538 + CC2592 USB stick and dev board hardware (not recommended since use older hardware and firmware)
- - CC2531 USB stick hardware (not recommended for Zigbee networks with more than 20 devices)
- - CC2530 + CC2591/CC2592 USB stick hardware (not recommended for Zigbee networks with more than 20 devices)
+ - CC2538 + CC2592 USB stick and dev board hardware (**not recommended, old hardware and end-of-life firmware**)
+ - CC2531 USB stick hardware (**not recommended for Zigbee networks with more than 20 devices**)
+ - CC2530 + CC2591/CC2592 USB stick hardware (**not recommended for Zigbee networks with more than 20 devices**)
 
 Tip! Adapters listed as "[Texas Instruments sticks compatible with Zigbee2MQTT](https://www.zigbee2mqtt.io/information/supported_adapters)" also works with zigpy-znp.
 
@@ -112,7 +112,6 @@ These specific adapters are used as reference hardware for development and testi
 
  - [TI LAUNCHXL-CC26X2R1](https://www.ti.com/tool/LAUNCHXL-CC26X2R1) running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` using [TI's UNIFLASH](https://www.ti.com/tool/download/UNIFLASH).
  - [Electrolama zzh CC2652R](https://electrolama.com/projects/zig-a-zig-ah/) and [Slaesh CC2652R](https://slae.sh/projects/cc2652/) sticks running [Z-Stack 3 firmware (based on version 4.40.00.44)](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin). You can flash `CC2652R_20210120.hex` or `CC2652RB_20210120.hex` respectively using [cc2538-bsl](https://github.com/JelmerT/cc2538-bsl).
- - CC2531 running [Z-Stack 3.0.1](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_3.0.x/bin/CC2531_20190425.zip). You can flash `CC2531ZNP-without-SBL.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-without-SBL.bin /dev/serial/by-id/YOUR-CC2531` if your stick already has a serial bootloader. Note that Z-Stack 3.0.x firmware is not recommended for the CC2530 and CC2531 in a "production" environment (since they are not powerful enough).
  - CC2531 running [Z-Stack Home 1.2](https://github.com/Koenkk/Z-Stack-firmware/blob/master/coordinator/Z-Stack_Home_1.2/bin/default/CC2531_DEFAULT_20190608.zip). You can flash `CC2531ZNP-Prod.bin` to your stick directly with `zigpy_znp`: `python -m zigpy_znp.tools.flash_write -i /path/to/CC2531ZNP-Prod.bin /dev/serial/by-id/YOUR-CC2531` if your stick already has a serial bootloader.
 
 ## Texas Instruments Chip Part Numbers
