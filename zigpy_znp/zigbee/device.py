@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 
 import zigpy.zdo
 import zigpy.device
 import zigpy.zdo.types as zdo_t
+import zigpy.application
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
+import zigpy_znp.zigbee.application as znp_app
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,31 +44,61 @@ class ZNPCoordinator(zigpy.device.Device):
 
         return f"{model}, Z-Stack {version} (build {self.application._zstack_build_id})"
 
+    def request(
+        self,
+        profile,
+        cluster,
+        src_ep,
+        dst_ep,
+        sequence,
+        data,
+        expect_reply=True,
+        # Extend the default timeout
+        timeout=2 * zigpy.device.APS_REPLY_TIMEOUT,
+        use_ieee=False,
+    ):
+        """
+        Normal `zigpy.device.Device:request` except its default timeout is longer.
+        """
+
+        return super().request(
+            profile,
+            cluster,
+            src_ep,
+            dst_ep,
+            sequence,
+            data,
+            expect_reply=expect_reply,
+            timeout=timeout,
+            use_ieee=use_ieee,
+        )
+
 
 class ZNPZDOEndpoint(zigpy.zdo.ZDO):
     @property
-    def app(self):
+    def app(self) -> zigpy.application.ControllerApplication:
         return self.device.application
 
-    async def async_handle_mgmt_permit_joining_req(
-        self,
-        hdr: zdo_t.ZDOHeader,
-        PermitDuration: t.uint8_t,
-        TC_Significant: t.Bool,
-        *,
-        dst_addressing,
+    def _send_loopback_reply(
+        self, command_id: zdo_t.ZDOCmd, *, tsn: t.uint8_t, **kwargs
     ):
-        # Joins *must* be sent via a ZDO command. Otherwise, Z-Stack will not actually
-        # permit the coordinator to send the network key while routers will.
-        await self.app._znp.request_callback_rsp(
-            request=c.ZDO.MgmtPermitJoinReq.Req(
-                AddrMode=t.AddrMode.NWK,
-                Dst=0x0000,
-                Duration=PermitDuration,
-                TCSignificance=TC_Significant,
-            ),
-            RspStatus=t.Status.SUCCESS,
-            callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+        """
+        Constructs and sends back a loopback ZDO response.
+        """
+
+        message = t.uint8_t(tsn).serialize() + self._serialize(
+            command_id, *kwargs.values()
+        )
+
+        LOGGER.debug("Sending loopback reply %s (%s), tsn=%s", command_id, kwargs, tsn)
+
+        self.app.handle_message(
+            sender=self.app.zigpy_device,
+            profile=znp_app.ZDO_PROFILE,
+            cluster=command_id,
+            src_ep=znp_app.ZDO_ENDPOINT,
+            dst_ep=znp_app.ZDO_ENDPOINT,
+            message=message,
         )
 
     def handle_mgmt_nwk_update_req(
@@ -83,7 +117,7 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
     async def async_handle_mgmt_nwk_update_req(
         self, hdr: zdo_t.ZDOHeader, NwkUpdate: zdo_t.NwkUpdate, *, dst_addressing
     ):
-        # Energy scans are handled properly by Z-Stack
+        # Energy scans are handled properly by Z-Stack, no need to do anything
         if NwkUpdate.ScanDuration not in (
             zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
             zdo_t.NwkUpdate.CHANNEL_MASK_MANAGER_ADDR_CHANGE_REQ,
@@ -97,6 +131,15 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
             == NwkUpdate.ScanChannels
         ):
             LOGGER.warning("NWK update request is ignored when channel does not change")
+            self._send_loopback_reply(
+                zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
+                Status=zdo_t.Status.SUCCESS,
+                ScannedChannels=t.Channels.NO_CHANNELS,
+                TotalTransmissions=0,
+                TransmissionFailures=0,
+                EnergyValues=[],
+                tsn=hdr.tsn,
+            )
             return
 
         await self.app._znp.request(
@@ -128,3 +171,13 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
                 f" {self.app.state.network_information.nwk_update_id} instead of being"
                 f" set to {NwkUpdate.nwkUpdateId}"
             )
+
+        self._send_loopback_reply(
+            zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
+            Status=zdo_t.Status.SUCCESS,
+            ScannedChannels=t.Channels.NO_CHANNELS,
+            TotalTransmissions=0,
+            TransmissionFailures=0,
+            EnergyValues=[],
+            tsn=hdr.tsn,
+        )
