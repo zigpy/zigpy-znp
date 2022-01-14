@@ -63,7 +63,7 @@ async def test_probe_unsuccessful_slow(device, make_znp_server, mocker):
     # Don't respond to anything
     znp_server._listeners.clear()
 
-    mocker.patch("zigpy_znp.zigbee.application.PROBE_TIMEOUT", new=0.1)
+    mocker.patch("zigpy_znp.api.CONNECT_PROBE_TIMEOUT", new=0.1)
 
     assert not (
         await ControllerApplication.probe(

@@ -1,12 +1,18 @@
 import asyncio
 
 import pytest
+import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.tools.energy_scan import main as energy_scan
 
-from ..conftest import EMPTY_DEVICES, FORMED_DEVICES
+from ..conftest import (
+    EMPTY_DEVICES,
+    FORMED_DEVICES,
+    serialize_zdo_command,
+    deserialize_zdo_command,
+)
 
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
@@ -23,32 +29,52 @@ async def test_energy_scan_formed(device, make_znp_server, capsys):
 
     def fake_scanner(request):
         async def response(request):
-            znp_server.send(c.ZDO.MgmtNWKUpdateReq.Rsp(Status=t.Status.SUCCESS))
+            znp_server.send(c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS))
 
-            delay = 2 ** request.ScanDuration
-            num_channels = len(list(request.Channels))
+            params = deserialize_zdo_command(request.ClusterId, request.Data[1:])
+            channels = params["NwkUpdate"].ScanChannels
+            num_channels = len(list(channels))
 
-            for i in range(request.ScanCount):
-                await asyncio.sleep(delay / 100)
+            await asyncio.sleep(0.1)
 
-                znp_server.send(
-                    c.ZDO.MgmtNWKUpdateNotify.Callback(
-                        Src=0x0000,
+            znp_server.send(
+                c.ZDO.MsgCbIncoming.Callback(
+                    Src=0x0000,
+                    IsBroadcast=t.Bool.false,
+                    ClusterId=zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
+                    SecurityUse=0,
+                    TSN=request.TSN,
+                    MacDst=0x0000,
+                    Data=serialize_zdo_command(
+                        command_id=zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
                         Status=t.ZDOStatus.SUCCESS,
-                        ScannedChannels=request.Channels,
+                        ScannedChannels=channels,
                         TotalTransmissions=998,
                         TransmissionFailures=2,
-                        EnergyValues=list(range(num_channels)),
-                    )
+                        EnergyValues=list(range(11, 26 + 1))[:num_channels],
+                    ),
                 )
+            )
+
+            znp_server.send(
+                c.ZDO.MgmtNWKUpdateNotify.Callback(
+                    Src=0x0000,
+                    Status=t.ZDOStatus.SUCCESS,
+                    ScannedChannels=channels,
+                    TotalTransmissions=998,
+                    TransmissionFailures=2,
+                    EnergyValues=list(range(11, 26 + 1))[:num_channels],
+                )
+            )
 
         asyncio.create_task(response(request))
 
     znp_server.callback_for_response(
-        c.ZDO.MgmtNWKUpdateReq.Req(
-            Dst=0x0000,
-            DstAddrMode=t.AddrMode.NWK,
-            NwkManagerAddr=0x0000,
+        c.AF.DataRequestExt.Req(
+            DstAddrModeAddress=t.AddrModeAddress(mode=t.AddrMode.NWK, address=0x0000),
+            DstEndpoint=0,
+            SrcEndpoint=0,
+            ClusterId=zdo_t.ZDOCmd.Mgmt_NWK_Update_req,
             partial=True,
         ),
         fake_scanner,

@@ -718,7 +718,7 @@ class ZNP:
         Called when a command that is not handled by any listener is received.
         """
 
-        LOGGER.warning("Received an unhandled command: %s", command)
+        LOGGER.debug("Command was not handled")
 
     @contextlib.asynccontextmanager
     async def capture_responses(self, responses):

@@ -2,12 +2,12 @@ import asyncio
 import logging
 
 import pytest
-from zigpy.zdo.types import ZDOCmd
+import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from ..conftest import FORMED_DEVICES, CoroutineMock
+from ..conftest import FORMED_DEVICES, CoroutineMock, serialize_zdo_command
 
 
 def awaitable_mock(*, return_value=None, side_effect=None):
@@ -75,6 +75,24 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
 
     # Assume its NWK changed and we're just finding out
     znp_server.send(
+        c.ZDO.MsgCbIncoming.Callback(
+            Src=0x0001,
+            IsBroadcast=t.Bool.false,
+            ClusterId=zdo_t.ZDOCmd.Device_annce,
+            SecurityUse=0,
+            TSN=123,
+            MacDst=0x0000,
+            Data=serialize_zdo_command(
+                command_id=zdo_t.ZDOCmd.Device_annce,
+                NWKAddr=new_nwk,
+                IEEEAddr=device.ieee,
+                Capability=c.zdo.MACCapabilities.Router,
+                Status=t.ZDOStatus.SUCCESS,
+            ),
+        )
+    )
+
+    znp_server.send(
         c.ZDO.EndDeviceAnnceInd.Callback(
             Src=0x0001,
             NWK=new_nwk,
@@ -83,11 +101,13 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
         )
     )
 
+    await asyncio.sleep(0.1)
+
     app.handle_join.assert_called_once_with(
         nwk=new_nwk, ieee=device.ieee, parent_nwk=None
     )
     assert app.handle_message.call_count == 1
-    assert app.handle_message.mock_calls[0][2]["cluster"] == ZDOCmd.Device_annce
+    assert app.handle_message.mock_calls[0][2]["cluster"] == zdo_t.ZDOCmd.Device_annce
 
     # The device's NWK updated
     assert device.nwk == new_nwk
