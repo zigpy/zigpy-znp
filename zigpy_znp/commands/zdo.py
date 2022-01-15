@@ -982,7 +982,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 "This field indicates either SUCCESS or FAILURE.",
             ),
             t.Param("NWK", t.NWK, "Device's short address of this Node descriptor"),
-            t.Param("NodeDescriptor", NullableNodeDescriptor, "Node descriptor"),
+            t.Param(
+                "NodeDescriptor",
+                NullableNodeDescriptor,
+                "Node descriptor",
+                optional=True,
+            ),
         ),
     )
 
