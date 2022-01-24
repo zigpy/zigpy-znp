@@ -115,11 +115,6 @@ async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
     # This already exists
     znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\xBB"
 
-    # XXX: empty NVRAM breaks current alignment autodetection method (NWKKEY is missing)
-    async def replacement(self, *args, **kwargs):
-        self.align_structs = znp_server.align_structs
-
-    mocker.patch("zigpy_znp.nvram.NVRAMHelper.determine_alignment", new=replacement)
     await nvram_write([znp_server._port_path, "-i", str(backup_file)])
 
     nvram_obj = dump_nvram(znp_server)

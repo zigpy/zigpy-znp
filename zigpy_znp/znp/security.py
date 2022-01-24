@@ -253,12 +253,9 @@ async def read_unhashed_link_keys(
         )
 
 
-async def read_devices(znp: ZNP) -> typing.Sequence[StoredDevice]:
-    tclk_seed = None
-
-    if znp.version > 1.2:
-        tclk_seed = await znp.nvram.osal_read(OsalNvIds.TCLK_SEED, item_type=t.KeyData)
-
+async def read_devices(
+    znp: ZNP, *, tclk_seed: t.KeyData | None
+) -> typing.Sequence[StoredDevice]:
     addr_mgr = await read_addr_manager_entries(znp)
     devices = {}
 

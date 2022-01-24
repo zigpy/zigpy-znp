@@ -2,23 +2,28 @@ import asyncio
 import logging
 
 import pytest
-from zigpy.zdo.types import ZDOCmd
+import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from ..conftest import FORMED_DEVICES, CoroutineMock
+from ..conftest import FORMED_DEVICES, CoroutineMock, serialize_zdo_command
 
 
-def awaitable_mock(return_value):
+def awaitable_mock(*, return_value=None, side_effect=None):
+    assert (return_value or side_effect) and not (return_value and side_effect)
+
     mock_called = asyncio.get_running_loop().create_future()
 
-    def side_effect(*args, **kwargs):
+    def side_effect_(*args, **kwargs):
         mock_called.set_result((args, kwargs))
 
-        return return_value
+        if return_value is not None:
+            return return_value
+        else:
+            raise side_effect
 
-    return mock_called, CoroutineMock(side_effect=side_effect)
+    return mock_called, CoroutineMock(side_effect=side_effect_)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -45,7 +50,7 @@ async def test_on_zdo_relays_message_callback_unknown(
     app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    discover_called, discover_mock = awaitable_mock(return_value=None)
+    discover_called, discover_mock = awaitable_mock(side_effect=KeyError())
     mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
 
     caplog.set_level(logging.WARNING)
@@ -70,6 +75,24 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
 
     # Assume its NWK changed and we're just finding out
     znp_server.send(
+        c.ZDO.MsgCbIncoming.Callback(
+            Src=0x0001,
+            IsBroadcast=t.Bool.false,
+            ClusterId=zdo_t.ZDOCmd.Device_annce,
+            SecurityUse=0,
+            TSN=123,
+            MacDst=0x0000,
+            Data=serialize_zdo_command(
+                command_id=zdo_t.ZDOCmd.Device_annce,
+                NWKAddr=new_nwk,
+                IEEEAddr=device.ieee,
+                Capability=c.zdo.MACCapabilities.Router,
+                Status=t.ZDOStatus.SUCCESS,
+            ),
+        )
+    )
+
+    znp_server.send(
         c.ZDO.EndDeviceAnnceInd.Callback(
             Src=0x0001,
             NWK=new_nwk,
@@ -78,11 +101,13 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
         )
     )
 
+    await asyncio.sleep(0.1)
+
     app.handle_join.assert_called_once_with(
         nwk=new_nwk, ieee=device.ieee, parent_nwk=None
     )
     assert app.handle_message.call_count == 1
-    assert app.handle_message.mock_calls[0][2]["cluster"] == ZDOCmd.Device_annce
+    assert app.handle_message.mock_calls[0][2]["cluster"] == zdo_t.ZDOCmd.Device_annce
 
     # The device's NWK updated
     assert device.nwk == new_nwk
@@ -183,7 +208,7 @@ async def test_on_af_message_callback(device, make_application, mocker):
     app.get_device.reset_mock()
 
     # Message from an unknown device
-    discover_called, discover_mock = awaitable_mock(return_value=None)
+    discover_called, discover_mock = awaitable_mock(side_effect=KeyError())
     mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
 
     znp_server.send(af_message)

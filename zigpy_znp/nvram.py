@@ -25,21 +25,19 @@ class NVRAMHelper:
         structs are read/written.
         """
 
-        # TODO: Figure out a way to use `c.UTIL.AssocFindDevice.Req(Index=0)`!
-        #       This is the only (known) MT command to just send a struct's in-memory
-        #       representation over serial.
+        # This is the only known MT command to respond with a struct's in-memory
+        # representation over serial.
+        LOGGER.debug("Detecting struct alignment")
+        rsp = await self.znp.request(c.UTIL.AssocFindDevice.Req(Index=0))
 
-        # NWKKEY is almost always present, regardless of adapter state.
-        # It is an 8-bit sequence number, a 16 byte key, and a 32-bit frame counter.
-        # This is at least 1 + 16 + 4 = 21 bytes, or 24 if you have to 32-bit align.
-        value = await self.osal_read(nvids.OsalNvIds.NWKKEY, item_type=t.Bytes)
-
-        if len(value) == 24:
-            self.align_structs = True
-        elif len(value) == 21:
+        if len(rsp.Device) == 28:
             self.align_structs = False
+        elif len(rsp.Device) == 36:
+            # `AssociatedDevice` has an extra member at the end in Z-Stack 3.30 but
+            # the struct does not change in size due to padding.
+            self.align_structs = True
         else:
-            raise ValueError(f"Unexpected value for NWKKEY: {value!r}")
+            raise ValueError(f"Cannot determine alignment from struct: {rsp!r}")
 
         LOGGER.debug("Detected struct alignment: %s", self.align_structs)
 

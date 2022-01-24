@@ -100,16 +100,7 @@ class GroupIdList(t.LVList, item_type=t.GroupId, length_type=t.uint8_t):
     pass
 
 
-class BindEntry(t.Struct):
-    """Bind table entry."""
-
-    Src: t.EUI64
-    SrcEp: t.uint8_t
-    ClusterId: t.ClusterId
-    DstAddr: zigpy.zdo.types.MultiAddress
-
-
-class BindEntryList(t.LVList, item_type=BindEntry, length_type=t.uint8_t):
+class BindEntryList(t.LVList, item_type=zigpy.zdo.types.Binding, length_type=t.uint8_t):
     pass
 
 
@@ -122,6 +113,10 @@ class EnergyValues(t.LVList, item_type=t.uint8_t, length_type=t.uint8_t):
 
 
 class ChildInfoList(t.LVList, item_type=t.EUI64, length_type=t.uint8_t):
+    pass
+
+
+class NWKArray(t.CompleteList, item_type=t.NWK):
     pass
 
 
@@ -701,18 +696,19 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # set rejoin backoff duration and rejoin scan duration for an end device
-    SetRejoinParams = t.CommandDef(
+    # XXX: Undocumented
+    SendData = t.CommandDef(
         t.CommandType.SREQ,
-        # in documentation CmdId=0x26 which conflict with discover req
         0x28,
         req_schema=(
+            t.Param("Dst", t.NWK, "Short address of the destination"),
+            t.Param("TSN", t.uint8_t, "Transaction sequence number"),
+            t.Param("CommandId", t.uint16_t, "ZDO Command ID"),
             t.Param(
-                "BackoffDuraation",
-                t.uint32_t,
-                "Rejoin backoff  duration for end device",
+                "Data",
+                t.Bytes,
+                "Data to send",
             ),
-            t.Param("ScanDuration", t.uint32_t, "Rejoin scan duration for end device"),
         ),
         rsp_schema=t.STATUS_SCHEMA,
     )
@@ -944,12 +940,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             ),
             t.Param("IEEE", t.EUI64, "Extended address of the source device"),
             t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param("NumAssoc", t.uint8_t, "Number of associated devices"),
             t.Param(
                 "Index",
                 t.uint8_t,
                 "Starting index into the list of associated devices",
             ),
-            t.Param("Devices", t.NWKList, "List of the associated devices"),
+            t.Param("Devices", NWKArray, "List of the associated devices"),
         ),
     )
 
@@ -963,12 +960,13 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             ),
             t.Param("IEEE", t.EUI64, "Extended address of the source device"),
             t.Param("NWK", t.NWK, "Short address of the source device"),
+            t.Param("NumAssoc", t.uint8_t, "Number of associated devices"),
             t.Param(
                 "Index",
                 t.uint8_t,
                 "Starting index into the list of associated devices",
             ),
-            t.Param("Devices", t.NWKList, "List of the associated devices"),
+            t.Param("Devices", NWKArray, "List of the associated devices"),
         ),
     )
 
@@ -984,7 +982,12 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 "This field indicates either SUCCESS or FAILURE.",
             ),
             t.Param("NWK", t.NWK, "Device's short address of this Node descriptor"),
-            t.Param("NodeDescriptor", NullableNodeDescriptor, "Node descriptor"),
+            t.Param(
+                "NodeDescriptor",
+                NullableNodeDescriptor,
+                "Node descriptor",
+                optional=True,
+            ),
         ),
     )
 
@@ -1209,8 +1212,8 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
                 t.uint8_t,
                 "Total number of entries available on the device",
             ),
-            t.Param("Index", t.uint8_t, "Index where the response starts"),
-            t.Param("BindTable", BindEntryList, "list of BindEntries"),
+            t.Param("StartIndex", t.uint8_t, "Index where the response starts"),
+            t.Param("BindTableList", BindEntryList, "list of BindEntries"),
         ),
     )
 
@@ -1431,4 +1434,20 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         t.CommandType.AREQ,
         0xCB,
         rsp_schema=(t.Param("Duration", t.uint8_t, "Permit join duration"),),
+    )
+
+    # set rejoin backoff duration and rejoin scan duration for an end device
+    SetRejoinParams = t.CommandDef(
+        t.CommandType.SREQ,
+        # in documentation CmdId=0x26 which conflict with discover req
+        0xCC,
+        req_schema=(
+            t.Param(
+                "BackoffDuraation",
+                t.uint32_t,
+                "Rejoin backoff  duration for end device",
+            ),
+            t.Param("ScanDuration", t.uint32_t, "Rejoin scan duration for end device"),
+        ),
+        rsp_schema=t.STATUS_SCHEMA,
     )

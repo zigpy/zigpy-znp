@@ -39,6 +39,7 @@ def json_backup_to_zigpy_state(
     network_info.channel_mask = t.Channels.from_channel_list(backup["channel_mask"])
     network_info.security_level = backup["security_level"]
     network_info.stack_specific = backup.get("stack_specific")
+    network_info.tc_link_key = zigpy.state.Key()
     network_info.tc_link_key.key = const.DEFAULT_TC_LINK_KEY
 
     network_info.network_key = zigpy.state.Key()
@@ -66,8 +67,9 @@ def json_backup_to_zigpy_state(
 
         # The `is_child` key is currently optional
         if obj.get("is_child", True):
-            network_info.children.append(node)
-        elif node.nwk is not None:
+            network_info.children.append(node.ieee)
+
+        if node.nwk is not None:
             network_info.nwk_addresses[node.ieee] = node.nwk
 
         if "link_key" in obj:

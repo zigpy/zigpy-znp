@@ -14,6 +14,8 @@ from ..conftest import (
     FORMED_ZSTACK3_DEVICES,
     CoroutineMock,
     FormedLaunchpadCC26X2R1,
+    zdo_request_matcher,
+    serialize_zdo_command,
 )
 
 
@@ -27,7 +29,6 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
 
     app, znp_server = await make_application(server_cls=device)
 
-    # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(
             AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=10, partial=True
@@ -39,6 +40,20 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
     )
 
     # Handle the ZDO broadcast sent by Zigpy
+    permit_join_broadcast_raw = znp_server.reply_once_to(
+        request=zdo_request_matcher(
+            dst_addr=t.AddrModeAddress(t.AddrMode.Broadcast, 0xFFFC),
+            command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_req,
+            TSN=7,
+            zdo_PermitDuration=10,
+            zdo_TC_Significant=0,
+        ),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
+    # And the duplicate one using the MT command
     permit_join_broadcast = znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(
             AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=10, partial=True
@@ -52,14 +67,13 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
     await app.startup(auto_form=False)
     await app.permit(time_s=10)
 
-    if fixed_joining_bug:
-        await permit_join_broadcast
+    await permit_join_broadcast
+    await permit_join_broadcast_raw
 
-        # Joins should not have been opened on the coordinator
+    if fixed_joining_bug:
         assert not permit_join_coordinator.done()
     else:
-        await permit_join_coordinator
-        await permit_join_broadcast
+        assert permit_join_coordinator.done()
 
     await app.shutdown()
 
@@ -193,6 +207,24 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
     await asyncio.sleep(0.1)
 
     znp_server.send(
+        c.ZDO.MsgCbIncoming.Callback(
+            Src=nwk,
+            IsBroadcast=t.Bool.false,
+            ClusterId=zdo_t.ZDOCmd.Device_annce,
+            SecurityUse=0,
+            TSN=123,
+            MacDst=0x0000,
+            Data=serialize_zdo_command(
+                command_id=zdo_t.ZDOCmd.Device_annce,
+                NWKAddr=nwk,
+                IEEEAddr=ieee,
+                Capability=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
+                Status=t.ZDOStatus.SUCCESS,
+            ),
+        )
+    )
+
+    znp_server.send(
         c.ZDO.EndDeviceAnnceInd.Callback(
             Src=nwk,
             NWK=nwk,
@@ -200,6 +232,8 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
             Capabilities=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
         )
     )
+
+    await asyncio.sleep(0.1)
 
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=None)
 
@@ -213,6 +247,11 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
 async def test_on_zdo_device_join_and_announce_slow(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
+
+    znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(partial=True),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
 
     mocker.patch.object(app, "handle_join")
     mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
@@ -233,6 +272,24 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
 
     znp_server.send(
+        c.ZDO.MsgCbIncoming.Callback(
+            Src=nwk,
+            IsBroadcast=t.Bool.false,
+            ClusterId=zdo_t.ZDOCmd.Device_annce,
+            SecurityUse=0,
+            TSN=123,
+            MacDst=0x0000,
+            Data=serialize_zdo_command(
+                command_id=zdo_t.ZDOCmd.Device_annce,
+                NWKAddr=nwk,
+                IEEEAddr=ieee,
+                Capability=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
+                Status=t.ZDOStatus.SUCCESS,
+            ),
+        )
+    )
+
+    znp_server.send(
         c.ZDO.EndDeviceAnnceInd.Callback(
             Src=nwk,
             NWK=nwk,
@@ -241,285 +298,10 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
         )
     )
 
+    await asyncio.sleep(0.1)
+
     # The announcement will trigger another join indication
     assert app.handle_join.call_count == 2
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_new_device_join_and_bind_complex(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
-    await app.startup(auto_form=False)
-
-    nwk = 0x6A7C
-    ieee = t.EUI64.convert("00:17:88:01:08:64:6C:81")
-
-    # Handle the startup permit join clear
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-        override=True,
-    )
-
-    # Handle the permit join request sent by us
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=60, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ],
-    )
-
-    # Handle the ZDO broadcast sent by Zigpy
-    znp_server.reply_once_to(
-        request=c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=60, partial=True
-        ),
-        responses=[
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-            c.ZDO.TCDevInd.Callback(SrcNwk=nwk, SrcIEEE=ieee, ParentNwk=0x0000),
-        ],
-    )
-
-    # Handle the route-discovery-upon-join request
-    znp_server.reply_once_to(
-        request=c.ZDO.ExtRouteDisc.Req(Dst=nwk, partial=True),
-        responses=[
-            c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS),
-        ],
-    )
-
-    node_desc = c.zdo.NullableNodeDescriptor(2, 64, 128, 4107, 89, 63, 0, 63, 0)
-
-    num_node_desc_reqs = 0
-
-    # Some devices join once, wait a bit, and re-join again
-    def poorly_timed_announce_replier(req):
-        nonlocal num_node_desc_reqs
-        num_node_desc_reqs += 1
-
-        if num_node_desc_reqs > 1:
-            return
-
-        return c.ZDO.EndDeviceAnnceInd.Callback(
-            Src=nwk,
-            NWK=nwk,
-            IEEE=ieee,
-            Capabilities=c.zdo.MACCapabilities.AllocateShortAddrDuringAssocNeeded,
-        )
-
-    znp_server.reply_to(
-        request=c.ZDO.NodeDescReq.Req(DstAddr=nwk, NWKAddrOfInterest=nwk),
-        responses=[
-            c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
-            poorly_timed_announce_replier,
-            c.ZDO.NodeDescRsp.Callback(
-                Src=nwk, Status=t.ZDOStatus.SUCCESS, NWK=nwk, NodeDescriptor=node_desc
-            ),
-        ],
-    )
-
-    znp_server.reply_to(
-        request=c.ZDO.ActiveEpReq.Req(DstAddr=nwk, NWKAddrOfInterest=nwk),
-        responses=[
-            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.ActiveEpRsp.Callback(
-                Src=nwk, Status=t.ZDOStatus.SUCCESS, NWK=nwk, ActiveEndpoints=[2, 1]
-            ),
-        ],
-    )
-
-    znp_server.reply_to(
-        request=c.ZDO.SimpleDescReq.Req(DstAddr=nwk, NWKAddrOfInterest=nwk, Endpoint=2),
-        responses=[
-            c.ZDO.SimpleDescReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.SimpleDescRsp.Callback(
-                Src=nwk,
-                Status=t.ZDOStatus.SUCCESS,
-                NWK=nwk,
-                SimpleDescriptor=zdo_t.SizePrefixedSimpleDescriptor(
-                    2, 260, 263, 0, [0, 1, 3, 1030, 1024, 1026], [25]
-                ),
-            ),
-        ],
-    )
-
-    znp_server.reply_to(
-        request=c.ZDO.SimpleDescReq.Req(DstAddr=nwk, NWKAddrOfInterest=nwk, Endpoint=1),
-        responses=[
-            c.ZDO.SimpleDescReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.SimpleDescRsp.Callback(
-                Src=nwk,
-                Status=t.ZDOStatus.SUCCESS,
-                NWK=nwk,
-                SimpleDescriptor=zdo_t.SizePrefixedSimpleDescriptor(
-                    1, 49246, 2128, 2, [0], [0, 3, 4, 6, 8, 768, 5]
-                ),
-            ),
-        ],
-    )
-
-    def data_req_callback(request):
-        if request.Data == bytes([0x00, request.TSN]) + b"\x00\x04\x00\x05\x00":
-            # Manufacturer + model
-            znp_server.send(c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS))
-            znp_server.send(
-                c.AF.DataConfirm.Callback(
-                    Status=t.Status.SUCCESS,
-                    Endpoint=request.SrcEndpoint,
-                    TSN=request.TSN,
-                )
-            )
-            znp_server.send(
-                c.AF.IncomingMsg.Callback(
-                    GroupId=0x0000,
-                    ClusterId=request.ClusterId,
-                    SrcAddr=nwk,
-                    SrcEndpoint=request.DstEndpoint,
-                    DstEndpoint=request.SrcEndpoint,
-                    WasBroadcast=t.Bool.false,
-                    LQI=156,
-                    SecurityUse=t.Bool.false,
-                    TimeStamp=2123652,
-                    TSN=0,
-                    Data=b"\x18"
-                    + bytes([request.TSN])
-                    + b"\x01\x04\x00\x00\x42\x07\x50\x68\x69\x6C\x69\x70\x73\x05\x00"
-                    + b"\x00\x42\x06\x53\x4D\x4C\x30\x30\x31",
-                    MacSrcAddr=nwk,
-                    MsgResultRadius=29,
-                )
-            )
-        elif request.Data == bytes([0x00, request.TSN]) + b"\x00\x04\x00":
-            # Manufacturer
-            znp_server.send(c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS))
-            znp_server.send(
-                c.AF.DataConfirm.Callback(
-                    Status=t.Status.SUCCESS,
-                    Endpoint=request.SrcEndpoint,
-                    TSN=request.TSN,
-                )
-            )
-            znp_server.send(
-                c.AF.IncomingMsg.Callback(
-                    GroupId=0x0000,
-                    ClusterId=request.ClusterId,
-                    SrcAddr=nwk,
-                    SrcEndpoint=request.DstEndpoint,
-                    DstEndpoint=request.SrcEndpoint,
-                    WasBroadcast=t.Bool.false,
-                    LQI=156,
-                    SecurityUse=t.Bool.false,
-                    TimeStamp=2123652,
-                    TSN=0,
-                    Data=b"\x18"
-                    + bytes([request.TSN])
-                    + b"\x01\x04\x00\x00\x42\x07\x50\x68\x69\x6C\x69\x70\x73",
-                    MacSrcAddr=nwk,
-                    MsgResultRadius=29,
-                )
-            )
-        elif request.Data == bytes([0x00, request.TSN]) + b"\x00\x05\x00":
-            # Model
-            znp_server.send(c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS))
-            znp_server.send(
-                c.AF.DataConfirm.Callback(
-                    Status=t.Status.SUCCESS,
-                    Endpoint=request.SrcEndpoint,
-                    TSN=request.TSN,
-                )
-            )
-            znp_server.send(
-                c.AF.IncomingMsg.Callback(
-                    GroupId=0x0000,
-                    ClusterId=request.ClusterId,
-                    SrcAddr=nwk,
-                    SrcEndpoint=request.DstEndpoint,
-                    DstEndpoint=request.SrcEndpoint,
-                    WasBroadcast=t.Bool.false,
-                    LQI=156,
-                    SecurityUse=t.Bool.false,
-                    TimeStamp=2123652,
-                    TSN=0,
-                    Data=b"\x18"
-                    + bytes([request.TSN])
-                    + b"\x01\x05\x00\x00\x42\x06\x53\x4D\x4C\x30\x30\x31",
-                    MacSrcAddr=nwk,
-                    MsgResultRadius=29,
-                )
-            )
-
-    znp_server.callback_for_response(
-        c.AF.DataRequestExt.Req(
-            partial=True,
-            DstAddrModeAddress=t.AddrModeAddress(mode=t.AddrMode.NWK, address=nwk),
-        ),
-        data_req_callback,
-    )
-
-    device_future = asyncio.get_running_loop().create_future()
-
-    class TestListener:
-        def device_initialized(self, device):
-            device_future.set_result(device)
-
-    app.add_listener(TestListener())
-
-    await app.permit(time_s=60)  # duration is sent as byte 0x3C in first ZDO broadcast
-
-    # The device has finally joined and been initialized
-    device = await device_future
-
-    assert not device.initializing
-    assert device.model == "SML001"
-    assert device.manufacturer == "Philips"
-    assert set(device.endpoints.keys()) == {0, 1, 2}
-
-    assert set(device.endpoints[1].in_clusters.keys()) == {0}
-    assert set(device.endpoints[1].out_clusters.keys()) == {0, 3, 4, 6, 8, 768, 5}
-
-    assert set(device.endpoints[2].in_clusters.keys()) == {0, 1, 3, 1030, 1024, 1026}
-    assert set(device.endpoints[2].out_clusters.keys()) == {25}
-
-    # Once we've confirmed the device is good, start testing binds
-    def bind_req_callback(request):
-        assert request.Dst == nwk
-        assert request.Src == ieee
-        assert request.SrcEndpoint in device.endpoints
-
-        cluster = request.ClusterId
-        ep = device.endpoints[request.SrcEndpoint]
-        assert cluster in ep.in_clusters or cluster in ep.out_clusters
-
-        assert request.Address.ieee == app.state.node_info.ieee
-        assert request.Address.addrmode == 0x03
-
-        # Make sure the endpoint profiles match up
-        our_ep = request.Address.endpoint
-        assert app.get_device(nwk=0x0000).endpoints[our_ep].profile_id == ep.profile_id
-
-        znp_server.send(c.ZDO.BindReq.Rsp(Status=t.Status.SUCCESS))
-        znp_server.send(c.ZDO.BindRsp.Callback(Src=nwk, Status=t.ZDOStatus.SUCCESS))
-
-    znp_server.callback_for_response(
-        c.ZDO.BindReq.Req(Dst=nwk, Src=ieee, partial=True), bind_req_callback
-    )
-
-    for ep_id, endpoint in device.endpoints.items():
-        if ep_id == 0:
-            continue
-
-        for cluster in endpoint.in_clusters.values():
-            await cluster.bind()
 
     await app.shutdown()
 
@@ -552,6 +334,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
                 Status=t.ZDOStatus.SUCCESS,
                 IEEE=existing_ieee,
                 NWK=existing_nwk + 1,
+                NumAssoc=0,
                 Index=0,
                 Devices=[],
             ),
@@ -577,6 +360,7 @@ async def test_unknown_device_discovery(device, make_application, mocker):
     # If a completely unknown device joins the network, it will be treated as a new join
     new_nwk = 0x5678
     new_ieee = t.EUI64(range(1, 9))
+
     did_ieee_addr_req2 = znp_server.reply_once_to(
         request=c.ZDO.IEEEAddrReq.Req(
             NWK=new_nwk,
@@ -589,15 +373,38 @@ async def test_unknown_device_discovery(device, make_application, mocker):
                 Status=t.ZDOStatus.SUCCESS,
                 IEEE=new_ieee,
                 NWK=new_nwk,
+                NumAssoc=0,
                 Index=0,
                 Devices=[],
             ),
         ],
     )
+
     new_dev = await app._get_or_discover_device(nwk=new_nwk)
     await did_ieee_addr_req2
     assert app.handle_join.call_count == 2
     assert new_dev.nwk == new_nwk
     assert new_dev.ieee == new_ieee
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_unknown_device_discovery_failure(device, make_application, mocker):
+    mocker.patch("zigpy_znp.zigbee.application.IEEE_ADDR_DISCOVERY_TIMEOUT", new=0.1)
+
+    app, znp_server = await make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    znp_server.reply_once_to(
+        request=c.ZDO.IEEEAddrReq.Req(partial=True),
+        responses=[
+            c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS),
+        ],
+    )
+
+    # Discovery will throw an exception when the device cannot be found
+    with pytest.raises(KeyError):
+        await app._get_or_discover_device(nwk=0x3456)
 
     await app.shutdown()

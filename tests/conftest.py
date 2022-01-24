@@ -7,6 +7,7 @@ import contextlib
 from unittest.mock import Mock, PropertyMock
 
 import pytest
+import zigpy.types
 import zigpy.device
 
 try:
@@ -282,6 +283,27 @@ def make_application(make_znp_server):
     return inner
 
 
+def zdo_request_matcher(
+    dst_addr: t.AddrModeAddress, command_id: t.uint16_t, **kwargs
+) -> c.AF.DataRequestExt.Req:
+    zdo_kwargs = {k: v for k, v in kwargs.items() if k.startswith("zdo_")}
+
+    kwargs = {k: v for k, v in kwargs.items() if not k.startswith("zdo_")}
+    kwargs.setdefault("DstEndpoint", 0x00)
+    kwargs.setdefault("DstPanId", 0x0000)
+    kwargs.setdefault("SrcEndpoint", 0x00)
+    kwargs.setdefault("Radius", None)
+    kwargs.setdefault("Options", None)
+
+    return c.AF.DataRequestExt.Req(
+        DstAddrModeAddress=dst_addr,
+        ClusterId=command_id,
+        Data=bytes([kwargs["TSN"]]) + serialize_zdo_command(command_id, **zdo_kwargs),
+        **kwargs,
+        partial=True,
+    )
+
+
 class BaseServerZNP(ZNP):
     align_structs = False
     version = None
@@ -383,6 +405,19 @@ def reply_to(request):
     return inner
 
 
+def serialize_zdo_command(command_id, **kwargs):
+    field_names, field_types = zdo_t.CLUSTERS[command_id]
+
+    return t.Bytes(zigpy.types.serialize(kwargs.values(), field_types))
+
+
+def deserialize_zdo_command(command_id, data):
+    field_names, field_types = zdo_t.CLUSTERS[command_id]
+    args, data = zigpy.types.deserialize(data, field_types)
+
+    return dict(zip(field_names, args))
+
+
 class BaseZStackDevice(BaseServerZNP):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -391,6 +426,7 @@ class BaseZStackDevice(BaseServerZNP):
         self._nvram = {}
 
         self.device_state = t.DeviceState.InitializedNotStarted
+        self.zdo_callbacks = set()
 
         # Handle the decorators
         for name in dir(self):
@@ -541,17 +577,92 @@ class BaseZStackDevice(BaseServerZNP):
             nwkUpdateId=0,
         )
 
-    @reply_to(c.ZDO.ActiveEpReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
-    def active_endpoints_request(self, req):
+    @reply_to(
+        c.ZDO.MgmtPermitJoinReq.Req(AddrMode=t.AddrMode.NWK, Dst=0x0000, partial=True)
+    )
+    @reply_to(
+        c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, partial=True
+        )
+    )
+    def permit_join(self, request):
         return [
-            c.ZDO.ActiveEpReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
+        ]
+
+    @reply_to(c.AF.DataRequestExt.Req(partial=True, DstEndpoint=0))
+    def on_zdo_request(self, req):
+        kwargs = deserialize_zdo_command(req.ClusterId, req.Data[1:])
+        handler_name = f"on_zdo_{zdo_t.ZDOCmd(req.ClusterId).name.lower()}"
+        handler = getattr(self, handler_name, None)
+
+        if handler is None:
+            LOGGER.warning("No ZDO handler %s, kwargs: %s", handler_name, kwargs)
+            return
+
+        responses = handler(req=req, **kwargs) or []
+
+        return [c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS)] + responses
+
+    def on_zdo_mgmt_permit_joining_req(self, req, PermitDuration, TC_Significant):
+        if req.DstAddrModeAddress.address != 0x0000:
+            return
+
+        responses = [
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS)
+        ]
+
+        if zdo_t.ZDOCmd.Mgmt_Permit_Joining_rsp in self.zdo_callbacks:
+            responses.append(
+                c.ZDO.MsgCbIncoming.Callback(
+                    Src=0x0000,
+                    IsBroadcast=t.Bool.false,
+                    ClusterId=zdo_t.ZDOCmd.Mgmt_Permit_Joining_rsp,
+                    SecurityUse=0,
+                    TSN=req.TSN,
+                    MacDst=0x0000,
+                    Data=serialize_zdo_command(
+                        command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_rsp,
+                        Status=t.ZDOStatus.SUCCESS,
+                    ),
+                )
+            )
+
+        return responses
+
+    def on_zdo_active_ep_req(self, req, NWKAddrOfInterest):
+        if NWKAddrOfInterest != 0x0000:
+            return
+
+        responses = [
             c.ZDO.ActiveEpRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
                 NWK=0x0000,
                 ActiveEndpoints=[ep.Endpoint for ep in self.active_endpoints],
-            ),
+            )
         ]
+
+        if zdo_t.ZDOCmd.Active_EP_rsp in self.zdo_callbacks:
+            responses.append(
+                c.ZDO.MsgCbIncoming.Callback(
+                    Src=0x0000,
+                    IsBroadcast=t.Bool.false,
+                    ClusterId=zdo_t.ZDOCmd.Active_EP_rsp,
+                    SecurityUse=0,
+                    TSN=req.TSN,
+                    MacDst=0x0000,
+                    Data=serialize_zdo_command(
+                        command_id=zdo_t.ZDOCmd.Active_EP_rsp,
+                        Status=t.ZDOStatus.SUCCESS,
+                        NWKAddrOfInterest=0x0000,
+                        ActiveEPList=[ep.Endpoint for ep in self.active_endpoints],
+                    ),
+                )
+            )
+
+        return responses
 
     @reply_to(c.AF.Register.Req(partial=True))
     def on_endpoint_registration(self, req):
@@ -565,31 +676,53 @@ class BaseZStackDevice(BaseServerZNP):
 
         return c.AF.Delete.Rsp(Status=t.Status.SUCCESS)
 
-    @reply_to(
-        c.ZDO.SimpleDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000, partial=True)
-    )
-    def on_simple_desc_req(self, req):
-        for ep in self.active_endpoints:
-            if ep.Endpoint == req.Endpoint:
-                return [
-                    c.ZDO.SimpleDescReq.Rsp(Status=t.Status.SUCCESS),
-                    c.ZDO.SimpleDescRsp.Callback(
-                        Src=0x0000,
-                        Status=t.ZDOStatus.SUCCESS,
-                        NWK=0x0000,
-                        SimpleDescriptor=zdo_t.SizePrefixedSimpleDescriptor(
-                            endpoint=ep.Endpoint,
-                            profile=ep.ProfileId,
-                            device_type=ep.DeviceId,
-                            device_version=ep.DeviceVersion,
-                            input_clusters=ep.InputClusters,
-                            output_clusters=ep.OutputClusters,
-                        ),
-                    ),
-                ]
+    def on_zdo_simple_desc_req(self, req, NWKAddrOfInterest, EndPoint):
+        if NWKAddrOfInterest != 0x0000:
+            return
 
-        # Bad things happen when an invalid endpoint ID is passed in
-        pytest.fail("Simple descriptor request to an invalid endpoint breaks Z-Stack")
+        for ep in self.active_endpoints:
+            if ep.Endpoint == EndPoint:
+                break
+        else:
+            # Bad things happen when an invalid endpoint ID is passed in
+            pytest.fail("Simple descriptor request to invalid endpoint breaks Z-Stack")
+            return
+
+        responses = [
+            c.ZDO.SimpleDescRsp.Callback(
+                Src=0x0000,
+                Status=t.ZDOStatus.SUCCESS,
+                NWK=0x0000,
+                SimpleDescriptor=zdo_t.SizePrefixedSimpleDescriptor(
+                    endpoint=ep.Endpoint,
+                    profile=ep.ProfileId,
+                    device_type=ep.DeviceId,
+                    device_version=ep.DeviceVersion,
+                    input_clusters=ep.InputClusters,
+                    output_clusters=ep.OutputClusters,
+                ),
+            ),
+        ]
+
+        if zdo_t.ZDOCmd.Simple_Desc_rsp in self.zdo_callbacks:
+            responses.append(
+                c.ZDO.MsgCbIncoming.Callback(
+                    Src=0x0000,
+                    IsBroadcast=t.Bool.false,
+                    ClusterId=zdo_t.ZDOCmd.Simple_Desc_rsp,
+                    SecurityUse=0,
+                    TSN=req.TSN,
+                    MacDst=0x0000,
+                    Data=serialize_zdo_command(
+                        command_id=zdo_t.ZDOCmd.Simple_Desc_rsp,
+                        Status=t.ZDOStatus.SUCCESS,
+                        NWKAddrOfInterest=0x0000,
+                        SimpleDescriptor=responses[0].SimpleDescriptor,
+                    ),
+                )
+            )
+
+        return responses
 
     @reply_to(c.SYS.OSALNVWrite.Req(partial=True))
     @reply_to(c.SYS.OSALNVWriteExt.Req(partial=True))
@@ -724,29 +857,18 @@ class BaseZStackDevice(BaseServerZNP):
             AssociatedDevices=[],
         )
 
-    @reply_to(
-        c.ZDO.MgmtNWKUpdateReq.Req(Dst=0x0000, DstAddrMode=t.AddrMode.NWK, partial=True)
-    )
-    def nwk_update_req(self, request):
-        valid_channels = [t.Channels.from_channel_list([i]) for i in range(11, 26 + 1)]
-
-        if request.ScanDuration == 0xFE:
-            assert request.Channels in valid_channels
-
-            def update_channel():
-                nib = self.nib
-                nib.nwkLogicalChannel = 11 + valid_channels.index(request.Channels)
-                nib.nwkUpdateId += 1
-
-                self.nib = nib
-
-            asyncio.get_running_loop().call_later(0.1, update_channel)
-
-            return c.ZDO.MgmtNWKUpdateReq.Rsp(Status=t.Status.SUCCESS)
-
     @reply_to(c.ZDO.ExtRouteChk.Req(partial=True))
     def zdo_route_check(self, request):
         return c.ZDO.ExtRouteChk.Rsp(Status=c.zdo.RoutingStatus.SUCCESS)
+
+    @reply_to(c.ZDO.MsgCallbackRegister.Req(partial=True))
+    def register_zdo_callback(self, request):
+        self.zdo_callbacks.add(request.ClusterId)
+        return c.ZDO.MsgCallbackRegister.Rsp(Status=t.Status.SUCCESS)
+
+    @reply_to(c.UTIL.AssocFindDevice.Req(Index=0))
+    def assoc_find_dev_responder(self, req):
+        return req.Rsp(Device=t.Bytes(b"\xFF" * (36 if self.align_structs else 28)))
 
 
 class BaseZStack1CC2531(BaseZStackDevice):
@@ -828,10 +950,11 @@ class BaseZStack1CC2531(BaseZStackDevice):
                 self.create_nib,
             ]
 
-    @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
-    def node_desc_responder(self, req):
-        return [
-            c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
+    def on_zdo_node_desc_req(self, req, NWKAddrOfInterest):
+        if NWKAddrOfInterest != 0x0000:
+            return
+
+        responses = [
             c.ZDO.NodeDescRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
@@ -850,25 +973,40 @@ class BaseZStack1CC2531(BaseZStackDevice):
             ),
         ]
 
-    @reply_to(
-        c.ZDO.MgmtPermitJoinReq.Req(AddrMode=t.AddrMode.NWK, Dst=0x0000, partial=True)
-    )
-    @reply_to(
-        c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, partial=True
-        )
-    )
-    def permit_join(self, request):
-        if request.Duration != 0:
-            rsp = [c.ZDO.PermitJoinInd.Callback(Duration=request.Duration)]
-        else:
-            rsp = []
+        if zdo_t.ZDOCmd.Node_Desc_rsp in self.zdo_callbacks:
+            responses.append(
+                c.ZDO.MsgCbIncoming.Callback(
+                    Src=0x0000,
+                    IsBroadcast=t.Bool.false,
+                    ClusterId=zdo_t.ZDOCmd.Node_Desc_rsp,
+                    SecurityUse=0,
+                    TSN=req.TSN,
+                    MacDst=0x0000,
+                    Data=serialize_zdo_command(
+                        command_id=zdo_t.ZDOCmd.Node_Desc_rsp,
+                        Status=t.ZDOStatus.SUCCESS,
+                        NWKAddrOfInterest=0x0000,
+                        NodeDescriptor=zdo_t.NodeDescriptor(
+                            **responses[0].NodeDescriptor.as_dict()
+                        ),
+                    ),
+                )
+            )
 
-        return rsp + [
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-            c.ZDO.PermitJoinInd.Callback(Duration=0),
-        ]
+        return responses
+
+    def on_zdo_mgmt_permit_joining_req(self, req, PermitDuration, TC_Significant):
+        result = super().on_zdo_mgmt_permit_joining_req(
+            req, PermitDuration, TC_Significant
+        )
+
+        if not result:
+            return
+
+        if PermitDuration != 0:
+            result = [c.ZDO.PermitJoinInd.Callback(Duration=PermitDuration)] + result
+
+        return result + [c.ZDO.PermitJoinInd.Callback(Duration=0)]
 
     @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
@@ -893,22 +1031,6 @@ class BaseZStack3Device(BaseZStackDevice):
         self._new_channel = request.Channel
 
         return c.AppConfig.BDBSetChannel.Rsp(Status=t.Status.SUCCESS)
-
-    @reply_to(
-        c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.NWK, Dst=0x0000, Duration=0, partial=True
-        )
-    )
-    @reply_to(
-        c.ZDO.MgmtPermitJoinReq.Req(
-            AddrMode=t.AddrMode.Broadcast, Dst=0xFFFC, Duration=0, partial=True
-        )
-    )
-    def permit_join(self, request):
-        return [
-            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
-            c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
-        ]
 
     def create_nib(self, _=None):
         super().create_nib()
@@ -1083,10 +1205,11 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
             BootloaderRevision=0xFFFFFFFF,
         )
 
-    @reply_to(c.ZDO.NodeDescReq.Req(DstAddr=0x0000, NWKAddrOfInterest=0x0000))
-    def node_desc_responder(self, req):
-        return [
-            c.ZDO.NodeDescReq.Rsp(Status=t.Status.SUCCESS),
+    def on_zdo_node_desc_req(self, req, NWKAddrOfInterest):
+        if NWKAddrOfInterest != 0x0000:
+            return
+
+        responses = [
             c.ZDO.NodeDescRsp.Callback(
                 Src=0x0000,
                 Status=t.ZDOStatus.SUCCESS,
@@ -1104,6 +1227,28 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
                 ),
             ),
         ]
+
+        if zdo_t.ZDOCmd.Node_Desc_rsp in self.zdo_callbacks:
+            responses.append(
+                c.ZDO.MsgCbIncoming.Callback(
+                    Src=0x0000,
+                    IsBroadcast=t.Bool.false,
+                    ClusterId=zdo_t.ZDOCmd.Node_Desc_rsp,
+                    SecurityUse=0,
+                    TSN=req.TSN,
+                    MacDst=0x0000,
+                    Data=serialize_zdo_command(
+                        command_id=zdo_t.ZDOCmd.Node_Desc_rsp,
+                        Status=t.ZDOStatus.SUCCESS,
+                        NWKAddrOfInterest=0x0000,
+                        NodeDescriptor=zdo_t.NodeDescriptor.replace(
+                            responses[0].NodeDescriptor
+                        ),
+                    ),
+                )
+            )
+
+        return responses
 
     @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
@@ -1157,7 +1302,7 @@ class BaseZStack3CC2531(BaseZStack3Device):
             BootloaderRevision=0,
         )
 
-    node_desc_responder = BaseZStack1CC2531.node_desc_responder
+    on_zdo_node_desc_req = BaseZStack1CC2531.on_zdo_node_desc_req
 
     @reply_to(c.UTIL.LEDControl.Req(partial=True))
     def led_responder(self, req):
