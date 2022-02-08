@@ -5,10 +5,9 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/psf/black
-    rev: 21.9b0
+    rev: 22.1.0
     hooks:
       - id: black
-        args: [--safe, --quiet]
 
   - repo: https://github.com/PyCQA/flake8
     rev: 4.0.1

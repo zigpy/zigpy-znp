@@ -59,7 +59,7 @@ async def nvram_read(znp: ZNP):
         if nvid == ExNvIds.LEGACY:
             continue
 
-        for sub_id in range(2 ** 16):
+        for sub_id in range(2**16):
             try:
                 value = await znp.nvram.read(
                     item_id=nvid, sub_id=sub_id, item_type=t.Bytes

@@ -200,7 +200,7 @@ def test_command_param_binding():
 
     # Overflowing integer types
     with pytest.raises(ValueError):
-        c.UTIL.TimeAlive.Rsp(Seconds=10 ** 20)
+        c.UTIL.TimeAlive.Rsp(Seconds=10**20)
 
     # Integers will not be coerced to enums
     assert t.MTCapabilities.SYS == 0x0001

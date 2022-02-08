@@ -10,7 +10,7 @@ from zigpy_znp.tools.flash_write import main as flash_write, get_firmware_crcs
 from ..conftest import BaseServerZNP, CoroutineMock
 
 random.seed(12345)
-FAKE_IMAGE_SIZE = 2 ** 10
+FAKE_IMAGE_SIZE = 2**10
 FAKE_FLASH = bytearray(
     random.getrandbits(FAKE_IMAGE_SIZE * 8).to_bytes(FAKE_IMAGE_SIZE, "little")
 )
