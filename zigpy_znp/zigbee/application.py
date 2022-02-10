@@ -327,7 +327,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self._znp.version >= 3.30 and rsp.StatusOrPower != t.Status.SUCCESS:
             # Z-Stack 3's response indicates success or failure
             raise InvalidCommandResponse(
-                f"Failed to set TX power: {t.Status(rsp.StatusOrPower)!r}", rsp
+                f"Failed to set TX power: {t.Status(rsp.StatusOrPower & 0xFF)!r}", rsp
             )
         elif self._znp.version < 3.30 and rsp.StatusOrPower != dbm:
             # Old Z-Stack releases used the response status field to indicate the power
