@@ -2,6 +2,10 @@
 requires = ["setuptools>=34.4.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.black]
+safe = true
+quiet = true
+
 [tool.isort]
 multi_line_output = 3
 length_sort = true

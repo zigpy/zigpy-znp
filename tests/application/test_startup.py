@@ -144,7 +144,9 @@ async def test_tx_power(device, succeed, make_application):
             set_tx_power = znp_server.reply_once_to(
                 request=c.SYS.SetTxPower.Req(TXPower=19),
                 responses=[
-                    c.SYS.SetTxPower.Rsp(StatusOrPower=t.Status.INVALID_PARAMETER)
+                    c.SYS.SetTxPower.Rsp(
+                        StatusOrPower=t.Status.MAC_INVALID_PARAMETER - 0xFF - 1
+                    )
                 ],
             )
     else:

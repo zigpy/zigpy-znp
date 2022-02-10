@@ -43,7 +43,7 @@ async def nvram_reset(znp: ZNP) -> None:
             if nvid == ExNvIds.LEGACY:
                 continue
 
-            for sub_id in range(2 ** 16):
+            for sub_id in range(2**16):
                 existed = await znp.nvram.delete(item_id=nvid, sub_id=sub_id)
                 LOGGER.info("Cleared %s[0x%04X]", nvid.name, sub_id)
 

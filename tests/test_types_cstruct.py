@@ -31,7 +31,7 @@ def test_struct_field_values():
 
     # Invalid values can't be passed during construction
     with pytest.raises(ValueError):
-        TestStruct(a=1, b=2 ** 32)
+        TestStruct(a=1, b=2**32)
 
     struct2 = TestStruct()
     struct2.a = 1
