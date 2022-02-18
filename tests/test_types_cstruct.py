@@ -296,15 +296,15 @@ def test_old_nib_deserialize():
         SecurityLevel: t.uint8_t
         SymLink: t.uint8_t
         CapabilityFlags: t.uint8_t
-        PaddingByte0: PaddingByte
+        PaddingByte0: PaddingByte  # type:ignore[valid-type]
         TransactionPersistenceTime: t.uint16_t
         nwkProtocolVersion: t.uint8_t
         RouteDiscoveryTime: t.uint8_t
         RouteExpiryTime: t.uint8_t
-        PaddingByte1: PaddingByte
+        PaddingByte1: PaddingByte  # type:ignore[valid-type]
         nwkDevAddress: t.NWK
         nwkLogicalChannel: t.uint8_t
-        PaddingByte2: PaddingByte
+        PaddingByte2: PaddingByte  # type:ignore[valid-type]
         nwkCoordAddress: t.NWK
         nwkCoordExtAddress: t.EUI64
         nwkPanId: t.uint16_t
@@ -330,11 +330,11 @@ def test_old_nib_deserialize():
         nwkConcentratorDiscoveryTime: t.uint8_t
         nwkConcentratorRadius: t.uint8_t
         nwkAllFresh: t.uint8_t
-        PaddingByte3: PaddingByte
+        PaddingByte3: PaddingByte  # type:ignore[valid-type]
         nwkManagerAddr: t.NWK
         nwkTotalTransmissions: t.uint16_t
         nwkUpdateId: t.uint8_t
-        PaddingByte4: PaddingByte
+        PaddingByte4: PaddingByte  # type:ignore[valid-type]
 
     nib = t.NIB(
         SequenceNum=54,

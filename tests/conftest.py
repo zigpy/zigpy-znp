@@ -14,7 +14,7 @@ try:
     # Python 3.8 already has this
     from unittest.mock import AsyncMock as CoroutineMock  # noqa: F401
 except ImportError:
-    from asynctest import CoroutineMock  # noqa: F401
+    from asynctest import CoroutineMock  # type:ignore[no-redef]  # noqa: F401
 
 import zigpy.endpoint
 import zigpy.zdo.types as zdo_t
@@ -69,7 +69,7 @@ class ForwardingSerialTransport:
         assert self._is_connected
         self.protocol.data_received(data)
 
-    def close(self, *, error=ValueError("Connection was closed")):
+    def close(self, *, error=ValueError("Connection was closed")):  # noqa:
         LOGGER.debug("Closing %s", self)
         if not self._is_connected:
             return

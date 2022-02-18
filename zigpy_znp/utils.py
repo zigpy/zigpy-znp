@@ -6,6 +6,7 @@ import inspect
 import logging
 import functools
 import dataclasses
+from typing import CoroutineFunction
 
 import zigpy_znp.types as t
 
@@ -14,7 +15,7 @@ LOGGER = logging.getLogger(__name__)
 
 def deduplicate_commands(
     commands: typing.Iterable[t.CommandBase],
-) -> tuple[t.CommandBase]:
+) -> tuple[t.CommandBase, ...]:
     """
     Deduplicates an iterable of commands by folding more-specific commands into less-
     specific commands. Used to avoid triggering callbacks multiple times per packet.
@@ -135,7 +136,7 @@ class CallbackResponseListener(BaseResponseListener):
 
     def _resolve(self, response: t.CommandBase) -> bool:
         try:
-            result = self.callback(response)
+            result = self.callback(response)  # type:ignore[misc]
 
             # Run coroutines in the background
             if asyncio.iscoroutine(result):
@@ -165,8 +166,8 @@ class CatchAllResponse:
 
 
 def combine_concurrent_calls(
-    function: typing.CoroutineFunction,
-) -> typing.CoroutineFunction:
+    function: CoroutineFunction,
+) -> CoroutineFunction:
     """
     Decorator that allows concurrent calls to expensive coroutines to share a result.
     """

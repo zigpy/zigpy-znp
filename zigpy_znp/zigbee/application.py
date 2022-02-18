@@ -806,7 +806,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Old versions of Z-Stack do not include `CodeRevision` in the version response
         if self._version_rsp.CodeRevision is None:
-            return 0x00000000
+            return t.uint32_t(0x00000000)
 
         return self._version_rsp.CodeRevision
 

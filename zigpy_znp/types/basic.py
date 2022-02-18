@@ -37,8 +37,9 @@ def serialize_list(objects) -> Bytes:
 
 class FixedIntType(int):
     _signed = None
-    _size = None
+    _size = None  # type:int
 
+    @classmethod
     def __new__(cls, *args, **kwargs):
         if cls._signed is None or cls._size is None:
             raise TypeError(f"{cls} is abstract and cannot be created")
@@ -48,6 +49,7 @@ class FixedIntType(int):
 
         return instance
 
+    @classmethod
     def __init_subclass__(cls, signed=None, size=None, hex_repr=None) -> None:
         super().__init_subclass__()
 
@@ -58,7 +60,7 @@ class FixedIntType(int):
             cls._size = size
 
         if hex_repr:
-            fmt = f"0x{{:0{cls._size * 2}X}}"
+            fmt = f"0x{{:0{cls._size * 2}X}}"  # type:ignore[operator]
             cls.__str__ = cls.__repr__ = lambda self: fmt.format(self)
         elif hex_repr is not None and not hex_repr:
             cls.__str__ = super().__str__
@@ -77,13 +79,15 @@ class FixedIntType(int):
             raise ValueError(str(e)) from e
 
     @classmethod
-    def deserialize(cls, data: bytes) -> tuple[FixedIntType, bytes]:
-        if len(data) < cls._size:
+    def deserialize(
+        cls, data: bytes
+    ) -> tuple[FixedIntType, bytes]:  # type:ignore[return-value]
+        if len(data) < cls._size:  # type:ignore[operator]
             raise ValueError(f"Data is too short to contain {cls._size} bytes")
 
         r = cls.from_bytes(data[: cls._size], "little", signed=cls._signed)
         data = data[cls._size :]
-        return r, data
+        return r, data  # type:ignore[return-value]
 
 
 class uint_t(FixedIntType, signed=False):
@@ -162,7 +166,7 @@ class ShortBytes(Bytes):
     _header = uint8_t
 
     def serialize(self) -> Bytes:
-        return self._header(len(self)).serialize() + self
+        return self._header(len(self)).serialize() + self  # type:ignore[return-value]
 
     @classmethod
     def deserialize(cls, data: bytes) -> tuple[Bytes, bytes]:
@@ -182,7 +186,7 @@ class BaseListType(list):
     @classmethod
     def _serialize_item(cls, item, *, align):
         if not isinstance(item, cls._item_type):
-            item = cls._item_type(item)
+            item = cls._item_type(item)  # type:ignore[misc]
 
         if issubclass(cls._item_type, CStruct):
             return item.serialize(align=align)
@@ -215,7 +219,7 @@ class LVList(BaseListType):
     def deserialize(cls, data: bytes, *, align=False) -> tuple[LVList, bytes]:
         length, data = cls._header.deserialize(data)
         r = cls()
-        for i in range(length):
+        for _i in range(length):
             item, data = cls._deserialize_item(data, align=align)
             r.append(item)
         return r, data
@@ -242,7 +246,7 @@ class FixedList(BaseListType):
     @classmethod
     def deserialize(cls, data: bytes, *, align=False) -> tuple[FixedList, bytes]:
         r = cls()
-        for i in range(cls._length):
+        for _i in range(cls._length):
             item, data = cls._deserialize_item(data, align=align)
             r.append(item)
         return r, data
@@ -271,7 +275,7 @@ def enum_flag_factory(int_type: FixedIntType) -> enum.Flag:
     appropriate methods but with only one non-Enum parent class.
     """
 
-    class _NewEnum(int_type, enum.Flag):
+    class _NewEnum(int_type, enum.Flag):  # type:ignore[misc,valid-type]
         # Rebind classmethods to our own class
         _missing_ = classmethod(enum.IntFlag._missing_.__func__)
         _create_pseudo_member_ = classmethod(
@@ -286,7 +290,7 @@ def enum_flag_factory(int_type: FixedIntType) -> enum.Flag:
         __rxor__ = enum.IntFlag.__rxor__
         __invert__ = enum.IntFlag.__invert__
 
-    return _NewEnum
+    return _NewEnum  # type:ignore[return-value]
 
 
 class enum_uint8(uint8_t, enum.Enum):
@@ -321,33 +325,33 @@ class enum_uint64(uint64_t, enum.Enum):
     pass
 
 
-class enum_flag_uint8(enum_flag_factory(uint8_t)):
+class enum_flag_uint8(enum_flag_factory(uint8_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint16(enum_flag_factory(uint16_t)):
+class enum_flag_uint16(enum_flag_factory(uint16_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint24(enum_flag_factory(uint24_t)):
+class enum_flag_uint24(enum_flag_factory(uint24_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint32(enum_flag_factory(uint32_t)):
+class enum_flag_uint32(enum_flag_factory(uint32_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint40(enum_flag_factory(uint40_t)):
+class enum_flag_uint40(enum_flag_factory(uint40_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint48(enum_flag_factory(uint48_t)):
+class enum_flag_uint48(enum_flag_factory(uint48_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint56(enum_flag_factory(uint56_t)):
+class enum_flag_uint56(enum_flag_factory(uint56_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint64(enum_flag_factory(uint64_t)):
+class enum_flag_uint64(enum_flag_factory(uint64_t)):  # type:ignore[misc]
     pass

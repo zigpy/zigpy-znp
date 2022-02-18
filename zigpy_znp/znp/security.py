@@ -25,7 +25,7 @@ class StoredDevice:
 
 
 def rotate(lst: typing.Sequence, n: int) -> typing.Sequence:
-    return lst[n:] + lst[:n]
+    return lst[n:] + lst[:n]  # type:ignore[operator]
 
 
 def compute_key(ieee: t.EUI64, tclk_seed: t.KeyData, shift: int) -> t.KeyData:
@@ -172,7 +172,7 @@ async def read_addr_manager_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]
     return entries
 
 
-async def read_hashed_link_keys(
+async def read_hashed_link_keys(  # type:ignore[misc]
     znp: ZNP, tclk_seed: t.KeyData
 ) -> typing.Iterable[zigpy.state.Key]:
     if znp.version >= 3.30:
@@ -204,7 +204,7 @@ async def read_hashed_link_keys(
         )
 
 
-async def read_unhashed_link_keys(
+async def read_unhashed_link_keys(  # type:ignore[misc]
     znp: ZNP, addr_mgr_entries: typing.Sequence[t.AddrMgrEntry]
 ) -> typing.Iterable[zigpy.state.Key]:
     if znp.version == 3.30:
