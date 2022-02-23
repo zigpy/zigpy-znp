@@ -248,9 +248,11 @@ class ZNP:
                         timeout=NETWORK_COMMISSIONING_TIMEOUT,
                     )
 
+                    # This is the correct startup sequence according to the forums,
+                    # including the formation failure error
                     if (
                         commissioning_rsp.Status
-                        != c.app_config.BDBCommissioningStatus.Success
+                        != c.app_config.BDBCommissioningStatus.FormationFailure
                     ):
                         raise RuntimeError(
                             f"Network formation failed: {commissioning_rsp}"
