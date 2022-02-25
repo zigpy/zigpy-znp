@@ -249,10 +249,11 @@ class ZNP:
                     )
 
                     # This is the correct startup sequence according to the forums,
-                    # including the formation failure error
-                    if (
-                        commissioning_rsp.Status
-                        != c.app_config.BDBCommissioningStatus.FormationFailure
+                    # including the formation failure error.  Success is only returned
+                    # when the network is first formed.
+                    if commissioning_rsp.Status not in (
+                        c.app_config.BDBCommissioningStatus.FormationFailure,
+                        c.app_config.BDBCommissioningStatus.Success,
                     ):
                         raise RuntimeError(
                             f"Network formation failed: {commissioning_rsp}"
