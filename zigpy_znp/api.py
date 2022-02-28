@@ -389,7 +389,7 @@ class ZNP:
             OsalNvIds.EXTADDR: node_info.ieee,
             OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType(node_info.logical_type),
             OsalNvIds.NWK_ACTIVE_KEY_INFO: key_info.Active,
-            OsalNvIds.NWK_ALTERN_KEY_INFO: const.EMPTY_KEY,
+            OsalNvIds.NWK_ALTERN_KEY_INFO: key_info.Active,
         }
 
         tclk_seed = None
