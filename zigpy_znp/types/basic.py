@@ -29,8 +29,6 @@ class TrailingBytes(Bytes):
     Bytes must occur at the very end of a parameter list for easy parsing.
     """
 
-    pass
-
 
 def serialize_list(objects) -> Bytes:
     return Bytes(b"".join([o.serialize() for o in objects]))

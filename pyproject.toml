@@ -53,6 +53,9 @@ disable_error_code = [
 [tool.coverage.run]
 source = "zigpy_znp"
 
+[tool.pyupgrade]
+py37plus = true
+
 [tool.tox]
 legacy_tox_ini = """
 [tox]

@@ -536,7 +536,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         # Z-Stack does not need any special code to do this
-        pass
 
     async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
         """
@@ -640,8 +639,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Some commands are unhandled but frequently sent by devices on the network. To
         reduce unnecessary logging messages, they are given an explicit callback.
         """
-
-        pass
 
     async def on_zdo_message(self, msg: c.ZDO.MsgCbIncoming.Callback) -> None:
         """

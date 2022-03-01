@@ -96,8 +96,6 @@ class AddrModeAddress:
 class GroupId(basic.uint16_t, hex_repr=True):
     """Group ID class"""
 
-    pass
-
 
 class ScanType(basic.enum_uint8):
     EnergyDetect = 0x00
