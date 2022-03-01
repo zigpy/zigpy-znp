@@ -25,7 +25,7 @@ class CStructField:
 
     def get_size_and_alignment(self, align=False) -> tuple[int, int]:
         if issubclass(self.type, (zigpy_t.FixedIntType, t.FixedIntType)):
-            return (self.type._size, self.type._size) if align else (1, 1)
+            return self.type._size, (self.type._size if align else 1)
         elif issubclass(self.type, zigpy_t.EUI64):
             return 8, 1
         elif issubclass(self.type, zigpy_t.KeyData):
