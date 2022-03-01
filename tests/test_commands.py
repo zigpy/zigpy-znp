@@ -137,7 +137,7 @@ def test_commands_schema():
 
                     commands_by_id[cmd.Req.header].append(cmd.Req)
                 else:
-                    assert False, "Command is empty"
+                    assert False, "Command is empty"  # noqa: B011
             elif cmd.type == t.CommandType.SRSP:
                 # The one command like this is RPCError
                 assert cmd is c.RPCError.CommandNotRecognized
@@ -153,7 +153,7 @@ def test_commands_schema():
 
                 commands_by_id[cmd.Rsp.header].append(cmd.Rsp)
             else:
-                assert False, "Command has unknown type"
+                assert False, "Command has unknown type"  # noqa: B011
 
     duplicate_commands = {
         cmd: commands for cmd, commands in commands_by_id.items() if len(commands) > 1

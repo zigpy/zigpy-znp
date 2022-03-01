@@ -1,6 +1,11 @@
+import typing
+
 import pytest
 
 import zigpy_znp.types as t
+
+if typing.TYPE_CHECKING:
+    import typing_extensions
 
 
 def test_struct_fields():
@@ -266,7 +271,7 @@ def test_struct_incomplete_serialization():
 
 
 def test_old_nib_deserialize():
-    PaddingByte = t.uint8_t
+    PaddingByte: typing_extensions.TypeAlias = t.uint8_t
 
     class NwkState16(t.enum_uint16):
         NWK_INIT = 0
@@ -296,15 +301,15 @@ def test_old_nib_deserialize():
         SecurityLevel: t.uint8_t
         SymLink: t.uint8_t
         CapabilityFlags: t.uint8_t
-        PaddingByte0: PaddingByte  # type:ignore[valid-type]
+        PaddingByte0: PaddingByte
         TransactionPersistenceTime: t.uint16_t
         nwkProtocolVersion: t.uint8_t
         RouteDiscoveryTime: t.uint8_t
         RouteExpiryTime: t.uint8_t
-        PaddingByte1: PaddingByte  # type:ignore[valid-type]
+        PaddingByte1: PaddingByte
         nwkDevAddress: t.NWK
         nwkLogicalChannel: t.uint8_t
-        PaddingByte2: PaddingByte  # type:ignore[valid-type]
+        PaddingByte2: PaddingByte
         nwkCoordAddress: t.NWK
         nwkCoordExtAddress: t.EUI64
         nwkPanId: t.uint16_t

@@ -6,7 +6,6 @@ import inspect
 import logging
 import functools
 import dataclasses
-from typing import CoroutineFunction
 
 import zigpy_znp.types as t
 
@@ -136,6 +135,7 @@ class CallbackResponseListener(BaseResponseListener):
 
     def _resolve(self, response: t.CommandBase) -> bool:
         try:
+            # https://github.com/python/mypy/issues/5485
             result = self.callback(response)  # type:ignore[misc]
 
             # Run coroutines in the background
@@ -166,8 +166,8 @@ class CatchAllResponse:
 
 
 def combine_concurrent_calls(
-    function: CoroutineFunction,
-) -> CoroutineFunction:
+    function: typing.CoroutineFunction,
+) -> typing.CoroutineFunction:
     """
     Decorator that allows concurrent calls to expensive coroutines to share a result.
     """

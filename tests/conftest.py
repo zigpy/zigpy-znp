@@ -69,8 +69,9 @@ class ForwardingSerialTransport:
         assert self._is_connected
         self.protocol.data_received(data)
 
-    def close(self, *, error=ValueError("Connection was closed")):  # noqa:
+    def close(self, *, error=ValueError("Connection was closed")):  # noqa: B008
         LOGGER.debug("Closing %s", self)
+
         if not self._is_connected:
             return
 
