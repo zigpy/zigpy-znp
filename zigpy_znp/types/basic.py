@@ -41,7 +41,7 @@ class FixedIntType(int):
     _size: int
 
     def __new__(cls, *args, **kwargs):
-        if cls._signed is None or cls._size is None:
+        if getattr(cls, "_signed", None) is None or getattr(cls, "_size", None) is None:
             raise TypeError(f"{cls} is abstract and cannot be created")
 
         instance = super().__new__(cls, *args, **kwargs)
