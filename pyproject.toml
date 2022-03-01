@@ -37,6 +37,22 @@ max-line-length = 88
 # D202 No blank lines allowed after function docstring
 ignore = "W503,E203,D202"
 
+[tool.mypy]
+check_untyped_defs = true
+show_error_codes = true
+show_error_context = true
+disable_error_code = [
+    "attr-defined",
+    "assignment",
+    "arg-type",
+    "union-attr",
+    "var-annotated",
+    "name-defined",
+]
+
+[tool.coverage.run]
+source = "zigpy_znp"
+
 [tool.tox]
 legacy_tox_ini = """
 [tox]
