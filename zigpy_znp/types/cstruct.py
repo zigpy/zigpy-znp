@@ -25,7 +25,7 @@ class CStructField:
 
     def get_size_and_alignment(self, align=False) -> tuple[int, int]:
         if issubclass(self.type, (zigpy_t.FixedIntType, t.FixedIntType)):
-            return self.type._size, self.type._size if align else 1
+            return self.type._size, (self.type._size if align else 1)
         elif issubclass(self.type, zigpy_t.EUI64):
             return 8, 1
         elif issubclass(self.type, zigpy_t.KeyData):
@@ -131,7 +131,7 @@ class CStruct:
     def get_size(cls, *, align=False) -> int:
         total_size = 0
 
-        for padding, size, field in cls.get_padded_fields(align=align):
+        for padding, size, _field in cls.get_padded_fields(align=align):
             total_size += padding + size
 
         final_padding = (-total_size) % cls.get_alignment(align=align)
@@ -198,7 +198,7 @@ class CStruct:
 
         return type(self)(**d)
 
-    def __eq__(self, other: CStruct) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(self, type(other)) and not isinstance(other, type(self)):
             return NotImplemented
 

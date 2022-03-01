@@ -64,7 +64,7 @@ class AddrModeAddress:
         }[self.mode]
 
     @classmethod
-    def deserialize(cls, data: bytes) -> "AddrModeAddress":
+    def deserialize(cls, data: bytes) -> tuple[AddrModeAddress, bytes]:
         mode, data = AddrMode.deserialize(data)
         address, data = EUI64.deserialize(data)
 

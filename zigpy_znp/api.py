@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+import typing
 import asyncio
 import logging
 import itertools
@@ -30,6 +31,9 @@ from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
+if typing.TYPE_CHECKING:
+    import typing_extensions
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -50,8 +54,8 @@ class ZNP:
         self._listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
 
-        self.capabilities = None
-        self.version = None
+        self.capabilities = None  # type: int
+        self.version = None  # type: float
 
         self.nvram = NVRAMHelper(self)
         self.network_info: zigpy.state.NetworkInformation = None
@@ -542,7 +546,7 @@ class ZNP:
 
                 try:
                     async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
-                        result = await ping_task
+                        result = await ping_task  # type:ignore[misc]
                 except asyncio.TimeoutError:
                     ping_task.cancel()
 
@@ -609,7 +613,7 @@ class ZNP:
 
         self._app = None
 
-        for header, listeners in self._listeners.items():
+        for _header, listeners in self._listeners.items():
             for listener in listeners:
                 listener.cancel()
 
@@ -659,7 +663,7 @@ class ZNP:
             counts[OneShotResponseListener],
         )
 
-    def frame_received(self, frame: GeneralFrame) -> bool:
+    def frame_received(self, frame: GeneralFrame) -> bool | None:
         """
         Called when a frame has been received. Returns whether or not the frame was
         handled by any listener.
@@ -669,7 +673,7 @@ class ZNP:
 
         if frame.header not in c.COMMANDS_BY_ID:
             LOGGER.error("Received an unknown frame: %s", frame)
-            return
+            return None
 
         command_cls = c.COMMANDS_BY_ID[frame.header]
 
@@ -680,7 +684,7 @@ class ZNP:
             # https://github.com/home-assistant/core/issues/50005
             if command_cls == c.ZDO.ParentAnnceRsp.Callback:
                 LOGGER.warning("Failed to parse broken %s as %s", frame, command_cls)
-                return
+                return None
 
             raise
 
@@ -760,7 +764,21 @@ class ZNP:
 
         return self.callback_for_responses([response], callback)
 
-    def wait_for_responses(self, responses, *, context=False) -> asyncio.Future:
+    @typing.overload
+    def wait_for_responses(
+        self, responses, *, context: typing_extensions.Literal[False] = ...
+    ) -> asyncio.Future:
+        ...
+
+    @typing.overload
+    def wait_for_responses(
+        self, responses, *, context: typing_extensions.Literal[True]
+    ) -> tuple[asyncio.Future, OneShotResponseListener]:
+        ...
+
+    def wait_for_responses(
+        self, responses, *, context: bool = False
+    ) -> asyncio.Future | tuple[asyncio.Future, OneShotResponseListener]:
         """
         Creates a one-shot listener that matches any *one* of the given responses.
         """
@@ -787,7 +805,9 @@ class ZNP:
 
         return self.wait_for_responses([response])
 
-    async def request(self, request: t.CommandBase, **response_params) -> t.CommandBase:
+    async def request(
+        self, request: t.CommandBase, **response_params
+    ) -> t.CommandBase | None:
         """
         Sends a SREQ/AREQ request and returns its SRSP (only for SREQ), failing if any
         of the SRSP's parameters don't match `response_params`.
@@ -827,7 +847,7 @@ class ZNP:
             if not request.Rsp:
                 LOGGER.debug("Request has no response, not waiting for one.")
                 self._uart.send(frame)
-                return
+                return None
 
             # We need to create the response listener before we send the request
             response_future = self.wait_for_responses(

@@ -214,7 +214,7 @@ class CommandsMeta(type):
                     req_header = header
                     rsp_header = CommandHeader(0x0040 + req_header)
 
-                    class Req(
+                    class Req(  # type:ignore[no-redef]
                         CommandBase, header=req_header, schema=definition.req_schema
                     ):
                         pass
@@ -261,7 +261,9 @@ class CommandsMeta(type):
                         )  # pragma: no cover
 
                     # If there is no request, this is a just a response
-                    class Rsp(CommandBase, header=header, schema=definition.rsp_schema):
+                    class Rsp(  # type:ignore[no-redef]
+                        CommandBase, header=header, schema=definition.rsp_schema
+                    ):
                         pass
 
                     Rsp.__qualname__ = qualname + ".Rsp"

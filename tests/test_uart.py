@@ -218,7 +218,7 @@ def test_uart_frame_received_error(connected_uart, mocker):
     uart.data_received(test_frame_bytes * 3)
 
     # We should have received all three frames
-    znp.frame_received.call_count == 3
+    assert znp.frame_received.call_count == 3
 
 
 async def test_connection_lost(dummy_serial_conn, mocker, event_loop):

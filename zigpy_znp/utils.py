@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 def deduplicate_commands(
     commands: typing.Iterable[t.CommandBase],
-) -> tuple[t.CommandBase]:
+) -> tuple[t.CommandBase, ...]:
     """
     Deduplicates an iterable of commands by folding more-specific commands into less-
     specific commands. Used to avoid triggering callbacks multiple times per packet.
@@ -135,7 +135,8 @@ class CallbackResponseListener(BaseResponseListener):
 
     def _resolve(self, response: t.CommandBase) -> bool:
         try:
-            result = self.callback(response)
+            # https://github.com/python/mypy/issues/5485
+            result = self.callback(response)  # type:ignore[misc]
 
             # Run coroutines in the background
             if asyncio.iscoroutine(result):
