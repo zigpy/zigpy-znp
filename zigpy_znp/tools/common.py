@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import sys
+import typing
 import logging
 import argparse
-from typing import Optional, Sequence
 
 import jsonschema
 import coloredlogs
@@ -117,9 +117,7 @@ def validate_backup_json(backup: t.JSONType) -> None:
 
 
 class CustomArgumentParser(argparse.ArgumentParser):
-    def parse_args(
-        self, args: Optional[Sequence[str]] = None, namespace=None
-    ):  # type:ignore[override]
+    def parse_args(self, args: typing.Sequence[str] | None = None, namespace=None):
         args = super().parse_args(args, namespace)
 
         # Since we're running as a CLI tool, install our own log level and color logger

@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import os
 import time
+import typing
 import asyncio
 import logging
 import itertools
 import contextlib
 import dataclasses
-from typing import Union, overload
 from collections import Counter, defaultdict
 
 import zigpy.state
 import async_timeout
 import zigpy.zdo.types as zdo_t
-from typing_extensions import Literal
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
@@ -31,6 +30,9 @@ from zigpy_znp.utils import (
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
+
+if typing.TYPE_CHECKING:
+    import typing_extensions
 
 LOGGER = logging.getLogger(__name__)
 
@@ -762,21 +764,21 @@ class ZNP:
 
         return self.callback_for_responses([response], callback)
 
-    @overload
+    @typing.overload
     def wait_for_responses(
-        self, responses, *, context: Literal[False] = ...
+        self, responses, *, context: typing_extensions.Literal[False] = ...
     ) -> asyncio.Future:
         ...
 
-    @overload
+    @typing.overload
     def wait_for_responses(
-        self, responses, *, context: Literal[True]
+        self, responses, *, context: typing_extensions.Literal[True]
     ) -> tuple[asyncio.Future, OneShotResponseListener]:
         ...
 
     def wait_for_responses(
         self, responses, *, context: bool = False
-    ) -> Union[asyncio.Future | tuple[asyncio.Future, OneShotResponseListener]]:
+    ) -> asyncio.Future | tuple[asyncio.Future, OneShotResponseListener]:
         """
         Creates a one-shot listener that matches any *one* of the given responses.
         """

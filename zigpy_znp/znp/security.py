@@ -24,8 +24,8 @@ class StoredDevice:
         return dataclasses.replace(self, **kwargs)
 
 
-def rotate(lst: typing.Sequence, n: int) -> typing.Sequence:
-    return lst[n:] + lst[:n]  # type:ignore[operator]
+def rotate(lst: list, n: int) -> list:
+    return lst[n:] + lst[:n]
 
 
 def compute_key(ieee: t.EUI64, tclk_seed: t.KeyData, shift: int) -> t.KeyData:
@@ -174,7 +174,7 @@ async def read_addr_manager_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]
 
 async def read_hashed_link_keys(  # type:ignore[misc]
     znp: ZNP, tclk_seed: t.KeyData
-) -> typing.Iterable[zigpy.state.Key]:
+) -> typing.AsyncGenerator[zigpy.state.Key, None]:
     if znp.version >= 3.30:
         entries = znp.nvram.read_table(
             item_id=ExNvIds.TCLK_TABLE,
@@ -204,9 +204,9 @@ async def read_hashed_link_keys(  # type:ignore[misc]
         )
 
 
-async def read_unhashed_link_keys(  # type:ignore[misc]
+async def read_unhashed_link_keys(
     znp: ZNP, addr_mgr_entries: typing.Sequence[t.AddrMgrEntry]
-) -> typing.Iterable[zigpy.state.Key]:
+) -> typing.AsyncGenerator[zigpy.state.Key, None]:
     if znp.version == 3.30:
         link_key_offset_base = 0x0000
         table = znp.nvram.read_table(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import typing
 
 from zigpy_znp.types.cstruct import CStruct
 
@@ -36,10 +37,9 @@ def serialize_list(objects) -> Bytes:
 
 
 class FixedIntType(int):
-    _signed = None
-    _size = None  # type:int
+    _signed: bool
+    _size: int
 
-    @classmethod
     def __new__(cls, *args, **kwargs):
         if cls._signed is None or cls._size is None:
             raise TypeError(f"{cls} is abstract and cannot be created")
@@ -49,7 +49,6 @@ class FixedIntType(int):
 
         return instance
 
-    @classmethod
     def __init_subclass__(cls, signed=None, size=None, hex_repr=None) -> None:
         super().__init_subclass__()
 
@@ -79,15 +78,13 @@ class FixedIntType(int):
             raise ValueError(str(e)) from e
 
     @classmethod
-    def deserialize(
-        cls, data: bytes
-    ) -> tuple[FixedIntType, bytes]:  # type:ignore[return-value]
-        if len(data) < cls._size:  # type:ignore[operator]
+    def deserialize(cls, data: bytes) -> tuple[FixedIntType, bytes]:
+        if len(data) < cls._size:
             raise ValueError(f"Data is too short to contain {cls._size} bytes")
 
         r = cls.from_bytes(data[: cls._size], "little", signed=cls._signed)
         data = data[cls._size :]
-        return r, data  # type:ignore[return-value]
+        return typing.cast(FixedIntType, r), data
 
 
 class uint_t(FixedIntType, signed=False):
