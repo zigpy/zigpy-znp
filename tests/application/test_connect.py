@@ -27,7 +27,7 @@ async def test_leak_detection(make_znp_server, mocker):
     znp_server = make_znp_server(server_cls=FormedLaunchpadCC26X2R1)
 
     def count_connected():
-        return sum([t._is_connected for t in znp_server._transports])
+        return sum(t._is_connected for t in znp_server._transports)
 
     # Opening and closing one connection will keep the count at zero
     assert count_connected() == 0

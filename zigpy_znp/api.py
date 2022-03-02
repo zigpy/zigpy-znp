@@ -591,7 +591,6 @@ class ZNP:
         """
         Called by the UART object when a connection has been made.
         """
-        pass
 
     def connection_lost(self, exc) -> None:
         """

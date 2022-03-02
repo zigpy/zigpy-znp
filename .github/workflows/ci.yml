@@ -267,6 +267,7 @@ jobs:
             --timeout=20 \
             --durations=10 \
             --cov zigpy_znp \
+            --cov-config pyproject.toml \
             -o console_output_style=count \
             -p no:sugar \
             tests
