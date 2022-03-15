@@ -387,7 +387,9 @@ class ZNP:
             OsalNvIds.PRECFGKEY: key_info.Active.Key,
             OsalNvIds.CHANLIST: network_info.channel_mask,
             # If the EXTADDR entry is deleted, Z-Stack resets it to the hardware address
-            OsalNvIds.EXTADDR: node_info.ieee,
+            OsalNvIds.EXTADDR: (
+                None if node_info.ieee == t.EUI64.UNKNOWN else node_info.ieee
+            ),
             OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType(node_info.logical_type),
             OsalNvIds.NWK_ACTIVE_KEY_INFO: key_info.Active,
             OsalNvIds.NWK_ALTERN_KEY_INFO: key_info.Active,
