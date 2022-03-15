@@ -386,6 +386,7 @@ class ZNP:
             OsalNvIds.EXTENDED_PAN_ID: network_info.extended_pan_id,
             OsalNvIds.PRECFGKEY: key_info.Active.Key,
             OsalNvIds.CHANLIST: network_info.channel_mask,
+            # If the EXTADDR entry is deleted, Z-Stack resets it to the hardware address
             OsalNvIds.EXTADDR: node_info.ieee,
             OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType(node_info.logical_type),
             OsalNvIds.NWK_ACTIVE_KEY_INFO: key_info.Active,
@@ -426,7 +427,10 @@ class ZNP:
             nvram[OsalNvIds.TCLK_SEED] = tclk_seed
 
         for key, value in nvram.items():
-            await self.nvram.osal_write(key, value, create=True)
+            if value is None:
+                await self.nvram.osal_delete(key)
+            else:
+                await self.nvram.osal_write(key, value, create=True)
 
         await security.write_nwk_frame_counter(
             self,
