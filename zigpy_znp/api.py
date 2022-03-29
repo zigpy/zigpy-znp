@@ -512,6 +512,10 @@ class ZNP:
                 create=True,
             )
 
+        # Reset after writing network settings to allow Z-Stack to recreate NVRAM items
+        # that were intentionally deleted.
+        await self.reset()
+
         LOGGER.debug("Done!")
 
     async def migrate_nvram(self) -> bool:
