@@ -170,15 +170,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
     async def start_network(self, *, read_only=False):
+        if self.state.node_info == zigpy.state.NodeInfo():
+            await self.load_network_info()
+
         if not read_only:
             await self._znp.migrate_nvram()
             await self._write_stack_settings(reset_if_changed=True)
 
         if self.znp_config[conf.CONF_TX_POWER] is not None:
             await self.set_tx_power(dbm=self.znp_config[conf.CONF_TX_POWER])
-
-        if self.state.node_info == zigpy.state.NodeInfo():
-            await self.load_network_info()
 
         await self._znp.start_network()
 
@@ -882,8 +882,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
             try:
-                await self.connect()
-                await self.startup()
+                await self.startup(auto_form=False)
                 return
             except asyncio.CancelledError:
                 raise

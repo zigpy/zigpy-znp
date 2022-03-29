@@ -233,8 +233,6 @@ def make_application(make_znp_server):
         server_cls,
         client_config=None,
         server_config=None,
-        *,
-        auto_connect=True,
         **kwargs,
     ):
         default = config_for_port_path(FAKE_SERIAL_PORT)
@@ -274,9 +272,6 @@ def make_application(make_znp_server):
         app.add_initialized_device = add_initialized_device.__get__(app)
 
         server = make_znp_server(server_cls=server_cls, config=server_config, **kwargs)
-
-        if auto_connect:
-            await app.connect()
 
         return app, server
 
@@ -830,6 +825,12 @@ class BaseZStackDevice(BaseServerZNP):
                     OsalNvIds.STARTUP_OPTION
                 ] = t.StartupOptions.NONE.serialize()
 
+        # Resetting recreates the EXTADDR NVRAM item
+        if OsalNvIds.EXTADDR not in self._nvram.get(ExNvIds.LEGACY, {}):
+            self._nvram[ExNvIds.LEGACY][OsalNvIds.EXTADDR] = self._orig_nvram[
+                ExNvIds.LEGACY
+            ][OsalNvIds.EXTADDR]
+
         version = self.version_replier(None)
 
         return c.SYS.ResetInd.Callback(
@@ -1312,43 +1313,43 @@ class BaseZStack3CC2531(BaseZStack3Device):
 class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2652R-ZStack4.formed.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class ResetLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2652R-ZStack4.reset.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class FormedZStack3CC2531(BaseZStack3CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack3.formed.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class ResetZStack3CC2531(BaseZStack3CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack3.reset.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class FormedZStack1CC2531(BaseZStack1CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack1.formed.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class ResetZStack1CC2531(BaseZStack1CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack1.reset.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 EMPTY_DEVICES = [

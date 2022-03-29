@@ -219,13 +219,13 @@ async def test_auto_form_unnecessary(device, make_application, mocker):
 async def test_auto_form_necessary(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)
 
-    assert app.state.network_info.channel is None
-    assert app.state.network_info.channel_mask is None
+    assert app.state.network_info.channel == 0
+    assert app.state.network_info.channel_mask == t.Channels.NO_CHANNELS
 
     await app.startup(auto_form=True)
 
-    assert app.state.network_info.channel is not None
-    assert app.state.network_info.channel_mask is not None
+    assert app.state.network_info.channel != 0
+    assert app.state.network_info.channel_mask != t.Channels.NO_CHANNELS
 
     nvram = znp_server._nvram[ExNvIds.LEGACY]
 
