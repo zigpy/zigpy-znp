@@ -175,7 +175,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if not read_only:
             await self._znp.migrate_nvram()
-            await self._write_stack_settings(reset_if_changed=True)
+            await self._write_stack_settings()
+
+        await self._znp.reset()
 
         if self.znp_config[conf.CONF_TX_POWER] is not None:
             await self.set_tx_power(dbm=self.znp_config[conf.CONF_TX_POWER])
@@ -790,7 +792,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         except (asyncio.TimeoutError, CommandNotRecognized):
             LOGGER.info("This build of Z-Stack does not appear to support LED control")
 
-    async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
+    async def _write_stack_settings(self, *, reset_if_changed: bool) -> bool:
         """
         Writes network-independent Z-Stack settings to NVRAM.
         If no settings actually change, no reset will be performed.
@@ -826,9 +828,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 await self._znp.nvram.osal_write(nvid, value)
                 any_changed = True
 
-        if reset_if_changed and any_changed:
-            # Reset to make the above NVRAM writes take effect
-            await self._znp.reset()
+        return any_changed
 
     @contextlib.asynccontextmanager
     async def _limit_concurrency(self):
