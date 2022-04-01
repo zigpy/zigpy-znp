@@ -62,3 +62,28 @@ setenv =
 commands=
     black --check --fast {toxinidir}/zigpy_znp {toxinidir}/tests {toxinidir}/setup.py
 """
+
+[tool.mypy]
+ignore_missing_imports = true
+install_types = true
+non_interactive = true
+show_error_codes = true
+show_error_context = true
+error_summary = true
+disable_error_code = [
+    "union-attr",
+    "attr-defined",
+    "return-value",
+    "assignment",
+    "override",
+    "no-redef",
+    "operator",
+    "arg-type",
+    "valid-type",
+    "misc",
+    "var-annotated",
+    "name-defined",
+    "call-overload",
+]
+# Only report on selected files
+follow_imports = "silent"
