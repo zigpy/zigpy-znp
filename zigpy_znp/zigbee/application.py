@@ -792,7 +792,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         except (asyncio.TimeoutError, CommandNotRecognized):
             LOGGER.info("This build of Z-Stack does not appear to support LED control")
 
-    async def _write_stack_settings(self, *, reset_if_changed: bool) -> bool:
+    async def _write_stack_settings(self) -> bool:
         """
         Writes network-independent Z-Stack settings to NVRAM.
         If no settings actually change, no reset will be performed.
