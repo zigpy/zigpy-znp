@@ -14,7 +14,6 @@ import zigpy.state
 import async_timeout
 import zigpy.zdo.types as zdo_t
 from zigpy.exceptions import NetworkNotFormed
-from typing_extensions import Literal
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
@@ -32,6 +31,9 @@ from zigpy_znp.utils import (
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
+
+if typing.TYPE_CHECKING:
+    import typing_extensions
 
 LOGGER = logging.getLogger(__name__)
 
@@ -56,8 +58,8 @@ class ZNP:
         self._listeners = defaultdict(list)
         self._sync_request_lock = asyncio.Lock()
 
-        self.capabilities = None
-        self.version = None
+        self.capabilities = None  # type: int
+        self.version = None  # type: float
 
         self.nvram = NVRAMHelper(self)
         self.network_info: zigpy.state.NetworkInfo = None
@@ -657,7 +659,7 @@ class ZNP:
 
                 try:
                     async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
-                        result = await ping_task
+                        result = await ping_task  # type:ignore[misc]
                 except asyncio.TimeoutError:
                     ping_task.cancel()
 
@@ -702,7 +704,6 @@ class ZNP:
         """
         Called by the UART object when a connection has been made.
         """
-        pass
 
     def connection_lost(self, exc) -> None:
         """
@@ -724,7 +725,7 @@ class ZNP:
 
         self._app = None
 
-        for header, listeners in self._listeners.items():
+        for _header, listeners in self._listeners.items():
             for listener in listeners:
                 listener.cancel()
 
@@ -774,7 +775,7 @@ class ZNP:
             counts[OneShotResponseListener],
         )
 
-    def frame_received(self, frame: GeneralFrame) -> bool:
+    def frame_received(self, frame: GeneralFrame) -> bool | None:
         """
         Called when a frame has been received. Returns whether or not the frame was
         handled by any listener.
@@ -877,19 +878,19 @@ class ZNP:
 
     @typing.overload
     def wait_for_responses(
-        self, responses, *, context: Literal[bool] = False
+        self, responses, *, context: typing_extensions.Literal[False] = ...
     ) -> asyncio.Future:
         ...
 
     @typing.overload
     def wait_for_responses(
-        self, responses, *, context: bool = Literal[True]
-    ) -> tuple[asyncio.Future, BaseResponseListener]:
+        self, responses, *, context: typing_extensions.Literal[True]
+    ) -> tuple[asyncio.Future, OneShotResponseListener]:
         ...
 
     def wait_for_responses(
         self, responses, *, context: bool = False
-    ) -> asyncio.Future | tuple[asyncio.Future, BaseResponseListener]:
+    ) -> asyncio.Future | tuple[asyncio.Future, OneShotResponseListener]:
         """
         Creates a one-shot listener that matches any *one* of the given responses.
         """

@@ -136,7 +136,6 @@ async def test_nvram_reset(device, make_znp_server):
     await nvram_reset([znp_server._port_path])
 
     # Nothing exists but the synthetic POLL_RATE_OLD16
-    assert len(znp_server._nvram[ExNvIds.LEGACY].keys()) == 1
     assert len([v for v in znp_server._nvram.values() if v]) == 1
     assert OsalNvIds.POLL_RATE_OLD16 in znp_server._nvram[ExNvIds.LEGACY]
 
@@ -153,7 +152,6 @@ async def test_nvram_reset_clear(device, make_znp_server, caplog):
     assert "will be removed in a future release" in caplog.text
 
     # Nothing exists but the synthetic POLL_RATE_OLD16
-    assert len(znp_server._nvram[ExNvIds.LEGACY].keys()) == 1
     assert len([v for v in znp_server._nvram.values() if v]) == 1
     assert OsalNvIds.POLL_RATE_OLD16 in znp_server._nvram[ExNvIds.LEGACY]
 

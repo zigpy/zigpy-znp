@@ -23,7 +23,7 @@ from . import basic
 
 LOGGER = logging.getLogger(__name__)
 
-JSONType = typing.Union[typing.Dict[str, typing.Any], typing.List[typing.Any]]
+JSONType = typing.Dict[str, typing.Any]
 
 
 class AddrMode(basic.enum_uint8):
@@ -64,7 +64,7 @@ class AddrModeAddress:
         }[self.mode]
 
     @classmethod
-    def deserialize(cls, data: bytes) -> "AddrModeAddress":
+    def deserialize(cls, data: bytes) -> tuple[AddrModeAddress, bytes]:
         mode, data = AddrMode.deserialize(data)
         address, data = EUI64.deserialize(data)
 
@@ -95,8 +95,6 @@ class AddrModeAddress:
 
 class GroupId(basic.uint16_t, hex_repr=True):
     """Group ID class"""
-
-    pass
 
 
 class ScanType(basic.enum_uint8):

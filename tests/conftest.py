@@ -14,7 +14,7 @@ try:
     # Python 3.8 already has this
     from unittest.mock import AsyncMock as CoroutineMock  # type: ignore # noqa: F401
 except ImportError:
-    from asynctest import CoroutineMock  # type: ignore # noqa: F401
+    from asynctest import CoroutineMock  # type:ignore[no-redef]  # noqa: F401
 
 import zigpy.endpoint
 import zigpy.zdo.types as zdo_t
@@ -69,8 +69,9 @@ class ForwardingSerialTransport:
         assert self._is_connected
         self.protocol.data_received(data)
 
-    def close(self, *, error=ValueError("Connection was closed")):
+    def close(self, *, error=ValueError("Connection was closed")):  # noqa: B008
         LOGGER.debug("Closing %s", self)
+
         if not self._is_connected:
             return
 
@@ -419,6 +420,7 @@ class BaseZStackDevice(BaseServerZNP):
 
         self.active_endpoints = []
         self._nvram = {}
+        self._orig_nvram = {}
 
         self.device_state = t.DeviceState.InitializedNotStarted
         self.zdo_callbacks = set()
@@ -826,7 +828,10 @@ class BaseZStackDevice(BaseServerZNP):
                 ] = t.StartupOptions.NONE.serialize()
 
         # Resetting recreates the EXTADDR NVRAM item
-        if OsalNvIds.EXTADDR not in self._nvram.get(ExNvIds.LEGACY, {}):
+        if (
+            OsalNvIds.EXTADDR not in self._nvram.get(ExNvIds.LEGACY, {})
+            and self._orig_nvram
+        ):
             self._nvram[ExNvIds.LEGACY][OsalNvIds.EXTADDR] = self._orig_nvram[
                 ExNvIds.LEGACY
             ][OsalNvIds.EXTADDR]

@@ -93,7 +93,7 @@ class CommandHeader(t.uint16_t):
 
     def __new__(
         cls, value: int = 0x0000, *, id=None, subsystem=None, type=None
-    ) -> "CommandHeader":
+    ) -> CommandHeader:
         instance = super().__new__(cls, value)
 
         if id is not None:
@@ -116,7 +116,7 @@ class CommandHeader(t.uint16_t):
         """Return CommandHeader id."""
         return t.uint8_t(self >> 8)
 
-    def with_id(self, value: int) -> "CommandHeader":
+    def with_id(self, value: int) -> CommandHeader:
         """command ID setter."""
         return type(self)(self & 0x00FF | (value & 0xFF) << 8)
 
@@ -125,7 +125,7 @@ class CommandHeader(t.uint16_t):
         """Return subsystem of the command."""
         return Subsystem(self.cmd0 & 0x1F)
 
-    def with_subsystem(self, value: Subsystem) -> "CommandHeader":
+    def with_subsystem(self, value: Subsystem) -> CommandHeader:
         return type(self)(self & 0xFFE0 | value & 0x1F)
 
     @property
@@ -133,7 +133,7 @@ class CommandHeader(t.uint16_t):
         """Return command type."""
         return CommandType(self.cmd0 >> 5)
 
-    def with_type(self, value) -> "CommandHeader":
+    def with_type(self, value) -> CommandHeader:
         return type(self)(self & 0xFF1F | (value & 0x07) << 5)
 
     def __str__(self) -> str:
@@ -214,7 +214,7 @@ class CommandsMeta(type):
                     req_header = header
                     rsp_header = CommandHeader(0x0040 + req_header)
 
-                    class Req(
+                    class Req(  # type:ignore[no-redef]
                         CommandBase, header=req_header, schema=definition.req_schema
                     ):
                         pass
@@ -261,7 +261,9 @@ class CommandsMeta(type):
                         )  # pragma: no cover
 
                     # If there is no request, this is a just a response
-                    class Rsp(CommandBase, header=header, schema=definition.rsp_schema):
+                    class Rsp(  # type:ignore[no-redef]
+                        CommandBase, header=header, schema=definition.rsp_schema
+                    ):
                         pass
 
                     Rsp.__qualname__ = qualname + ".Rsp"
@@ -397,7 +399,7 @@ class CommandBase:
         return GeneralFrame(self.header, b"".join(chunks))
 
     @classmethod
-    def from_frame(cls, frame, *, align=False) -> "CommandBase":
+    def from_frame(cls, frame, *, align=False) -> CommandBase:
         if frame.header != cls.header:
             raise ValueError(
                 f"Wrong frame header in {cls}: {cls.header} != {frame.header}"
@@ -433,7 +435,7 @@ class CommandBase:
 
         return cls(**params)
 
-    def matches(self, other: "CommandBase") -> bool:
+    def matches(self, other: CommandBase) -> bool:
         if type(self) is not type(other):
             return False
 
@@ -453,7 +455,7 @@ class CommandBase:
 
         return True
 
-    def replace(self, **kwargs) -> "CommandBase":
+    def replace(self, **kwargs) -> CommandBase:
         """
         Returns a copy of the current command with replaced parameters.
         """
