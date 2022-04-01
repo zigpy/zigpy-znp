@@ -84,17 +84,17 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._znp: ZNP | None = None
 
         # It's simpler to work with Task objects if they're never actually None
-        self._reconnect_task = asyncio.Future()
+        self._reconnect_task: asyncio.Future = asyncio.Future()
         self._reconnect_task.cancel()
 
-        self._watchdog_task = asyncio.Future()
+        self._watchdog_task: asyncio.Future = asyncio.Future()
         self._watchdog_task.cancel()
 
         self._version_rsp = None
         self._concurrent_requests_semaphore = None
         self._currently_waiting_requests = 0
 
-        self._join_announce_tasks = {}
+        self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
@@ -670,7 +670,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Old versions of Z-Stack do not include `CodeRevision` in the version response
         if self._version_rsp.CodeRevision is None:
-            return 0x00000000
+            return t.uint32_t(0x00000000)
 
         return self._version_rsp.CodeRevision
 

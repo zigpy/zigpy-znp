@@ -12,9 +12,9 @@ import zigpy.device
 
 try:
     # Python 3.8 already has this
-    from unittest.mock import AsyncMock as CoroutineMock  # noqa: F401
+    from unittest.mock import AsyncMock as CoroutineMock  # type: ignore # noqa: F401
 except ImportError:
-    from asynctest import CoroutineMock  # noqa: F401
+    from asynctest import CoroutineMock  # type: ignore # noqa: F401
 
 import zigpy.endpoint
 import zigpy.zdo.types as zdo_t
