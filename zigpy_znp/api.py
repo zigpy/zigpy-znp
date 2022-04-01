@@ -14,6 +14,7 @@ import zigpy.state
 import async_timeout
 import zigpy.zdo.types as zdo_t
 from zigpy.exceptions import NetworkNotFormed
+from typing_extensions import Literal
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
@@ -31,9 +32,6 @@ from zigpy_znp.utils import (
 from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
-
-if typing.TYPE_CHECKING:
-    from typing_extensions import Literal
 
 LOGGER = logging.getLogger(__name__)
 
