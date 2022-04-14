@@ -159,7 +159,7 @@ class ZNP:
                 seq=0,
                 tx_counter=0,
                 rx_counter=0,
-                partner_ieee=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+                partner_ieee=node_info.ieee,
             ),
             children=[],
             nwk_addresses={},
