@@ -405,15 +405,12 @@ class ZNP:
             # TCLK_SEED is TCLK_TABLE_START in Z-Stack 1
             nvram[OsalNvIds.TCLK_SEED] = t.TCLinkKey(
                 ExtAddr=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),  # global
-                Key=network_info.tc_link_key.key or const.DEFAULT_TC_LINK_KEY,
+                Key=network_info.tc_link_key.key,
                 TxFrameCounter=0,
                 RxFrameCounter=0,
             )
         else:
-            if (
-                network_info.tc_link_key is not None
-                and network_info.tc_link_key.key != const.DEFAULT_TC_LINK_KEY
-            ):
+            if network_info.tc_link_key.key != const.DEFAULT_TC_LINK_KEY:
                 LOGGER.warning(
                     "TC link key is configured at build time in Z-Stack 3 and cannot be"
                     " changed at runtime: %s",
