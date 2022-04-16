@@ -140,6 +140,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._znp.close()
             self._znp = None
 
+    async def register_endpoint(self, descriptor: zdo_t.SimpleDescriptor) -> None:
+        """
+        Registers a new endpoint on the device.
+        """
+
+        await self._znp.request(
+            c.AF.Register.Req(
+                Endpoint=descriptor.endpoint,
+                ProfileId=descriptor.profile,
+                DeviceId=descriptor.device_type,
+                DeviceVersion=descriptor.device_version,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=descriptor.input_clusters,
+                OutputClusters=descriptor.output_clusters,
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
+
     async def load_network_info(self, *, load_devices=False) -> None:
         """
         Loads network information from NVRAM.
@@ -900,36 +918,32 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Registers the Zigbee endpoints required to communicate with various devices.
         """
 
-        await self._znp.request(
-            c.AF.Register.Req(
-                Endpoint=ZHA_ENDPOINT,
-                ProfileId=zigpy.profiles.zha.PROFILE_ID,
-                DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
-                DeviceVersion=0b0000,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[
+        await self.register_endpoint(
+            zdo_t.SimpleDescriptor(
+                endpoint=ZHA_ENDPOINT,
+                profile=zigpy.profiles.zha.PROFILE_ID,
+                device_type=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
+                device_version=0b0000,
+                input_clusters=[
                     clusters.general.Basic.cluster_id,
                     clusters.general.Ota.cluster_id,
                 ],
-                OutputClusters=[
+                output_clusters=[
                     clusters.security.IasZone.cluster_id,
                     clusters.security.IasWd.cluster_id,
                 ],
-            ),
-            RspStatus=t.Status.SUCCESS,
+            )
         )
 
-        await self._znp.request(
-            c.AF.Register.Req(
-                Endpoint=ZLL_ENDPOINT,
-                ProfileId=zigpy.profiles.zll.PROFILE_ID,
-                DeviceId=zigpy.profiles.zll.DeviceType.CONTROLLER,
-                DeviceVersion=0b0000,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[clusters.general.Basic.cluster_id],
-                OutputClusters=[],
-            ),
-            RspStatus=t.Status.SUCCESS,
+        await self.register_endpoint(
+            zdo_t.SimpleDescriptor(
+                endpoint=ZLL_ENDPOINT,
+                profile=zigpy.profiles.zll.PROFILE_ID,
+                device_type=zigpy.profiles.zll.DeviceType.CONTROLLER,
+                device_version=0b0000,
+                input_clusters=[clusters.general.Basic.cluster_id],
+                output_clusters=[],
+            )
         )
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
