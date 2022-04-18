@@ -140,7 +140,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._znp.close()
             self._znp = None
 
-    async def register_endpoint(self, descriptor: zdo_t.SimpleDescriptor) -> None:
+    async def add_endpoint(self, descriptor: zdo_t.SimpleDescriptor) -> None:
         """
         Registers a new endpoint on the device.
         """
@@ -918,7 +918,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Registers the Zigbee endpoints required to communicate with various devices.
         """
 
-        await self.register_endpoint(
+        await self.add_endpoint(
             zdo_t.SimpleDescriptor(
                 endpoint=ZHA_ENDPOINT,
                 profile=zigpy.profiles.zha.PROFILE_ID,
@@ -935,7 +935,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
         )
 
-        await self.register_endpoint(
+        await self.add_endpoint(
             zdo_t.SimpleDescriptor(
                 endpoint=ZLL_ENDPOINT,
                 profile=zigpy.profiles.zll.PROFILE_ID,
