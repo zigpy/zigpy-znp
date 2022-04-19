@@ -15,11 +15,9 @@ import zigpy.types
 import zigpy.config
 import zigpy.device
 import async_timeout
-import zigpy.endpoint
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
-from zigpy.zcl import clusters
 from zigpy.types import deserialize as list_deserialize
 from zigpy.exceptions import DeliveryError
 
@@ -35,8 +33,6 @@ from zigpy_znp.zigbee.device import ZNPCoordinator
 
 ZDO_ENDPOINT = 0
 ZHA_ENDPOINT = 1
-ZLL_ENDPOINT = 2
-
 ZDO_PROFILE = 0x0000
 
 # All of these are in seconds
@@ -209,7 +205,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.znp_config[conf.CONF_LED_MODE] is not None:
             await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
-        await self._register_endpoints()
+        await self.register_endpoints()
 
         # Receive a callback for every known ZDO command
         for cluster_id in zdo_t.ZDOCmd:
@@ -912,39 +908,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         conf.CONF_AUTO_RECONNECT_RETRY_DELAY
                     ]
                 )
-
-    async def _register_endpoints(self) -> None:
-        """
-        Registers the Zigbee endpoints required to communicate with various devices.
-        """
-
-        await self.add_endpoint(
-            zdo_t.SimpleDescriptor(
-                endpoint=ZHA_ENDPOINT,
-                profile=zigpy.profiles.zha.PROFILE_ID,
-                device_type=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
-                device_version=0b0000,
-                input_clusters=[
-                    clusters.general.Basic.cluster_id,
-                    clusters.general.Ota.cluster_id,
-                ],
-                output_clusters=[
-                    clusters.security.IasZone.cluster_id,
-                    clusters.security.IasWd.cluster_id,
-                ],
-            )
-        )
-
-        await self.add_endpoint(
-            zdo_t.SimpleDescriptor(
-                endpoint=ZLL_ENDPOINT,
-                profile=zigpy.profiles.zll.PROFILE_ID,
-                device_type=zigpy.profiles.zll.DeviceType.CONTROLLER,
-                device_version=0b0000,
-                input_clusters=[clusters.general.Basic.cluster_id],
-                output_clusters=[],
-            )
-        )
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
