@@ -20,7 +20,7 @@ from ..conftest import (
 
 DEV_NETWORK_SETTINGS = {
     FormedLaunchpadCC26X2R1: (
-        "CC1352/CC2652, Z-Stack 3.30+ (build 20200805)",
+        f"CC1352/CC2652, Z-Stack 3.30+ (build {FormedLaunchpadCC26X2R1.code_revision})",
         15,
         t.Channels.from_channel_list([15]),
         0x4402,
@@ -28,7 +28,7 @@ DEV_NETWORK_SETTINGS = {
         t.KeyData.convert("4C:4E:72:B8:41:22:51:79:9A:BF:35:25:12:88:CA:83"),
     ),
     FormedZStack3CC2531: (
-        "CC2531, Z-Stack 3.0.x (build 20190425)",
+        f"CC2531, Z-Stack 3.0.x (build {FormedZStack3CC2531.code_revision})",
         15,
         t.Channels.from_channel_list([15]),
         0xB6AB,
@@ -36,7 +36,7 @@ DEV_NETWORK_SETTINGS = {
         t.KeyData.convert("6D:DE:24:EA:E2:85:52:B6:DE:29:56:EB:05:85:1A:FA"),
     ),
     FormedZStack1CC2531: (
-        "CC2531, Z-Stack Home 1.2 (build 20190608)",
+        f"CC2531, Z-Stack Home 1.2 (build {FormedZStack1CC2531.code_revision})",
         11,
         t.Channels.from_channel_list([11]),
         0x1A62,

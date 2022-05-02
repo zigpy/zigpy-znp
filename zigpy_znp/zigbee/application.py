@@ -998,6 +998,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # addressing another device. The router will receive the ZDO request and a
             # device will try to join, but Z-Stack will never send the network key.
             if cluster == zdo_t.ZDOCmd.Mgmt_Permit_Joining_req:
+                if dst_addr.mode == t.AddrMode.Broadcast:
+                    # The coordinator responds to broadcasts
+                    permit_addr = 0x0000
+                else:
+                    # Otherwise, the destination device responds
+                    permit_addr = dst_addr.address
+
                 await self._znp.request_callback_rsp(
                     request=c.ZDO.MgmtPermitJoinReq.Req(
                         AddrMode=dst_addr.mode,
@@ -1006,7 +1013,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         TCSignificance=data[2],
                     ),
                     RspStatus=t.Status.SUCCESS,
-                    callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+                    callback=c.ZDO.MgmtPermitJoinRsp.Callback(
+                        Src=permit_addr, partial=True
+                    ),
                 )
             # Internally forward ZDO requests destined for the coordinator back to zigpy
             # so we can send internal Z-Stack requests when necessary

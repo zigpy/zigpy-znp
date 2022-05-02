@@ -345,7 +345,7 @@ class CommandBase:
                     and not issubclass(param.type, enum.Enum),
 
                     isinstance(value, bytes)
-                    and issubclass(param.type, (t.ShortBytes, t.LongBytes)),
+                    and issubclass(param.type, (t.ShortBytes, t.LongBytes, t.Bytes)),
 
                     isinstance(value, list) and issubclass(param.type, list),
                     isinstance(value, bool) and issubclass(param.type, t.Bool),

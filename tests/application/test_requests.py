@@ -21,10 +21,13 @@ from ..conftest import (
 )
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_chosen_dst_endpoint(device, make_application, mocker):
     app, znp_server = await make_application(device)
     await app.startup(auto_form=False)
+
+    build = mocker.patch.object(type(app), "_zstack_build_id", mocker.PropertyMock())
+    build.return_value = 20200708
 
     cluster = mocker.Mock()
     cluster.endpoint.endpoint_id = 2
