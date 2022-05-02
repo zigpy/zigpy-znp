@@ -19,14 +19,8 @@ from ..conftest import (
 )
 
 
-@pytest.mark.parametrize(
-    "device,fixed_joining_bug",
-    [(d, False) for d in FORMED_DEVICES] + [(FormedLaunchpadCC26X2R1, True)],
-)
-async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
-    if fixed_joining_bug:
-        mocker.patch.object(device, "code_revision", 20210708)
-
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_permit_join(device, mocker, make_application):
     app, znp_server = make_application(server_cls=device)
 
     permit_join_coordinator = znp_server.reply_once_to(
@@ -70,7 +64,7 @@ async def test_permit_join(device, fixed_joining_bug, mocker, make_application):
     await permit_join_broadcast
     await permit_join_broadcast_raw
 
-    if fixed_joining_bug:
+    if device.code_revision >= 20210708:
         assert not permit_join_coordinator.done()
     else:
         assert permit_join_coordinator.done()
@@ -97,6 +91,41 @@ async def test_join_coordinator(device, make_application):
     await app.permit(node=app.ieee)
 
     await permit_join_coordinator
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_join_device(device, make_application):
+    ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
+    nwk = 0x1234
+
+    app, znp_server = make_application(server_cls=device)
+    device = app.add_initialized_device(ieee=ieee, nwk=nwk)
+
+    permit_join = znp_server.reply_once_to(
+        request=c.ZDO.MgmtPermitJoinReq.Req(
+            AddrMode=t.AddrMode.NWK, Dst=nwk, Duration=60, partial=True
+        ),
+        responses=[
+            c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
+            c.ZDO.MgmtPermitJoinRsp.Callback(Src=nwk, Status=t.ZDOStatus.SUCCESS),
+            c.ZDO.MsgCbIncoming.Callback(
+                Src=nwk,
+                IsBroadcast=t.Bool.false,
+                ClusterId=32822,
+                SecurityUse=0,
+                TSN=6,
+                MacDst=0x0000,
+                Data=b"\x00",
+            ),
+        ],
+    )
+
+    await app.startup(auto_form=False)
+    await app.permit(node=ieee)
+
+    await permit_join
 
     await app.shutdown()
 

@@ -1111,7 +1111,7 @@ class BaseZStack3Device(BaseZStackDevice):
 class BaseLaunchpadCC26X2R1(BaseZStack3Device):
     version = 3.30
     align_structs = True
-    code_revision = 20200805
+    code_revision = 20220219
 
     def _create_network_nvram(self):
         super()._create_network_nvram()
