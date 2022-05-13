@@ -51,7 +51,7 @@ async def test_zigpy_request(device, make_application):
     app, znp_server = await make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 7
+    TSN = 6
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
@@ -111,7 +111,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     app, znp_server = await make_application(device)
     await app.startup(auto_form=False)
 
-    TSN = 7
+    TSN = 6
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
@@ -511,6 +511,8 @@ async def test_request_cancellation_shielding(
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_request_recovery_route_rediscovery_zdo(device, make_application, mocker):
+    TSN = 6
+
     app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
@@ -555,7 +557,7 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.NWK, device.nwk),
             command_id=zdo_t.ZDOCmd.Active_EP_req,
-            TSN=7,
+            TSN=TSN,
             zdo_NWKAddrOfInterest=device.nwk,
         ),
         responses=[
@@ -570,7 +572,7 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
                 IsBroadcast=t.Bool.false,
                 ClusterId=zdo_t.ZDOCmd.Active_EP_rsp,
                 SecurityUse=0,
-                TSN=7,
+                TSN=TSN,
                 MacDst=device.nwk,
                 Data=serialize_zdo_command(
                     command_id=zdo_t.ZDOCmd.Active_EP_rsp,

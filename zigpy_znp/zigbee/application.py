@@ -236,11 +236,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._watchdog_task = asyncio.create_task(self._watchdog_loop())
 
-        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
-        # unless they are explicitly disabled. We can't fix this but we can disable them
-        # as early as possible to shrink the window of opportunity for unwanted joins.
-        await self.permit(time_s=0)
-
     async def set_tx_power(self, dbm: int) -> None:
         """
         Sets the radio TX power.
