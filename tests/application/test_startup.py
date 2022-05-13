@@ -78,11 +78,11 @@ async def test_info(
     assert app.state.network_info.network_key.key == network_key
     assert app.state.network_info.network_key.seq == 0
 
-    assert app.zigpy_device.manufacturer == "Texas Instruments"
-    assert app.zigpy_device.model == model
+    assert app._device.manufacturer == "Texas Instruments"
+    assert app._device.model == model
 
     # Anything to make sure it's set
-    assert app.zigpy_device.node_desc.maximum_outgoing_transfer_size == 160
+    assert app._device.node_desc.maximum_outgoing_transfer_size == 160
 
     await app.shutdown()
 
@@ -98,8 +98,8 @@ async def test_endpoints(device, make_application):
 
     # We currently just register two endpoints
     assert len(endpoints) == 2
-    assert 1 in app.zigpy_device.endpoints
-    assert 2 in app.zigpy_device.endpoints
+    assert 1 in app._device.endpoints
+    assert 2 in app._device.endpoints
 
     await app.shutdown()
 

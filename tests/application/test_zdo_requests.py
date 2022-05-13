@@ -88,7 +88,7 @@ async def test_mgmt_nwk_update_req(
             broadcast_address=zigpy_t.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
         )
     else:
-        await app.zigpy_device.zdo.Mgmt_NWK_Update_req(update)
+        await app._device.zdo.Mgmt_NWK_Update_req(update)
 
     if change_channel:
         await nwk_update_req

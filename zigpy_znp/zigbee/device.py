@@ -93,7 +93,7 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
         LOGGER.debug("Sending loopback reply %s (%s), tsn=%s", command_id, kwargs, tsn)
 
         self.app.handle_message(
-            sender=self.app.zigpy_device,
+            sender=self.app._device,
             profile=znp_app.ZDO_PROFILE,
             cluster=command_id,
             src_ep=znp_app.ZDO_ENDPOINT,

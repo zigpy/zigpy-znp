@@ -219,7 +219,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.devices[self.state.node_info.ieee] = ZNPCoordinator(
             self, self.state.node_info.ieee, self.state.node_info.nwk
         )
-        await self.zigpy_device.schedule_initialize()
+        await self._device.schedule_initialize()
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
@@ -650,8 +650,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         device.radio_details(lqi=msg.LQI, rssi=None)
 
         # XXX: Is it possible to receive messages on non-assigned endpoints?
-        if msg.DstEndpoint in self.zigpy_device.endpoints:
-            profile = self.zigpy_device.endpoints[msg.DstEndpoint].profile_id
+        if msg.DstEndpoint in self._device.endpoints:
+            profile = self._device.endpoints[msg.DstEndpoint].profile_id
         else:
             LOGGER.warning("Received a message on an unregistered endpoint: %s", msg)
             profile = zigpy.profiles.zha.PROFILE_ID
@@ -680,14 +680,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return t.uint32_t(0x00000000)
 
         return self._version_rsp.CodeRevision
-
-    @property
-    def zigpy_device(self) -> zigpy.device.Device:
-        """
-        Reference to zigpy device 0x0000, the coordinator.
-        """
-
-        return self.devices[self.state.node_info.ieee]
 
     @property
     def znp_config(self) -> conf.ConfigType:
@@ -923,7 +915,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Always fall back to endpoint 1
         candidates = [ZHA_ENDPOINT]
 
-        for ep_id, endpoint in self.zigpy_device.endpoints.items():
+        for ep_id, endpoint in self._device.endpoints.items():
             if ep_id == ZDO_ENDPOINT:
                 continue
 
@@ -1028,10 +1020,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ) or (
                 # Or a direct unicast request
                 dst_addr.mode == t.AddrMode.NWK
-                and dst_addr.address == self.zigpy_device.nwk
+                and dst_addr.address == self._device.nwk
             ):
                 self.handle_message(
-                    sender=self.zigpy_device,
+                    sender=self._device,
                     profile=profile,
                     cluster=cluster,
                     src_ep=src_ep,

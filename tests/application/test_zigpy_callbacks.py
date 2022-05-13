@@ -144,7 +144,6 @@ async def test_on_af_message_callback(device, make_application, mocker):
     discover_called, discover_mock = awaitable_mock(return_value=device)
     mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
     mocker.patch.object(app, "handle_message")
-    mocker.patch.object(app, "get_device")
 
     af_message = c.AF.IncomingMsg.Callback(
         GroupId=1,
@@ -173,7 +172,6 @@ async def test_on_af_message_callback(device, make_application, mocker):
 
     device.reset_mock()
     app.handle_message.reset_mock()
-    app.get_device.reset_mock()
 
     # ZLL message
     discover_called, discover_mock = awaitable_mock(return_value=device)
@@ -189,7 +187,6 @@ async def test_on_af_message_callback(device, make_application, mocker):
 
     device.reset_mock()
     app.handle_message.reset_mock()
-    app.get_device.reset_mock()
 
     # Message on an unknown endpoint (is this possible?)
     discover_called, discover_mock = awaitable_mock(return_value=device)
@@ -205,7 +202,6 @@ async def test_on_af_message_callback(device, make_application, mocker):
 
     device.reset_mock()
     app.handle_message.reset_mock()
-    app.get_device.reset_mock()
 
     # Message from an unknown device
     discover_called, discover_mock = awaitable_mock(side_effect=KeyError())
