@@ -387,12 +387,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             response = await self._znp.request_callback_rsp(
                 request=c.ZDO.MgmtPermitJoinReq.Req(
                     AddrMode=t.AddrMode.NWK,
-                    Dst=0x0000,
+                    Dst=self.state.node_info.nwk,
                     Duration=time_s,
                     TCSignificance=1,
                 ),
                 RspStatus=t.Status.SUCCESS,
-                callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+                callback=c.ZDO.MgmtPermitJoinRsp.Callback(
+                    Src=self.state.node_info.nwk, partial=True
+                ),
             )
 
             if response.Status != t.Status.SUCCESS:
@@ -1000,7 +1002,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             if cluster == zdo_t.ZDOCmd.Mgmt_Permit_Joining_req:
                 if dst_addr.mode == t.AddrMode.Broadcast:
                     # The coordinator responds to broadcasts
-                    permit_addr = 0x0000
+                    permit_addr = self.state.node_info.nwk
                 else:
                     # Otherwise, the destination device responds
                     permit_addr = dst_addr.address
@@ -1150,7 +1152,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         if (
                             dst_ep == ZDO_ENDPOINT
                             and dst_addr.mode == t.AddrMode.NWK
-                            and dst_addr.address != 0x0000
+                            and dst_addr.address != self.state.node_info.nwk
                         ):
                             route_status = await self._znp.request(
                                 c.ZDO.ExtRouteChk.Req(
