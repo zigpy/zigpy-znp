@@ -15,6 +15,7 @@ import async_timeout
 import zigpy.zdo.types as zdo_t
 from zigpy.exceptions import NetworkNotFormed
 
+import zigpy_znp
 import zigpy_znp.const as const
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -140,7 +141,10 @@ class ZNP:
             self, ext_pan_id=nib.extendedPANID
         )
 
+        version = await self.request(c.SYS.Version.Req())
+
         network_info = zigpy.state.NetworkInfo(
+            source=f"zigpy-znp@{zigpy_znp.__version__}",
             extended_pan_id=nib.extendedPANID,
             pan_id=nib.nwkPanId,
             nwk_update_id=nib.nwkUpdateId,
@@ -165,6 +169,7 @@ class ZNP:
             nwk_addresses={},
             key_table=[],
             stack_specific={},
+            metadata={"zstack": version.as_dict()},
         )
 
         tclk_seed = None
