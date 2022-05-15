@@ -1,5 +1,4 @@
 import logging
-import dataclasses
 
 import pytest
 
@@ -31,16 +30,22 @@ async def test_state_transfer(from_device, to_device, make_connected_znp):
 
     # Z-Stack 1 devices can't have some security info read out
     if issubclass(from_device, BaseZStack1CC2531):
-        assert formed_znp.network_info == dataclasses.replace(
-            empty_znp.network_info, stack_specific={}
+        assert formed_znp.network_info == empty_znp.network_info.replace(
+            stack_specific={},
+            metadata=formed_znp.network_info.metadata,
         )
     elif issubclass(to_device, BaseZStack1CC2531):
         assert (
-            dataclasses.replace(formed_znp.network_info, stack_specific={})
+            formed_znp.network_info.replace(
+                stack_specific={},
+                metadata=empty_znp.network_info.metadata,
+            )
             == empty_znp.network_info
         )
     else:
-        assert formed_znp.network_info == empty_znp.network_info
+        assert formed_znp.network_info == empty_znp.network_info.replace(
+            metadata=formed_znp.network_info.metadata
+        )
 
     assert formed_znp.node_info == empty_znp.node_info
 

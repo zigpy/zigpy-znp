@@ -244,7 +244,7 @@ async def test_auto_form_necessary(device, make_application, mocker):
 async def test_zstack_build_id_empty(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)
 
-    znp_server.reply_once_to(
+    znp_server.reply_to(
         c.SYS.Version.Req(),
         responses=c.SYS.Version.Rsp(
             TransportRev=2,
