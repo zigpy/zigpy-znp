@@ -122,7 +122,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if self._znp is not None:
             try:
-                await self._znp.reset()
+                await self._znp.reset(wait_for_reset=False)
             finally:
                 self._znp.close()
                 self._znp = None

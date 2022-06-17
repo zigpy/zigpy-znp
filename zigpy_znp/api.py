@@ -583,16 +583,19 @@ class ZNP:
 
         return True
 
-    async def reset(self) -> None:
+    async def reset(self, *, wait_for_reset: bool = True) -> None:
         """
         Performs a soft reset within Z-Stack.
         A hard reset resets the serial port, causing the device to disconnect.
         """
 
-        await self.request_callback_rsp(
-            request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
-            callback=c.SYS.ResetInd.Callback(partial=True),
-        )
+        if wait_for_reset:
+            await self.request_callback_rsp(
+                request=c.SYS.ResetReq.Req(Type=t.ResetType.Soft),
+                callback=c.SYS.ResetInd.Callback(partial=True),
+            )
+        else:
+            await self.request(c.SYS.ResetReq.Req(Type=t.ResetType.Soft))
 
     @property
     def _port_path(self) -> str:
