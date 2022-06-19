@@ -220,7 +220,7 @@ async def test_reconnect_lockup(device, event_loop, make_application, mocker):
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_reconnect_lockup_pyserial(device, event_loop, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.WATCHDOG_PERIOD", 0.1)
 
@@ -228,7 +228,8 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
         server_cls=device,
         client_config={
             conf.CONF_ZNP_CONFIG: {
-                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.1,
+                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.01,
+                conf.CONF_SREQ_TIMEOUT: 0.1,
             }
         },
     )
@@ -243,20 +244,20 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
     # We are connected
     assert app._znp is not None
 
-    did_load_info = asyncio.get_running_loop().create_future()
+    did_start_network = asyncio.get_running_loop().create_future()
 
-    async def patched_load_network_info(old_load=app.load_network_info, **kwargs):
+    async def patched_start_network(old_start_network=app.start_network, **kwargs):
         try:
-            return await old_load(**kwargs)
+            return await old_start_network(**kwargs)
         finally:
-            did_load_info.set_result(True)
+            did_start_network.set_result(True)
 
-    with patch.object(app, "load_network_info", patched_load_network_info):
+    with patch.object(app, "start_network", patched_start_network):
         # "Drop" the connection like PySerial
         app._znp._uart.connection_lost(exc=None)
 
         # Wait until we are reconnecting
-        await did_load_info
+        await did_start_network
 
     # "Drop" the connection like PySerial again, but during connect
     app._znp._uart.connection_lost(exc=None)
