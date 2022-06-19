@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import patch
 
 import pytest
 
@@ -6,7 +7,7 @@ import zigpy_znp.config as conf
 from zigpy_znp.uart import connect as uart_connect
 from zigpy_znp.zigbee.application import ControllerApplication
 
-from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1, swap_attribute
+from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1
 
 
 async def test_no_double_connect(make_znp_server, mocker):
@@ -118,7 +119,7 @@ async def test_reconnect(device, event_loop, make_application):
     assert app._znp is not None
 
     # Don't reply to anything for a bit
-    with swap_attribute(znp_server, "frame_received", lambda _: None):
+    with patch.object(znp_server, "frame_received", lambda _: None):
         # Now that we're connected, have the server close the connection
         znp_server._uart._transport.close()
 
@@ -197,7 +198,7 @@ async def test_reconnect_lockup(device, event_loop, make_application, mocker):
     await app.startup(auto_form=False)
 
     # Stop responding
-    with swap_attribute(znp_server, "frame_received", lambda _: None):
+    with patch.object(znp_server, "frame_received", lambda _: None):
         assert app._znp is not None
         assert app._reconnect_task.done()
 
@@ -250,7 +251,7 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
         finally:
             did_load_info.set_result(True)
 
-    with swap_attribute(app, "load_network_info", patched_load_network_info):
+    with patch.object(app, "load_network_info", patched_load_network_info):
         # "Drop" the connection like PySerial
         app._znp._uart.connection_lost(exc=None)
 

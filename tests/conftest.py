@@ -3,8 +3,7 @@ import asyncio
 import inspect
 import logging
 import pathlib
-import contextlib
-from unittest.mock import Mock, PropertyMock
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 import zigpy.types
@@ -217,17 +216,6 @@ def merge_dicts(a, b):
     return c
 
 
-@contextlib.contextmanager
-def swap_attribute(obj, name, value):
-    old_value = getattr(obj, name)
-    setattr(obj, name, value)
-
-    try:
-        yield old_value
-    finally:
-        setattr(obj, name, old_value)
-
-
 @pytest.fixture
 def make_application(make_znp_server):
     async def inner(
@@ -363,7 +351,7 @@ class BaseServerZNP(ZNP):
 
     def close(self):
         # We don't clear listeners on shutdown
-        with swap_attribute(self, "_listeners", {}):
+        with patch.object(self, "_listeners", {}):
             return super().close()
 
 
