@@ -471,15 +471,7 @@ class CommandBase:
         Converts the command into a dictionary.
         """
 
-        result = {}
-
-        for param, value in self._bound_params.values():
-            if issubclass(param.type, t.CStruct):
-                result[param.name] = value.as_dict()
-            else:
-                result[param.name] = value
-
-        return result
+        return {p.name: v for p, v in self._bound_params.values()}
 
     def __eq__(self, other):
         return type(self) is type(other) and self._bound_params == other._bound_params

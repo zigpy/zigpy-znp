@@ -2,6 +2,7 @@ import logging
 
 import pytest
 
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
@@ -64,3 +65,30 @@ async def test_broken_cc2531_load_state(device, make_connected_znp, caplog):
     assert "inconsistent" in caplog.text
 
     znp.close()
+
+
+@pytest.mark.parametrize("device", [FormedZStack3CC2531])
+async def test_state_write_tclk_zstack3(device, make_connected_znp, caplog):
+    formed_znp, _ = await make_connected_znp(server_cls=device)
+
+    await formed_znp.load_network_info()
+    formed_znp.close()
+
+    empty_znp, _ = await make_connected_znp(server_cls=device)
+
+    caplog.set_level(logging.WARNING)
+    await empty_znp.write_network_info(
+        network_info=formed_znp.network_info.replace(
+            tc_link_key=formed_znp.network_info.tc_link_key.replace(
+                # Non-standard TCLK
+                key=t.KeyData.convert("AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD")
+            )
+        ),
+        node_info=formed_znp.node_info,
+    )
+    assert "TC link key is configured at build time in Z-Stack 3" in caplog.text
+
+    await empty_znp.load_network_info()
+
+    # TCLK was not changed
+    assert formed_znp.network_info == empty_znp.network_info

@@ -123,8 +123,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self._znp is not None:
             try:
                 await self._znp.reset(wait_for_reset=False)
-            except asyncio.CancelledError:
-                raise
             except Exception as e:
                 LOGGER.warning("Failed to reset before disconnect: %s", e)
             finally:
