@@ -3,8 +3,7 @@ import asyncio
 import inspect
 import logging
 import pathlib
-import contextlib
-from unittest.mock import Mock, PropertyMock
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 import zigpy.types
@@ -12,7 +11,7 @@ import zigpy.device
 
 try:
     # Python 3.8 already has this
-    from unittest.mock import AsyncMock as CoroutineMock  # noqa: F401
+    from unittest.mock import AsyncMock as CoroutineMock  # type: ignore # noqa: F401
 except ImportError:
     from asynctest import CoroutineMock  # type:ignore[no-redef]  # noqa: F401
 
@@ -217,20 +216,14 @@ def merge_dicts(a, b):
     return c
 
 
-@contextlib.contextmanager
-def swap_attribute(obj, name, value):
-    old_value = getattr(obj, name)
-    setattr(obj, name, value)
-
-    try:
-        yield old_value
-    finally:
-        setattr(obj, name, old_value)
-
-
 @pytest.fixture
 def make_application(make_znp_server):
-    def inner(server_cls, client_config=None, server_config=None, **kwargs):
+    async def inner(
+        server_cls,
+        client_config=None,
+        server_config=None,
+        **kwargs,
+    ):
         default = config_for_port_path(FAKE_SERIAL_PORT)
 
         client_config = merge_dicts(default, client_config or {})
@@ -267,9 +260,9 @@ def make_application(make_znp_server):
 
         app.add_initialized_device = add_initialized_device.__get__(app)
 
-        return app, make_znp_server(
-            server_cls=server_cls, config=server_config, **kwargs
-        )
+        server = make_znp_server(server_cls=server_cls, config=server_config, **kwargs)
+
+        return app, server
 
     return inner
 
@@ -358,7 +351,7 @@ class BaseServerZNP(ZNP):
 
     def close(self):
         # We don't clear listeners on shutdown
-        with swap_attribute(self, "_listeners", {}):
+        with patch.object(self, "_listeners", {}):
             return super().close()
 
 
@@ -415,6 +408,7 @@ class BaseZStackDevice(BaseServerZNP):
 
         self.active_endpoints = []
         self._nvram = {}
+        self._orig_nvram = {}
 
         self.device_state = t.DeviceState.InitializedNotStarted
         self.zdo_callbacks = set()
@@ -820,6 +814,15 @@ class BaseZStackDevice(BaseServerZNP):
                 self._nvram[ExNvIds.LEGACY][
                     OsalNvIds.STARTUP_OPTION
                 ] = t.StartupOptions.NONE.serialize()
+
+        # Resetting recreates the EXTADDR NVRAM item
+        if (
+            OsalNvIds.EXTADDR not in self._nvram.get(ExNvIds.LEGACY, {})
+            and self._orig_nvram
+        ):
+            self._nvram[ExNvIds.LEGACY][OsalNvIds.EXTADDR] = self._orig_nvram[
+                ExNvIds.LEGACY
+            ][OsalNvIds.EXTADDR]
 
         version = self.version_replier(None)
 
@@ -1303,43 +1306,43 @@ class BaseZStack3CC2531(BaseZStack3Device):
 class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2652R-ZStack4.formed.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class ResetLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2652R-ZStack4.reset.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class FormedZStack3CC2531(BaseZStack3CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack3.formed.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class ResetZStack3CC2531(BaseZStack3CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack3.reset.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class FormedZStack1CC2531(BaseZStack1CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack1.formed.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 class ResetZStack1CC2531(BaseZStack1CC2531):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self._nvram = load_nvram_json("CC2531-ZStack1.reset.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
 
 
 EMPTY_DEVICES = [

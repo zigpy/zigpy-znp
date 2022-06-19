@@ -26,7 +26,7 @@ async def test_mgmt_nwk_update_req(
 ):
     mocker.patch("zigpy_znp.zigbee.device.NWK_UPDATE_LOOP_DELAY", 0.1)
 
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     if change_channel:
         new_channel = 11 + (26 - znp_server.nib.nwkLogicalChannel)
@@ -88,7 +88,7 @@ async def test_mgmt_nwk_update_req(
             broadcast_address=zigpy_t.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
         )
     else:
-        await app.zigpy_device.zdo.Mgmt_NWK_Update_req(update)
+        await app._device.zdo.Mgmt_NWK_Update_req(update)
 
     if change_channel:
         await nwk_update_req

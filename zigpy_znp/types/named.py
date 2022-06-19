@@ -23,7 +23,7 @@ from . import basic
 
 LOGGER = logging.getLogger(__name__)
 
-JSONType = typing.Union[typing.Dict[str, typing.Any], typing.List[typing.Any]]
+JSONType = typing.Dict[str, typing.Any]
 
 
 class AddrMode(basic.enum_uint8):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import time
-import random
 import asyncio
 import logging
 import itertools
@@ -16,12 +15,10 @@ import zigpy.types
 import zigpy.config
 import zigpy.device
 import async_timeout
-import zigpy.endpoint
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
-from zigpy.zcl import clusters
-from zigpy.types import ExtendedPanId, deserialize as list_deserialize
+from zigpy.types import deserialize as list_deserialize
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.const as const
@@ -29,7 +26,6 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
-from zigpy_znp.znp import security
 from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
@@ -37,11 +33,10 @@ from zigpy_znp.zigbee.device import ZNPCoordinator
 
 ZDO_ENDPOINT = 0
 ZHA_ENDPOINT = 1
-ZLL_ENDPOINT = 2
-
 ZDO_PROFILE = 0x0000
 
 # All of these are in seconds
+PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
 IEEE_ADDR_DISCOVERY_TIMEOUT = 5
@@ -85,51 +80,54 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._znp: ZNP | None = None
 
         # It's simpler to work with Task objects if they're never actually None
-        self._reconnect_task = asyncio.Future()
+        self._reconnect_task: asyncio.Future = asyncio.Future()
         self._reconnect_task.cancel()
 
-        self._watchdog_task = asyncio.Future()
+        self._watchdog_task: asyncio.Future = asyncio.Future()
         self._watchdog_task.cancel()
 
         self._version_rsp = None
         self._concurrent_requests_semaphore = None
         self._currently_waiting_requests = 0
 
-        self._join_announce_tasks = {}
+        self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
     ##################################################################
 
     @classmethod
-    async def probe(cls, device_config: conf.ConfigType) -> bool:
-        """
-        Checks whether the device represented by `device_config` is a valid ZNP radio.
-        Doesn't throw any errors.
-        """
-
-        znp = ZNP(conf.CONFIG_SCHEMA({conf.CONF_DEVICE: device_config}))
-        LOGGER.debug("Probing %s", znp._port_path)
-
+    async def probe(cls, device_config):
         try:
-            # `ZNP.connect` times out on its own
-            await znp.connect()
-        except Exception as e:
-            LOGGER.debug(
-                "Failed to probe ZNP radio with config %s", device_config, exc_info=e
-            )
+            async with async_timeout.timeout(PROBE_TIMEOUT):
+                return await super().probe(device_config)
+        except asyncio.TimeoutError:
             return False
-        else:
-            return True
-        finally:
-            znp.close()
 
-    async def shutdown(self):
-        """
-        Gracefully shuts down the application and cleans up all resources.
-        """
+    async def connect(self):
+        assert self._znp is None
 
-        self.close()
+        znp = ZNP(self.config)
+        await znp.connect()
+
+        # We only assign `self._znp` after it has successfully connected
+        self._znp = znp
+        self._znp.set_application(self)
+
+        self._bind_callbacks()
+
+    async def disconnect(self):
+        self._reconnect_task.cancel()
+        self._watchdog_task.cancel()
+
+        if self._znp is not None:
+            try:
+                await self._znp.reset(wait_for_reset=False)
+            except Exception as e:
+                LOGGER.warning("Failed to reset before disconnect: %s", e)
+            finally:
+                self._znp.close()
+                self._znp = None
 
     def close(self):
         self._reconnect_task.cancel()
@@ -140,122 +138,67 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self._znp.close()
             self._znp = None
 
-    async def startup(self, auto_form=False, force_form=False, read_only=False):
+    async def add_endpoint(self, descriptor: zdo_t.SimpleDescriptor) -> None:
         """
-        Performs application startup.
-
-        This entails creating the ZNP object, connecting to the radio, potentially
-        forming a network, and configuring our settings.
+        Registers a new endpoint on the device.
         """
 
-        try:
-            return await self._startup(
-                auto_form=auto_form,
-                force_form=force_form,
-                read_only=read_only,
-            )
-        except Exception:
-            await self.shutdown()
-            raise
+        await self._znp.request(
+            c.AF.Register.Req(
+                Endpoint=descriptor.endpoint,
+                ProfileId=descriptor.profile,
+                DeviceId=descriptor.device_type,
+                DeviceVersion=descriptor.device_version,
+                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
+                InputClusters=descriptor.input_clusters,
+                OutputClusters=descriptor.output_clusters,
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
 
-    async def _startup(self, auto_form=False, force_form=False, read_only=False):
-        assert self._znp is None
+    async def load_network_info(self, *, load_devices=False) -> None:
+        """
+        Loads network information from NVRAM.
+        """
 
-        znp = ZNP(self.config)
-        await znp.connect()
+        await self._znp.load_network_info(load_devices=load_devices)
 
-        # We only assign `self._znp` after it has successfully connected
-        self._znp = znp
-        self._znp.set_application(self)
+        self.state.node_info = self._znp.node_info
+        self.state.network_info = self._znp.network_info
 
-        if not read_only and not force_form:
-            await self._migrate_nvram()
+    async def write_network_info(
+        self,
+        *,
+        network_info: zigpy.state.NetworkInfo,
+        node_info: zigpy.state.NodeInfo,
+    ) -> None:
+        """
+        Writes network and node state to NVRAM.
+        """
 
-        self._bind_callbacks()
+        network_info.stack_specific.setdefault("zstack", {})
 
-        # Next, read out the NVRAM item that Zigbee2MQTT writes when it has configured
-        # a device to make sure that our network settings will not be reset.
-        if self._znp.version == 1.2:
-            configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK1
-        else:
-            configured_nv_item = OsalNvIds.HAS_CONFIGURED_ZSTACK3
+        if "tclk_seed" not in network_info.stack_specific["zstack"]:
+            network_info.stack_specific["zstack"]["tclk_seed"] = os.urandom(16).hex()
 
-        try:
-            configured_value = await self._znp.nvram.osal_read(
-                configured_nv_item, item_type=t.uint8_t
-            )
-        except KeyError:
-            is_configured = False
-        else:
-            is_configured = configured_value == const.ZSTACK_CONFIGURE_SUCCESS
+        return await self._znp.write_network_info(
+            network_info=network_info, node_info=node_info
+        )
 
-        if force_form:
-            LOGGER.info("Forming a new network")
-            await self.form_network()
-        elif not is_configured:
-            if not auto_form:
-                raise RuntimeError("Cannot start application, network is not formed")
-            elif read_only:
-                raise RuntimeError(
-                    "Cannot start application, network is not formed and read-only"
-                )
+    async def start_network(self, *, read_only=False):
+        if self.state.node_info == zigpy.state.NodeInfo():
+            await self.load_network_info()
 
-            LOGGER.info("ZNP is not configured, forming a new network")
+        if not read_only:
+            await self._znp.migrate_nvram()
+            await self._write_stack_settings()
 
-            # Network formation requires multiple resets so it will write the NVRAM
-            # settings itself
-            await self.form_network()
-        else:
-            # Issue a reset first to make sure we aren't permitting joins
-            await self._znp.reset()
+        await self._znp.reset()
 
-            LOGGER.info("ZNP is already configured, not forming a new network")
-
-            if not read_only:
-                await self._write_stack_settings(reset_if_changed=True)
-
-        # At this point the device state should the same, regardless of whether we just
-        # formed a new network or are restoring one
         if self.znp_config[conf.CONF_TX_POWER] is not None:
             await self.set_tx_power(dbm=self.znp_config[conf.CONF_TX_POWER])
 
-        # Both versions of Z-Stack use this callback
-        started_as_coordinator = self._znp.wait_for_response(
-            c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
-        )
-
-        if self._znp.version == 1.2:
-            # Z-Stack Home 1.2 has a simple startup sequence
-            await self._znp.request(
-                c.ZDO.StartupFromApp.Req(StartDelay=100),
-                RspState=c.zdo.StartupState.RestoredNetworkState,
-            )
-        else:
-            # Z-Stack 3 uses the BDB subsystem
-            bdb_commissioning_done = self._znp.wait_for_response(
-                c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True, RemainingModes=c.app_config.BDBCommissioningMode.NONE
-                )
-            )
-
-            # According to the forums, this is the correct startup sequence, including
-            # the formation failure error
-            await self._znp.request_callback_rsp(
-                request=c.AppConfig.BDBStartCommissioning.Req(
-                    Mode=c.app_config.BDBCommissioningMode.NwkFormation
-                ),
-                RspStatus=t.Status.SUCCESS,
-                callback=c.AppConfig.BDBCommissioningNotification.Callback(
-                    partial=True,
-                    Status=c.app_config.BDBCommissioningStatus.NetworkRestored,
-                ),
-            )
-
-            await bdb_commissioning_done
-
-        # The startup sequence should not take forever
-        async with async_timeout.timeout(STARTUP_TIMEOUT):
-            await started_as_coordinator
+        await self._znp.start_network()
 
         self._version_rsp = await self._znp.request(c.SYS.Version.Req())
 
@@ -264,8 +207,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.znp_config[conf.CONF_LED_MODE] is not None:
             await self._set_led_mode(led=0xFF, mode=self.znp_config[conf.CONF_LED_MODE])
 
-        await self.load_network_info()
-        await self._register_endpoints()
+        await self.register_endpoints()
 
         # Receive a callback for every known ZDO command
         for cluster_id in zdo_t.ZDOCmd:
@@ -276,9 +218,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self._znp.request(c.ZDO.MsgCallbackRegister.Req(ClusterId=cluster_id))
 
         # Setup the coordinator as a zigpy device and initialize it to request node info
-        self.devices[self.ieee] = ZNPCoordinator(self, self.ieee, self.nwk)
-        self.zigpy_device.zdo.add_listener(self)
-        await self.zigpy_device.schedule_initialize()
+        self.devices[self.state.node_info.ieee] = ZNPCoordinator(
+            self, self.state.node_info.ieee, self.state.node_info.nwk
+        )
+        await self._device.schedule_initialize()
 
         # Now that we know what device we are, set the max concurrent requests
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
@@ -288,34 +231,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
 
-        LOGGER.info("Network settings")
-        LOGGER.info("  Model: %s", self.zigpy_device.model)
-        LOGGER.info("  Z-Stack version: %s", self._znp.version)
-        LOGGER.info("  Z-Stack build id: %s", self._zstack_build_id)
-        LOGGER.info("  Max concurrent requests: %s", max_concurrent_requests)
-        LOGGER.info("  Channel: %s", self.channel)
-        LOGGER.info("  PAN ID: 0x%04X", self.pan_id)
-        LOGGER.info("  Extended PAN ID: %s", self.extended_pan_id)
-        LOGGER.info("  Device IEEE: %s", self.ieee)
-        LOGGER.info("  Device NWK: 0x%04X", self.nwk)
-        LOGGER.debug(
-            "  Network key: %s",
-            ":".join(
-                f"{c:02x}" for c in self.state.network_information.network_key.key
-            ),
-        )
-
-        if self.state.network_information.network_key.key == const.Z2M_NETWORK_KEY:
+        if self.state.network_info.network_key.key == const.Z2M_NETWORK_KEY:
             LOGGER.warning(
                 "Your network is using the insecure Zigbee2MQTT network key!"
             )
 
         self._watchdog_task = asyncio.create_task(self._watchdog_loop())
-
-        # XXX: The CC2531 running Z-Stack Home 1.2 permanently permits joins on startup
-        # unless they are explicitly disabled. We can't fix this but we can disable them
-        # as early as possible to shrink the window of opportunity for unwanted joins.
-        await self.permit(time_s=0)
 
     async def set_tx_power(self, dbm: int) -> None:
         """
@@ -336,64 +257,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 "Requested TX power %d was adjusted to %d", dbm, rsp.StatusOrPower
             )
 
-    async def form_network(self):
-        """
-        Clears the current config and forms a new network with a random network key,
-        PAN ID, and extended PAN ID.
-        """
-
-        # First, make the settings consistent and randomly generate missing values
-        channel = self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNEL]
-        channels = self.config[conf.CONF_NWK][conf.CONF_NWK_CHANNELS]
-        pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_PAN_ID]
-        extended_pan_id = self.config[conf.CONF_NWK][conf.CONF_NWK_EXTENDED_PAN_ID]
-        network_key = self.config[conf.CONF_NWK][conf.CONF_NWK_KEY]
-
-        if pan_id is None:
-            pan_id = random.SystemRandom().randint(0x0001, 0xFFFE + 1)
-
-        if extended_pan_id is None:
-            extended_pan_id = ExtendedPanId(os.urandom(8))
-
-        if network_key is None:
-            network_key = t.KeyData(os.urandom(16))
-
-        # Override `channels` with a single channel if one is explicitly set
-        if channel is not None:
-            channels = t.Channels.from_channel_list([channel])
-
-        network_info = zigpy.state.NetworkInformation(
-            extended_pan_id=extended_pan_id,
-            pan_id=pan_id,
-            nwk_update_id=self.config[conf.CONF_NWK][conf.CONF_NWK_UPDATE_ID],
-            nwk_manager_id=0x0000,
-            channel=channel,
-            channel_mask=channels,
-            security_level=5,
-            network_key=zigpy.state.Key(
-                key=network_key,
-                tx_counter=0,
-                rx_counter=0,
-                seq=0,
-                partner_ieee=None,
-            ),
-            tc_link_key=None,
-            children=[],
-            key_table=[],
-            nwk_addresses={},
-            stack_specific={"zstack": {"tclk_seed": os.urandom(16).hex()}},
-        )
-
-        node_info = zigpy.state.NodeInfo(
-            nwk=0x0000,
-            ieee=None,
-            logical_type=zdo_t.LogicalType.Coordinator,
-        )
-
-        await self.write_network_info(network_info=network_info, node_info=node_info)
-        await self._write_stack_settings(reset_if_changed=False)
-        await self._znp.reset()
-
     def get_dst_address(self, cluster: zigpy.zcl.Cluster) -> zdo_t.MultiAddress:
         """
         Helper to get a dst address for bind/unbind operations.
@@ -404,7 +267,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         dst_addr = zdo_t.MultiAddress()
         dst_addr.addrmode = 0x03
-        dst_addr.ieee = self.ieee
+        dst_addr.ieee = self.state.node_info.ieee
         dst_addr.endpoint = self._find_endpoint(
             dst_ep=cluster.endpoint.endpoint_id,
             profile=cluster.endpoint.profile_id,
@@ -513,16 +376,22 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # through the coordinator itself.
         #
         # Fixed in https://github.com/Koenkk/Z-Stack-firmware/commit/efac5ee46b9b437
-        if time_s == 0 or self._zstack_build_id < 20210708 or node == self.ieee:
+        if (
+            time_s == 0
+            or self._zstack_build_id < 20210708
+            or node == self.state.node_info.ieee
+        ):
             response = await self._znp.request_callback_rsp(
                 request=c.ZDO.MgmtPermitJoinReq.Req(
                     AddrMode=t.AddrMode.NWK,
-                    Dst=0x0000,
+                    Dst=self.state.node_info.nwk,
                     Duration=time_s,
                     TCSignificance=1,
                 ),
                 RspStatus=t.Status.SUCCESS,
-                callback=c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, partial=True),
+                callback=c.ZDO.MgmtPermitJoinRsp.Callback(
+                    Src=self.state.node_info.nwk, partial=True
+                ),
             )
 
             if response.Status != t.Status.SUCCESS:
@@ -536,6 +405,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         # Z-Stack does not need any special code to do this
+
+    async def force_remove(self, dev: zigpy.device.Device) -> None:
+        """
+        Send a lower-level leave command to the device
+        """
+
+        # Z-Stack does not have any way to do this
 
     async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
         """
@@ -776,8 +652,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         device.radio_details(lqi=msg.LQI, rssi=None)
 
         # XXX: Is it possible to receive messages on non-assigned endpoints?
-        if msg.DstEndpoint in self.zigpy_device.endpoints:
-            profile = self.zigpy_device.endpoints[msg.DstEndpoint].profile_id
+        if msg.DstEndpoint in self._device.endpoints:
+            profile = self._device.endpoints[msg.DstEndpoint].profile_id
         else:
             LOGGER.warning("Received a message on an unregistered endpoint: %s", msg)
             profile = zigpy.profiles.zha.PROFILE_ID
@@ -806,14 +682,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return t.uint32_t(0x00000000)
 
         return self._version_rsp.CodeRevision
-
-    @property
-    def zigpy_device(self) -> zigpy.device.Device:
-        """
-        Reference to zigpy device 0x0000, the coordinator.
-        """
-
-        return self.devices[self.ieee]
 
     @property
     def znp_config(self) -> conf.ConfigType:
@@ -925,59 +793,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         except (asyncio.TimeoutError, CommandNotRecognized):
             LOGGER.info("This build of Z-Stack does not appear to support LED control")
 
-    async def _migrate_nvram(self):
-        """
-        Migrates NVRAM entries using the `ZIGPY_ZNP_MIGRATION_ID` NVRAM item.
-        """
-
-        try:
-            migration_id = await self._znp.nvram.osal_read(
-                OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, item_type=t.uint8_t
-            )
-        except KeyError:
-            migration_id = 0
-
-        initial_migration_id = migration_id
-
-        # Migration 1: empty `ADDRMGR` entries are version-dependent and were improperly
-        #              written for CC253x devices.
-        #
-        #              This migration is stateless and can safely be run more than once:
-        #              the only downside is that startup times increase by 10s on newer
-        #              coordinators, which is why the migration ID is persisted.
-        if migration_id < 1:
-            try:
-                entries = await security.read_addr_manager_entries(self._znp)
-            except KeyError:
-                pass
-            else:
-                fixed_entries = []
-
-                for entry in entries:
-                    if entry.extAddr != t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"):
-                        fixed_entries.append(entry)
-                    elif self._znp.version == 3.30:
-                        fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3)
-                    else:
-                        fixed_entries.append(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1)
-
-                if entries != fixed_entries:
-                    LOGGER.warning(
-                        "Repairing %d invalid empty address manager entries (total %d)",
-                        sum(i != j for i, j in zip(entries, fixed_entries)),
-                        len(entries),
-                    )
-                    await security.write_addr_manager_entries(self._znp, fixed_entries)
-
-            migration_id = 1
-
-        if initial_migration_id != migration_id:
-            await self._znp.nvram.osal_write(
-                OsalNvIds.ZIGPY_ZNP_MIGRATION_ID, t.uint8_t(migration_id), create=True
-            )
-            await self._znp.reset()
-
-    async def _write_stack_settings(self, *, reset_if_changed: bool) -> None:
+    async def _write_stack_settings(self) -> bool:
         """
         Writes network-independent Z-Stack settings to NVRAM.
         If no settings actually change, no reset will be performed.
@@ -985,7 +801,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # It's better to be explicit than rely on the NVRAM defaults
         settings = {
-            OsalNvIds.LOGICAL_TYPE: t.DeviceLogicalType.Coordinator,
+            OsalNvIds.LOGICAL_TYPE: t.uint8_t(self.state.node_info.logical_type),
             # Source routing
             OsalNvIds.CONCENTRATOR_ENABLE: t.Bool(True),
             OsalNvIds.CONCENTRATOR_DISCOVERY: t.uint8_t(120),
@@ -1013,9 +829,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 await self._znp.nvram.osal_write(nvid, value)
                 any_changed = True
 
-        if reset_if_changed and any_changed:
-            # Reset to make the above NVRAM writes take effect
-            await self._znp.reset()
+        return any_changed
 
     @contextlib.asynccontextmanager
     async def _limit_concurrency(self):
@@ -1069,7 +883,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
             try:
-                await self._startup()
+                await self.connect()
+                await self.start_network()
                 return
             except asyncio.CancelledError:
                 raise
@@ -1085,67 +900,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         conf.CONF_AUTO_RECONNECT_RETRY_DELAY
                     ]
                 )
-
-    async def _register_endpoints(self) -> None:
-        """
-        Registers the Zigbee endpoints required to communicate with various devices.
-        """
-
-        await self._znp.request(
-            c.AF.Register.Req(
-                Endpoint=ZHA_ENDPOINT,
-                ProfileId=zigpy.profiles.zha.PROFILE_ID,
-                DeviceId=zigpy.profiles.zha.DeviceType.IAS_CONTROL,
-                DeviceVersion=0b0000,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[
-                    clusters.general.Basic.cluster_id,
-                    clusters.general.Ota.cluster_id,
-                ],
-                OutputClusters=[
-                    clusters.security.IasZone.cluster_id,
-                    clusters.security.IasWd.cluster_id,
-                ],
-            ),
-            RspStatus=t.Status.SUCCESS,
-        )
-
-        await self._znp.request(
-            c.AF.Register.Req(
-                Endpoint=ZLL_ENDPOINT,
-                ProfileId=zigpy.profiles.zll.PROFILE_ID,
-                DeviceId=zigpy.profiles.zll.DeviceType.CONTROLLER,
-                DeviceVersion=0b0000,
-                LatencyReq=c.af.LatencyReq.NoLatencyReqs,
-                InputClusters=[clusters.general.Basic.cluster_id],
-                OutputClusters=[],
-            ),
-            RspStatus=t.Status.SUCCESS,
-        )
-
-    async def load_network_info(self, *, load_devices=False) -> None:
-        """
-        Loads network information from NVRAM.
-        """
-
-        await self._znp.load_network_info(load_devices=load_devices)
-
-        self.state.node_information = self._znp.node_info
-        self.state.network_information = self._znp.network_info
-
-    async def write_network_info(
-        self,
-        *,
-        network_info: zigpy.state.NetworkInformation,
-        node_info: zigpy.state.NodeInfo,
-    ) -> None:
-        """
-        Writes network and node state to NVRAM.
-        """
-
-        return await self._znp.write_network_info(
-            network_info=network_info, node_info=node_info
-        )
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
@@ -1164,7 +918,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Always fall back to endpoint 1
         candidates = [ZHA_ENDPOINT]
 
-        for ep_id, endpoint in self.zigpy_device.endpoints.items():
+        for ep_id, endpoint in self._device.endpoints.items():
             if ep_id == ZDO_ENDPOINT:
                 continue
 
@@ -1238,7 +992,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             if cluster == zdo_t.ZDOCmd.Mgmt_Permit_Joining_req:
                 if dst_addr.mode == t.AddrMode.Broadcast:
                     # The coordinator responds to broadcasts
-                    permit_addr = 0x0000
+                    permit_addr = self.state.node_info.nwk
                 else:
                     # Otherwise, the destination device responds
                     permit_addr = dst_addr.address
@@ -1269,10 +1023,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ) or (
                 # Or a direct unicast request
                 dst_addr.mode == t.AddrMode.NWK
-                and dst_addr.address == self.zigpy_device.nwk
+                and dst_addr.address == self._device.nwk
             ):
                 self.handle_message(
-                    sender=self.zigpy_device,
+                    sender=self._device,
                     profile=profile,
                     cluster=cluster,
                     src_ep=src_ep,
@@ -1388,7 +1142,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         if (
                             dst_ep == ZDO_ENDPOINT
                             and dst_addr.mode == t.AddrMode.NWK
-                            and dst_addr.address != 0x0000
+                            and dst_addr.address != self.state.node_info.nwk
                         ):
                             route_status = await self._znp.request(
                                 c.ZDO.ExtRouteChk.Req(

@@ -5,6 +5,7 @@ import itertools
 from collections import deque, defaultdict
 
 import zigpy.zdo.types as zdo_t
+from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp.types as t
 from zigpy_znp.tools.common import setup_parser
@@ -18,10 +19,11 @@ async def perform_energy_scan(radio_path, num_scans=None):
 
     config = ControllerApplication.SCHEMA({"device": {"path": radio_path}})
     app = ControllerApplication(config)
+    await app.connect()
 
     try:
-        await app.startup(read_only=True)
-    except RuntimeError as e:
+        await app.start_network(read_only=True)
+    except NetworkNotFormed as e:
         LOGGER.error("Could not start application: %s", e)
         LOGGER.error("Form a network with `python -m zigpy_znp.tools.form_network`")
         return

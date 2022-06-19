@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import patch
 
 import pytest
 
@@ -6,7 +7,7 @@ import zigpy_znp.config as conf
 from zigpy_znp.uart import connect as uart_connect
 from zigpy_znp.zigbee.application import ControllerApplication
 
-from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1, swap_attribute
+from ..conftest import FORMED_DEVICES, FormedLaunchpadCC26X2R1
 
 
 async def test_no_double_connect(make_znp_server, mocker):
@@ -57,13 +58,31 @@ async def test_probe_unsuccessful():
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_probe_unsuccessful_slow(device, make_znp_server, mocker):
+async def test_probe_unsuccessful_slow1(device, make_znp_server, mocker):
     znp_server = make_znp_server(server_cls=device, shorten_delays=False)
 
     # Don't respond to anything
     znp_server._listeners.clear()
 
     mocker.patch("zigpy_znp.api.CONNECT_PROBE_TIMEOUT", new=0.1)
+
+    assert not (
+        await ControllerApplication.probe(
+            conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port})
+        )
+    )
+
+    assert not any([t._is_connected for t in znp_server._transports])
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_probe_unsuccessful_slow2(device, make_znp_server, mocker):
+    znp_server = make_znp_server(server_cls=device, shorten_delays=False)
+
+    # Don't respond to anything
+    znp_server._listeners.clear()
+
+    mocker.patch("zigpy_znp.zigbee.application.PROBE_TIMEOUT", new=0.1)
 
     assert not (
         await ControllerApplication.probe(
@@ -100,8 +119,8 @@ async def test_probe_multiple(device, make_znp_server):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_reconnect(device, event_loop, make_application):
-    app, znp_server = make_application(
+async def test_reconnect(device, make_application):
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={
             # Make auto-reconnection happen really fast
@@ -118,7 +137,7 @@ async def test_reconnect(device, event_loop, make_application):
     assert app._znp is not None
 
     # Don't reply to anything for a bit
-    with swap_attribute(znp_server, "frame_received", lambda _: None):
+    with patch.object(znp_server, "frame_received", lambda _: None):
         # Now that we're connected, have the server close the connection
         znp_server._uart._transport.close()
 
@@ -143,7 +162,7 @@ async def test_reconnect(device, event_loop, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_shutdown_from_app(device, mocker, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -159,7 +178,7 @@ async def test_shutdown_from_app(device, mocker, make_application):
 
 
 async def test_clean_shutdown(make_application):
-    app, znp_server = make_application(server_cls=FormedLaunchpadCC26X2R1)
+    app, znp_server = await make_application(server_cls=FormedLaunchpadCC26X2R1)
     await app.startup(auto_form=False)
 
     # This should not throw
@@ -170,7 +189,7 @@ async def test_clean_shutdown(make_application):
 
 
 async def test_multiple_shutdown(make_application):
-    app, znp_server = make_application(server_cls=FormedLaunchpadCC26X2R1)
+    app, znp_server = await make_application(server_cls=FormedLaunchpadCC26X2R1)
     await app.startup(auto_form=False)
 
     await app.shutdown()
@@ -179,10 +198,10 @@ async def test_multiple_shutdown(make_application):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_reconnect_lockup(device, event_loop, make_application, mocker):
+async def test_reconnect_lockup(device, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.WATCHDOG_PERIOD", 0.1)
 
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={
             # Make auto-reconnection happen really fast
@@ -197,7 +216,7 @@ async def test_reconnect_lockup(device, event_loop, make_application, mocker):
     await app.startup(auto_form=False)
 
     # Stop responding
-    with swap_attribute(znp_server, "frame_received", lambda _: None):
+    with patch.object(znp_server, "frame_received", lambda _: None):
         assert app._znp is not None
         assert app._reconnect_task.done()
 
@@ -219,15 +238,16 @@ async def test_reconnect_lockup(device, event_loop, make_application, mocker):
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_reconnect_lockup_pyserial(device, event_loop, make_application, mocker):
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_reconnect_lockup_pyserial(device, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.WATCHDOG_PERIOD", 0.1)
 
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={
             conf.CONF_ZNP_CONFIG: {
-                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.1,
+                conf.CONF_AUTO_RECONNECT_RETRY_DELAY: 0.01,
+                conf.CONF_SREQ_TIMEOUT: 0.1,
             }
         },
     )
@@ -242,20 +262,20 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
     # We are connected
     assert app._znp is not None
 
-    did_load_info = asyncio.get_running_loop().create_future()
+    did_start_network = asyncio.get_running_loop().create_future()
 
-    async def patched_load_network_info(*, old_load=app.load_network_info):
+    async def patched_start_network(old_start_network=app.start_network, **kwargs):
         try:
-            return await old_load()
+            return await old_start_network(**kwargs)
         finally:
-            did_load_info.set_result(True)
+            did_start_network.set_result(True)
 
-    with swap_attribute(app, "load_network_info", patched_load_network_info):
+    with patch.object(app, "start_network", patched_start_network):
         # "Drop" the connection like PySerial
         app._znp._uart.connection_lost(exc=None)
 
         # Wait until we are reconnecting
-        await did_load_info
+        await did_start_network
 
     # "Drop" the connection like PySerial again, but during connect
     app._znp._uart.connection_lost(exc=None)
@@ -269,3 +289,49 @@ async def test_reconnect_lockup_pyserial(device, event_loop, make_application, m
     assert app._znp and app._znp._uart
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_disconnect(device, make_application):
+    app, znp_server = await make_application(
+        server_cls=device,
+        client_config={
+            conf.CONF_ZNP_CONFIG: {
+                conf.CONF_SREQ_TIMEOUT: 0.1,
+            }
+        },
+    )
+
+    assert app._znp is None
+    await app.connect()
+
+    assert app._znp is not None
+
+    await app.disconnect()
+    assert app._znp is None
+
+    await app.disconnect()
+    await app.disconnect()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_disconnect_failure(device, make_application):
+    app, znp_server = await make_application(
+        server_cls=device,
+        client_config={
+            conf.CONF_ZNP_CONFIG: {
+                conf.CONF_SREQ_TIMEOUT: 0.1,
+            }
+        },
+    )
+
+    assert app._znp is None
+    await app.connect()
+
+    assert app._znp is not None
+
+    with patch.object(app._znp, "reset", side_effect=RuntimeError("An error")):
+        # Runs without error
+        await app.disconnect()
+
+    assert app._znp is None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import typing
 import logging
 import dataclasses
 
@@ -464,6 +465,13 @@ class CommandBase:
         params.update(kwargs)
 
         return type(self)(partial=self._partial, **params)
+
+    def as_dict(self) -> dict[str, typing.Any]:
+        """
+        Converts the command into a dictionary.
+        """
+
+        return {p.name: v for p, v in self._bound_params.values()}
 
     def __eq__(self, other):
         return type(self) is type(other) and self._bound_params == other._bound_params

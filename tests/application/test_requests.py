@@ -23,7 +23,7 @@ from ..conftest import (
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_chosen_dst_endpoint(device, make_application, mocker):
-    app, znp_server = make_application(device)
+    app, znp_server = await make_application(device)
     await app.startup(auto_form=False)
 
     build = mocker.patch.object(type(app), "_zstack_build_id", mocker.PropertyMock())
@@ -48,7 +48,7 @@ async def test_chosen_dst_endpoint(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_zigpy_request(device, make_application):
-    app, znp_server = make_application(device)
+    app, znp_server = await make_application(device)
     await app.startup(auto_form=False)
 
     TSN = 6
@@ -108,7 +108,7 @@ async def test_zigpy_request(device, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_zigpy_request_failure(device, make_application, mocker):
-    app, znp_server = make_application(device)
+    app, znp_server = await make_application(device)
     await app.startup(auto_form=False)
 
     TSN = 6
@@ -161,7 +161,7 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     ],
 )
 async def test_request_addr_mode(device, addr, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -188,7 +188,7 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_mrequest(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     mocker.patch.object(app, "_send_request", new=CoroutineMock())
     group = app.groups.add_group(0x1234, "test group")
@@ -206,7 +206,7 @@ async def test_mrequest(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_mrequest_doesnt_block(device, make_application, event_loop):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     znp_server.reply_once_to(
         request=c.AF.DataRequestExt.Req(
@@ -239,7 +239,7 @@ async def test_mrequest_doesnt_block(device, make_application, event_loop):
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_broadcast(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     await app.startup()
 
     znp_server.reply_once_to(
@@ -275,7 +275,7 @@ async def test_broadcast(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_request_concurrency(device, make_application, mocker):
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device,
         client_config={"znp_config": {conf.CONF_MAX_CONCURRENT_REQUESTS: 2}},
     )
@@ -346,7 +346,7 @@ async def test_request_concurrency(device, make_application, mocker):
 async def test_request_concurrency_overflow(device, make_application, mocker):
     mocker.patch("zigpy_znp.zigbee.application.MAX_WAITING_REQUESTS", new=1)
 
-    app, znp_server = make_application(
+    app, znp_server = await make_application(
         server_cls=device, client_config={
             'znp_config': {conf.CONF_MAX_CONCURRENT_REQUESTS: 1}
         }
@@ -399,7 +399,7 @@ async def test_request_concurrency_overflow(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_nonstandard_profile(device, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
@@ -456,7 +456,7 @@ async def test_nonstandard_profile(device, make_application):
 async def test_request_cancellation_shielding(
     device, make_application, mocker, event_loop
 ):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -511,7 +511,9 @@ async def test_request_cancellation_shielding(
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_request_recovery_route_rediscovery_zdo(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    TSN = 6
+
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -555,7 +557,7 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.NWK, device.nwk),
             command_id=zdo_t.ZDOCmd.Active_EP_req,
-            TSN=6,
+            TSN=TSN,
             zdo_NWKAddrOfInterest=device.nwk,
         ),
         responses=[
@@ -570,7 +572,7 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
                 IsBroadcast=t.Bool.false,
                 ClusterId=zdo_t.ZDOCmd.Active_EP_rsp,
                 SecurityUse=0,
-                TSN=6,
+                TSN=TSN,
                 MacDst=device.nwk,
                 Data=serialize_zdo_command(
                     command_id=zdo_t.ZDOCmd.Active_EP_rsp,
@@ -592,7 +594,7 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_request_recovery_route_rediscovery_af(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -661,7 +663,7 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_request_recovery_use_ieee_addr(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -729,7 +731,7 @@ async def test_request_recovery_use_ieee_addr(device, make_application, mocker):
 async def test_request_recovery_assoc_remove(
     device_cls, fw_assoc_remove, final_status, make_application, mocker
 ):
-    app, znp_server = make_application(server_cls=device_cls)
+    app, znp_server = await make_application(server_cls=device_cls)
 
     await app.startup(auto_form=False)
 
@@ -863,7 +865,7 @@ async def test_request_recovery_assoc_remove(
 async def test_request_recovery_manual_source_route(
     device, succeed, relays, make_application, mocker
 ):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -937,7 +939,7 @@ async def test_request_recovery_manual_source_route(
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_route_discovery_concurrency(device, make_application):
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -976,7 +978,7 @@ async def test_route_discovery_concurrency(device, make_application):
 async def test_zdo_from_unknown(device, make_application, caplog, mocker):
     mocker.patch("zigpy_znp.zigbee.application.IEEE_ADDR_DISCOVERY_TIMEOUT", new=0.1)
 
-    app, znp_server = make_application(server_cls=device)
+    app, znp_server = await make_application(server_cls=device)
 
     znp_server.reply_once_to(
         request=c.ZDO.IEEEAddrReq.Req(partial=True),

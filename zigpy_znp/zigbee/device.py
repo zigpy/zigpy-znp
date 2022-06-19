@@ -93,7 +93,7 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
         LOGGER.debug("Sending loopback reply %s (%s), tsn=%s", command_id, kwargs, tsn)
 
         self.app.handle_message(
-            sender=self.app.zigpy_device,
+            sender=self.app._device,
             profile=znp_app.ZDO_PROFILE,
             cluster=command_id,
             src_ep=znp_app.ZDO_ENDPOINT,
@@ -124,7 +124,7 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
         ):
             return
 
-        old_network_info = self.app.state.network_information
+        old_network_info = self.app.state.network_info
 
         if (
             t.Channels.from_channel_list([old_network_info.channel])
@@ -157,18 +157,17 @@ class ZNPZDOEndpoint(zigpy.zdo.ZDO):
 
         # Wait until the network info changes, it can take ~5s
         while (
-            self.app.state.network_information.nwk_update_id
-            == old_network_info.nwk_update_id
+            self.app.state.network_info.nwk_update_id == old_network_info.nwk_update_id
         ):
             await self.app.load_network_info(load_devices=False)
             await asyncio.sleep(NWK_UPDATE_LOOP_DELAY)
 
         # Z-Stack automatically increments the NWK update ID instead of setting it
         # TODO: Directly set it once radio settings API is finalized.
-        if NwkUpdate.nwkUpdateId != self.app.state.network_information.nwk_update_id:
+        if NwkUpdate.nwkUpdateId != self.app.state.network_info.nwk_update_id:
             LOGGER.warning(
                 f"`nwkUpdateId` was incremented to"
-                f" {self.app.state.network_information.nwk_update_id} instead of being"
+                f" {self.app.state.network_info.nwk_update_id} instead of being"
                 f" set to {NwkUpdate.nwkUpdateId}"
             )
 
