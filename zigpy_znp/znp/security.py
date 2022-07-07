@@ -5,6 +5,7 @@ import logging
 import dataclasses
 
 import zigpy.state
+import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
@@ -272,14 +273,20 @@ async def read_devices(
             t.AddrMgrUserType.Assoc | t.AddrMgrUserType.Security,
             t.AddrMgrUserType.Security,
         ):
+            is_child = bool(entry.type & t.AddrMgrUserType.Assoc)
+
             devices[entry.extAddr] = StoredDevice(
                 node_info=zigpy.state.NodeInfo(
                     nwk=entry.nwkAddr,
                     ieee=entry.extAddr,
-                    logical_type=None,
+                    logical_type=(
+                        zdo_t.LogicalType.EndDevice
+                        if is_child
+                        else zdo_t.LogicalType.Router
+                    ),
                 ),
                 key=None,
-                is_child=bool(entry.type & t.AddrMgrUserType.Assoc),
+                is_child=is_child,
             )
         else:
             raise ValueError(f"Unexpected entry type: {entry.type}")
