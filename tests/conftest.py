@@ -40,7 +40,6 @@ def pytest_collection_modifyitems(session, config, items):
             pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
         )
         item.add_marker(pytest.mark.filterwarnings("error::RuntimeWarning"))
-        item.add_marker(pytest.mark.asyncio)
 
 
 class ForwardingSerialTransport:
@@ -91,7 +90,7 @@ def config_for_port_path(path):
 
 
 @pytest.fixture
-async def make_znp_server(mocker):
+def make_znp_server(mocker):
     transports = []
 
     def inner(server_cls, config=None, shorten_delays=True):
