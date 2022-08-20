@@ -884,7 +884,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
             try:
                 await self.connect()
-                await self.start_network()
+                await self.initialize()
                 return
             except asyncio.CancelledError:
                 raise
