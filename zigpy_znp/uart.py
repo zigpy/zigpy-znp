@@ -1,6 +1,7 @@
 import typing
 import asyncio
 import logging
+import threading
 import warnings
 
 import serial
@@ -169,9 +170,29 @@ class ZnpMtProtocol(asyncio.Protocol):
             f">"
         )
 
+znp_loop = None
+hass_loop = None
 
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
-    loop = asyncio.get_running_loop()
+    global hass_loop, znp_loop
+
+    if hass_loop is None:
+        hass_loop = asyncio.get_running_loop()
+
+    if znp_loop is None:
+        znp_loop = asyncio.new_event_loop()
+
+        def run_znp_loop():
+            znp_loop.run_forever()
+
+        znp_thread = threading.Thread(target=run_znp_loop, daemon=True, name="ZigpyThread")
+        znp_thread.start()
+    future = asyncio.run_coroutine_threadsafe(connect2(config, api), znp_loop)
+    return future.result()
+
+
+async def connect2(config: conf.ConfigType, api) -> ZnpMtProtocol:
+    loop = znp_loop
 
     port = config[conf.CONF_DEVICE_PATH]
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]

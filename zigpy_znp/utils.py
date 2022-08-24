@@ -73,8 +73,13 @@ class BaseResponseListener:
 
         if not any(c.matches(response) for c in self.matching_commands):
             return False
-
-        return self._resolve(response)
+        from zigpy_znp.uart import hass_loop
+        _self = self
+        async def _resolve() -> bool:
+            return _self._resolve(response)
+        future = asyncio.run_coroutine_threadsafe(_resolve(), hass_loop)
+        #return future.result()
+        return True
 
     def _resolve(self, response: t.CommandBase) -> bool:
         """
