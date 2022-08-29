@@ -16,7 +16,16 @@ hass_loop = None
 def init():
     global znp_loop, hass_loop
     if hass_loop is None:
-        hass_loop = asyncio.get_running_loop()
+        try
+            hass_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            hass_loop = asyncio.new_event_loop()
+
+            def run_hass_loop():
+                hass_loop.run_forever()
+
+            hass_fake_thread = threading.Thread(target=run_hass_loop, daemon=True, name="WorkerThread")
+            hass_fake_thread.start()
 
     if znp_loop is None:
         znp_loop = asyncio.new_event_loop()
