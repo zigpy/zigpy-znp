@@ -73,7 +73,7 @@ class BaseResponseListener:
 
         if not any(c.matches(response) for c in self.matching_commands):
             return False
-        from zigpy_znp.uart import hass_loop
+        from zigpy_znp.async_utils import hass_loop
         _self = self
         async def _resolve() -> bool:
             return _self._resolve(response)
