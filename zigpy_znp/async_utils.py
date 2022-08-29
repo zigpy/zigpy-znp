@@ -23,8 +23,6 @@ def init():
 
         znp_thread = threading.Thread(target=run_znp_loop, daemon=True, name="ZigpyThread")
         znp_thread.start()
-    future = asyncio.run_coroutine_threadsafe(connect2(config, api), znp_loop)
-    return future.result()
 
 if znp_loop is None:
     init()
