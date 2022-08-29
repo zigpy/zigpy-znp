@@ -34,7 +34,7 @@ def run_in_loop(function: any, loop, wait_for_result:bool=True):
     @functools.wraps(function)
     async def new_func(*args, **kwargs):
         future = asyncio.run_coroutine_threadsafe(function(*args, **kwargs), loop)
-        return future.result() if wait_for_result else None
+        return await future.result() if wait_for_result else None
     return new_func
 
 def run_in_znp_loop(function: any, wait_for_result:bool=True):
