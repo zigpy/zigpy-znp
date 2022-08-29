@@ -78,7 +78,9 @@ class ZnpMtProtocol(asyncio.Protocol):
             LOGGER.log(log.TRACE, "Parsed frame: %s", frame)
 
             try:
-                self._api.frame_received(frame.payload)
+                async def _frame_received(payload):
+                    self._api.frame_received(payload)
+                future = asyncio.run_coroutine_threadsafe(_frame_received(frame.payload), async_utils.hass_loop)
             except Exception as e:
                 LOGGER.error(
                     "Received an exception while passing frame to API: %s",
