@@ -1,5 +1,4 @@
 import typing
-import async_utils
 import asyncio
 import logging
 import threading
@@ -7,6 +6,7 @@ import warnings
 
 import serial
 
+import zigpy_znp.async_utils
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
