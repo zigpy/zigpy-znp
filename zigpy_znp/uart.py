@@ -6,10 +6,10 @@ import warnings
 
 import serial
 
-import zigpy_znp.async_utils
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
+from zigpy_znp.async_utils import *
 from zigpy_znp.types import Bytes
 from zigpy_znp.exceptions import InvalidFrame
 
