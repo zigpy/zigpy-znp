@@ -1,4 +1,5 @@
 import typing
+import async_utils
 import asyncio
 import logging
 import threading
@@ -173,7 +174,7 @@ class ZnpMtProtocol(asyncio.Protocol):
 znp_loop = None
 hass_loop = None
 
-async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
+async def connect3(config: conf.ConfigType, api) -> ZnpMtProtocol:
     global hass_loop, znp_loop
 
     if hass_loop is None:
@@ -191,7 +192,8 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     return future.result()
 
 
-async def connect2(config: conf.ConfigType, api) -> ZnpMtProtocol:
+@run_in_znp_loop
+async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     loop = znp_loop
 
     port = config[conf.CONF_DEVICE_PATH]
