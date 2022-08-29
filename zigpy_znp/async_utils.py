@@ -16,7 +16,7 @@ hass_loop = None
 def init():
     global znp_loop, hass_loop
     if hass_loop is None:
-        try
+        try:
             hass_loop = asyncio.get_running_loop()
         except RuntimeError:
             hass_loop = asyncio.new_event_loop()
