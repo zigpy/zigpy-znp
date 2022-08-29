@@ -46,9 +46,9 @@ class ZnpMtProtocol(asyncio.Protocol):
         if self._transport is not None:
             LOGGER.debug("Closing serial port")
             
-            async def close_transport():
+            async def _close_transport():
                 self._transport.close()
-            future = asyncio.run_coroutine_threadsafe(_frame_received(frame.payload), async_utils.znp_loop)
+            future = asyncio.run_coroutine_threadsafe(_close_transport(), async_utils.znp_loop)
             future.result()
             self._transport = None
 
