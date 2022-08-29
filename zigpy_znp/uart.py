@@ -6,7 +6,7 @@ import warnings
 
 import serial
 
-import zigpy_znp.async_utils
+import zigpy_znp.async_utils as async_utils
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
@@ -192,7 +192,7 @@ async def connect3(config: conf.ConfigType, api) -> ZnpMtProtocol:
     return future.result()
 
 
-@run_in_znp_loop
+@async_utils.run_in_znp_loop
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     loop = znp_loop
 
