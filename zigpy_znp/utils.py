@@ -80,7 +80,7 @@ class BaseResponseListener:
         #future = asyncio.run_coroutine_threadsafe(_resolve(), hass_loop)
         #return future.result()
         #return True
-        return self._resolve()
+        return self._resolve(response)
 
     def _resolve(self, response: t.CommandBase) -> bool:
         """
