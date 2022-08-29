@@ -1,7 +1,10 @@
 import typing
 import asyncio
 import logging
+import functools
 import threading
+import dataclasses
+
 
 LOGGER = logging.getLogger(__name__)
 
