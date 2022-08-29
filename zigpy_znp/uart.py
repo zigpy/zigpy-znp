@@ -171,9 +171,6 @@ class ZnpMtProtocol(asyncio.Protocol):
             f">"
         )
 
-znp_loop = None
-hass_loop = None
-
 async def connect3(config: conf.ConfigType, api) -> ZnpMtProtocol:
     global hass_loop, znp_loop
 
@@ -194,7 +191,7 @@ async def connect3(config: conf.ConfigType, api) -> ZnpMtProtocol:
 
 @async_utils.run_in_znp_loop
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
-    loop = znp_loop
+    loop = asyncio.get_running_loop()
 
     port = config[conf.CONF_DEVICE_PATH]
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]
