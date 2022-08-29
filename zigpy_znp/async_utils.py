@@ -27,18 +27,18 @@ def init():
 if znp_loop is None:
     init()
 
-def run_in_loop(function: typing.CoroutineFunction, loop, wait_for_result:bool=True) -> typing.CoroutineFunction | None:
+def run_in_loop(function: any, loop, wait_for_result:bool=True):
     @functools.wraps(function)
     async def new_func(*args, **kwargs):
         future = asyncio.run_coroutine_threadsafe(function(*args, **kwargs), loop)
         return future.result() if wait_for_result else None
     return new_func
 
-def run_in_znp_loop(function: typing.CoroutineFunction, wait_for_result:bool=True) -> typing.CoroutineFunction | None:
+def run_in_znp_loop(function: any, wait_for_result:bool=True):
     global znp_loop
     return run_in_loop(function, znp_loop, wait_for_result)
 	
-def run_in_hass_loop(function: typing.CoroutineFunction, wait_for_result:bool=True) -> typing.CoroutineFunction | None:
+def run_in_hass_loop(function: any, wait_for_result:bool=True):
     global hass_loop
     return run_in_loop(function, hass_loop, wait_for_result)
 	
