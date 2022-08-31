@@ -4,7 +4,8 @@ import logging
 import threading
 import warnings
 
-import serial
+import serialpy as serial
+import serialpy as serial_asyncio
 
 import zigpy_znp.async_utils as async_utils
 import zigpy_znp.config as conf
@@ -12,15 +13,6 @@ import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
 from zigpy_znp.types import Bytes
 from zigpy_znp.exceptions import InvalidFrame
-
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        action="ignore",
-        module="serial_asyncio",
-        message='"@coroutine" decorator is deprecated',
-        category=DeprecationWarning,
-    )
-    import serial_asyncio  # noqa: E402
 
 
 LOGGER = logging.getLogger(__name__)
@@ -37,6 +29,7 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._transport = None
         self._connected_event = asyncio.Event()
 
+    @async_utils.run_in_znp_loop
     def close(self) -> None:
         """Closes the port."""
 
@@ -45,11 +38,8 @@ class ZnpMtProtocol(asyncio.Protocol):
 
         if self._transport is not None:
             LOGGER.debug("Closing serial port")
-            
-            async def _close_transport():
-                self._transport.close()
-            future = asyncio.run_coroutine_threadsafe(_close_transport(), async_utils.znp_loop)
-            future.result()
+
+            self._transport.close()
             self._transport = None
 
     def connection_lost(self, exc: typing.Optional[Exception]) -> None:
@@ -83,7 +73,7 @@ class ZnpMtProtocol(asyncio.Protocol):
             try:
                 async def _frame_received(payload):
                     self._api.frame_received(payload)
-                future = asyncio.run_coroutine_threadsafe(_frame_received(frame.payload), async_utils.hass_loop)
+                async_utils.run_in_worker_loop(_frame_received(frame.payload), wait_for_result=False)
             except Exception as e:
                 LOGGER.error(
                     "Received an exception while passing frame to API: %s",
@@ -176,23 +166,6 @@ class ZnpMtProtocol(asyncio.Protocol):
             f">"
         )
 
-async def connect3(config: conf.ConfigType, api) -> ZnpMtProtocol:
-    global hass_loop, znp_loop
-
-    if hass_loop is None:
-        hass_loop = asyncio.get_running_loop()
-
-    if znp_loop is None:
-        znp_loop = asyncio.new_event_loop()
-
-        def run_znp_loop():
-            znp_loop.run_forever()
-
-        znp_thread = threading.Thread(target=run_znp_loop, daemon=True, name="ZigpyThread")
-        znp_thread.start()
-    future = asyncio.run_coroutine_threadsafe(connect2(config, api), znp_loop)
-    return future.result()
-
 
 @async_utils.run_in_znp_loop
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
@@ -202,7 +175,7 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]
     flow_control = config[conf.CONF_DEVICE_FLOW_CONTROL]
 
-    LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
+    LOGGER.debug("Connecting to %s at %s baud in thread %s", port, baudrate, threading.current_thread().name)
 
     _, protocol = await serial_asyncio.create_serial_connection(
         loop=loop,

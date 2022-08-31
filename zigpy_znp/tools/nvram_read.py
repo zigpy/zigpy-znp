@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 import zigpy_znp.types as t
+from zigpy_znp import async_utils
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
@@ -96,4 +97,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))  # pragma: no cover
+    async_utils.run_in_worker_loop(main(sys.argv[1:]))  # pragma: no cover

@@ -8,6 +8,7 @@ import zigpy.zdo.types as zdo_t
 from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp.types as t
+from zigpy_znp import async_utils
 from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.zigbee.application import ControllerApplication
 
@@ -93,4 +94,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))  # pragma: no cover
+    async_utils.run_in_worker_loop(main(sys.argv[1:]))  # pragma: no cover

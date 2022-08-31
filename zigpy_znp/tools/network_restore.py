@@ -9,6 +9,7 @@ import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
+from zigpy_znp import async_utils
 from zigpy_znp.api import ZNP
 from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
 from zigpy_znp.zigbee.application import ControllerApplication
@@ -130,4 +131,4 @@ async def main(argv: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))  # pragma: no cover
+    async_utils.run_in_worker_loop(main(sys.argv[1:]))  # pragma: no cover

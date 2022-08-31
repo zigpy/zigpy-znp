@@ -2,6 +2,7 @@ import sys
 import asyncio
 import logging
 
+from zigpy_znp import async_utils
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.types.nvids import (
@@ -79,4 +80,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))  # pragma: no cover
+    async_utils.run_in_worker_loop(main(sys.argv[1:]))  # pragma: no cover

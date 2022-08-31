@@ -21,7 +21,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.logger as log
 import zigpy_znp.commands as c
-from zigpy_znp import uart
+from zigpy_znp import uart, async_utils
 from zigpy_znp.nvram import NVRAMHelper
 from zigpy_znp.utils import (
     CatchAllResponse,
