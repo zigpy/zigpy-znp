@@ -1,5 +1,4 @@
 import sys
-import asyncio
 import logging
 import itertools
 from collections import deque, defaultdict

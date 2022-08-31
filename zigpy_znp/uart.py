@@ -2,18 +2,16 @@ import typing
 import asyncio
 import logging
 import threading
-import warnings
 
 import serialpy as serial
 import serialpy as serial_asyncio
 
-import zigpy_znp.async_utils as async_utils
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
+import zigpy_znp.async_utils as async_utils
 from zigpy_znp.types import Bytes
 from zigpy_znp.exceptions import InvalidFrame
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -71,9 +69,13 @@ class ZnpMtProtocol(asyncio.Protocol):
             LOGGER.log(log.TRACE, "Parsed frame: %s", frame)
 
             try:
+
                 async def _frame_received(payload):
                     self._api.frame_received(payload)
-                async_utils.run_in_worker_loop(_frame_received(frame.payload), wait_for_result=False)
+
+                async_utils.run_in_worker_loop(
+                    _frame_received(frame.payload), wait_for_result=False
+                )
             except Exception as e:
                 LOGGER.error(
                     "Received an exception while passing frame to API: %s",
@@ -175,7 +177,12 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]
     flow_control = config[conf.CONF_DEVICE_FLOW_CONTROL]
 
-    LOGGER.debug("Connecting to %s at %s baud in thread %s", port, baudrate, threading.current_thread().name)
+    LOGGER.debug(
+        "Connecting to %s at %s baud in thread %s",
+        port,
+        baudrate,
+        threading.current_thread().name,
+    )
 
     _, protocol = await serial_asyncio.create_serial_connection(
         loop=loop,

@@ -1,6 +1,5 @@
 import sys
 import json
-import asyncio
 import logging
 
 import zigpy_znp.types as t

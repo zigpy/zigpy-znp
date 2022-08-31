@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import json
-import asyncio
 
 import zigpy.state
 import zigpy.zdo.types as zdo_t

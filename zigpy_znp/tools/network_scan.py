@@ -1,6 +1,5 @@
 import sys
 import time
-import asyncio
 import logging
 import itertools
 

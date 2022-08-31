@@ -1,6 +1,5 @@
 import sys
 import json
-import asyncio
 import logging
 
 from zigpy_znp import async_utils

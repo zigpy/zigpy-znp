@@ -1,10 +1,7 @@
-import typing
 import asyncio
 import logging
 import functools
 import threading
-import dataclasses
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -20,7 +17,7 @@ def try_get_running_loop_as_worker_loop():
     if _worker_loop is None:
         try:
             _worker_loop = asyncio.get_running_loop()
-        except:
+        except RuntimeError:
             pass
 
 
@@ -45,12 +42,15 @@ def get_znp_loop():
 def start_worker_loop_in_thread():
     global _worker_loop_thread, _worker_loop
     if _worker_loop_thread is None and _worker_loop is not None:
+
         def run_worker_loop():
             asyncio.set_event_loop(_worker_loop)
             _worker_loop.thread = threading.current_thread()
             _worker_loop.run_forever()
 
-        _worker_loop_thread = threading.Thread(target=run_worker_loop, daemon=True, name="ZigpyWorkerThread")
+        _worker_loop_thread = threading.Thread(
+            target=run_worker_loop, daemon=True, name="ZigpyWorkerThread"
+        )
         _worker_loop_thread.start()
 
 
@@ -68,11 +68,13 @@ def init_znp_loop():
         _znp_loop = asyncio.new_event_loop()
 
         def run_znp_loop():
-            #asyncio.set_event_loop(_znp_loop)
+            # asyncio.set_event_loop(_znp_loop)
             _znp_loop.thread = threading.current_thread()
             _znp_loop.run_forever()
 
-        znp_thread = threading.Thread(target=run_znp_loop, daemon=True, name="ZigpySerialThread")
+        znp_thread = threading.Thread(
+            target=run_znp_loop, daemon=True, name="ZigpySerialThread"
+        )
         znp_thread.start()
 
 
@@ -85,29 +87,36 @@ def delegate_to_worker_thread(coro, wait: bool = True):
     return future.result() if wait else None
 
 
-def run_in_loop(function: any, loop = None, loop_getter = None, wait_for_result: bool = True, *args, **kwargs):
+def run_in_loop(
+    function, loop=None, loop_getter=None, wait_for_result: bool = True, *args, **kwargs
+):
     if loop is None and loop_getter is None:
-        raise "either loop or loop_getter must be passed to run_in_loop"
+        raise RuntimeError("either loop or loop_getter must be passed to run_in_loop")
 
     if asyncio.iscoroutine(function):
         # called as a function call
         _loop = loop if loop is not None else loop_getter()
-        #_cur_loop = asyncio.get_event_loop()
-        #_run_loop = None
-        #try:
+        # _cur_loop = asyncio.get_event_loop()
+        # _run_loop = None
+        # try:
         #    _cur_loop = asyncio.get_running_loop()
-        #except RuntimeError:
+        # except RuntimeError:
         #    pass
 
-        #if _cur_loop is not None and _cur_loop is _loop and False:
-        if False and hasattr(_loop, "thread") and threading.current_thread().name == _loop.thread.name:
+        # if _cur_loop is not None and _cur_loop is _loop and False:
+        if (
+            False
+            and hasattr(_loop, "thread")
+            and threading.current_thread().name == _loop.thread.name
+        ):
+
             async def run():
                 return function()
 
             x = _loop.run_until_complete(run)
-            #if wait_for_result and asyncio.iscoroutine(x):
+            # if wait_for_result and asyncio.iscoroutine(x):
             #    return x
-            #else:
+            # else:
             #    return x
             return x
         else:
@@ -118,8 +127,13 @@ def run_in_loop(function: any, loop = None, loop_getter = None, wait_for_result:
 
         @functools.wraps(function)
         def new_sync(*args, **kwargs):
-            _loop = loop if loop is not None else loop_getter()
-            return run_in_loop(function(*args, **kwargs), loop=loop, loop_getter=loop_getter, wait_for_result=wait_for_result)
+            loop if loop is not None else loop_getter()
+            return run_in_loop(
+                function(*args, **kwargs),
+                loop=loop,
+                loop_getter=loop_getter,
+                wait_for_result=wait_for_result,
+            )
 
         async def new_async(*args, **kwargs):
             return new_sync(*args, **kwargs)
@@ -131,9 +145,10 @@ def run_in_loop(function: any, loop = None, loop_getter = None, wait_for_result:
 
 
 def run_in_znp_loop(*args, **kwargs):
-    return run_in_loop(*args, **kwargs, loop_getter=get_znp_loop)
+    kwargs["loop_getter"] = get_znp_loop
+    return run_in_loop(*args, **kwargs)
 
 
 def run_in_worker_loop(*args, **kwargs):
-    return run_in_loop(*args, **kwargs, loop_getter=get_worker_loop)
-
+    kwargs["loop_getter"] = get_worker_loop
+    return run_in_loop(*args, **kwargs)
