@@ -45,7 +45,6 @@ def start_worker_loop_in_thread():
 
         def run_worker_loop():
             asyncio.set_event_loop(_worker_loop)
-            _worker_loop.thread = threading.current_thread()
             _worker_loop.run_forever()
 
         _worker_loop_thread = threading.Thread(
@@ -69,7 +68,6 @@ def init_znp_loop():
 
         def run_znp_loop():
             # asyncio.set_event_loop(_znp_loop)
-            _znp_loop.thread = threading.current_thread()
             _znp_loop.run_forever()
 
         znp_thread = threading.Thread(
@@ -96,31 +94,7 @@ def run_in_loop(
     if asyncio.iscoroutine(function):
         # called as a function call
         _loop = loop if loop is not None else loop_getter()
-        # _cur_loop = asyncio.get_event_loop()
-        # _run_loop = None
-        # try:
-        #    _cur_loop = asyncio.get_running_loop()
-        # except RuntimeError:
-        #    pass
-
-        # if _cur_loop is not None and _cur_loop is _loop and False:
-        if (
-            False
-            and hasattr(_loop, "thread")
-            and threading.current_thread().name == _loop.thread.name
-        ):
-
-            async def run():
-                return function()
-
-            x = _loop.run_until_complete(run)
-            # if wait_for_result and asyncio.iscoroutine(x):
-            #    return x
-            # else:
-            #    return x
-            return x
-        else:
-            future = asyncio.run_coroutine_threadsafe(function, _loop)
+        future = asyncio.run_coroutine_threadsafe(function, _loop)
         return future.result() if wait_for_result else None
     else:
         # probably a decorator
