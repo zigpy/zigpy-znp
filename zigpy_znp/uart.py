@@ -37,8 +37,12 @@ class ZnpMtProtocol(asyncio.Protocol):
         if self._transport is not None:
             LOGGER.debug("Closing serial port")
 
-            self._transport.close()
-            self._transport = None
+            @async_utils.run_in_worker_loop
+            def close_transport():
+                self._transport.close()
+                self._transport = None
+
+            close_transport()
 
     def connection_lost(self, exc: typing.Optional[Exception]) -> None:
         """Connection lost."""
