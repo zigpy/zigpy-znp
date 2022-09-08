@@ -18,7 +18,6 @@ import async_timeout
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
-from zigpy.types import deserialize as list_deserialize
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.const as const
@@ -271,93 +270,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return dst_addr
 
-    @zigpy.util.retryable_request
-    async def request(
-        self,
-        device,
-        profile,
-        cluster,
-        src_ep,
-        dst_ep,
-        sequence,
-        data,
-        expect_reply=True,
-        use_ieee=False,
-    ) -> tuple[t.Status, str]:
-        tx_options = c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
-
-        if expect_reply:
-            tx_options |= c.af.TransmitOptions.ACK_REQUEST
-
-        if use_ieee:
-            destination = t.AddrModeAddress(mode=t.AddrMode.IEEE, address=device.ieee)
-        else:
-            destination = t.AddrModeAddress(mode=t.AddrMode.NWK, address=device.nwk)
-
-        return await self._send_request(
-            dst_addr=destination,
-            dst_ep=dst_ep,
-            src_ep=src_ep,
-            profile=profile,
-            cluster=cluster,
-            sequence=sequence,
-            options=tx_options,
-            radius=30,
-            data=data,
-        )
-
-    async def broadcast(
-        self,
-        profile,
-        cluster,
-        src_ep,
-        dst_ep,
-        grpid,
-        radius,
-        sequence,
-        data,
-        broadcast_address=zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
-    ) -> tuple[t.Status, str]:
-        assert grpid == 0
-
-        return await self._send_request(
-            dst_addr=t.AddrModeAddress(
-                mode=t.AddrMode.Broadcast, address=broadcast_address
-            ),
-            dst_ep=dst_ep,
-            src_ep=src_ep,
-            profile=profile,
-            cluster=cluster,
-            sequence=sequence,
-            options=c.af.TransmitOptions.NONE,
-            radius=radius,
-            data=data,
-        )
-
-    async def mrequest(
-        self,
-        group_id,
-        profile,
-        cluster,
-        src_ep,
-        sequence,
-        data,
-        *,
-        hops=0,
-        non_member_radius=3,
-    ) -> tuple[t.Status, str]:
-        return await self._send_request(
-            dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=group_id),
-            dst_ep=src_ep,
-            src_ep=src_ep,
-            profile=profile,
-            cluster=cluster,
-            sequence=sequence,
-            options=c.af.TransmitOptions.NONE,
-            radius=hops,
-            data=data,
-        )
-
     async def permit(self, time_s: int = 60, node: t.EUI64 = None):
         """
         Permit joining the network via a specific node or via all router nodes.
@@ -526,31 +438,36 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 LOGGER.debug("Ignoring loopback ZDO request")
                 return
 
-        message = t.uint8_t(msg.TSN).serialize() + msg.Data
-        hdr, data = zdo_t.ZDOHeader.deserialize(msg.ClusterId, message)
-        names, types = zdo_t.CLUSTERS[msg.ClusterId]
-        args, data = list_deserialize(data, types)
-        kwargs = dict(zip(names, args))
-
-        if msg.ClusterId == zdo_t.ZDOCmd.Device_annce:
-            self.on_zdo_device_announce(*args)
-            device = self.get_device(ieee=kwargs["IEEEAddr"])
+        if msg.IsBroadcast:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.Broadcast,
+                address=zigpy.types.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
+            )
         else:
-            try:
-                device = await self._get_or_discover_device(nwk=msg.Src)
-            except KeyError:
-                LOGGER.warning(
-                    "Received a ZDO message from an unknown device: %s", msg.Src
-                )
-                return
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.NWK,
+                address=self.state.node_info.nwk,
+            )
 
-        self.handle_message(
-            sender=device,
-            profile=ZDO_PROFILE,
-            cluster=msg.ClusterId,
-            src_ep=ZDO_ENDPOINT,
-            dst_ep=ZDO_ENDPOINT,
-            message=message,
+        self.packet_received(
+            zigpy.types.ZigbeePacket(
+                src=zigpy.types.AddrModeAddress(
+                    addr_mode=zigpy.types.AddrMode.NWK,
+                    address=msg.Src,
+                ),
+                src_ep=ZDO_ENDPOINT,
+                dst=dst,
+                dst_ep=ZDO_ENDPOINT,
+                tsn=msg.TSN,
+                profile=ZDO_PROFILE,
+                cluster_id=msg.ClusterId,
+                data=t.uint8_t(msg.TSN).serialize() + msg.Data,
+                tx_options=(
+                    zigpy.types.TransmitOptions.APS_Encryption
+                    if msg.SecurityUse
+                    else zigpy.types.TransmitOptions.NONE
+                ),
+            )
         )
 
     def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
@@ -646,16 +563,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Handler for all non-ZDO messages.
         """
 
-        try:
-            device = await self._get_or_discover_device(nwk=msg.SrcAddr)
-        except KeyError:
-            LOGGER.warning(
-                "Received an AF message from an unknown device: %s", msg.SrcAddr
-            )
-            return
-
-        device.radio_details(lqi=msg.LQI, rssi=None)
-
         # XXX: Is it possible to receive messages on non-assigned endpoints?
         if msg.DstEndpoint in self._device.endpoints:
             profile = self._device.endpoints[msg.DstEndpoint].profile_id
@@ -663,13 +570,43 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning("Received a message on an unregistered endpoint: %s", msg)
             profile = zigpy.profiles.zha.PROFILE_ID
 
-        self.handle_message(
-            sender=device,
-            profile=profile,
-            cluster=msg.ClusterId,
-            src_ep=msg.SrcEndpoint,
-            dst_ep=msg.DstEndpoint,
-            message=msg.Data,
+        if msg.WasBroadcast:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.Broadcast,
+                address=zigpy.types.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
+            )
+        elif msg.GroupId != 0x0000:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.Group,
+                address=msg.GroupId,
+            )
+        else:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.NWK,
+                address=self.state.node_info.nwk,
+            )
+
+        self.packet_received(
+            zigpy.types.ZigbeePacket(
+                src=zigpy.types.AddrModeAddress(
+                    addr_mode=zigpy.types.AddrMode.NWK, address=msg.SrcAddr
+                ),
+                src_ep=msg.SrcEndpoint,
+                dst=dst,
+                dst_ep=msg.DstEndpoint,
+                tsn=msg.TSN,
+                profile=profile,
+                cluster_id=msg.ClusterId,
+                data=msg.Data,
+                tx_options=(
+                    zigpy.types.TransmitOptions.APS_Encryption
+                    if msg.SecurityUse
+                    else zigpy.types.TransmitOptions.NONE
+                ),
+                radius=msg.MsgResultRadius,
+                lqi=msg.LQI,
+                rssi=None,
+            )
         )
 
     ####################
@@ -960,6 +897,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Picks the correct request sending mechanism and fixes endpoint information.
         """
 
+        if dst_ep is None:
+            dst_ep = 0
+
+        if radius is None:
+            radius = 0
+
+        if relays is not None and not isinstance(dst_addr.address, t.NWK):
+            LOGGER.warning("Packets with relays can only be sent with NWK addressing")
+            relays = None
+
         # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
         # We pick ours based on the registered endpoints when using an older firmware
         src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
@@ -1095,35 +1042,31 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await asyncio.sleep(0.1 * 13)
 
-    async def _send_request(
-        self,
-        dst_addr,
-        dst_ep,
-        src_ep,
-        profile,
-        cluster,
-        sequence,
-        options,
-        radius,
-        data,
-    ) -> tuple[t.Status, str]:
+    async def send_packet(self, packet: zigpy.types.ZigbeePacket) -> None:
         """
         Fault-tolerant wrapper around `_send_request_raw` that transparently attempts to
         repair routes and contact the device through other methods when Z-Stack errors
         are encountered.
         """
 
+        LOGGER.debug("Sending packet %r", packet)
+
+        options = c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
+
+        if zigpy.types.TransmitOptions.ACK in packet.tx_options:
+            options |= c.af.TransmitOptions.ACK_REQUEST
+
+        if zigpy.types.TransmitOptions.APS_Encryption in packet.tx_options:
+            options |= c.af.TransmitOptions.ENABLE_SECURITY
+
         try:
-            if dst_addr.mode == t.AddrMode.NWK:
-                device = self.get_device(nwk=dst_addr.address)
-            elif dst_addr.mode == t.AddrMode.IEEE:
-                device = self.get_device(ieee=dst_addr.address)
-            else:
-                device = None
-        except KeyError:
+            device = self.get_device_with_address(packet.dst)
+        except (KeyError, ValueError):
             # Sometimes a request is sent to a device not in the database. This should
             # work, the device object is only for recovery.
             device = None
+
+        dst_addr = t.AddrModeAddress.from_zigpy_type(packet.dst)
 
         status = None
         response = None
@@ -1145,7 +1088,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         # indicating that a route is missing so we need to explicitly
                         # check for one.
                         if (
-                            dst_ep == ZDO_ENDPOINT
+                            packet.dst_ep == ZDO_ENDPOINT
                             and dst_addr.mode == t.AddrMode.NWK
                             and dst_addr.address != self.state.node_info.nwk
                         ):
@@ -1165,14 +1108,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
                         response = await self._send_request_raw(
                             dst_addr=dst_addr,
-                            dst_ep=dst_ep,
-                            src_ep=src_ep,
-                            profile=profile,
-                            cluster=cluster,
-                            sequence=sequence,
+                            dst_ep=packet.dst_ep,
+                            src_ep=packet.src_ep,
+                            profile=packet.profile,
+                            cluster=packet.cluster_id,
+                            sequence=packet.tsn,
                             options=options,
-                            radius=radius,
-                            data=data,
+                            radius=packet.radius,
+                            data=packet.data,
                             relays=force_relays,
                         )
                         break
@@ -1292,7 +1235,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 else:
                     raise DeliveryError(
                         f"Request failed after {REQUEST_MAX_RETRIES} attempts:"
-                        f" {status!r}"
+                        f" {status!r}",
+                        status=status,
                     )
         finally:
             # We *must* re-add the device association if we previously removed it but
@@ -1308,6 +1252,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 )
 
         if response.Status != t.Status.SUCCESS:
-            return response.Status, "Failed to send request"
-
-        return response.Status, "Sent request successfully"
+            raise DeliveryError(
+                f"Failed to send request: {response.Status}", status=response.Status
+            )

@@ -1,9 +1,9 @@
-from . import basic, named, cstruct
+from . import basic, named, cstruct, zigpy_types
 
 
 class NwkKeyDesc(cstruct.CStruct):
     KeySeqNum: basic.uint8_t
-    Key: named.KeyData
+    Key: zigpy_types.KeyData
 
 
 class NwkState(basic.enum_uint8):
@@ -46,17 +46,17 @@ class NIB(cstruct.CStruct):
     RouteDiscoveryTime: basic.uint8_t
     RouteExpiryTime: basic.uint8_t
 
-    nwkDevAddress: named.NWK
+    nwkDevAddress: zigpy_types.NWK
 
     nwkLogicalChannel: basic.uint8_t
 
-    nwkCoordAddress: named.NWK
-    nwkCoordExtAddress: named.EUI64
+    nwkCoordAddress: zigpy_types.NWK
+    nwkCoordExtAddress: zigpy_types.EUI64
     nwkPanId: basic.uint16_t
 
     # XXX: this is really a uint16_t but we pad with zeroes so it works out in the end
     nwkState: NwkState
-    channelList: named.Channels
+    channelList: zigpy_types.Channels
 
     beaconOrder: basic.uint8_t
     superFrameOrder: basic.uint8_t
@@ -68,9 +68,9 @@ class NIB(cstruct.CStruct):
 
     nodeDepth: basic.uint8_t
 
-    extendedPANID: named.EUI64
+    extendedPANID: zigpy_types.EUI64
 
-    nwkKeyLoaded: named.Bool
+    nwkKeyLoaded: zigpy_types.Bool
 
     spare1: NwkKeyDesc
     spare2: NwkKeyDesc
@@ -80,13 +80,13 @@ class NIB(cstruct.CStruct):
 
     nwkLinkStatusPeriod: basic.uint8_t
     nwkRouterAgeLimit: basic.uint8_t
-    nwkUseMultiCast: named.Bool
-    nwkIsConcentrator: named.Bool
+    nwkUseMultiCast: zigpy_types.Bool
+    nwkIsConcentrator: zigpy_types.Bool
     nwkConcentratorDiscoveryTime: basic.uint8_t
     nwkConcentratorRadius: basic.uint8_t
     nwkAllFresh: basic.uint8_t
 
-    nwkManagerAddr: named.NWK
+    nwkManagerAddr: zigpy_types.NWK
     nwkTotalTransmissions: basic.uint16_t
     nwkUpdateId: basic.uint8_t
 
@@ -94,8 +94,8 @@ class NIB(cstruct.CStruct):
 class Beacon(cstruct.CStruct):
     """Beacon message."""
 
-    Src: named.NWK
-    PanId: named.PanId
+    Src: zigpy_types.NWK
+    PanId: zigpy_types.PanId
     Channel: basic.uint8_t
     PermitJoining: basic.uint8_t
     RouterCapacity: basic.uint8_t
@@ -105,12 +105,12 @@ class Beacon(cstruct.CStruct):
     LQI: basic.uint8_t
     Depth: basic.uint8_t
     UpdateId: basic.uint8_t
-    ExtendedPanId: named.ExtendedPanId
+    ExtendedPanId: zigpy_types.ExtendedPanId
 
 
 class TCLinkKey(cstruct.CStruct):
-    ExtAddr: named.EUI64
-    Key: named.KeyData
+    ExtAddr: zigpy_types.EUI64
+    Key: zigpy_types.KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
 
@@ -163,7 +163,7 @@ class TCLKDevEntry(cstruct.CStruct):
     txFrmCntr: basic.uint32_t
     rxFrmCntr: basic.uint32_t
 
-    extAddr: named.EUI64
+    extAddr: zigpy_types.EUI64
     keyAttributes: KeyAttributes
     keyType: KeyType
 
@@ -174,7 +174,7 @@ class TCLKDevEntry(cstruct.CStruct):
 
 class NwkSecMaterialDesc(cstruct.CStruct):
     FrameCounter: basic.uint32_t
-    ExtendedPanID: named.EUI64
+    ExtendedPanID: zigpy_types.EUI64
 
 
 class AddrMgrUserType(basic.enum_flag_uint8):
@@ -187,8 +187,8 @@ class AddrMgrUserType(basic.enum_flag_uint8):
 
 class AddrMgrEntry(cstruct.CStruct):
     type: AddrMgrUserType
-    nwkAddr: named.NWK
-    extAddr: named.EUI64
+    nwkAddr: zigpy_types.NWK
+    extAddr: zigpy_types.EUI64
 
 
 class AddressManagerTable(basic.CompleteList, item_type=AddrMgrEntry):
@@ -202,7 +202,7 @@ class AuthenticationOption(basic.enum_uint8):
 
 
 class APSKeyDataTableEntry(cstruct.CStruct):
-    Key: named.KeyData
+    Key: zigpy_types.KeyData
     TxFrameCounter: basic.uint32_t
     RxFrameCounter: basic.uint32_t
 
@@ -251,7 +251,7 @@ class BaseAssociatedDevice(cstruct.CStruct):
     linkInfo: LinkInfo
     endDev: AgingEndDevice
     timeoutCounter: basic.uint32_t
-    keepaliveRcv: named.Bool
+    keepaliveRcv: zigpy_types.Bool
 
 
 class AssociatedDeviceZStack1(BaseAssociatedDevice):

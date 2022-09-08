@@ -5,21 +5,10 @@ import typing
 import logging
 import dataclasses
 
-from zigpy.types import (  # noqa: F401
-    NWK,
-    EUI64,
-    Bool,
-    PanId,
-    Struct,
-    KeyData,
-    Channels,
-    ClusterId,
-    ExtendedPanId,
-    CharacterString,
-)
+import zigpy.types
 from zigpy.zdo.types import Status as ZDOStatus  # noqa: F401
 
-from . import basic
+from . import basic, zigpy_types
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,21 +44,36 @@ class AddrModeAddress:
 
         return instance
 
+    @classmethod
+    def from_zigpy_type(
+        cls, zigpy_addr: zigpy.types.AddrModeAddress
+    ) -> AddrModeAddress:
+        return cls(
+            mode=AddrMode[zigpy_addr.addr_mode.name],
+            address=zigpy_addr.address,
+        )
+
+    def as_zigpy_type(self) -> zigpy.types.AddrModeAddress:
+        return zigpy.types.AddrModeAddress(
+            addr_mode=zigpy.types.AddrMode[self.mode.name],
+            address=self.address,
+        )
+
     def _get_address_type(self):
         return {
-            AddrMode.NWK: NWK,
-            AddrMode.Group: NWK,
-            AddrMode.Broadcast: NWK,
-            AddrMode.IEEE: EUI64,
+            AddrMode.NWK: zigpy_types.NWK,
+            AddrMode.Group: zigpy_types.NWK,
+            AddrMode.Broadcast: zigpy_types.NWK,
+            AddrMode.IEEE: zigpy_types.EUI64,
         }[self.mode]
 
     @classmethod
     def deserialize(cls, data: bytes) -> tuple[AddrModeAddress, bytes]:
         mode, data = AddrMode.deserialize(data)
-        address, data = EUI64.deserialize(data)
+        address, data = zigpy_types.EUI64.deserialize(data)
 
         if mode != AddrMode.IEEE:
-            address, _ = NWK.deserialize(address.serialize())
+            address, _ = zigpy_types.NWK.deserialize(address.serialize())
 
         return cls(mode=mode, address=address), data
 
@@ -386,11 +390,13 @@ class DeviceTypeCapabilities(basic.enum_flag_uint8):
     EndDevice = 1 << 2
 
 
-class ClusterIdList(basic.LVList, item_type=ClusterId, length_type=basic.uint8_t):
+class ClusterIdList(
+    basic.LVList, item_type=zigpy_types.ClusterId, length_type=basic.uint8_t
+):
     pass
 
 
-class NWKList(basic.LVList, item_type=NWK, length_type=basic.uint8_t):
+class NWKList(basic.LVList, item_type=zigpy_types.NWK, length_type=basic.uint8_t):
     pass
 
 
