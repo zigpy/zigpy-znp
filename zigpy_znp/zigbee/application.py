@@ -38,6 +38,7 @@ ZDO_PROFILE = 0x0000
 PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
+EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 IEEE_ADDR_DISCOVERY_TIMEOUT = 5
 DEVICE_JOIN_MAX_DELAY = 5
 WATCHDOG_PERIOD = 30
@@ -891,6 +892,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         data,
         *,
         relays=None,
+        extended_timeout=False,
     ):
         """
         Used by `request`/`mrequest`/`broadcast` to send a request.
@@ -992,7 +994,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 request=request, RspStatus=t.Status.SUCCESS
             )
         else:
-            async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+            async with async_timeout.timeout(
+                EXTENDED_DATA_CONFIRM_TIMEOUT
+                if extended_timeout
+                else DATA_CONFIRM_TIMEOUT
+            ):
                 # Shield from cancellation to prevent requests that time out in higher
                 # layers from missing expected responses
                 response = await asyncio.shield(
@@ -1117,6 +1123,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             radius=packet.radius,
                             data=packet.data,
                             relays=force_relays,
+                            extended_timeout=packet.extended_timeout,
                         )
                         break
                     except InvalidCommandResponse as e:
