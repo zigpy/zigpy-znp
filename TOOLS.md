@@ -189,16 +189,6 @@ $ python -m zigpy_znp.tools.nvram_reset /dev/serial/by-id/your-radio
 
 Some warnings are normal, as not all entries will be present in every device.
 
-## Network formation
-Form a new network on the command line:
-
-```console
-$ python -m zigpy_znp.tools.form_network /dev/serial/by-id/your-radio
-```
-
-Currently no command line options are supported so the network will be formed only on
-channel 15 with randomly-generated settings.
-
 ## Network scan
 Nearby routers can be discovered by performing an active network scan. Pass `-a` to
 prevent beacon deduplication and pass `-c 11,15` to narrow the set of channels scanned.
