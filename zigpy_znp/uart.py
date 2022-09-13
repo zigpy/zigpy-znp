@@ -37,12 +37,43 @@ class ZnpMtProtocol(asyncio.Protocol):
         if self._transport is not None:
             LOGGER.debug("Closing serial port")
 
-            @async_utils.run_in_worker_loop
             def close_transport():
+                LOGGER.warning(
+                    "Closing serial port in thread %s" % threading.current_thread().name
+                )
                 self._transport.close()
                 self._transport = None
 
-            close_transport()
+            try:
+                close_transport()
+            except RuntimeError:
+                LOGGER.warning("Trying to close transport in its own loop")
+                close_transport_in_loop = async_utils.run_in_loop(
+                    close_transport, self._transport._loop
+                )
+                try:
+                    close_transport_in_loop()
+                except RuntimeError:
+                    LOGGER.warning("Trying to close transport in znp loop")
+                    close_transport_in_loop = async_utils.run_in_loop(
+                        close_transport, async_utils.get_znp_loop()
+                    )
+
+                    try:
+                        close_transport_in_loop()
+                    except RuntimeError:
+                        LOGGER.warning("Trying to close transport in worker loop")
+                        close_transport_in_loop = async_utils.run_in_loop(
+                            close_transport, async_utils.get_worker_loop()
+                        )
+
+                        try:
+                            close_transport_in_loop()
+                        except RuntimeError as e:
+                            LOGGER.error(
+                                "Failed to close serial connection in any loop"
+                            )
+                            raise e
 
     def connection_lost(self, exc: typing.Optional[Exception]) -> None:
         """Connection lost."""
@@ -175,7 +206,8 @@ class ZnpMtProtocol(asyncio.Protocol):
 
 @async_utils.run_in_znp_loop
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
-    loop = asyncio.get_running_loop()
+    LOGGER.info("uart connecting in thread %s" % threading.current_thread().name)
+    loop = async_utils.get_znp_loop()
 
     port = config[conf.CONF_DEVICE_PATH]
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]
