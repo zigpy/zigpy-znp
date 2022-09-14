@@ -483,16 +483,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ZDO source routing message callback
         """
 
-        try:
-            device = await self._get_or_discover_device(nwk=msg.DstAddr)
-        except KeyError:
-            LOGGER.warning(
-                "Received a ZDO message from an unknown device: %s", msg.DstAddr
-            )
-            return
-
-        # `relays` is a property with a setter that emits an event
-        device.relays = msg.Relays
+        self.handle_relays(nwk=msg.DstAddr, relays=msg.Relays)
 
     def on_zdo_device_announce(self, nwk: t.NWK, ieee: t.EUI64, capabilities) -> None:
         """
