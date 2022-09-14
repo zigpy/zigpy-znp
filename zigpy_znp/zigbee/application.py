@@ -459,7 +459,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 tsn=msg.TSN,
                 profile_id=ZDO_PROFILE,
                 cluster_id=msg.ClusterId,
-                data=t.SerializedBytes(t.uint8_t(msg.TSN).serialize() + msg.Data),
+                data=t.SerializableBytes(t.uint8_t(msg.TSN).serialize() + msg.Data),
                 tx_options=(
                     zigpy.types.TransmitOptions.APS_Encryption
                     if msg.SecurityUse
