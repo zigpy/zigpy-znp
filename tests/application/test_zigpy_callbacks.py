@@ -68,7 +68,7 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
     await app.startup(auto_form=False)
 
     mocker.spy(app, "handle_join")
-    mocker.patch.object(app, "handle_message")
+    mocker.spy(app, "packet_received")
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
     new_nwk = device.nwk + 1
@@ -103,12 +103,14 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
 
     await asyncio.sleep(0.1)
 
+    assert app.packet_received.call_count == 1
+
+    packet = app.packet_received.mock_calls[0].args[0]
+    assert packet.cluster_id == zdo_t.ZDOCmd.Device_annce
+
     app.handle_join.assert_called_once_with(
         nwk=new_nwk, ieee=device.ieee, parent_nwk=None
     )
-    assert app.handle_message.call_count == 1
-    assert app.handle_message.mock_calls[0][2]["cluster"] == zdo_t.ZDOCmd.Device_annce
-
     # The device's NWK updated
     assert device.nwk == new_nwk
 
