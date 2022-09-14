@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
-import time
 import asyncio
 import logging
 import itertools
-import contextlib
 
 import zigpy.zcl
 import zigpy.zdo
@@ -87,8 +85,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._watchdog_task.cancel()
 
         self._version_rsp = None
-        self._concurrent_requests_semaphore = None
-        self._currently_waiting_requests = 0
 
         self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
@@ -219,12 +215,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self._device.schedule_initialize()
 
         # Now that we know what device we are, set the max concurrent requests
-        if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
+        if self._config[conf.CONF_MAX_CONCURRENT_REQUESTS] is None:
             max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
         else:
-            max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
+            max_concurrent_requests = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
-        self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
+        # Update the max value of the concurrent request semaphore at runtime
+        self._concurrent_requests_semaphore.max_value = max_concurrent_requests
 
         if self.state.network_info.network_key.key == const.Z2M_NETWORK_KEY:
             LOGGER.warning(
@@ -773,42 +770,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 any_changed = True
 
         return any_changed
-
-    @contextlib.asynccontextmanager
-    async def _limit_concurrency(self):
-        """
-        Async context manager that prevents devices from being overwhelmed by requests.
-        Mainly a thin wrapper around `asyncio.Semaphore` that logs when it has to wait.
-        """
-
-        # Allow sending some requests before the application has fully started
-        if self._concurrent_requests_semaphore is None:
-            yield
-            return
-
-        start_time = time.time()
-        was_locked = self._concurrent_requests_semaphore.locked()
-
-        if was_locked:
-            self._currently_waiting_requests += 1
-            LOGGER.debug(
-                "Max concurrency reached, delaying requests (%s enqueued)",
-                self._currently_waiting_requests,
-            )
-
-        try:
-            async with self._concurrent_requests_semaphore:
-                if was_locked:
-                    LOGGER.debug(
-                        "Previously delayed request is now running, "
-                        "delayed by %0.2f seconds",
-                        time.time() - start_time,
-                    )
-
-                yield
-        finally:
-            if was_locked:
-                self._currently_waiting_requests -= 1
 
     async def _reconnect(self) -> None:
         """
