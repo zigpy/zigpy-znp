@@ -9,4 +9,5 @@ from zigpy.types import (  # noqa: F401
     ClusterId,
     ExtendedPanId,
     CharacterString,
+    SerializedBytes,
 )

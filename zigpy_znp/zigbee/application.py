@@ -457,9 +457,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 dst=dst,
                 dst_ep=ZDO_ENDPOINT,
                 tsn=msg.TSN,
-                profile=ZDO_PROFILE,
+                profile_id=ZDO_PROFILE,
                 cluster_id=msg.ClusterId,
-                data=t.uint8_t(msg.TSN).serialize() + msg.Data,
+                data=t.SerializedBytes(t.uint8_t(msg.TSN).serialize() + msg.Data),
                 tx_options=(
                     zigpy.types.TransmitOptions.APS_Encryption
                     if msg.SecurityUse
@@ -584,7 +584,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 dst=dst,
                 dst_ep=msg.DstEndpoint,
                 tsn=msg.TSN,
-                profile=profile,
+                profile_id=profile,
                 cluster_id=msg.ClusterId,
                 data=msg.Data,
                 tx_options=(
@@ -1073,7 +1073,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             sequence=packet.tsn,
                             options=options,
                             radius=packet.radius,
-                            data=packet.data,
+                            data=packet.data.serialize(),
                             relays=force_relays,
                             extended_timeout=packet.extended_timeout,
                         )
