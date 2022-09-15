@@ -1,7 +1,7 @@
 import asyncio
-import logging
 
 import pytest
+import zigpy.types as zigpy_t
 import zigpy.endpoint
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
@@ -142,13 +142,13 @@ async def test_zigpy_request_failure(device, make_application, mocker):
         ],
     )
 
-    mocker.spy(app, "_send_request")
+    mocker.spy(app, "send_packet")
 
     # Fail to turn on the light
     with pytest.raises(InvalidCommandResponse):
         await device.endpoints[1].on_off.on()
 
-    assert app._send_request.call_count == 1
+    assert app.send_packet.call_count == 1
     await app.shutdown()
 
 
@@ -167,7 +167,7 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
-    mocker.patch.object(app, "_send_request", new=CoroutineMock())
+    mocker.patch.object(app, "send_packet", new=CoroutineMock())
 
     await app.request(
         device,
@@ -180,8 +180,8 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
         data=b"6",
     )
 
-    assert app._send_request.call_count == 1
-    assert app._send_request.mock_calls[0][2]["dst_addr"] == addr
+    assert app.send_packet.call_count == 1
+    assert app.send_packet.mock_calls[0].args[0].dst == addr.as_zigpy_type()
 
     await app.shutdown()
 
@@ -190,16 +190,17 @@ async def test_request_addr_mode(device, addr, make_application, mocker):
 async def test_mrequest(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)
 
-    mocker.patch.object(app, "_send_request", new=CoroutineMock())
+    mocker.patch.object(app, "send_packet", new=CoroutineMock())
     group = app.groups.add_group(0x1234, "test group")
 
     await group.endpoint.on_off.on()
 
-    assert app._send_request.call_count == 1
-    assert app._send_request.mock_calls[0][2]["dst_addr"] == t.AddrModeAddress(
-        mode=t.AddrMode.Group, address=0x1234
+    assert app.send_packet.call_count == 1
+    assert (
+        app.send_packet.mock_calls[0].args[0].dst
+        == t.AddrModeAddress(mode=t.AddrMode.Group, address=0x1234).as_zigpy_type()
     )
-    assert app._send_request.mock_calls[0][2]["data"] == b"\x01\x01\x01"
+    assert app.send_packet.mock_calls[0].args[0].data.serialize() == b"\x01\x01\x01"
 
     await app.shutdown()
 
@@ -268,6 +269,7 @@ async def test_broadcast(device, make_application, mocker):
         radius=3,
         sequence=1,
         data=b"???",
+        broadcast_address=zigpy_t.BroadcastAddress.RX_ON_WHEN_IDLE,
     )
 
     await app.shutdown()
@@ -277,7 +279,7 @@ async def test_broadcast(device, make_application, mocker):
 async def test_request_concurrency(device, make_application, mocker):
     app, znp_server = await make_application(
         server_cls=device,
-        client_config={"znp_config": {conf.CONF_MAX_CONCURRENT_REQUESTS: 2}},
+        client_config={conf.CONF_MAX_CONCURRENT_REQUESTS: 2},
     )
 
     await app.startup()
@@ -319,7 +321,7 @@ async def test_request_concurrency(device, make_application, mocker):
     )
 
     # We create a whole bunch at once
-    responses = await asyncio.gather(
+    await asyncio.gather(
         *[
             app.request(
                 device,
@@ -334,67 +336,10 @@ async def test_request_concurrency(device, make_application, mocker):
         ]
     )
 
-    assert all(status == t.Status.SUCCESS for status, msg in responses)
     assert in_flight_requests == 0
     assert did_lock
 
     await app.shutdown()
-
-
-"""
-@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_request_concurrency_overflow(device, make_application, mocker):
-    mocker.patch("zigpy_znp.zigbee.application.MAX_WAITING_REQUESTS", new=1)
-
-    app, znp_server = await make_application(
-        server_cls=device, client_config={
-            'znp_config': {conf.CONF_MAX_CONCURRENT_REQUESTS: 1}
-        }
-    )
-
-    await app.startup()
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
-
-    def make_response(req):
-        async def callback(req):
-            await asyncio.sleep(0.01 * req.TSN)
-
-            znp_server.send(c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS))
-            znp_server.send(
-                c.AF.DataConfirm.Callback(
-                    Status=t.Status.SUCCESS, Endpoint=1, TSN=req.TSN
-                )
-            )
-
-        asyncio.create_task(callback(req))
-
-    znp_server.reply_to(
-        request=c.AF.DataRequestExt.Req(partial=True), responses=[make_response]
-    )
-
-    # We can only handle 1 in-flight request and 1 enqueued request. Last one will fail.
-    responses = await asyncio.gather(
-        *[
-            app.request(
-                device,
-                profile=260,
-                cluster=1,
-                src_ep=1,
-                dst_ep=1,
-                sequence=seq,
-                data=b"\x00",
-            )
-            for seq in range(3)
-        ], return_exceptions=True)
-
-    (rsp1, stat1), (rsp2, stat2), error3 = responses
-
-    assert rsp1 == rsp2 == t.Status.SUCCESS
-    assert isinstance(error3, ValueError)
-
-    await app.shutdown()
-"""
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -970,38 +915,5 @@ async def test_route_discovery_concurrency(device, make_application):
 
     assert route_discovery1.call_count == 1
     assert route_discovery2.call_count == 2
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_zdo_from_unknown(device, make_application, caplog, mocker):
-    mocker.patch("zigpy_znp.zigbee.application.IEEE_ADDR_DISCOVERY_TIMEOUT", new=0.1)
-
-    app, znp_server = await make_application(server_cls=device)
-
-    znp_server.reply_once_to(
-        request=c.ZDO.IEEEAddrReq.Req(partial=True),
-        responses=[c.ZDO.IEEEAddrReq.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    await app.startup(auto_form=False)
-
-    caplog.set_level(logging.WARNING)
-
-    znp_server.send(
-        c.ZDO.MsgCbIncoming.Callback(
-            Src=0x1234,
-            IsBroadcast=t.Bool.false,
-            ClusterId=zdo_t.ZDOCmd.Mgmt_Leave_rsp,
-            SecurityUse=0,
-            TSN=123,
-            MacDst=0x0000,
-            Data=t.Bytes([123, 0x00]),
-        )
-    )
-
-    await asyncio.sleep(0.5)
-    assert "unknown device" in caplog.text
 
     await app.shutdown()

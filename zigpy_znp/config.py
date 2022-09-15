@@ -104,6 +104,9 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     vol.Optional(CONF_LED_MODE, default=LEDMode.OFF): vol.Any(
                         None, EnumValue(LEDMode, transformer=bool_to_upper_str)
                     ),
+                    vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default=None): vol.Any(
+                        None, "auto", VolPositiveNumber
+                    ),
                     vol.Optional(
                         CONF_CONNECT_RTS_STATES, default=[False, True, False]
                     ): vol.Schema([cv_boolean]),

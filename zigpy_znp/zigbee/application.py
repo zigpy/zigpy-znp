@@ -37,7 +37,6 @@ PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
 EXTENDED_DATA_CONFIRM_TIMEOUT = 30
-IEEE_ADDR_DISCOVERY_TIMEOUT = 5
 DEVICE_JOIN_MAX_DELAY = 5
 WATCHDOG_PERIOD = 30
 
@@ -214,8 +213,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
         await self._device.schedule_initialize()
 
+        # Deprecate ZNP-specific config
+        if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] is not None:
+            LOGGER.warning(
+                "`zigpy_config:znp_config:max_concurrent_requests` is deprecated,"
+                " move this key up to `zigpy_config:max_concurrent_requests` instead"
+            )
+            concurrency = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
+        else:
+            concurrency = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
+
         # Now that we know what device we are, set the max concurrent requests
-        if self._config[conf.CONF_MAX_CONCURRENT_REQUESTS] is None:
+        if concurrency in (None, "auto"):
             max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
         else:
             max_concurrent_requests = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
@@ -447,26 +456,42 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 address=self.state.node_info.nwk,
             )
 
-        self.packet_received(
-            zigpy.types.ZigbeePacket(
-                src=zigpy.types.AddrModeAddress(
-                    addr_mode=zigpy.types.AddrMode.NWK,
-                    address=msg.Src,
-                ),
-                src_ep=ZDO_ENDPOINT,
-                dst=dst,
-                dst_ep=ZDO_ENDPOINT,
-                tsn=msg.TSN,
-                profile_id=ZDO_PROFILE,
-                cluster_id=msg.ClusterId,
-                data=t.SerializableBytes(t.uint8_t(msg.TSN).serialize() + msg.Data),
-                tx_options=(
-                    zigpy.types.TransmitOptions.APS_Encryption
-                    if msg.SecurityUse
-                    else zigpy.types.TransmitOptions.NONE
-                ),
-            )
+        packet = zigpy.types.ZigbeePacket(
+            src=zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.NWK,
+                address=msg.Src,
+            ),
+            src_ep=ZDO_ENDPOINT,
+            dst=dst,
+            dst_ep=ZDO_ENDPOINT,
+            tsn=msg.TSN,
+            profile_id=ZDO_PROFILE,
+            cluster_id=msg.ClusterId,
+            data=t.SerializableBytes(t.uint8_t(msg.TSN).serialize() + msg.Data),
+            tx_options=(
+                zigpy.types.TransmitOptions.APS_Encryption
+                if msg.SecurityUse
+                else zigpy.types.TransmitOptions.NONE
+            ),
         )
+
+        # Peek into the ZDO packet so that we can cancel our existing TC join timer when
+        # a device actually sends an announcemement
+        try:
+            zdo_hdr, zdo_args = self._device.zdo.deserialize(
+                cluster_id=packet.cluster_id, data=packet.data.serialize()
+            )
+        except Exception:
+            LOGGER.warning("Failed to deserialize ZDO packet", exc_info=True)
+        else:
+            if zdo_hdr.command_id == zdo_t.ZDOCmd.Device_annce:
+                _, ieee, _ = zdo_args
+
+                # Cancel any existing TC join timers so we don't double announce
+                if ieee in self._join_announce_tasks:
+                    self._join_announce_tasks.pop(ieee).cancel()
+
+        self.packet_received(packet)
 
     def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
         """
@@ -484,25 +509,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         self.handle_relays(nwk=msg.DstAddr, relays=msg.Relays)
-
-    def on_zdo_device_announce(self, nwk: t.NWK, ieee: t.EUI64, capabilities) -> None:
-        """
-        ZDO end device announcement callback
-        """
-
-        LOGGER.info(
-            "ZDO device announce: nwk=%s, ieee=%s, capabilities=%s",
-            nwk,
-            ieee,
-            capabilities,
-        )
-
-        # Cancel an existing join timer so we don't double announce
-        if ieee in self._join_announce_tasks:
-            self._join_announce_tasks.pop(ieee).cancel()
-
-        # Sometimes devices change their NWK when announcing so re-join it.
-        self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
 
     def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
         """
@@ -648,64 +654,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 self.connection_lost(e)
 
                 return
-
-    @combine_concurrent_calls
-    async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device:
-        """
-        Finds a device by its NWK address. If a device does not exist in the zigpy
-        database, attempt to look up its new NWK address. If it does not exist in the
-        zigpy database, treat the device as a new join.
-        """
-
-        try:
-            return self.get_device(nwk=nwk)
-        except KeyError:
-            pass
-
-        LOGGER.debug("Device with NWK 0x%04X not in database", nwk)
-
-        try:
-            async with async_timeout.timeout(IEEE_ADDR_DISCOVERY_TIMEOUT):
-                ieee_addr_rsp = await self._znp.request_callback_rsp(
-                    request=c.ZDO.IEEEAddrReq.Req(
-                        NWK=nwk,
-                        RequestType=c.zdo.AddrRequestType.SINGLE,
-                        StartIndex=0,
-                    ),
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.ZDO.IEEEAddrRsp.Callback(partial=True, NWK=nwk),
-                )
-        except asyncio.TimeoutError:
-            raise KeyError(f"Unknown device: 0x{nwk:04X}")
-        else:
-            ieee = ieee_addr_rsp.IEEE
-
-        try:
-            device = self.get_device(ieee=ieee)
-        except KeyError:
-            LOGGER.debug("Treating unknown device as a new join")
-            self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
-
-            return self.get_device(ieee=ieee)
-
-        # The `Device` object could have been updated while this coroutine is running
-        if device.nwk == nwk:
-            return device
-
-        LOGGER.warning(
-            "Device %s changed its NWK from %s to %s",
-            device.ieee,
-            device.nwk,
-            nwk,
-        )
-
-        # Notify zigpy of the change
-        self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
-
-        # `handle_join` will update the NWK
-        assert device.nwk == nwk
-
-        return device
 
     async def _set_led_mode(self, *, led: t.uint8_t, mode: c.util.LEDMode) -> None:
         """

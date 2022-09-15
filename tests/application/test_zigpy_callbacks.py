@@ -1,29 +1,14 @@
 import asyncio
-import logging
+from unittest.mock import MagicMock
 
 import pytest
+import zigpy.types as zigpy_t
 import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 
-from ..conftest import FORMED_DEVICES, CoroutineMock, serialize_zdo_command
-
-
-def awaitable_mock(*, return_value=None, side_effect=None):
-    assert (return_value or side_effect) and not (return_value and side_effect)
-
-    mock_called = asyncio.get_running_loop().create_future()
-
-    def side_effect_(*args, **kwargs):
-        mock_called.set_result((args, kwargs))
-
-        if return_value is not None:
-            return return_value
-        else:
-            raise side_effect
-
-    return mock_called, CoroutineMock(side_effect=side_effect_)
+from ..conftest import FORMED_DEVICES, serialize_zdo_command
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -31,33 +16,12 @@ async def test_on_zdo_relays_message_callback(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    device = mocker.Mock()
-    discover_called, discover_mock = awaitable_mock(return_value=device)
-    mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
-
+    app.handle_relays = MagicMock()
     znp_server.send(c.ZDO.SrcRtgInd.Callback(DstAddr=0x1234, Relays=[0x5678, 0xABCD]))
 
-    await discover_called
-    assert device.relays == [0x5678, 0xABCD]
+    await asyncio.sleep(0.1)
 
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_on_zdo_relays_message_callback_unknown(
-    device, make_application, mocker, caplog
-):
-    app, znp_server = await make_application(server_cls=device)
-    await app.startup(auto_form=False)
-
-    discover_called, discover_mock = awaitable_mock(side_effect=KeyError())
-    mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
-
-    caplog.set_level(logging.WARNING)
-    znp_server.send(c.ZDO.SrcRtgInd.Callback(DstAddr=0x1234, Relays=[0x5678, 0xABCD]))
-
-    await discover_called
-    assert "unknown device" in caplog.text
+    app.handle_relays.assert_called_once_with(nwk=0x1234, relays=[0x5678, 0xABCD])
 
     await app.shutdown()
 
@@ -68,7 +32,7 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
     await app.startup(auto_form=False)
 
     mocker.spy(app, "handle_join")
-    mocker.spy(app, "packet_received")
+    mocker.patch.object(app, "handle_message")
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xFA9E)
     new_nwk = device.nwk + 1
@@ -103,15 +67,11 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
 
     await asyncio.sleep(0.1)
 
-    assert app.packet_received.call_count == 1
-
-    packet = app.packet_received.mock_calls[0].args[0]
-    assert packet.cluster_id == zdo_t.ZDOCmd.Device_annce
-
     app.handle_join.assert_called_once_with(
         nwk=new_nwk, ieee=device.ieee, parent_nwk=None
     )
-    # The device's NWK updated
+
+    # The device's NWK has been updated
     assert device.nwk == new_nwk
 
     await app.shutdown()
@@ -142,15 +102,13 @@ async def test_on_af_message_callback(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    device = mocker.Mock()
-    discover_called, discover_mock = awaitable_mock(return_value=device)
-    mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
     mocker.patch.object(app, "handle_message")
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     af_message = c.AF.IncomingMsg.Callback(
-        GroupId=1,
+        GroupId=0x0000,
         ClusterId=2,
-        SrcAddr=0xABCD,
+        SrcAddr=device.nwk,
         SrcEndpoint=4,
         DstEndpoint=1,  # ZHA endpoint
         WasBroadcast=False,
@@ -165,54 +123,48 @@ async def test_on_af_message_callback(device, make_application, mocker):
 
     # Normal message
     znp_server.send(af_message)
+    await asyncio.sleep(0.1)
 
-    await discover_called
-    device.radio_details.assert_called_once_with(lqi=19, rssi=None)
     app.handle_message.assert_called_once_with(
-        sender=device, profile=260, cluster=2, src_ep=4, dst_ep=1, message=b"test"
+        sender=device,
+        profile=260,
+        cluster=2,
+        src_ep=4,
+        dst_ep=1,
+        message=b"test",
+        dst_addressing=zigpy_t.AddrMode.NWK,
     )
 
-    device.reset_mock()
     app.handle_message.reset_mock()
 
     # ZLL message
-    discover_called, discover_mock = awaitable_mock(return_value=device)
-    mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
-
     znp_server.send(af_message.replace(DstEndpoint=2))
+    await asyncio.sleep(0.1)
 
-    await discover_called
-    device.radio_details.assert_called_once_with(lqi=19, rssi=None)
     app.handle_message.assert_called_once_with(
-        sender=device, profile=49246, cluster=2, src_ep=4, dst_ep=2, message=b"test"
+        sender=device,
+        profile=49246,
+        cluster=2,
+        src_ep=4,
+        dst_ep=2,
+        message=b"test",
+        dst_addressing=zigpy_t.AddrMode.NWK,
     )
 
-    device.reset_mock()
     app.handle_message.reset_mock()
 
     # Message on an unknown endpoint (is this possible?)
-    discover_called, discover_mock = awaitable_mock(return_value=device)
-    mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
-
     znp_server.send(af_message.replace(DstEndpoint=3))
+    await asyncio.sleep(0.1)
 
-    await discover_called
-    device.radio_details.assert_called_once_with(lqi=19, rssi=None)
     app.handle_message.assert_called_once_with(
-        sender=device, profile=260, cluster=2, src_ep=4, dst_ep=3, message=b"test"
+        sender=device,
+        profile=260,
+        cluster=2,
+        src_ep=4,
+        dst_ep=3,
+        message=b"test",
+        dst_addressing=zigpy_t.AddrMode.NWK,
     )
 
-    device.reset_mock()
     app.handle_message.reset_mock()
-
-    # Message from an unknown device
-    discover_called, discover_mock = awaitable_mock(side_effect=KeyError())
-    mocker.patch.object(app, "_get_or_discover_device", new=discover_mock)
-
-    znp_server.send(af_message)
-
-    await discover_called
-    assert device.radio_details.call_count == 0
-    assert app.handle_message.call_count == 0
-
-    await app.shutdown()
