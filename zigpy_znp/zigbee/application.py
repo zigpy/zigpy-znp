@@ -586,7 +586,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 tsn=msg.TSN,
                 profile_id=profile,
                 cluster_id=msg.ClusterId,
-                data=msg.Data,
+                data=t.SerializableBytes(bytes(msg.Data)),
                 tx_options=(
                     zigpy.types.TransmitOptions.APS_Encryption
                     if msg.SecurityUse
@@ -1068,7 +1068,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             dst_addr=dst_addr,
                             dst_ep=packet.dst_ep,
                             src_ep=packet.src_ep,
-                            profile=packet.profile,
+                            profile=packet.profile_id,
                             cluster=packet.cluster_id,
                             sequence=packet.tsn,
                             options=options,
