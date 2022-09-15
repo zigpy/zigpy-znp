@@ -26,6 +26,7 @@ import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+from zigpy_znp.types import AddrMode
 from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 from zigpy_znp.types.nvids import OsalNvIds
@@ -960,17 +961,29 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
 
         if relays is None:
-            request = c.AF.DataRequestExt.Req(
-                DstAddrModeAddress=dst_addr,
-                DstEndpoint=dst_ep,
-                DstPanId=0x0000,
-                SrcEndpoint=src_ep,
-                ClusterId=cluster,
-                TSN=sequence,
-                Options=options,
-                Radius=radius,
-                Data=data,
-            )
+            if dst_addr.mode == AddrMode.NWK and len(data) < 128:
+                request = c.AF.DataRequest.Req(
+                    DstAddr=dst_addr.address,
+                    DstEndpoint=dst_ep,
+                    SrcEndpoint=src_ep,
+                    ClusterId=cluster,
+                    TSN=sequence,
+                    Options=options,
+                    Radius=radius,
+                    Data=data,
+                )
+            else:
+                request = c.AF.DataRequestExt.Req(
+                    DstAddrModeAddress=dst_addr,
+                    DstEndpoint=dst_ep,
+                    DstPanId=0x0000,
+                    SrcEndpoint=src_ep,
+                    ClusterId=cluster,
+                    TSN=sequence,
+                    Options=options,
+                    Radius=radius,
+                    Data=data,
+                )
         else:
             request = c.AF.DataRequestSrcRtg.Req(
                 DstAddr=dst_addr.address,
