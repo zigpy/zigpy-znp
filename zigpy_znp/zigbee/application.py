@@ -19,9 +19,8 @@ import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
 from zigpy.types import deserialize as list_deserialize
-from zigpy.exceptions import DeliveryError
 from zigpy.config import CONF_ADDITIONAL_ENDPOINTS
-
+from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
