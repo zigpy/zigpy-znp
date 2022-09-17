@@ -20,6 +20,8 @@ import zigpy.zdo.types as zdo_t
 import zigpy.application
 from zigpy.types import deserialize as list_deserialize
 from zigpy.exceptions import DeliveryError
+from zigpy.config import CONF_ADDITIONAL_ENDPOINTS
+
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
@@ -912,8 +914,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return ZDO_ENDPOINT
 
         # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
-        if self._zstack_build_id >= 20210708:
-            return ZHA_ENDPOINT
+        if not self.config.get(CONF_ADDITIONAL_ENDPOINTS):
+            if self._zstack_build_id >= 20210708:
+                return ZHA_ENDPOINT
 
         # Always fall back to endpoint 1
         candidates = [ZHA_ENDPOINT]
