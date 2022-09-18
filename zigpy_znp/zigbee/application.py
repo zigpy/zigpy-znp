@@ -210,12 +210,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         await self.register_endpoints()
 
         # Receive a callback for every known ZDO command
-        for cluster_id in zdo_t.ZDOCmd:
-            # Ignore outgoing ZDO requests, only receive announcements and responses
-            if cluster_id.name.endswith(("_req", "_set")):
-                continue
-
-            await self._znp.request(c.ZDO.MsgCallbackRegister.Req(ClusterId=cluster_id))
+        await self._znp.request(c.ZDO.MsgCallbackRegister.Req(ClusterId=0xFFFF))
 
         # Setup the coordinator as a zigpy device and initialize it to request node info
         self.devices[self.state.node_info.ieee] = ZNPCoordinator(
@@ -520,6 +515,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
         Global callback for all ZDO messages.
         """
+
+        try:
+            zdo_t.ZDOCmd(msg.ClusterId)
+        except ValueError:
+            pass
+        else:
+            # Ignore loopback ZDO requests, only receive announcements and responses
+            if zdo_t.ZDOCmd(msg.ClusterId).name.endswith(("_req", "_set")):
+                LOGGER.debug("Ignoring loopback ZDO request")
+                return
 
         message = t.uint8_t(msg.TSN).serialize() + msg.Data
         hdr, data = zdo_t.ZDOHeader.deserialize(msg.ClusterId, message)

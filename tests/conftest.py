@@ -856,7 +856,12 @@ class BaseZStackDevice(BaseServerZNP):
 
     @reply_to(c.ZDO.MsgCallbackRegister.Req(partial=True))
     def register_zdo_callback(self, request):
-        self.zdo_callbacks.add(request.ClusterId)
+        if request.ClusterId == 0xFFFF:
+            for cluster_id in zdo_t.ZDOCmd:
+                self.zdo_callbacks.add(cluster_id)
+        else:
+            self.zdo_callbacks.add(request.ClusterId)
+
         return c.ZDO.MsgCallbackRegister.Rsp(Status=t.Status.SUCCESS)
 
     @reply_to(c.UTIL.AssocFindDevice.Req(Index=0))
