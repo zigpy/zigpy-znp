@@ -799,15 +799,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Picks the correct request sending mechanism and fixes endpoint information.
         """
 
-        if dst_ep is None:
-            dst_ep = 0
-
         if radius is None:
             radius = 0
-
-        if relays is not None and not isinstance(dst_addr.address, t.NWK):
-            LOGGER.warning("Packets with relays can only be sent with NWK addressing")
-            relays = None
 
         # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
         # We pick ours based on the registered endpoints when using an older firmware
@@ -816,19 +809,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if relays is None:
             request = c.AF.DataRequestExt.Req(
                 DstAddrModeAddress=dst_addr,
-                DstEndpoint=dst_ep,
+                DstEndpoint=dst_ep or 0,
                 DstPanId=0x0000,
                 SrcEndpoint=src_ep,
                 ClusterId=cluster,
                 TSN=sequence,
                 Options=options,
-                Radius=radius,
+                Radius=10,
                 Data=data,
             )
         else:
             request = c.AF.DataRequestSrcRtg.Req(
                 DstAddr=dst_addr.address,
-                DstEndpoint=dst_ep,
+                DstEndpoint=dst_ep or 0,
                 SrcEndpoint=src_ep,
                 ClusterId=cluster,
                 TSN=sequence,
@@ -879,13 +872,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 dst_addr.mode == t.AddrMode.NWK
                 and dst_addr.address == self._device.nwk
             ):
-                self.handle_message(
-                    sender=self._device,
-                    profile=profile,
-                    cluster=cluster,
-                    src_ep=src_ep,
-                    dst_ep=dst_ep,
-                    message=data,
+                self.packet_received(
+                    zigpy.types.ZigbeePacket(
+                        src=zigpy.types.AddrModeAddress(
+                            addr_mode=zigpy.types.AddrMode.NWK,
+                            address=self._device.nwk,
+                        ),
+                        src_ep=src_ep,
+                        dst=zigpy.types.AddrModeAddress(
+                            addr_mode=zigpy.types.AddrMode.NWK,
+                            address=self._device.nwk,
+                        ),
+                        dst_ep=dst_ep,
+                        tsn=sequence,
+                        profile_id=profile,
+                        cluster_id=cluster,
+                        data=t.SerializableBytes(data),
+                        radius=radius,
+                    )
                 )
 
         if dst_ep == ZDO_ENDPOINT or dst_addr.mode == t.AddrMode.Broadcast:
