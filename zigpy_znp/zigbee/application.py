@@ -815,7 +815,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ClusterId=cluster,
                 TSN=sequence,
                 Options=options,
-                Radius=10,
+                Radius=radius,
                 Data=data,
             )
         else:
