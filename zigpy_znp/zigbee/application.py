@@ -983,6 +983,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         association = None
         force_relays = None
 
+        if packet.source_route is not None:
+            force_relays = packet.source_route
+
         tried_assoc_remove = False
         tried_route_discovery = False
         tried_last_good_route = False
