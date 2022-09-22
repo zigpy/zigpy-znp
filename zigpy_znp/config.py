@@ -76,6 +76,18 @@ def bool_to_upper_str(value: typing.Any) -> str:
         return str(value).upper()
 
 
+def cv_deprecated(message: str) -> typing.Callable[[typing.Any], None]:
+    """
+    Raises a deprecation exception when a value is passed in.
+    """
+
+    def validator(value: typing.Any) -> None:
+        if value is not None:
+            raise vol.Invalid(message)
+
+    return validator
+
+
 CONF_ZNP_CONFIG = "znp_config"
 CONF_TX_POWER = "tx_power"
 CONF_LED_MODE = "led_mode"
@@ -104,8 +116,11 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     vol.Optional(CONF_LED_MODE, default=LEDMode.OFF): vol.Any(
                         None, EnumValue(LEDMode, transformer=bool_to_upper_str)
                     ),
-                    vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default=None): vol.Any(
-                        None, "auto", VolPositiveNumber
+                    vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default=None): (
+                        cv_deprecated(
+                            "`zigpy_config: znp_config: max_concurrent_requests` has"
+                            " been renamed to `zigpy_config: max_concurrent_requests`."
+                        )
                     ),
                     vol.Optional(
                         CONF_CONNECT_RTS_STATES, default=[False, True, False]

@@ -215,16 +215,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Deprecate ZNP-specific config
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] is not None:
-            LOGGER.warning(
+            raise RuntimeError(
                 "`zigpy_config:znp_config:max_concurrent_requests` is deprecated,"
-                " move this key up to `zigpy_config:max_concurrent_requests` instead"
+                " move this key up to `zigpy_config:max_concurrent_requests` instead."
             )
-            concurrency = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
-        else:
-            concurrency = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
         # Now that we know what device we are, set the max concurrent requests
-        if concurrency in (None, "auto"):
+        if self._config[conf.CONF_MAX_CONCURRENT_REQUESTS] is None:
             max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
         else:
             max_concurrent_requests = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
@@ -559,7 +556,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         """
 
         # XXX: Is it possible to receive messages on non-assigned endpoints?
-        if msg.DstEndpoint in self._device.endpoints:
+        if msg.DstEndpoint != 0 and msg.DstEndpoint in self._device.endpoints:
             profile = self._device.endpoints[msg.DstEndpoint].profile_id
         else:
             LOGGER.warning("Received a message on an unregistered endpoint: %s", msg)
@@ -799,9 +796,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Picks the correct request sending mechanism and fixes endpoint information.
         """
 
-        if radius is None:
-            radius = 0
-
         # Zigpy just sets src == dst, which doesn't work for devices with many endpoints
         # We pick ours based on the registered endpoints when using an older firmware
         src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
@@ -1027,11 +1021,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             cluster=packet.cluster_id,
                             sequence=packet.tsn,
                             options=options,
-                            radius=packet.radius,
+                            radius=packet.radius or 0,
                             data=packet.data.serialize(),
                             relays=force_relays,
                             extended_timeout=packet.extended_timeout,
                         )
+                        status = response.Status
                         break
                     except InvalidCommandResponse as e:
                         status = e.response.Status
@@ -1164,8 +1159,3 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         NodeRelation=association.Device.nodeRelation,
                     )
                 )
-
-        if response.Status != t.Status.SUCCESS:
-            raise DeliveryError(
-                f"Failed to send request: {response.Status}", status=response.Status
-            )

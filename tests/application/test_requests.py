@@ -917,3 +917,95 @@ async def test_route_discovery_concurrency(device, make_application):
     assert route_discovery2.call_count == 2
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_send_security_and_packet_source_route(device, make_application, mocker):
+    app, znp_server = await make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    packet = zigpy_t.ZigbeePacket(
+        src=zigpy_t.AddrModeAddress(
+            addr_mode=zigpy_t.AddrMode.NWK, address=app.state.node_info.nwk
+        ),
+        src_ep=0x9A,
+        dst=zigpy_t.AddrModeAddress(addr_mode=zigpy_t.AddrMode.NWK, address=0xEEFF),
+        dst_ep=0xBC,
+        tsn=0xDE,
+        profile_id=0x1234,
+        cluster_id=0x0006,
+        data=zigpy_t.SerializableBytes(b"test data"),
+        extended_timeout=False,
+        tx_options=(
+            zigpy_t.TransmitOptions.ACK | zigpy_t.TransmitOptions.APS_Encryption
+        ),
+        source_route=[0xAABB, 0xCCDD],
+    )
+
+    data_req = znp_server.reply_once_to(
+        request=c.AF.DataRequestSrcRtg.Req(
+            DstAddr=packet.dst.address,
+            DstEndpoint=packet.dst_ep,
+            # SrcEndpoint=packet.src_ep,
+            ClusterId=packet.cluster_id,
+            TSN=packet.tsn,
+            Data=packet.data.serialize(),
+            SourceRoute=packet.source_route,
+            partial=True,
+        ),
+        responses=[
+            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(
+                Status=t.Status.SUCCESS,
+                Endpoint=packet.dst_ep,
+                TSN=packet.tsn,
+            ),
+        ],
+    )
+
+    await app.send_packet(packet)
+    req = await data_req
+    assert c.af.TransmitOptions.ENABLE_SECURITY in req.Options
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_send_packet_failure(device, make_application, mocker):
+    app, znp_server = await make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    packet = zigpy_t.ZigbeePacket(
+        src=zigpy_t.AddrModeAddress(addr_mode=zigpy_t.AddrMode.NWK, address=0x0000),
+        src_ep=0x9A,
+        dst=zigpy_t.AddrModeAddress(addr_mode=zigpy_t.AddrMode.NWK, address=0xEEFF),
+        dst_ep=0xBC,
+        tsn=0xDE,
+        profile_id=0x1234,
+        cluster_id=0x0006,
+        data=zigpy_t.SerializableBytes(b"test data"),
+    )
+
+    znp_server.reply_to(
+        request=c.ZDO.ExtRouteDisc.Req(Dst=packet.dst.address, partial=True),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    znp_server.reply_to(
+        request=c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(
+                Status=t.Status.MAC_NO_ACK,
+                Endpoint=packet.dst_ep,
+                TSN=packet.tsn,
+            ),
+        ],
+    )
+
+    with pytest.raises(zigpy.exceptions.DeliveryError) as excinfo:
+        await app.send_packet(packet)
+
+    assert excinfo.value.status == t.Status.MAC_NO_ACK
+
+    await app.shutdown()

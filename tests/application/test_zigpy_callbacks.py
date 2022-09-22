@@ -168,3 +168,128 @@ async def test_on_af_message_callback(device, make_application, mocker):
     )
 
     app.handle_message.reset_mock()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_receive_zdo_broadcast(device, make_application, mocker):
+    app, znp_server = await make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "packet_received")
+
+    zdo_callback = c.ZDO.MsgCbIncoming.Callback(
+        Src=0x35D9,
+        IsBroadcast=t.Bool.true,
+        ClusterId=19,
+        SecurityUse=0,
+        TSN=129,
+        MacDst=0xFFFF,
+        Data=b"bogus",
+    )
+    znp_server.send(zdo_callback)
+    await asyncio.sleep(0.1)
+
+    assert app.packet_received.call_count == 1
+    packet = app.packet_received.mock_calls[0].args[0]
+    assert packet.src == zigpy_t.AddrModeAddress(
+        addr_mode=zigpy_t.AddrMode.NWK, address=0x35D9
+    )
+    assert packet.src_ep == 0x00
+    assert packet.dst == zigpy_t.AddrModeAddress(
+        addr_mode=zigpy_t.AddrMode.Broadcast,
+        address=zigpy_t.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
+    )
+    assert packet.dst_ep == 0x00
+    assert packet.cluster_id == zdo_callback.ClusterId
+    assert packet.tsn == zdo_callback.TSN
+    assert packet.data.serialize() == bytes([zdo_callback.TSN]) + zdo_callback.Data
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_receive_af_broadcast(device, make_application, mocker):
+    app, znp_server = await make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "packet_received")
+
+    af_callback = c.AF.IncomingMsg.Callback(
+        GroupId=0x0000,
+        ClusterId=4096,
+        SrcAddr=0x1234,
+        SrcEndpoint=254,
+        DstEndpoint=2,
+        WasBroadcast=t.Bool.true,
+        LQI=90,
+        SecurityUse=t.Bool.false,
+        TimeStamp=4442962,
+        TSN=0,
+        Data=b"\x11\xA6\x00\x74\xB5\x7C\x00\x02\x5F",
+        MacSrcAddr=0x0000,
+        MsgResultRadius=0,
+    )
+    znp_server.send(af_callback)
+    await asyncio.sleep(0.1)
+
+    assert app.packet_received.call_count == 1
+    packet = app.packet_received.mock_calls[0].args[0]
+    assert packet.src == zigpy_t.AddrModeAddress(
+        addr_mode=zigpy_t.AddrMode.NWK,
+        address=0x1234,
+    )
+    assert packet.src_ep == af_callback.SrcEndpoint
+    assert packet.dst == zigpy_t.AddrModeAddress(
+        addr_mode=zigpy_t.AddrMode.Broadcast,
+        address=zigpy_t.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
+    )
+    assert packet.dst_ep == af_callback.DstEndpoint
+    assert packet.cluster_id == af_callback.ClusterId
+    assert packet.tsn == af_callback.TSN
+    assert packet.lqi == af_callback.LQI
+    assert packet.data.serialize() == af_callback.Data
+
+    await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_receive_af_group(device, make_application, mocker):
+    app, znp_server = await make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    mocker.patch.object(app, "packet_received")
+
+    af_callback = c.AF.IncomingMsg.Callback(
+        GroupId=0x1234,
+        ClusterId=4096,
+        SrcAddr=0x1234,
+        SrcEndpoint=254,
+        DstEndpoint=0,
+        WasBroadcast=t.Bool.false,
+        LQI=90,
+        SecurityUse=t.Bool.false,
+        TimeStamp=4442962,
+        TSN=0,
+        Data=b"\x11\xA6\x00\x74\xB5\x7C\x00\x02\x5F",
+        MacSrcAddr=0x0000,
+        MsgResultRadius=0,
+    )
+    znp_server.send(af_callback)
+    await asyncio.sleep(0.1)
+
+    assert app.packet_received.call_count == 1
+    packet = app.packet_received.mock_calls[0].args[0]
+    assert packet.src == zigpy_t.AddrModeAddress(
+        addr_mode=zigpy_t.AddrMode.NWK,
+        address=0x1234,
+    )
+    assert packet.src_ep == af_callback.SrcEndpoint
+    assert packet.dst == zigpy_t.AddrModeAddress(
+        addr_mode=zigpy_t.AddrMode.Group, address=0x1234
+    )
+    assert packet.cluster_id == af_callback.ClusterId
+    assert packet.tsn == af_callback.TSN
+    assert packet.lqi == af_callback.LQI
+    assert packet.data.serialize() == af_callback.Data
+
+    await app.shutdown()
