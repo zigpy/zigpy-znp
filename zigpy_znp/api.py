@@ -703,7 +703,7 @@ class ZNP:
             self.close()
             raise
 
-        LOGGER.debug("Connected to %s at %s baud", self._uart.name, self._uart.baudrate)
+        LOGGER.debug("Connected to %s", self._uart.url)
 
     def connection_made(self) -> None:
         """

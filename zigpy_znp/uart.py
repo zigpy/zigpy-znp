@@ -52,7 +52,7 @@ class ZnpMtProtocol(asyncio.Protocol):
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Opened serial port."""
         self._transport = transport
-        LOGGER.debug("Opened %s serial port", transport.serial.name)
+        LOGGER.debug("Opened %s serial port", self.url)
 
         self._connected_event.set()
 
@@ -91,18 +91,14 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._transport.write(data)
 
     def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
+        # TCP transport does not have DTR or RTS pins
+        if not hasattr(self._transport, "serial"):
+            return
+
         LOGGER.debug("Setting serial pin states: DTR=%s, RTS=%s", dtr, rts)
 
         self._transport.serial.dtr = dtr
         self._transport.serial.rts = rts
-
-    @property
-    def name(self) -> str:
-        return self._transport.serial.name
-
-    @property
-    def baudrate(self) -> int:
-        return self._transport.serial.baudrate
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""
@@ -156,8 +152,7 @@ class ZnpMtProtocol(asyncio.Protocol):
     def __repr__(self) -> str:
         return (
             f"<"
-            f"{type(self).__name__} connected to {self.name!r}"
-            f" at {self.baudrate} baud"
+            f"{type(self).__name__} connected to {self.url!r}"
             f" (api: {self._api})"
             f">"
         )
@@ -174,7 +169,7 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
 
     _, protocol = await zigpy.serial.create_serial_connection(
         loop=loop,
-        protocol_factory=lambda: ZnpMtProtocol(api),
+        protocol_factory=lambda: ZnpMtProtocol(api, url=port),
         url=port,
         baudrate=baudrate,
         xonxoff=(flow_control == "software"),
