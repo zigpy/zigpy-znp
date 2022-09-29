@@ -284,9 +284,10 @@ class ZNP:
                     await started_as_coordinator
             except asyncio.TimeoutError as e:
                 raise RuntimeError(
-                    "Network formation refused, RF environment is likely too noisy."
-                    " Temporarily unscrew the antenna or shield the coordinator"
-                    " with metal until a network is formed."
+                    "Network formation refused: there is too much RF interference."
+                    " Make sure your coordinator is on a USB 2.0 extension cable and"
+                    " away from any sources of interference, like USB 3.0 ports, SSDs,"
+                    " 2.4GHz routers, motherboards, etc."
                 ) from e
 
         LOGGER.debug("Waiting for NIB to stabilize")
