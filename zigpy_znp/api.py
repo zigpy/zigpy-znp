@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 import zigpy.state
 import async_timeout
 import zigpy.zdo.types as zdo_t
+import zigpy.exceptions
 from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp
@@ -264,7 +265,7 @@ class ZNP:
                         c.app_config.BDBCommissioningStatus.FormationFailure,
                         c.app_config.BDBCommissioningStatus.Success,
                     ):
-                        raise RuntimeError(
+                        raise zigpy.exceptions.FormationFailure(
                             f"Network formation failed: {commissioning_rsp}"
                         )
                 else:
@@ -283,7 +284,7 @@ class ZNP:
                 async with async_timeout.timeout(STARTUP_TIMEOUT):
                     await started_as_coordinator
             except asyncio.TimeoutError as e:
-                raise RuntimeError(
+                raise zigpy.exceptions.FormationFailure(
                     "Network formation refused: there is too much RF interference."
                     " Make sure your coordinator is on a USB 2.0 extension cable and"
                     " away from any sources of interference, like USB 3.0 ports, SSDs,"
