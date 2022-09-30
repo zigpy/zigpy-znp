@@ -161,6 +161,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.state.node_info = self._znp.node_info
         self.state.network_info = self._znp.network_info
 
+    async def reset_network_info(self) -> None:
+        """
+        Resets node network information and leaves the current network.
+        """
+
+        await self._znp.reset_network_info()
+
     async def write_network_info(
         self,
         *,

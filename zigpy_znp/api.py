@@ -310,17 +310,10 @@ class ZNP:
 
             await asyncio.sleep(1)
 
-    async def write_network_info(
-        self,
-        *,
-        network_info: zigpy.state.NetworkInfo,
-        node_info: zigpy.state.NodeInfo,
-    ) -> None:
+    async def reset_network_info(self):
         """
-        Writes network and node state to NVRAM.
+        Resets node network information and leaves the current network.
         """
-
-        from zigpy_znp.znp import security
 
         # Delete any existing NV items that store formation state
         await self.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK1)
@@ -335,6 +328,19 @@ class ZNP:
         )
 
         await self.reset()
+
+    async def write_network_info(
+        self,
+        *,
+        network_info: zigpy.state.NetworkInfo,
+        node_info: zigpy.state.NodeInfo,
+    ) -> None:
+        """
+        Writes network and node state to NVRAM.
+        """
+        from zigpy_znp.znp import security
+
+        await self.reset_network_info()
 
         # Form a network with completely random settings to get NVRAM to a known state
         for item, value in {
