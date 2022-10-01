@@ -225,7 +225,7 @@ class ZNP:
         """
 
         try:
-            await self._load_network_info()
+            await self._load_network_info(load_devices=load_devices)
         except KeyError as e:
             raise NetworkNotFormed() from e
 
