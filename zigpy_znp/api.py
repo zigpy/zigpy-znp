@@ -93,7 +93,7 @@ class ZNP:
         except CommandNotRecognized:
             return 3.0
 
-    async def load_network_info(self, *, load_devices=False):
+    async def _load_network_info(self, *, load_devices=False):
         """
         Loads low-level network information from NVRAM.
         Loading key data greatly increases the runtime so it not enabled by default.
@@ -101,27 +101,20 @@ class ZNP:
 
         from zigpy_znp.znp import security
 
-        is_on_network = None
-        nib = None
+        nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
 
-        try:
-            nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
-        except KeyError:
-            is_on_network = False
-        else:
-            is_on_network = nib.nwkLogicalChannel != 0 and nib.nwkKeyLoaded
+        if nib.nwkLogicalChannel == 0 or not nib.nwkKeyLoaded:
+            raise NetworkNotFormed()
 
-            if is_on_network and self.version >= 3.0:
-                # This NVRAM item is the very first thing initialized in `zgInit`
-                is_on_network = (
-                    await self.nvram.osal_read(
-                        OsalNvIds.BDBNODEISONANETWORK, item_type=t.uint8_t
-                    )
-                    == 1
-                )
-
-        if not is_on_network:
-            raise NetworkNotFormed("Device is not a part of a network")
+        # This NVRAM item is the very first thing initialized in `zgInit`
+        if (
+            self.version >= 3.0
+            and await self.nvram.osal_read(
+                OsalNvIds.BDBNODEISONANETWORK, item_type=t.uint8_t
+            )
+            != 1
+        ):
+            raise NetworkNotFormed()
 
         ieee = await self.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
         logical_type = await self.nvram.osal_read(
@@ -224,6 +217,17 @@ class ZNP:
 
         self.network_info = network_info
         self.node_info = node_info
+
+    async def load_network_info(self, *, load_devices=False):
+        """
+        Loads low-level network information from NVRAM.
+        Loading key data greatly increases the runtime so it not enabled by default.
+        """
+
+        try:
+            await self._load_network_info()
+        except KeyError as e:
+            raise NetworkNotFormed() from e
 
     async def start_network(self):
         # Both startup sequences end with the same callback
