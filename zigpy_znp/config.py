@@ -94,6 +94,7 @@ CONF_LED_MODE = "led_mode"
 CONF_SKIP_BOOTLOADER = "skip_bootloader"
 CONF_SREQ_TIMEOUT = "sync_request_timeout"
 CONF_ARSP_TIMEOUT = "async_response_timeout"
+CONF_PREFER_ENDPOINT_1 = "prefer_endpoint_1"
 CONF_AUTO_RECONNECT_RETRY_DELAY = "auto_reconnect_retry_delay"
 CONF_CONNECT_RTS_STATES = "connect_rts_pin_states"
 CONF_CONNECT_DTR_STATES = "connect_dtr_pin_states"
@@ -113,6 +114,7 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                         CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
                     ): VolPositiveNumber,
                     vol.Optional(CONF_SKIP_BOOTLOADER, default=True): cv_boolean,
+                    vol.Optional(CONF_PREFER_ENDPOINT_1, default=True): cv_boolean,
                     vol.Optional(CONF_LED_MODE, default=LEDMode.OFF): vol.Any(
                         None, EnumValue(LEDMode, transformer=bool_to_upper_str)
                     ),

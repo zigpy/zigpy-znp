@@ -759,7 +759,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return ZDO_ENDPOINT
 
         # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
-        if self._zstack_build_id >= 20210708:
+        if (
+            self._zstack_build_id >= 20210708
+            and self.znp_config[conf.CONF_PREFER_ENDPOINT_1]
+        ):
             return ZHA_ENDPOINT
 
         # Always fall back to endpoint 1
