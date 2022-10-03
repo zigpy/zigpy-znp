@@ -761,7 +761,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
         if (
             self._zstack_build_id >= 20210708
-            and self._config[conf.CONF_PREFER_ENDPOINT_1]
+            and self.znp_config[conf.CONF_PREFER_ENDPOINT_1]
         ):
             return ZHA_ENDPOINT
 
