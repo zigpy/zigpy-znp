@@ -1,4 +1,5 @@
 import pytest
+import voluptuous as vol
 from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp.types as t
@@ -9,6 +10,7 @@ from zigpy_znp.exceptions import InvalidCommandResponse
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
+    ALL_DEVICES,
     EMPTY_DEVICES,
     FORMED_DEVICES,
     CoroutineMock,
@@ -266,3 +268,28 @@ async def test_zstack_build_id_empty(device, make_application, mocker):
     assert app._zstack_build_id == 0x00000000
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_deprecated_concurrency_config(device, make_application):
+    with pytest.raises(vol.MultipleInvalid) as exc:
+        app, znp_server = await make_application(
+            server_cls=device,
+            client_config={
+                conf.CONF_ZNP_CONFIG: {
+                    conf.CONF_MAX_CONCURRENT_REQUESTS: 16,
+                }
+            },
+        )
+
+    assert "max_concurrent_requests" in str(exc.value)
+
+
+@pytest.mark.parametrize("device", ALL_DEVICES)
+async def test_reset_network_info(device, make_application):
+    app, znp_server = await make_application(server_cls=device)
+    await app.connect()
+    await app.reset_network_info()
+
+    with pytest.raises(NetworkNotFormed):
+        await app.start_network()

@@ -16,6 +16,7 @@ from zigpy.config import (  # noqa: F401
     CONF_NWK_TC_ADDRESS,
     CONF_NWK_TC_LINK_KEY,
     CONF_NWK_EXTENDED_PAN_ID,
+    CONF_MAX_CONCURRENT_REQUESTS,
     cv_boolean,
 )
 
@@ -75,6 +76,18 @@ def bool_to_upper_str(value: typing.Any) -> str:
         return str(value).upper()
 
 
+def cv_deprecated(message: str) -> typing.Callable[[typing.Any], None]:
+    """
+    Raises a deprecation exception when a value is passed in.
+    """
+
+    def validator(value: typing.Any) -> None:
+        if value is not None:
+            raise vol.Invalid(message)
+
+    return validator
+
+
 CONF_ZNP_CONFIG = "znp_config"
 CONF_TX_POWER = "tx_power"
 CONF_LED_MODE = "led_mode"
@@ -82,7 +95,6 @@ CONF_SKIP_BOOTLOADER = "skip_bootloader"
 CONF_SREQ_TIMEOUT = "sync_request_timeout"
 CONF_ARSP_TIMEOUT = "async_response_timeout"
 CONF_AUTO_RECONNECT_RETRY_DELAY = "auto_reconnect_retry_delay"
-CONF_MAX_CONCURRENT_REQUESTS = "max_concurrent_requests"
 CONF_CONNECT_RTS_STATES = "connect_rts_pin_states"
 CONF_CONNECT_DTR_STATES = "connect_dtr_pin_states"
 
@@ -104,8 +116,11 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     vol.Optional(CONF_LED_MODE, default=LEDMode.OFF): vol.Any(
                         None, EnumValue(LEDMode, transformer=bool_to_upper_str)
                     ),
-                    vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default="auto"): vol.Any(
-                        "auto", VolPositiveNumber
+                    vol.Optional(CONF_MAX_CONCURRENT_REQUESTS, default=None): (
+                        cv_deprecated(
+                            "`zigpy_config: znp_config: max_concurrent_requests` has"
+                            " been renamed to `zigpy_config: max_concurrent_requests`."
+                        )
                     ),
                     vol.Optional(
                         CONF_CONNECT_RTS_STATES, default=[False, True, False]

@@ -1,25 +1,16 @@
+from __future__ import annotations
+
 import typing
 import asyncio
 import logging
-import warnings
 
-import serial
+import zigpy.serial
 
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
 from zigpy_znp.types import Bytes
 from zigpy_znp.exceptions import InvalidFrame
-
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        action="ignore",
-        module="serial_asyncio",
-        message='"@coroutine" decorator is deprecated',
-        category=DeprecationWarning,
-    )
-    import serial_asyncio  # noqa: E402
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,11 +20,13 @@ class BufferTooShort(Exception):
 
 
 class ZnpMtProtocol(asyncio.Protocol):
-    def __init__(self, api):
+    def __init__(self, api, *, url: str | None = None) -> None:
         self._buffer = bytearray()
         self._api = api
         self._transport = None
         self._connected_event = asyncio.Event()
+
+        self.url = url
 
     def close(self) -> None:
         """Closes the port."""
@@ -47,7 +40,7 @@ class ZnpMtProtocol(asyncio.Protocol):
             self._transport.close()
             self._transport = None
 
-    def connection_lost(self, exc: typing.Optional[Exception]) -> None:
+    def connection_lost(self, exc: Exception | None) -> None:
         """Connection lost."""
 
         if exc is not None:
@@ -56,10 +49,10 @@ class ZnpMtProtocol(asyncio.Protocol):
         if self._api is not None:
             self._api.connection_lost(exc)
 
-    def connection_made(self, transport: serial_asyncio.SerialTransport) -> None:
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Opened serial port."""
         self._transport = transport
-        LOGGER.debug("Opened %s serial port", transport.serial.name)
+        LOGGER.debug("Opened %s serial port", self.url)
 
         self._connected_event.set()
 
@@ -98,18 +91,14 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._transport.write(data)
 
     def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
+        # TCP transport does not have DTR or RTS pins
+        if not hasattr(self._transport, "serial"):
+            return
+
         LOGGER.debug("Setting serial pin states: DTR=%s, RTS=%s", dtr, rts)
 
         self._transport.serial.dtr = dtr
         self._transport.serial.rts = rts
-
-    @property
-    def name(self) -> str:
-        return self._transport.serial.name
-
-    @property
-    def baudrate(self) -> int:
-        return self._transport.serial.baudrate
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""
@@ -163,8 +152,7 @@ class ZnpMtProtocol(asyncio.Protocol):
     def __repr__(self) -> str:
         return (
             f"<"
-            f"{type(self).__name__} connected to {self.name!r}"
-            f" at {self.baudrate} baud"
+            f"{type(self).__name__} connected to {self.url!r}"
             f" (api: {self._api})"
             f">"
         )
@@ -179,13 +167,11 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
 
     LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
 
-    _, protocol = await serial_asyncio.create_serial_connection(
+    _, protocol = await zigpy.serial.create_serial_connection(
         loop=loop,
-        protocol_factory=lambda: ZnpMtProtocol(api),
+        protocol_factory=lambda: ZnpMtProtocol(api, url=port),
         url=port,
         baudrate=baudrate,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
         xonxoff=(flow_control == "software"),
         rtscts=(flow_control == "hardware"),
     )

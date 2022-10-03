@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 import zigpy.state
 import async_timeout
 import zigpy.zdo.types as zdo_t
+import zigpy.exceptions
 from zigpy.exceptions import NetworkNotFormed
 
 import zigpy_znp
@@ -92,7 +93,7 @@ class ZNP:
         except CommandNotRecognized:
             return 3.0
 
-    async def load_network_info(self, *, load_devices=False):
+    async def _load_network_info(self, *, load_devices=False):
         """
         Loads low-level network information from NVRAM.
         Loading key data greatly increases the runtime so it not enabled by default.
@@ -100,27 +101,20 @@ class ZNP:
 
         from zigpy_znp.znp import security
 
-        is_on_network = None
-        nib = None
+        nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
 
-        try:
-            nib = await self.nvram.osal_read(OsalNvIds.NIB, item_type=t.NIB)
-        except KeyError:
-            is_on_network = False
-        else:
-            is_on_network = nib.nwkLogicalChannel != 0 and nib.nwkKeyLoaded
+        if nib.nwkLogicalChannel == 0 or not nib.nwkKeyLoaded:
+            raise NetworkNotFormed()
 
-            if is_on_network and self.version >= 3.0:
-                # This NVRAM item is the very first thing initialized in `zgInit`
-                is_on_network = (
-                    await self.nvram.osal_read(
-                        OsalNvIds.BDBNODEISONANETWORK, item_type=t.uint8_t
-                    )
-                    == 1
-                )
-
-        if not is_on_network:
-            raise NetworkNotFormed("Device is not a part of a network")
+        # This NVRAM item is the very first thing initialized in `zgInit`
+        if (
+            self.version >= 3.0
+            and await self.nvram.osal_read(
+                OsalNvIds.BDBNODEISONANETWORK, item_type=t.uint8_t
+            )
+            != 1
+        ):
+            raise NetworkNotFormed()
 
         ieee = await self.nvram.osal_read(OsalNvIds.EXTADDR, item_type=t.EUI64)
         logical_type = await self.nvram.osal_read(
@@ -224,6 +218,17 @@ class ZNP:
         self.network_info = network_info
         self.node_info = node_info
 
+    async def load_network_info(self, *, load_devices=False):
+        """
+        Loads low-level network information from NVRAM.
+        Loading key data greatly increases the runtime so it not enabled by default.
+        """
+
+        try:
+            await self._load_network_info(load_devices=load_devices)
+        except KeyError as e:
+            raise NetworkNotFormed() from e
+
     async def start_network(self):
         # Both startup sequences end with the same callback
         started_as_coordinator = self.wait_for_response(
@@ -264,7 +269,7 @@ class ZNP:
                         c.app_config.BDBCommissioningStatus.FormationFailure,
                         c.app_config.BDBCommissioningStatus.Success,
                     ):
-                        raise RuntimeError(
+                        raise zigpy.exceptions.FormationFailure(
                             f"Network formation failed: {commissioning_rsp}"
                         )
                 else:
@@ -283,10 +288,11 @@ class ZNP:
                 async with async_timeout.timeout(STARTUP_TIMEOUT):
                     await started_as_coordinator
             except asyncio.TimeoutError as e:
-                raise RuntimeError(
-                    "Network formation refused, RF environment is likely too noisy."
-                    " Temporarily unscrew the antenna or shield the coordinator"
-                    " with metal until a network is formed."
+                raise zigpy.exceptions.FormationFailure(
+                    "Network formation refused: there is too much RF interference."
+                    " Make sure your coordinator is on a USB 2.0 extension cable and"
+                    " away from any sources of interference, like USB 3.0 ports, SSDs,"
+                    " 2.4GHz routers, motherboards, etc."
                 ) from e
 
         LOGGER.debug("Waiting for NIB to stabilize")
@@ -308,17 +314,10 @@ class ZNP:
 
             await asyncio.sleep(1)
 
-    async def write_network_info(
-        self,
-        *,
-        network_info: zigpy.state.NetworkInfo,
-        node_info: zigpy.state.NodeInfo,
-    ) -> None:
+    async def reset_network_info(self):
         """
-        Writes network and node state to NVRAM.
+        Resets node network information and leaves the current network.
         """
-
-        from zigpy_znp.znp import security
 
         # Delete any existing NV items that store formation state
         await self.nvram.osal_delete(OsalNvIds.HAS_CONFIGURED_ZSTACK1)
@@ -333,6 +332,19 @@ class ZNP:
         )
 
         await self.reset()
+
+    async def write_network_info(
+        self,
+        *,
+        network_info: zigpy.state.NetworkInfo,
+        node_info: zigpy.state.NodeInfo,
+    ) -> None:
+        """
+        Writes network and node state to NVRAM.
+        """
+        from zigpy_znp.znp import security
+
+        await self.reset_network_info()
 
         # Form a network with completely random settings to get NVRAM to a known state
         for item, value in {
@@ -703,7 +715,7 @@ class ZNP:
             self.close()
             raise
 
-        LOGGER.debug("Connected to %s at %s baud", self._uart.name, self._uart.baudrate)
+        LOGGER.debug("Connected to %s", self._uart.url)
 
     def connection_made(self) -> None:
         """

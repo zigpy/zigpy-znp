@@ -51,9 +51,6 @@ Below are the defaults with the top-level Home Assistant `zha:` key.
 zha:
   zigpy_config:
     znp_config:
-      # "auto" picks the largest value that keeps the device's transmit buffer from getting full
-      max_concurrent_requests: auto
-
       # Only if your stick has a built-in power amplifier (i.e. CC1352P and CC2592)
       # If set, must be between:
       #  * CC1352/2652:  -22 and 19

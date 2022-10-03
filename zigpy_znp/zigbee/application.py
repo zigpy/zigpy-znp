@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
-import time
 import asyncio
 import logging
 import itertools
-import contextlib
 
 import zigpy.zcl
 import zigpy.zdo
@@ -18,7 +16,6 @@ import async_timeout
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
-from zigpy.types import deserialize as list_deserialize
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.const as const
@@ -39,7 +36,7 @@ ZDO_PROFILE = 0x0000
 PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
-IEEE_ADDR_DISCOVERY_TIMEOUT = 5
+EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 DEVICE_JOIN_MAX_DELAY = 5
 WATCHDOG_PERIOD = 30
 
@@ -87,8 +84,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._watchdog_task.cancel()
 
         self._version_rsp = None
-        self._concurrent_requests_semaphore = None
-        self._currently_waiting_requests = 0
 
         self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
@@ -166,6 +161,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.state.node_info = self._znp.node_info
         self.state.network_info = self._znp.network_info
 
+    async def reset_network_info(self) -> None:
+        """
+        Resets node network information and leaves the current network.
+        """
+
+        await self._znp.reset_network_info()
+
     async def write_network_info(
         self,
         *,
@@ -218,13 +220,21 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
         await self._device.schedule_initialize()
 
+        # Deprecate ZNP-specific config
+        if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] is not None:
+            raise RuntimeError(
+                "`zigpy_config:znp_config:max_concurrent_requests` is deprecated,"
+                " move this key up to `zigpy_config:max_concurrent_requests` instead."
+            )
+
         # Now that we know what device we are, set the max concurrent requests
-        if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] == "auto":
+        if self._config[conf.CONF_MAX_CONCURRENT_REQUESTS] is None:
             max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
         else:
-            max_concurrent_requests = self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS]
+            max_concurrent_requests = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
-        self._concurrent_requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
+        # Update the max value of the concurrent request semaphore at runtime
+        self._concurrent_requests_semaphore.max_value = max_concurrent_requests
 
         if self.state.network_info.network_key.key == const.Z2M_NETWORK_KEY:
             LOGGER.warning(
@@ -270,93 +280,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         )
 
         return dst_addr
-
-    @zigpy.util.retryable_request
-    async def request(
-        self,
-        device,
-        profile,
-        cluster,
-        src_ep,
-        dst_ep,
-        sequence,
-        data,
-        expect_reply=True,
-        use_ieee=False,
-    ) -> tuple[t.Status, str]:
-        tx_options = c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
-
-        if expect_reply:
-            tx_options |= c.af.TransmitOptions.ACK_REQUEST
-
-        if use_ieee:
-            destination = t.AddrModeAddress(mode=t.AddrMode.IEEE, address=device.ieee)
-        else:
-            destination = t.AddrModeAddress(mode=t.AddrMode.NWK, address=device.nwk)
-
-        return await self._send_request(
-            dst_addr=destination,
-            dst_ep=dst_ep,
-            src_ep=src_ep,
-            profile=profile,
-            cluster=cluster,
-            sequence=sequence,
-            options=tx_options,
-            radius=30,
-            data=data,
-        )
-
-    async def broadcast(
-        self,
-        profile,
-        cluster,
-        src_ep,
-        dst_ep,
-        grpid,
-        radius,
-        sequence,
-        data,
-        broadcast_address=zigpy.types.BroadcastAddress.RX_ON_WHEN_IDLE,
-    ) -> tuple[t.Status, str]:
-        assert grpid == 0
-
-        return await self._send_request(
-            dst_addr=t.AddrModeAddress(
-                mode=t.AddrMode.Broadcast, address=broadcast_address
-            ),
-            dst_ep=dst_ep,
-            src_ep=src_ep,
-            profile=profile,
-            cluster=cluster,
-            sequence=sequence,
-            options=c.af.TransmitOptions.NONE,
-            radius=radius,
-            data=data,
-        )
-
-    async def mrequest(
-        self,
-        group_id,
-        profile,
-        cluster,
-        src_ep,
-        sequence,
-        data,
-        *,
-        hops=0,
-        non_member_radius=3,
-    ) -> tuple[t.Status, str]:
-        return await self._send_request(
-            dst_addr=t.AddrModeAddress(mode=t.AddrMode.Group, address=group_id),
-            dst_ep=src_ep,
-            src_ep=src_ep,
-            profile=profile,
-            cluster=cluster,
-            sequence=sequence,
-            options=c.af.TransmitOptions.NONE,
-            radius=hops,
-            data=data,
-        )
 
     async def permit(self, time_s: int = 60, node: t.EUI64 = None):
         """
@@ -526,32 +449,53 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 LOGGER.debug("Ignoring loopback ZDO request")
                 return
 
-        message = t.uint8_t(msg.TSN).serialize() + msg.Data
-        hdr, data = zdo_t.ZDOHeader.deserialize(msg.ClusterId, message)
-        names, types = zdo_t.CLUSTERS[msg.ClusterId]
-        args, data = list_deserialize(data, types)
-        kwargs = dict(zip(names, args))
-
-        if msg.ClusterId == zdo_t.ZDOCmd.Device_annce:
-            self.on_zdo_device_announce(*args)
-            device = self.get_device(ieee=kwargs["IEEEAddr"])
+        if msg.IsBroadcast:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.Broadcast,
+                address=zigpy.types.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
+            )
         else:
-            try:
-                device = await self._get_or_discover_device(nwk=msg.Src)
-            except KeyError:
-                LOGGER.warning(
-                    "Received a ZDO message from an unknown device: %s", msg.Src
-                )
-                return
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.NWK,
+                address=self.state.node_info.nwk,
+            )
 
-        self.handle_message(
-            sender=device,
-            profile=ZDO_PROFILE,
-            cluster=msg.ClusterId,
+        packet = zigpy.types.ZigbeePacket(
+            src=zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.NWK,
+                address=msg.Src,
+            ),
             src_ep=ZDO_ENDPOINT,
+            dst=dst,
             dst_ep=ZDO_ENDPOINT,
-            message=message,
+            tsn=msg.TSN,
+            profile_id=ZDO_PROFILE,
+            cluster_id=msg.ClusterId,
+            data=t.SerializableBytes(t.uint8_t(msg.TSN).serialize() + msg.Data),
+            tx_options=(
+                zigpy.types.TransmitOptions.APS_Encryption
+                if msg.SecurityUse
+                else zigpy.types.TransmitOptions.NONE
+            ),
         )
+
+        # Peek into the ZDO packet so that we can cancel our existing TC join timer when
+        # a device actually sends an announcemement
+        try:
+            zdo_hdr, zdo_args = self._device.zdo.deserialize(
+                cluster_id=packet.cluster_id, data=packet.data.serialize()
+            )
+        except Exception:
+            LOGGER.warning("Failed to deserialize ZDO packet", exc_info=True)
+        else:
+            if zdo_hdr.command_id == zdo_t.ZDOCmd.Device_annce:
+                _, ieee, _ = zdo_args
+
+                # Cancel any existing TC join timers so we don't double announce
+                if ieee in self._join_announce_tasks:
+                    self._join_announce_tasks.pop(ieee).cancel()
+
+        self.packet_received(packet)
 
     def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
         """
@@ -568,35 +512,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ZDO source routing message callback
         """
 
-        try:
-            device = await self._get_or_discover_device(nwk=msg.DstAddr)
-        except KeyError:
-            LOGGER.warning(
-                "Received a ZDO message from an unknown device: %s", msg.DstAddr
-            )
-            return
-
-        # `relays` is a property with a setter that emits an event
-        device.relays = msg.Relays
-
-    def on_zdo_device_announce(self, nwk: t.NWK, ieee: t.EUI64, capabilities) -> None:
-        """
-        ZDO end device announcement callback
-        """
-
-        LOGGER.info(
-            "ZDO device announce: nwk=%s, ieee=%s, capabilities=%s",
-            nwk,
-            ieee,
-            capabilities,
-        )
-
-        # Cancel an existing join timer so we don't double announce
-        if ieee in self._join_announce_tasks:
-            self._join_announce_tasks.pop(ieee).cancel()
-
-        # Sometimes devices change their NWK when announcing so re-join it.
-        self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
+        self.handle_relays(nwk=msg.DstAddr, relays=msg.Relays)
 
     def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
         """
@@ -646,30 +562,50 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Handler for all non-ZDO messages.
         """
 
-        try:
-            device = await self._get_or_discover_device(nwk=msg.SrcAddr)
-        except KeyError:
-            LOGGER.warning(
-                "Received an AF message from an unknown device: %s", msg.SrcAddr
-            )
-            return
-
-        device.radio_details(lqi=msg.LQI, rssi=None)
-
         # XXX: Is it possible to receive messages on non-assigned endpoints?
-        if msg.DstEndpoint in self._device.endpoints:
+        if msg.DstEndpoint != 0 and msg.DstEndpoint in self._device.endpoints:
             profile = self._device.endpoints[msg.DstEndpoint].profile_id
         else:
             LOGGER.warning("Received a message on an unregistered endpoint: %s", msg)
             profile = zigpy.profiles.zha.PROFILE_ID
 
-        self.handle_message(
-            sender=device,
-            profile=profile,
-            cluster=msg.ClusterId,
-            src_ep=msg.SrcEndpoint,
-            dst_ep=msg.DstEndpoint,
-            message=msg.Data,
+        if msg.WasBroadcast:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.Broadcast,
+                address=zigpy.types.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
+            )
+        elif msg.GroupId != 0x0000:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.Group,
+                address=msg.GroupId,
+            )
+        else:
+            dst = zigpy.types.AddrModeAddress(
+                addr_mode=zigpy.types.AddrMode.NWK,
+                address=self.state.node_info.nwk,
+            )
+
+        self.packet_received(
+            zigpy.types.ZigbeePacket(
+                src=zigpy.types.AddrModeAddress(
+                    addr_mode=zigpy.types.AddrMode.NWK, address=msg.SrcAddr
+                ),
+                src_ep=msg.SrcEndpoint,
+                dst=dst,
+                dst_ep=msg.DstEndpoint,
+                tsn=msg.TSN,
+                profile_id=profile,
+                cluster_id=msg.ClusterId,
+                data=t.SerializableBytes(bytes(msg.Data)),
+                tx_options=(
+                    zigpy.types.TransmitOptions.APS_Encryption
+                    if msg.SecurityUse
+                    else zigpy.types.TransmitOptions.NONE
+                ),
+                radius=msg.MsgResultRadius,
+                lqi=msg.LQI,
+                rssi=None,
+            )
         )
 
     ####################
@@ -722,64 +658,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 self.connection_lost(e)
 
                 return
-
-    @combine_concurrent_calls
-    async def _get_or_discover_device(self, nwk: t.NWK) -> zigpy.device.Device:
-        """
-        Finds a device by its NWK address. If a device does not exist in the zigpy
-        database, attempt to look up its new NWK address. If it does not exist in the
-        zigpy database, treat the device as a new join.
-        """
-
-        try:
-            return self.get_device(nwk=nwk)
-        except KeyError:
-            pass
-
-        LOGGER.debug("Device with NWK 0x%04X not in database", nwk)
-
-        try:
-            async with async_timeout.timeout(IEEE_ADDR_DISCOVERY_TIMEOUT):
-                ieee_addr_rsp = await self._znp.request_callback_rsp(
-                    request=c.ZDO.IEEEAddrReq.Req(
-                        NWK=nwk,
-                        RequestType=c.zdo.AddrRequestType.SINGLE,
-                        StartIndex=0,
-                    ),
-                    RspStatus=t.Status.SUCCESS,
-                    callback=c.ZDO.IEEEAddrRsp.Callback(partial=True, NWK=nwk),
-                )
-        except asyncio.TimeoutError:
-            raise KeyError(f"Unknown device: 0x{nwk:04X}")
-        else:
-            ieee = ieee_addr_rsp.IEEE
-
-        try:
-            device = self.get_device(ieee=ieee)
-        except KeyError:
-            LOGGER.debug("Treating unknown device as a new join")
-            self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
-
-            return self.get_device(ieee=ieee)
-
-        # The `Device` object could have been updated while this coroutine is running
-        if device.nwk == nwk:
-            return device
-
-        LOGGER.warning(
-            "Device %s changed its NWK from %s to %s",
-            device.ieee,
-            device.nwk,
-            nwk,
-        )
-
-        # Notify zigpy of the change
-        self.handle_join(nwk=nwk, ieee=ieee, parent_nwk=None)
-
-        # `handle_join` will update the NWK
-        assert device.nwk == nwk
-
-        return device
 
     async def _set_led_mode(self, *, led: t.uint8_t, mode: c.util.LEDMode) -> None:
         """
@@ -835,42 +713,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 any_changed = True
 
         return any_changed
-
-    @contextlib.asynccontextmanager
-    async def _limit_concurrency(self):
-        """
-        Async context manager that prevents devices from being overwhelmed by requests.
-        Mainly a thin wrapper around `asyncio.Semaphore` that logs when it has to wait.
-        """
-
-        # Allow sending some requests before the application has fully started
-        if self._concurrent_requests_semaphore is None:
-            yield
-            return
-
-        start_time = time.time()
-        was_locked = self._concurrent_requests_semaphore.locked()
-
-        if was_locked:
-            self._currently_waiting_requests += 1
-            LOGGER.debug(
-                "Max concurrency reached, delaying requests (%s enqueued)",
-                self._currently_waiting_requests,
-            )
-
-        try:
-            async with self._concurrent_requests_semaphore:
-                if was_locked:
-                    LOGGER.debug(
-                        "Previously delayed request is now running, "
-                        "delayed by %0.2f seconds",
-                        time.time() - start_time,
-                    )
-
-                yield
-        finally:
-            if was_locked:
-                self._currently_waiting_requests -= 1
 
     async def _reconnect(self) -> None:
         """
@@ -954,6 +796,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         data,
         *,
         relays=None,
+        extended_timeout=False,
     ):
         """
         Used by `request`/`mrequest`/`broadcast` to send a request.
@@ -967,7 +810,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if relays is None:
             request = c.AF.DataRequestExt.Req(
                 DstAddrModeAddress=dst_addr,
-                DstEndpoint=dst_ep,
+                DstEndpoint=dst_ep or 0,
                 DstPanId=0x0000,
                 SrcEndpoint=src_ep,
                 ClusterId=cluster,
@@ -979,7 +822,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         else:
             request = c.AF.DataRequestSrcRtg.Req(
                 DstAddr=dst_addr.address,
-                DstEndpoint=dst_ep,
+                DstEndpoint=dst_ep or 0,
                 SrcEndpoint=src_ep,
                 ClusterId=cluster,
                 TSN=sequence,
@@ -1030,13 +873,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 dst_addr.mode == t.AddrMode.NWK
                 and dst_addr.address == self._device.nwk
             ):
-                self.handle_message(
-                    sender=self._device,
-                    profile=profile,
-                    cluster=cluster,
-                    src_ep=src_ep,
-                    dst_ep=dst_ep,
-                    message=data,
+                self.packet_received(
+                    zigpy.types.ZigbeePacket(
+                        src=zigpy.types.AddrModeAddress(
+                            addr_mode=zigpy.types.AddrMode.NWK,
+                            address=self._device.nwk,
+                        ),
+                        src_ep=src_ep,
+                        dst=zigpy.types.AddrModeAddress(
+                            addr_mode=zigpy.types.AddrMode.NWK,
+                            address=self._device.nwk,
+                        ),
+                        dst_ep=dst_ep,
+                        tsn=sequence,
+                        profile_id=profile,
+                        cluster_id=cluster,
+                        data=t.SerializableBytes(data),
+                        radius=radius,
+                    )
                 )
 
         if dst_ep == ZDO_ENDPOINT or dst_addr.mode == t.AddrMode.Broadcast:
@@ -1045,7 +899,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 request=request, RspStatus=t.Status.SUCCESS
             )
         else:
-            async with async_timeout.timeout(DATA_CONFIRM_TIMEOUT):
+            async with async_timeout.timeout(
+                EXTENDED_DATA_CONFIRM_TIMEOUT
+                if extended_timeout
+                else DATA_CONFIRM_TIMEOUT
+            ):
                 # Shield from cancellation to prevent requests that time out in higher
                 # layers from missing expected responses
                 response = await asyncio.shield(
@@ -1095,40 +953,39 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await asyncio.sleep(0.1 * 13)
 
-    async def _send_request(
-        self,
-        dst_addr,
-        dst_ep,
-        src_ep,
-        profile,
-        cluster,
-        sequence,
-        options,
-        radius,
-        data,
-    ) -> tuple[t.Status, str]:
+    async def send_packet(self, packet: zigpy.types.ZigbeePacket) -> None:
         """
         Fault-tolerant wrapper around `_send_request_raw` that transparently attempts to
         repair routes and contact the device through other methods when Z-Stack errors
         are encountered.
         """
 
+        LOGGER.debug("Sending packet %r", packet)
+
+        options = c.af.TransmitOptions.SUPPRESS_ROUTE_DISC_NETWORK
+
+        if zigpy.types.TransmitOptions.ACK in packet.tx_options:
+            options |= c.af.TransmitOptions.ACK_REQUEST
+
+        if zigpy.types.TransmitOptions.APS_Encryption in packet.tx_options:
+            options |= c.af.TransmitOptions.ENABLE_SECURITY
+
         try:
-            if dst_addr.mode == t.AddrMode.NWK:
-                device = self.get_device(nwk=dst_addr.address)
-            elif dst_addr.mode == t.AddrMode.IEEE:
-                device = self.get_device(ieee=dst_addr.address)
-            else:
-                device = None
-        except KeyError:
+            device = self.get_device_with_address(packet.dst)
+        except (KeyError, ValueError):
             # Sometimes a request is sent to a device not in the database. This should
             # work, the device object is only for recovery.
             device = None
+
+        dst_addr = t.AddrModeAddress.from_zigpy_type(packet.dst)
 
         status = None
         response = None
         association = None
         force_relays = None
+
+        if packet.source_route is not None:
+            force_relays = packet.source_route
 
         tried_assoc_remove = False
         tried_route_discovery = False
@@ -1145,7 +1002,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         # indicating that a route is missing so we need to explicitly
                         # check for one.
                         if (
-                            dst_ep == ZDO_ENDPOINT
+                            packet.dst_ep == ZDO_ENDPOINT
                             and dst_addr.mode == t.AddrMode.NWK
                             and dst_addr.address != self.state.node_info.nwk
                         ):
@@ -1165,16 +1022,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
                         response = await self._send_request_raw(
                             dst_addr=dst_addr,
-                            dst_ep=dst_ep,
-                            src_ep=src_ep,
-                            profile=profile,
-                            cluster=cluster,
-                            sequence=sequence,
+                            dst_ep=packet.dst_ep,
+                            src_ep=packet.src_ep,
+                            profile=packet.profile_id,
+                            cluster=packet.cluster_id,
+                            sequence=packet.tsn,
                             options=options,
-                            radius=radius,
-                            data=data,
+                            radius=packet.radius or 0,
+                            data=packet.data.serialize(),
                             relays=force_relays,
+                            extended_timeout=packet.extended_timeout,
                         )
+                        status = response.Status
                         break
                     except InvalidCommandResponse as e:
                         status = e.response.Status
@@ -1292,7 +1151,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 else:
                     raise DeliveryError(
                         f"Request failed after {REQUEST_MAX_RETRIES} attempts:"
-                        f" {status!r}"
+                        f" {status!r}",
+                        status=status,
                     )
         finally:
             # We *must* re-add the device association if we previously removed it but
@@ -1306,8 +1166,3 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         NodeRelation=association.Device.nodeRelation,
                     )
                 )
-
-        if response.Status != t.Status.SUCCESS:
-            return response.Status, "Failed to send request"
-
-        return response.Status, "Sent request successfully"
