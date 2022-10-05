@@ -43,7 +43,7 @@ LOGGER = logging.getLogger(__name__)
 # All of these are in seconds
 STARTUP_TIMEOUT = 15
 AFTER_BOOTLOADER_SKIP_BYTE_DELAY = 2.5
-NETWORK_COMMISSIONING_TIMEOUT = 30
+NETWORK_COMMISSIONING_TIMEOUT = 60
 BOOTLOADER_PIN_TOGGLE_DELAY = 0.15
 CONNECT_PING_TIMEOUT = 0.50
 CONNECT_PROBE_TIMEOUT = 10
@@ -935,7 +935,7 @@ class ZNP:
         return self.wait_for_responses([response])
 
     async def request(
-        self, request: t.CommandBase, **response_params
+        self, request: t.CommandBase, timeout: int | None = None, **response_params
     ) -> t.CommandBase | None:
         """
         Sends a SREQ/AREQ request and returns its SRSP (only for SREQ), failing if any
@@ -991,7 +991,9 @@ class ZNP:
             self._uart.send(frame)
 
             # We should get a SRSP in a reasonable amount of time
-            async with async_timeout.timeout(self._znp_config[conf.CONF_SREQ_TIMEOUT]):
+            async with async_timeout.timeout(
+                timeout or self._znp_config[conf.CONF_SREQ_TIMEOUT]
+            ):
                 # We lock until either a sync response is seen or an error occurs
                 response = await response_future
 
@@ -1032,7 +1034,7 @@ class ZNP:
         if not background:
             try:
                 async with async_timeout.timeout(timeout):
-                    await self.request(request, **response_params)
+                    await self.request(request, timeout=timeout, **response_params)
 
                     return await callback_rsp
             finally:
