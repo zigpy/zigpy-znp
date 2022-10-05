@@ -31,7 +31,11 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse, InvalidFrame
+from zigpy_znp.exceptions import (
+    InvalidFrame,
+    CommandNotRecognized,
+    InvalidCommandResponse,
+)
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 if typing.TYPE_CHECKING:
@@ -715,7 +719,7 @@ class ZNP:
             self.close()
             raise
 
-        LOGGER.debug("Connected to %s", self._uart.url)
+        LOGGER.debug("Connected to %s", self._uart.get_url())
 
     def connection_made(self) -> None:
         """
@@ -813,7 +817,9 @@ class ZNP:
             # https://github.com/home-assistant/core/issues/50005
             if command_cls == c.ZDO.ParentAnnceRsp.Callback:
                 LOGGER.warning("Failed to parse broken %s as %s", frame, command_cls)
-                raise InvalidFrame("Parsing frame %s ad command %s failed", frame, command_cls)
+                raise InvalidFrame(
+                    "Parsing frame %s ad command %s failed", frame, command_cls
+                )
 
             raise
 

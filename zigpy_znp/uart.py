@@ -9,8 +9,8 @@ import zigpy.serial
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
-from zigpy_znp.thread import ThreadsafeProxy, EventLoopThread
 from zigpy_znp.types import Bytes
+from zigpy_znp.thread import EventLoopThread, ThreadsafeProxy
 from zigpy_znp.exceptions import InvalidFrame
 
 LOGGER = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._api = api
         self._transport = None
         self._connected_event = asyncio.Event()
+        self._connection_done_event = asyncio.Event()
 
         self.url = url
 
@@ -46,6 +47,9 @@ class ZnpMtProtocol(asyncio.Protocol):
 
         if exc is not None:
             LOGGER.warning("Lost connection", exc_info=exc)
+
+        if self._connection_done_event:
+            self._connection_done_event.set()
 
         if self._api is not None:
             self._api.connection_lost(exc)
@@ -158,6 +162,9 @@ class ZnpMtProtocol(asyncio.Protocol):
             f">"
         )
 
+    def get_url(self):
+        return self.url
+
 
 async def _connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     loop = asyncio.get_running_loop()
@@ -166,8 +173,7 @@ async def _connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     baudrate = config[conf.CONF_DEVICE_BAUDRATE]
     flow_control = config[conf.CONF_DEVICE_FLOW_CONTROL]
 
-    import threading
-    LOGGER.debug("Connecting to %s at %s baud in thread %s", port, baudrate, threading.current_thread().name)
+    LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
 
     _, protocol = await zigpy.serial.create_serial_connection(
         loop=loop,
@@ -185,7 +191,9 @@ async def _connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     return protocol
 
 
-async def connect(config: conf.ConfigType, api, use_thread=True) -> ZnpMtProtocol:
+async def connect(
+    config: conf.ConfigType, api, use_thread=True
+) -> ZnpMtProtocol | ThreadsafeProxy:
     if use_thread:
         application = ThreadsafeProxy(api, asyncio.get_event_loop())
         thread = EventLoopThread()
@@ -197,6 +205,9 @@ async def connect(config: conf.ConfigType, api, use_thread=True) -> ZnpMtProtoco
         except Exception:
             thread.force_stop()
             raise
+
+        thread_safe_protocol = ThreadsafeProxy(protocol, thread.loop)
+        return thread_safe_protocol
     else:
-        protocol, _ = await _connect(config, api)
+        protocol = await _connect(config, api)
     return protocol
