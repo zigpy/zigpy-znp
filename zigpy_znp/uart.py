@@ -162,7 +162,7 @@ class ZnpMtProtocol(asyncio.Protocol):
             f">"
         )
 
-    def get_url(self):
+    async def get_url(self):
         return self.url
 
 
