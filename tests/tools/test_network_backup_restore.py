@@ -320,7 +320,7 @@ async def test_nwk_frame_counter_zstack33(make_connected_znp):
         znp.network_info, extended_pan_id=t.EUI64.convert("11:22:33:44:55:66:77:88")
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError):
         await security.read_nwk_frame_counter(znp)
 
     # Writes similarly will fail
