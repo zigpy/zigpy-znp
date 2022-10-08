@@ -106,7 +106,7 @@ async def read_nwk_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.u
             global_entry = entry
 
     if global_entry is None:
-        raise ValueError("No security material entry was found for this network")
+        raise KeyError("No security material entry was found for this network")
 
     return global_entry.FrameCounter
 
