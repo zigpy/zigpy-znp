@@ -788,19 +788,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
     async def _send_request_raw(
         self,
-        dst_addr,
-        dst_ep,
-        src_ep,
-        profile,
-        cluster,
-        sequence,
-        options,
-        radius,
-        data,
+        dst_addr: t.AddrModeAddress,
+        dst_ep: int,
+        src_ep: int,
+        profile: int,
+        cluster: int,
+        sequence: int,
+        options: c.af.TransmitOptions,
+        radius: int,
+        data: bytes,
         *,
-        relays=None,
-        extended_timeout=False,
-    ):
+        relays: list[t.NWK] | None = None,
+        extended_timeout: bool = False,
+    ) -> None:
         """
         Used by `request`/`mrequest`/`broadcast` to send a request.
         Picks the correct request sending mechanism and fixes endpoint information.
@@ -896,43 +896,56 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     )
                 )
 
-        if dst_ep == ZDO_ENDPOINT or dst_addr.mode == t.AddrMode.Broadcast:
-            # Broadcasts and ZDO requests will not receive a confirmation
-            response = await self._znp.request(
-                request=request, RspStatus=t.Status.SUCCESS
+        if dst_addr.mode == t.AddrMode.Broadcast:
+            # Broadcasts will not receive a confirmation
+            await self._znp.request(request=request, RspStatus=t.Status.SUCCESS)
+            return
+
+        if dst_ep == ZDO_ENDPOINT:
+            # ZDO requests do not receive an AF acknowledgement, we must wait for the
+            # response to know if the request was sent successfully
+            callback = c.ZDO.MsgCbIncoming.Callback(
+                partial=True,
+                Src=dst_addr.address,
+                IsBroadcast=t.Bool.false,
+                TSN=sequence,
             )
         else:
-            async with async_timeout.timeout(
-                EXTENDED_DATA_CONFIRM_TIMEOUT
-                if extended_timeout
-                else DATA_CONFIRM_TIMEOUT
-            ):
-                # Shield from cancellation to prevent requests that time out in higher
-                # layers from missing expected responses
-                response = await asyncio.shield(
-                    self._znp.request_callback_rsp(
-                        request=request,
-                        RspStatus=t.Status.SUCCESS,
-                        callback=c.AF.DataConfirm.Callback(
-                            partial=True,
-                            TSN=sequence,
-                            # XXX: can this ever not match?
-                            # Endpoint=src_ep,
-                        ),
-                        # Multicasts eventually receive a confirmation but waiting for
-                        # it is unnecessary
-                        background=(dst_addr.mode == t.AddrMode.Group),
-                    )
+            callback = c.AF.DataConfirm.Callback(
+                partial=True,
+                TSN=sequence,
+                # XXX: can this ever not match?
+                # Endpoint=src_ep,
+            )
+
+        async with async_timeout.timeout(
+            EXTENDED_DATA_CONFIRM_TIMEOUT if extended_timeout else DATA_CONFIRM_TIMEOUT
+        ):
+            # Shield from cancellation to prevent requests that time out in higher
+            # layers from missing expected responses
+            response = await asyncio.shield(
+                self._znp.request_callback_rsp(
+                    request=request,
+                    RspStatus=t.Status.SUCCESS,
+                    callback=callback,
+                    # Multicasts eventually receive a confirmation but waiting for
+                    # it is unnecessary
+                    background=(dst_addr.mode == t.AddrMode.Group),
                 )
+            )
 
-                # Both the callback and the response can have an error status
-                if response.Status != t.Status.SUCCESS:
-                    raise InvalidCommandResponse(
-                        f"Unsuccessful request status code: {response.Status!r}",
-                        response,
-                    )
+        # If we received a ZDO response, the request succeeded
+        if isinstance(response, c.ZDO.MsgCbIncoming.Callback):
+            return
 
-        return response
+        # Unicast, non-ZDO requests receive a "sent" callback
+        if response.Status != t.Status.SUCCESS:
+            raise InvalidCommandResponse(
+                f"Unsuccessful request status code: {response.Status!r}",
+                response,
+            )
+
+        return
 
     @combine_concurrent_calls
     async def _discover_route(self, nwk: t.NWK) -> None:
@@ -1023,7 +1036,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             if route_status.Status != c.zdo.RoutingStatus.SUCCESS:
                                 await self._discover_route(dst_addr.address)
 
-                        response = await self._send_request_raw(
+                        await self._send_request_raw(
                             dst_addr=dst_addr,
                             dst_ep=packet.dst_ep,
                             src_ep=packet.src_ep,
@@ -1036,7 +1049,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             relays=force_relays,
                             extended_timeout=packet.extended_timeout,
                         )
-                        status = response.Status
                         break
                     except InvalidCommandResponse as e:
                         status = e.response.Status
