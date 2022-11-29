@@ -3,6 +3,8 @@ from __future__ import annotations
 import enum
 import typing
 
+import zigpy.types as zigpy_t
+
 from zigpy_znp.types.cstruct import CStruct
 
 
@@ -264,30 +266,6 @@ class CompleteList(BaseListType):
         return r, data
 
 
-def enum_flag_factory(int_type: FixedIntType) -> enum.Flag:
-    """
-    Mixins are broken by Python 3.8.6 so we must dynamically create the enum with the
-    appropriate methods but with only one non-Enum parent class.
-    """
-
-    class _NewEnum(int_type, enum.Flag):  # type:ignore[misc,valid-type]
-        # Rebind classmethods to our own class
-        _missing_ = classmethod(enum.IntFlag._missing_.__func__)
-        _create_pseudo_member_ = classmethod(
-            enum.IntFlag._create_pseudo_member_.__func__
-        )
-
-        __or__ = enum.IntFlag.__or__
-        __and__ = enum.IntFlag.__and__
-        __xor__ = enum.IntFlag.__xor__
-        __ror__ = enum.IntFlag.__ror__
-        __rand__ = enum.IntFlag.__rand__
-        __rxor__ = enum.IntFlag.__rxor__
-        __invert__ = enum.IntFlag.__invert__
-
-    return _NewEnum  # type:ignore[return-value]
-
-
 class enum_uint8(uint8_t, enum.Enum):
     pass
 
@@ -320,33 +298,33 @@ class enum_uint64(uint64_t, enum.Enum):
     pass
 
 
-class enum_flag_uint8(enum_flag_factory(uint8_t)):  # type:ignore[misc]
+class enum_flag_uint8(zigpy_t.bitmap_factory(uint8_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint16(enum_flag_factory(uint16_t)):  # type:ignore[misc]
+class enum_flag_uint16(zigpy_t.bitmap_factory(uint16_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint24(enum_flag_factory(uint24_t)):  # type:ignore[misc]
+class enum_flag_uint24(zigpy_t.bitmap_factory(uint24_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint32(enum_flag_factory(uint32_t)):  # type:ignore[misc]
+class enum_flag_uint32(zigpy_t.bitmap_factory(uint32_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint40(enum_flag_factory(uint40_t)):  # type:ignore[misc]
+class enum_flag_uint40(zigpy_t.bitmap_factory(uint40_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint48(enum_flag_factory(uint48_t)):  # type:ignore[misc]
+class enum_flag_uint48(zigpy_t.bitmap_factory(uint48_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint56(enum_flag_factory(uint56_t)):  # type:ignore[misc]
+class enum_flag_uint56(zigpy_t.bitmap_factory(uint56_t)):  # type:ignore[misc]
     pass
 
 
-class enum_flag_uint64(enum_flag_factory(uint64_t)):  # type:ignore[misc]
+class enum_flag_uint64(zigpy_t.bitmap_factory(uint64_t)):  # type:ignore[misc]
     pass

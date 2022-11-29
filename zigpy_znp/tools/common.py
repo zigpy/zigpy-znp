@@ -177,7 +177,7 @@ class ClosableFileType(argparse.FileType):
     def __call__(self, string):
         f = super().__call__(string)
 
-        if f not in (sys.stdin, sys.stdout):
+        if f not in (sys.stdin, sys.stdout, sys.stdin.buffer, sys.stdout.buffer):
             return f
 
         return UnclosableFile(f)

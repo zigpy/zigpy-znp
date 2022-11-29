@@ -12,6 +12,7 @@ class NodeRelation(t.enum_uint8):
     CHILD_FFD_RX_IDLE = 4
     NEIGHBOR = 5
     OTHER = 6
+    UNKNOWN_8 = 8
     NOTUSED = 0xFF
 
 
