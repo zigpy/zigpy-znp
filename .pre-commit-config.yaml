@@ -34,6 +34,7 @@ repos:
       - id: mypy
         additional_dependencies:
           - zigpy
+          - types-setuptools
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.3.1
