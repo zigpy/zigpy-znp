@@ -16,6 +16,7 @@ import async_timeout
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
+import zigpy.config.defaults
 from zigpy.exceptions import DeliveryError
 
 import zigpy_znp.const as const
@@ -228,7 +229,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             )
 
         # Now that we know what device we are, set the max concurrent requests
-        if self._config[conf.CONF_MAX_CONCURRENT_REQUESTS] is None:
+        if self._config[conf.CONF_MAX_CONCURRENT_REQUESTS] in (
+            None,
+            zigpy.config.defaults.CONF_MAX_CONCURRENT_REQUESTS_DEFAULT,
+        ):
             max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
         else:
             max_concurrent_requests = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]

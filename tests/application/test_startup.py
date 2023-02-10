@@ -293,3 +293,18 @@ async def test_reset_network_info(device, make_application):
 
     with pytest.raises(NetworkNotFormed):
         await app.start_network()
+
+
+@pytest.mark.parametrize(
+    "device, concurrency",
+    [
+        (FormedLaunchpadCC26X2R1, 16),
+        (FormedZStack1CC2531, 2),
+    ],
+)
+async def test_concurrency_auto_config(device, concurrency, make_application):
+    app, znp_server = await make_application(server_cls=device)
+    await app.connect()
+    await app.start_network()
+
+    assert app._concurrent_requests_semaphore.max_value == concurrency
