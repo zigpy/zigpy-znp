@@ -1,26 +1,32 @@
 name: Publish distributions to PyPI and TestPyPI
 on:
-  push:
-    tags:
-      - "*"
+  release:
+    types:
+      - published
 
 jobs:
   build-and-publish:
     name: Build and publish distributions to PyPI and TestPyPI
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v3
     - name: Set up Python 3.8
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.8
+    - name: Set package version
+      run: |
+        version="${{ github.event.release.tag_name }}"
+        version="${version,,}"  # lowercase it
+        version="${version#v}"  # remove `v`
+        sed -i "s/version = \"0\.0\.0\"/version = \"${version}\"/" pyproject.toml
     - name: Install wheel
       run: >-
-        pip install wheel
+        pip install wheel build
     - name: Build
       run: >-
-        python3 setup.py sdist bdist_wheel
+        python3 -m build
     - name: Publish distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@master
+      uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_TOKEN }}
