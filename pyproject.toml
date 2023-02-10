@@ -1,6 +1,39 @@
 [build-system]
-requires = ["setuptools>=34.4.0", "wheel"]
+requires = ["setuptools>=61.0.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "zigpy-znp"
+version = "0.0.0"
+description = "A library for zigpy which communicates with TI ZNP radios"
+urls = {repository = "https://github.com/zigpy/zigpy-znp"}
+authors = [
+    {name = "Alexei Chetroi", email = "alexei.chetroi@outlook.com"}
+]
+readme = "README.md"
+license = {text = "GPL-3.0"}
+requires-python = ">=3.8"
+dependencies = [
+    "zigpy>=0.52.0",
+    "async_timeout",
+    "voluptuous",
+    "coloredlogs",
+    "jsonschema",
+]
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "tests.*"]
+
+[project.optional-dependencies]
+testing = [
+    "pytest>=7.1.2",
+    "pytest-asyncio>=0.19.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-mock>=3.8.2",
+    "pytest-cov>=3.0.0",
+    "coveralls",
+]
+
 
 [tool.black]
 safe = true
@@ -56,29 +89,3 @@ source = ["zigpy_znp"]
 
 [tool.pyupgrade]
 py37plus = true
-
-[tool.tox]
-legacy_tox_ini = """
-[tox]
-envlist = py37, py38, py39, lint, black
-skip_missing_interpreters = True
-
-[testenv]
-setenv = PYTHONPATH = {toxinidir}
-extras = testing
-commands = py.test --cov --cov-report=html
-
-[testenv:lint]
-basepython = python3
-deps = flake8
-commands = flake8
-
-[testenv:black]
-deps =
-    black==20.8.b1
-setenv =
-    LC_ALL=C.UTF-8
-    LANG=C.UTF-8
-commands=
-    black --check --fast {toxinidir}/zigpy_znp {toxinidir}/tests {toxinidir}/setup.py
-"""

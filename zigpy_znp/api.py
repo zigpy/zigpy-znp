@@ -12,11 +12,11 @@ from collections import Counter, defaultdict
 
 import zigpy.state
 import async_timeout
+import pkg_resources
 import zigpy.zdo.types as zdo_t
 import zigpy.exceptions
 from zigpy.exceptions import NetworkNotFormed
 
-import zigpy_znp
 import zigpy_znp.const as const
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -136,9 +136,10 @@ class ZNP:
         )
 
         version = await self.request(c.SYS.Version.Req())
+        package_version = pkg_resources.get_distribution("zigpy_znp").version
 
         network_info = zigpy.state.NetworkInfo(
-            source=f"zigpy-znp@{zigpy_znp.__version__}",
+            source=f"zigpy-znp@{package_version}",
             extended_pan_id=nib.extendedPANID,
             pan_id=nib.nwkPanId,
             nwk_update_id=nib.nwkUpdateId,
