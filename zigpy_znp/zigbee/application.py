@@ -183,7 +183,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if "tclk_seed" not in network_info.stack_specific["zstack"]:
             network_info.stack_specific["zstack"]["tclk_seed"] = os.urandom(16).hex()
 
-        return await self._znp.write_network_info(
+        await self._znp.write_network_info(
             network_info=network_info, node_info=node_info
         )
 
