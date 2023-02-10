@@ -969,6 +969,9 @@ class ZNP:
 
         frame = request.to_frame(align=self.nvram.align_structs)
 
+        if self._uart is None:
+            raise RuntimeError("Coordinator is disconnected, cannot send request")
+
         # We should only be sending one SREQ at a time, according to the spec
         async with self._sync_request_lock:
             LOGGER.debug("Sending request: %s", request)

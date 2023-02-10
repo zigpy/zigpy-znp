@@ -839,6 +839,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 Data=data,
             )
 
+        if self._znp is None:
+            raise DeliveryError("Coordinator is disconnected, cannot send request")
+
         # Z-Stack requires special treatment when sending ZDO requests
         if dst_ep == ZDO_ENDPOINT:
             # XXX: Joins *must* be sent via a ZDO command, even if they are directly
