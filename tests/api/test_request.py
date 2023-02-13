@@ -318,3 +318,13 @@ async def test_handling_unknown_bad_command_parsing(connected_znp):
 
     with pytest.raises(ValueError):
         znp.frame_received(bad_frame)
+
+
+async def test_send_failure_when_disconnected(connected_znp):
+    znp, _ = connected_znp
+    znp._uart = None
+
+    with pytest.raises(RuntimeError) as e:
+        await znp.request(c.SYS.Ping.Req())
+
+    assert "Coordinator is disconnected" in str(e.value)

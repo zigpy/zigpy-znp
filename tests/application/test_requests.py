@@ -1009,3 +1009,29 @@ async def test_send_packet_failure(device, make_application, mocker):
     assert excinfo.value.status == t.Status.MAC_NO_ACK
 
     await app.shutdown()
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_send_packet_failure_disconnected(device, make_application, mocker):
+    app, znp_server = await make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    app._znp = None
+
+    packet = zigpy_t.ZigbeePacket(
+        src=zigpy_t.AddrModeAddress(addr_mode=zigpy_t.AddrMode.NWK, address=0x0000),
+        src_ep=0x9A,
+        dst=zigpy_t.AddrModeAddress(addr_mode=zigpy_t.AddrMode.NWK, address=0xEEFF),
+        dst_ep=0xBC,
+        tsn=0xDE,
+        profile_id=0x1234,
+        cluster_id=0x0006,
+        data=zigpy_t.SerializableBytes(b"test data"),
+    )
+
+    with pytest.raises(zigpy.exceptions.DeliveryError) as excinfo:
+        await app.send_packet(packet)
+
+    assert "Coordinator is disconnected" in str(excinfo.value)
+
+    await app.shutdown()
