@@ -5,9 +5,9 @@ import json
 import asyncio
 import logging
 import datetime
+import importlib.metadata
 
 import zigpy.state
-import pkg_resources
 
 import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
@@ -84,8 +84,7 @@ async def backup_network(znp: ZNP) -> t.JSONType:
 
     now = datetime.datetime.now().astimezone()
 
-    package_version = pkg_resources.get_distribution("zigpy_znp").version
-    obj["metadata"]["source"] = f"zigpy-znp@{package_version}"
+    obj["metadata"]["source"] = f"zigpy-znp@{importlib.metadata.version('zigpy-znp')}"
     obj["metadata"]["internal"] = {
         "creation_time": now.isoformat(timespec="seconds"),
         "zstack": {
