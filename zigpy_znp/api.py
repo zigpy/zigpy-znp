@@ -345,7 +345,8 @@ class ZNP:
         """
         from zigpy_znp.znp import security
 
-        await self.reset_network_info()
+        if not network_info.stack_specific.get("form_quickly", False):
+            await self.reset_network_info()
 
         # Form a network with completely random settings to get NVRAM to a known state
         for item, value in {
@@ -377,6 +378,14 @@ class ZNP:
         LOGGER.debug("Forming temporary network")
         await self.start_network()
         await self.reset()
+
+        if network_info.stack_specific.get("form_quickly", False):
+            await self.nvram.osal_write(
+                OsalNvIds.ZIGPY_ZNP_MIGRATION_ID,
+                t.uint8_t(NVRAM_MIGRATION_ID),
+                create=True,
+            )
+            return
 
         LOGGER.debug("Writing actual network settings")
 
