@@ -1,4 +1,5 @@
 import logging
+from unittest import mock
 
 import pytest
 
@@ -10,6 +11,7 @@ from ..conftest import (
     FORMED_DEVICES,
     BaseZStack1CC2531,
     FormedZStack3CC2531,
+    FormedLaunchpadCC26X2R1,
 )
 
 
@@ -92,3 +94,23 @@ async def test_state_write_tclk_zstack3(device, make_connected_znp, caplog):
 
     # TCLK was not changed
     assert formed_znp.network_info == empty_znp.network_info
+
+
+@pytest.mark.parametrize("device", ALL_DEVICES)
+async def test_write_settings_fast(device, make_connected_znp):
+    formed_znp, _ = await make_connected_znp(server_cls=FormedLaunchpadCC26X2R1)
+    await formed_znp.load_network_info()
+    formed_znp.close()
+
+    znp, _ = await make_connected_znp(server_cls=device)
+
+    formed_znp.network_info.stack_specific["form_quickly"] = True
+
+    with mock.patch("zigpy_znp.znp.security.write_devices") as mock_write_devices:
+        await znp.write_network_info(
+            network_info=formed_znp.network_info,
+            node_info=formed_znp.node_info,
+        )
+
+    # We don't waste time writing device info
+    assert len(mock_write_devices.mock_awaits) == 0
