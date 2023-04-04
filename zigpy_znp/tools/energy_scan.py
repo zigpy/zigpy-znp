@@ -25,7 +25,6 @@ async def perform_energy_scan(radio_path, num_scans=None):
         await app.start_network(read_only=True)
     except NetworkNotFormed as e:
         LOGGER.error("Could not start application: %s", e)
-        LOGGER.error("Form a network with `python -m zigpy_znp.tools.form_network`")
         return
 
     LOGGER.info("Running scan...")

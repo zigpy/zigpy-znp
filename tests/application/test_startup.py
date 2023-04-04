@@ -205,18 +205,6 @@ async def test_led_mode(device, led_mode, make_application):
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_auto_form_unnecessary(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
-    mocker.patch.object(app, "form_network", new=CoroutineMock())
-
-    await app.startup(auto_form=True)
-
-    assert app.form_network.call_count == 0
-
-    await app.shutdown()
-
-
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
 async def test_auto_form_necessary(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)

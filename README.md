@@ -89,7 +89,6 @@ in **[`TOOLS.md`](./TOOLS.md)** but a brief description of each tool is included
  - **`energy_scan`**: Performs a continuous energy scan to check for non-Zigbee interference.
  - **`flash_read`**: For CC2531s, reads firmware from flash.
  - **`flash_write`**: For CC2531s, writes a firmware `.bin` to flash.
- - **`form_network`**: Forms a network with randomized settings on channel 15.
  - **`network_backup`**: Backs up the network data and device information into a human-readable JSON document.
  - **`network_restore`**: Restores a JSON network backup to the adapter.
  - **`network_scan`**: Actively sends beacon requests for network stumbling.
