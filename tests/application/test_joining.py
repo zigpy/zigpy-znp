@@ -38,7 +38,7 @@ async def test_permit_join(device, mocker, make_application):
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.Broadcast, 0xFFFC),
             command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_req,
-            TSN=6,
+            TSN=7,
             zdo_PermitDuration=10,
             zdo_TC_Significant=0,
         ),
@@ -115,7 +115,7 @@ async def test_join_device(device, make_application):
                 IsBroadcast=t.Bool.false,
                 ClusterId=32822,
                 SecurityUse=0,
-                TSN=6,
+                TSN=7,
                 MacDst=0x0000,
                 Data=b"\x00",
             ),
