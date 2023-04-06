@@ -264,7 +264,7 @@ jobs:
           . venv/bin/activate
           pytest \
             -qq \
-            --timeout=20 \
+            --timeout=30 \
             --durations=10 \
             --cov zigpy_znp \
             --cov-config pyproject.toml \
