@@ -217,7 +217,7 @@ def merge_dicts(a, b):
 
 @pytest.fixture
 def make_application(make_znp_server):
-    async def inner(
+    def inner(
         server_cls,
         client_config=None,
         server_config=None,

@@ -21,7 +21,7 @@ from ..conftest import (
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_permit_join(device, mocker, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     permit_join_coordinator = znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(
@@ -74,7 +74,7 @@ async def test_permit_join(device, mocker, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_join_coordinator(device, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
@@ -100,7 +100,7 @@ async def test_join_device(device, make_application):
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
     nwk = 0x1234
 
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     device = app.add_initialized_device(ieee=ieee, nwk=nwk)
 
     permit_join = znp_server.reply_once_to(
@@ -133,7 +133,7 @@ async def test_join_device(device, make_application):
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 @pytest.mark.parametrize("permit_result", [None, asyncio.TimeoutError()])
 async def test_permit_join_with_key(device, permit_result, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # Consciot bulb
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
@@ -183,7 +183,7 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
 
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 async def test_permit_join_with_invalid_key(device, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # Consciot bulb
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
@@ -197,7 +197,7 @@ async def test_permit_join_with_invalid_key(device, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_join", wraps=app.handle_join)
@@ -217,7 +217,7 @@ async def test_on_zdo_device_join(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_fast(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_join", wraps=app.handle_join)
@@ -274,7 +274,7 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_slow(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     znp_server.reply_to(
