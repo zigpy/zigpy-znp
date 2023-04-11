@@ -200,7 +200,7 @@ async def test_on_zdo_device_join(device, make_application, mocker):
     app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    mocker.patch.object(app, "handle_join")
+    mocker.patch.object(app, "handle_join", wraps=app.handle_join)
     mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0)
 
     nwk = 0x1234
@@ -220,7 +220,7 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
     app, znp_server = await make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    mocker.patch.object(app, "handle_join")
+    mocker.patch.object(app, "handle_join", wraps=app.handle_join)
     mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.5)
 
     nwk = 0x1234
@@ -282,7 +282,7 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
         responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
     )
 
-    mocker.patch.object(app, "handle_join")
+    mocker.patch.object(app, "handle_join", wraps=app.handle_join)
     mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
 
     nwk = 0x1234
