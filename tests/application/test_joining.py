@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 import zigpy.util
 import zigpy.types
+import zigpy.device
 import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
@@ -274,6 +275,10 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
 
 
 @mock.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
+@mock.patch(
+    "zigpy.device.Device._initialize",
+    new=zigpy.device.Device._initialize.__wrapped__,  # to disable retries
+)
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_slow(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
