@@ -980,8 +980,15 @@ class ZNP:
         if self._uart is None:
             raise RuntimeError("Coordinator is disconnected, cannot send request")
 
+        # Immediately send reset requests
+        ctx = (
+            contextlib.AsyncExitStack()
+            if isinstance(request, c.SYS.ResetReq.Req)
+            else self._sync_request_lock
+        )
+
         # We should only be sending one SREQ at a time, according to the spec
-        async with self._sync_request_lock:
+        async with ctx:
             LOGGER.debug("Sending request: %s", request)
 
             # If our request has no response, we cannot wait for one

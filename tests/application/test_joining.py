@@ -1,9 +1,11 @@
 import asyncio
 import contextlib
+from unittest import mock
 
 import pytest
 import zigpy.util
 import zigpy.types
+import zigpy.device
 import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
@@ -21,7 +23,7 @@ from ..conftest import (
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_permit_join(device, mocker, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     permit_join_coordinator = znp_server.reply_once_to(
         request=c.ZDO.MgmtPermitJoinReq.Req(
@@ -38,7 +40,7 @@ async def test_permit_join(device, mocker, make_application):
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.Broadcast, 0xFFFC),
             command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_req,
-            TSN=6,
+            TSN=7,
             zdo_PermitDuration=10,
             zdo_TC_Significant=0,
         ),
@@ -74,7 +76,7 @@ async def test_permit_join(device, mocker, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_join_coordinator(device, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # Handle us opening joins on the coordinator
     permit_join_coordinator = znp_server.reply_once_to(
@@ -100,7 +102,7 @@ async def test_join_device(device, make_application):
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
     nwk = 0x1234
 
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     device = app.add_initialized_device(ieee=ieee, nwk=nwk)
 
     permit_join = znp_server.reply_once_to(
@@ -115,7 +117,7 @@ async def test_join_device(device, make_application):
                 IsBroadcast=t.Bool.false,
                 ClusterId=32822,
                 SecurityUse=0,
-                TSN=6,
+                TSN=7,
                 MacDst=0x0000,
                 Data=b"\x00",
             ),
@@ -133,7 +135,7 @@ async def test_join_device(device, make_application):
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 @pytest.mark.parametrize("permit_result", [None, asyncio.TimeoutError()])
 async def test_permit_join_with_key(device, permit_result, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # Consciot bulb
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
@@ -183,7 +185,7 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
 
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
 async def test_permit_join_with_invalid_key(device, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # Consciot bulb
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
@@ -197,10 +199,10 @@ async def test_permit_join_with_invalid_key(device, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    mocker.patch.object(app, "handle_join")
+    mocker.patch.object(app, "handle_join", wraps=app.handle_join)
     mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0)
 
     nwk = 0x1234
@@ -217,10 +219,10 @@ async def test_on_zdo_device_join(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_fast(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    mocker.patch.object(app, "handle_join")
+    mocker.patch.object(app, "handle_join", wraps=app.handle_join)
     mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.5)
 
     nwk = 0x1234
@@ -272,9 +274,14 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
     await app.shutdown()
 
 
+@mock.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
+@mock.patch(
+    "zigpy.device.Device._initialize",
+    new=zigpy.device.Device._initialize.__wrapped__,  # to disable retries
+)
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_slow(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     znp_server.reply_to(
@@ -282,8 +289,7 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
         responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
     )
 
-    mocker.patch.object(app, "handle_join")
-    mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
+    mocker.patch.object(app, "handle_join", wraps=app.handle_join)
 
     nwk = 0x1234
     ieee = t.EUI64.convert("11:22:33:44:55:66:77:88")
@@ -295,11 +301,13 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
     # We're waiting for the device to announce itself
     assert app.handle_join.call_count == 0
 
-    await asyncio.sleep(0.3)
+    # Wait for the trust center join timeout to elapse
+    while app.handle_join.call_count == 0:
+        await asyncio.sleep(0.1)
 
-    # Too late, it already happened
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
 
+    # Finally, send the device announcement
     znp_server.send(
         c.ZDO.MsgCbIncoming.Callback(
             Src=nwk,
@@ -327,9 +335,10 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
         )
     )
 
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.5)
 
     # The announcement will trigger another join indication
     assert app.handle_join.call_count == 2
 
+    app.get_device(ieee=ieee).cancel_initialization()
     await app.shutdown()

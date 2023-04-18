@@ -217,7 +217,7 @@ def merge_dicts(a, b):
 
 @pytest.fixture
 def make_application(make_znp_server):
-    async def inner(
+    def inner(
         server_cls,
         client_config=None,
         server_config=None,
@@ -612,6 +612,35 @@ class BaseZStackDevice(BaseServerZNP):
                     ),
                 )
             )
+
+        return responses
+
+    def on_zdo_mgmt_nwk_update_req(self, req, NwkUpdate):
+        # Only handle energy scanning, for now
+        if NwkUpdate.ScanDuration in (
+            zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
+            zdo_t.NwkUpdate.CHANNEL_MASK_MANAGER_ADDR_CHANGE_REQ,
+        ):
+            return
+
+        responses = [
+            c.ZDO.MsgCbIncoming.Callback(
+                Src=0x0000,
+                IsBroadcast=t.Bool.false,
+                ClusterId=zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
+                SecurityUse=0,
+                TSN=req.TSN,
+                MacDst=0x0000,
+                Data=serialize_zdo_command(
+                    command_id=zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
+                    Status=zdo_t.Status.SUCCESS,
+                    ScannedChannels=NwkUpdate.ScanChannels,
+                    TotalTransmissions=0,
+                    TransmissionFailures=0,
+                    EnergyValues=list(NwkUpdate.ScanChannels),
+                ),
+            )
+        ]
 
         return responses
 

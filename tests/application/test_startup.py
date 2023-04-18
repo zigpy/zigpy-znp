@@ -64,7 +64,7 @@ async def test_info(
     make_application,
     caplog,
 ):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
 
@@ -91,7 +91,7 @@ async def test_info(
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_endpoints(device, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     endpoints = []
     znp_server.callback_for_response(c.AF.Register.Req(partial=True), endpoints.append)
@@ -108,7 +108,7 @@ async def test_endpoints(device, make_application):
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
 async def test_not_configured(device, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # We cannot start the application if Z-Stack is not configured and without auto_form
     with pytest.raises(NetworkNotFormed):
@@ -117,7 +117,7 @@ async def test_not_configured(device, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_reset(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     # `_reset` should be called at least once to put the radio into a consistent state
     mocker.spy(ZNP, "reset")
@@ -131,7 +131,7 @@ async def test_reset(device, make_application, mocker):
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 @pytest.mark.parametrize("succeed", [True, False])
 async def test_tx_power(device, succeed, make_application):
-    app, znp_server = await make_application(
+    app, znp_server = make_application(
         server_cls=device,
         client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_TX_POWER: 19}},
     )
@@ -178,7 +178,7 @@ async def test_tx_power(device, succeed, make_application):
 @pytest.mark.parametrize("led_mode", ["off", False, "on", True])
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_led_mode(device, led_mode, make_application):
-    app, znp_server = await make_application(
+    app, znp_server = make_application(
         server_cls=device,
         client_config={conf.CONF_ZNP_CONFIG: {conf.CONF_LED_MODE: led_mode}},
     )
@@ -207,7 +207,7 @@ async def test_led_mode(device, led_mode, make_application):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_auto_form_unnecessary(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     mocker.patch.object(app, "form_network", new=CoroutineMock())
 
     await app.startup(auto_form=True)
@@ -219,7 +219,7 @@ async def test_auto_form_unnecessary(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", EMPTY_DEVICES)
 async def test_auto_form_necessary(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     assert app.state.network_info.channel == 0
     assert app.state.network_info.channel_mask == t.Channels.NO_CHANNELS
@@ -244,7 +244,7 @@ async def test_auto_form_necessary(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", [FormedZStack1CC2531])
 async def test_zstack_build_id_empty(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
 
     znp_server.reply_to(
         c.SYS.Version.Req(),
@@ -273,7 +273,7 @@ async def test_zstack_build_id_empty(device, make_application, mocker):
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_deprecated_concurrency_config(device, make_application):
     with pytest.raises(vol.MultipleInvalid) as exc:
-        app, znp_server = await make_application(
+        app, znp_server = make_application(
             server_cls=device,
             client_config={
                 conf.CONF_ZNP_CONFIG: {
@@ -287,7 +287,7 @@ async def test_deprecated_concurrency_config(device, make_application):
 
 @pytest.mark.parametrize("device", ALL_DEVICES)
 async def test_reset_network_info(device, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.connect()
     await app.reset_network_info()
 
@@ -303,7 +303,7 @@ async def test_reset_network_info(device, make_application):
     ],
 )
 async def test_concurrency_auto_config(device, concurrency, make_application):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.connect()
     await app.start_network()
 

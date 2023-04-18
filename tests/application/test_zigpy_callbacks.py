@@ -13,7 +13,7 @@ from ..conftest import FORMED_DEVICES, serialize_zdo_command
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_relays_message_callback(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     app.handle_relays = MagicMock()
@@ -28,7 +28,7 @@ async def test_on_zdo_relays_message_callback(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_announce_nwk_change(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.spy(app, "handle_join")
@@ -79,7 +79,7 @@ async def test_on_zdo_device_announce_nwk_change(device, make_application, mocke
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_leave_callback(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_leave")
@@ -99,7 +99,7 @@ async def test_on_zdo_device_leave_callback(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_af_message_callback(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "handle_message")
@@ -172,7 +172,7 @@ async def test_on_af_message_callback(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_receive_zdo_broadcast(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "packet_received")
@@ -209,7 +209,7 @@ async def test_receive_zdo_broadcast(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_receive_af_broadcast(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "packet_received")
@@ -254,7 +254,7 @@ async def test_receive_af_broadcast(device, make_application, mocker):
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_receive_af_group(device, make_application, mocker):
-    app, znp_server = await make_application(server_cls=device)
+    app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
     mocker.patch.object(app, "packet_received")
