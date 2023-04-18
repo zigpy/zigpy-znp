@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+from unittest import mock
 
 import pytest
 import zigpy.util
@@ -272,6 +273,7 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
     await app.shutdown()
 
 
+@mock.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_on_zdo_device_join_and_announce_slow(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
@@ -283,7 +285,6 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
     )
 
     mocker.patch.object(app, "handle_join", wraps=app.handle_join)
-    mocker.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)
 
     nwk = 0x1234
     ieee = t.EUI64.convert("11:22:33:44:55:66:77:88")
@@ -295,11 +296,13 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
     # We're waiting for the device to announce itself
     assert app.handle_join.call_count == 0
 
-    await asyncio.sleep(0.3)
+    # Wait for the trust center join timeout to elapse
+    while app.handle_join.call_count == 0:
+        await asyncio.sleep(0.1)
 
-    # Too late, it already happened
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
 
+    # Finally, send the device announcement
     znp_server.send(
         c.ZDO.MsgCbIncoming.Callback(
             Src=nwk,
@@ -327,9 +330,10 @@ async def test_on_zdo_device_join_and_announce_slow(device, make_application, mo
         )
     )
 
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.5)
 
     # The announcement will trigger another join indication
     assert app.handle_join.call_count == 2
 
+    app.get_device(ieee=ieee).cancel_initialization()
     await app.shutdown()
