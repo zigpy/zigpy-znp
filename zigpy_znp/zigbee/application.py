@@ -376,6 +376,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 RspStatus=t.Status.SUCCESS,
             )
 
+    async def _move_network_to_channel(
+        self, new_channel: int, new_nwk_update_id: int
+    ) -> None:
+        """Moves device to a new channel."""
+        await self._znp.request(
+            request=c.ZDO.MgmtNWKUpdateReq.Req(
+                Dst=0x0000,
+                DstAddrMode=t.AddrMode.NWK,
+                Channels=t.Channels.from_channel_list([new_channel]),
+                ScanDuration=zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
+                ScanCount=0,
+                NwkManagerAddr=0x0000,
+                # `new_nwk_update_id` is ignored
+            ),
+            RspStatus=t.Status.SUCCESS,
+        )
+
     def connection_lost(self, exc):
         """
         Propagated up from UART through ZNP when the connection is lost.
