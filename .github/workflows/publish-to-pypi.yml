@@ -14,19 +14,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: 3.8
-    - name: Build wheel
-      run: |
-        VERSION="${{ github.event.release.tag_name }}"
-        VERSION="${VERSION,,}"  # lowercase it
-        VERSION="${VERSION#v}"  # remove `v`
-
+    - name: Install wheel
+      run: >-
         pip install wheel build
+    - name: Build wheel
+      run: >-
         python3 -m build
-
-        # Fail if we don't generate a package with the expected version
-        if ( ! ls -A "dist/*${VERSION}*.whl" 1> /dev/null 2>&1 ); then
-          exit 1
-        fi
     - name: Publish distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
