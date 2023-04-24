@@ -1,8 +1,6 @@
 import asyncio
 
 import pytest
-import zigpy.zdo
-import zigpy.types as zigpy_t
 import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.types as t
@@ -12,19 +10,19 @@ from tests.conftest import FormedLaunchpadCC26X2R1
 
 
 @pytest.mark.parametrize(
-    "broadcast,nwk_update_id,change_channel",
+    "nwk_update_id,change_channel",
     [
-        (False, 1, False),
-        (False, 1, True),
-        (True, 1, False),
-        (False, 200, True),
+        (1, False),
+        (1, True),
+        (1, False),
+        (200, True),
     ],
 )
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
 async def test_mgmt_nwk_update_req(
-    device, broadcast, nwk_update_id, change_channel, make_application, mocker
+    device, nwk_update_id, change_channel, make_application, mocker
 ):
-    mocker.patch("zigpy_znp.zigbee.device.NWK_UPDATE_LOOP_DELAY", 0.1)
+    mocker.patch("zigpy.application.CHANNEL_CHANGE_SETTINGS_RELOAD_DELAY_S", 0.1)
 
     app, znp_server = make_application(server_cls=device)
 
@@ -72,29 +70,13 @@ async def test_mgmt_nwk_update_req(
 
     await app.startup(auto_form=False)
 
-    update = zdo_t.NwkUpdate(
-        ScanChannels=t.Channels.from_channel_list([new_channel]),
-        ScanDuration=zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
-        nwkUpdateId=nwk_update_id,
-    )
-
-    if broadcast:
-        await zigpy.zdo.broadcast(
-            app,
-            zdo_t.ZDOCmd.Mgmt_NWK_Update_req,
-            0x0000,  # group id (ignore)
-            0,  # radius
-            update,
-            broadcast_address=zigpy_t.BroadcastAddress.ALL_ROUTERS_AND_COORDINATOR,
-        )
-    else:
-        await app._device.zdo.Mgmt_NWK_Update_req(update)
+    await app.move_network_to_channel(new_channel=new_channel)
 
     if change_channel:
         await nwk_update_req
     else:
         assert not nwk_update_req.done()
 
-    assert znp_server.nib.nwkLogicalChannel == list(update.ScanChannels)[0]
+    assert znp_server.nib.nwkLogicalChannel == new_channel
 
     await app.shutdown()
