@@ -27,8 +27,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Restore base Python virtual environment
-      allow-prereleases: true
         id: cache-venv
         uses: actions/cache@v2
         with:
