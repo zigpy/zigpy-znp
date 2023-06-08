@@ -28,6 +28,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Restore base Python virtual environment
+      allow-prereleases: true
         id: cache-venv
         uses: actions/cache@v2
         with:
@@ -58,6 +59,7 @@ jobs:
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
+          allow-prereleases: true
       - name: Restore base Python virtual environment
         id: cache-venv
         uses: actions/cache@v2
@@ -99,6 +101,7 @@ jobs:
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
+          allow-prereleases: true
       - name: Restore base Python virtual environment
         id: cache-venv
         uses: actions/cache@v2
@@ -142,6 +145,7 @@ jobs:
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
+          allow-prereleases: true
       - name: Restore base Python virtual environment
         id: cache-venv
         uses: actions/cache@v2
@@ -188,6 +192,7 @@ jobs:
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
+          allow-prereleases: true
       - name: Restore base Python virtual environment
         id: cache-venv
         uses: actions/cache@v2
@@ -235,6 +240,7 @@ jobs:
         id: python
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Restore base Python virtual environment
         id: cache-venv
         uses: actions/cache@v2
@@ -290,6 +296,7 @@ jobs:
         id: python
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
+          allow-prereleases: true
       - name: Restore base Python virtual environment
         id: cache-venv
         uses: actions/cache@v2
