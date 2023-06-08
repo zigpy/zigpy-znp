@@ -7,6 +7,7 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 import zigpy.types
+import zigpy.config
 import zigpy.device
 
 try:
@@ -86,7 +87,12 @@ class ForwardingSerialTransport:
 
 
 def config_for_port_path(path):
-    return conf.CONFIG_SCHEMA({conf.CONF_DEVICE: {conf.CONF_DEVICE_PATH: path}})
+    return conf.CONFIG_SCHEMA(
+        {
+            conf.CONF_DEVICE: {conf.CONF_DEVICE_PATH: path},
+            zigpy.config.CONF_NWK_BACKUP_ENABLED: False,
+        }
+    )
 
 
 @pytest.fixture
