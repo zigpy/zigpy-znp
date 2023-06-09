@@ -1,4 +1,7 @@
+import gc
+import sys
 import json
+import typing
 import asyncio
 import inspect
 import logging
@@ -7,6 +10,7 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 import zigpy.types
+import zigpy.config
 import zigpy.device
 
 try:
@@ -40,6 +44,46 @@ def pytest_collection_modifyitems(session, config, items):
             pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
         )
         item.add_marker(pytest.mark.filterwarnings("error::RuntimeWarning"))
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_fixture_post_finalizer(fixturedef, request) -> None:
+    """Called after fixture teardown"""
+    if fixturedef.argname != "event_loop":
+        return
+
+    policy = asyncio.get_event_loop_policy()
+    try:
+        loop = policy.get_event_loop()
+    except RuntimeError:
+        loop = None
+    if loop is not None:
+        # Cleanup code based on the implementation of asyncio.run()
+        try:
+            if not loop.is_closed():
+                asyncio.runners._cancel_all_tasks(loop)  # type: ignore[attr-defined]
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                if sys.version_info >= (3, 9):
+                    loop.run_until_complete(loop.shutdown_default_executor())
+        finally:
+            loop.close()
+    new_loop = policy.new_event_loop()  # Replace existing event loop
+    # Ensure subsequent calls to get_event_loop() succeed
+    policy.set_event_loop(new_loop)
+
+
+@pytest.fixture
+def event_loop(
+    request: pytest.FixtureRequest,
+) -> typing.Iterator[asyncio.AbstractEventLoop]:
+    """Create an instance of the default event loop for each test case."""
+    yield asyncio.get_event_loop_policy().new_event_loop()
+    # Call the garbage collector to trigger ResourceWarning's as soon
+    # as possible (these are triggered in various __del__ methods).
+    # Without this, resources opened in one test can fail other tests
+    # when the warning is generated.
+    gc.collect()
+    # Event loop cleanup handled by pytest_fixture_post_finalizer
 
 
 class ForwardingSerialTransport:
@@ -86,7 +130,12 @@ class ForwardingSerialTransport:
 
 
 def config_for_port_path(path):
-    return conf.CONFIG_SCHEMA({conf.CONF_DEVICE: {conf.CONF_DEVICE_PATH: path}})
+    return conf.CONFIG_SCHEMA(
+        {
+            conf.CONF_DEVICE: {conf.CONF_DEVICE_PATH: path},
+            zigpy.config.CONF_NWK_BACKUP_ENABLED: False,
+        }
+    )
 
 
 @pytest.fixture

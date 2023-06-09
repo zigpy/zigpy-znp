@@ -534,6 +534,9 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
     await was_route_discovered
     await zdo_req
 
+    # 6 accounts for the loopback requests
+    assert sum(c.value for c in app.state.counters["Retry_NONE"].values()) == 6 + 1
+
     await app.shutdown()
 
 
@@ -602,6 +605,9 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
     )
 
     await was_route_discovered
+    assert (
+        sum(c.value for c in app.state.counters["Retry_RouteDiscovery"].values()) == 1
+    )
 
     await app.shutdown()
 
@@ -666,6 +672,7 @@ async def test_request_recovery_use_ieee_addr(device, make_application, mocker):
     )
 
     assert was_ieee_addr_used
+    assert sum(c.value for c in app.state.counters["Retry_IEEEAddress"].values()) == 1
 
     await app.shutdown()
 
