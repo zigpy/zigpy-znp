@@ -1083,7 +1083,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 e,
                                 attempt + 1,
                                 REQUEST_MAX_RETRIES,
-                                retry_methods,
+                                retry_methods.name,
                             )
                             await asyncio.sleep(3 * REQUEST_ERROR_RETRY_DELAY)
                             continue
@@ -1183,7 +1183,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             e,
                             attempt + 1,
                             REQUEST_MAX_RETRIES,
-                            retry_methods,
+                            retry_methods.name,
                         )
 
                         # We've tried everything already so at this point just wait
