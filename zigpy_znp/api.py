@@ -344,8 +344,19 @@ class ZNP:
         """
         from zigpy_znp.znp import security
 
-        if not network_info.stack_specific.get("form_quickly", False):
-            await self.reset_network_info()
+        try:
+            if not network_info.stack_specific.get("form_quickly", False):
+                await self.reset_network_info()
+        except InvalidCommandResponse as rsp:
+            if rsp.response.Status != t.Status.NV_OPER_FAILED:
+                raise
+
+            # Sonoff Zigbee 3.0 USB Dongle Plus coordinators randomly fail with NVRAM
+            # corruption. This seemingly can only be fixed by re-flashing the firmware.
+            raise zigpy.exceptions.FormationFailure(
+                "Network formation failed: NVRAM is corrupted, re-flash your adapter's"
+                " firmware."
+            )
 
         # Form a network with completely random settings to get NVRAM to a known state
         for item, value in {
