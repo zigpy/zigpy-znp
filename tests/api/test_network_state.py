@@ -2,8 +2,10 @@ import logging
 from unittest import mock
 
 import pytest
+from zigpy.exceptions import FormationFailure
 
 import zigpy_znp.types as t
+import zigpy_znp.commands as c
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
@@ -114,3 +116,33 @@ async def test_write_settings_fast(device, make_connected_znp):
 
     # We don't waste time writing device info
     assert len(mock_write_devices.mock_awaits) == 0
+
+
+@pytest.mark.parametrize("device", FORMED_DEVICES)
+async def test_formation_failure_on_corrupted_nvram(device, make_connected_znp):
+    formed_znp, _ = await make_connected_znp(server_cls=FormedLaunchpadCC26X2R1)
+    await formed_znp.load_network_info()
+    formed_znp.close()
+
+    znp, znp_server = await make_connected_znp(server_cls=device)
+
+    # Instead of accepting the write, fail
+    write_reset_rsp = znp_server.reply_once_to(
+        request=c.SYS.OSALNVWriteExt.Req(
+            Id=OsalNvIds.STARTUP_OPTION,
+            Offset=0,
+            Value=t.ShortBytes(
+                (t.StartupOptions.ClearState | t.StartupOptions.ClearConfig).serialize()
+            ),
+        ),
+        responses=[c.SYS.OSALNVWriteExt.Rsp(Status=t.Status.NV_OPER_FAILED)],
+        override=True,
+    )
+
+    with pytest.raises(FormationFailure):
+        await znp.write_network_info(
+            network_info=formed_znp.network_info,
+            node_info=formed_znp.node_info,
+        )
+
+    await write_reset_rsp
