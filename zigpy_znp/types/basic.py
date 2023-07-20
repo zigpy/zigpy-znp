@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import enum
 import sys
+import enum
 import typing
 
 import zigpy.types as zigpy_t
@@ -67,8 +67,9 @@ class FixedIntType(int):
             cls.__repr__ = super().__repr__
 
         if sys.version_info < (3, 10):
-            # XXX: The enum module uses the first class with __new__ in its __dict__ as the
-            #      member type. We have to ensure this is true for every subclass.
+            # XXX: The enum module uses the first class with __new__ in its __dict__
+            #      as the member type. We have to ensure this is true for
+            #      every subclass.
             # Fixed with https://github.com/python/cpython/pull/26658
             if "__new__" not in cls.__dict__:
                 cls.__new__ = cls.__new__
