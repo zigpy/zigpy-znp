@@ -41,6 +41,11 @@ jobs:
             ${{ env.CACHE_VERSION}}-${{ runner.os }}-base-venv-${{ steps.python.outputs.python-version }}-
       - name: Create Python virtual environment
         if: steps.cache-venv.outputs.cache-hit != 'true'
+        env:
+          AIOHTTP_NO_EXTENSIONS: 1
+          MULTIDICT_NO_EXTENSIONS: 1
+          FROZENLIST_NO_EXTENSIONS: 1
+          YARL_NO_EXTENSIONS: 1
         run: |
           python -m venv venv
           . venv/bin/activate
