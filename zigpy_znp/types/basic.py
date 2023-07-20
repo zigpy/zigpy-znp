@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import sys
 import typing
 
 import zigpy.types as zigpy_t
@@ -65,10 +66,12 @@ class FixedIntType(int):
             cls.__str__ = super().__str__
             cls.__repr__ = super().__repr__
 
-        # XXX: The enum module uses the first class with __new__ in its __dict__ as the
-        #      member type. We have to ensure this is true for every subclass.
-        if "__new__" not in cls.__dict__:
-            cls.__new__ = cls.__new__
+        if sys.version_info < (3, 10):
+            # XXX: The enum module uses the first class with __new__ in its __dict__ as the
+            #      member type. We have to ensure this is true for every subclass.
+            # Fixed with https://github.com/python/cpython/pull/26658
+            if "__new__" not in cls.__dict__:
+                cls.__new__ = cls.__new__
 
     def serialize(self) -> bytes:
         try:
