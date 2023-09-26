@@ -1,33 +1,56 @@
 from __future__ import annotations
 
-from zigpy.types import (  # noqa: F401
-    enum8,
-    int8s,
-    enum16,
-    bitmap8,
-    uint8_t,
-    bitmap16,
-    uint16_t,
-    uint24_t,
-    uint32_t,
-    uint40_t,
-    uint64_t,
-    enum_factory,
-)
+import typing
+
+from zigpy.types import int8s, uint8_t, enum_factory  # noqa: F401
 
 from zigpy_znp.types.cstruct import CStruct
 
+if typing.TYPE_CHECKING:
+    import enum
 
-class enum24(enum_factory(uint24_t)):  # type: ignore[misc]
-    pass
+    class enum8(int, enum.Enum):
+        pass
 
+    class enum16(int, enum.Enum):
+        pass
 
-class enum40(enum_factory(uint40_t)):  # type: ignore[misc]
-    pass
+    class enum24(int, enum.Enum):
+        pass
 
+    class enum40(int, enum.Enum):
+        pass
 
-class enum64(enum_factory(uint64_t)):  # type: ignore[misc]
-    pass
+    class enum64(int, enum.Enum):
+        pass
+
+    class bitmap8(enum.IntFlag):
+        pass
+
+    class bitmap16(enum.IntFlag):
+        pass
+
+else:
+    from zigpy.types import (  # noqa: F401
+        enum8,
+        enum16,
+        bitmap8,
+        bitmap16,
+        uint16_t,
+        uint24_t,
+        uint32_t,
+        uint40_t,
+        uint64_t,
+    )
+
+    class enum24(enum_factory(uint24_t)):  # type: ignore[misc]
+        pass
+
+    class enum40(enum_factory(uint40_t)):  # type: ignore[misc]
+        pass
+
+    class enum64(enum_factory(uint64_t)):  # type: ignore[misc]
+        pass
 
 
 class Bytes(bytes):

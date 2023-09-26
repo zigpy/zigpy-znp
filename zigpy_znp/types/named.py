@@ -51,13 +51,13 @@ class AddrModeAddress:
         cls, zigpy_addr: zigpy.types.AddrModeAddress
     ) -> AddrModeAddress:
         return cls(
-            mode=AddrMode[zigpy_addr.addr_mode.name],  # type: ignore[misc]
+            mode=AddrMode[zigpy_addr.addr_mode.name],
             address=zigpy_addr.address,
         )
 
     def as_zigpy_type(self) -> zigpy.types.AddrModeAddress:
         return zigpy.types.AddrModeAddress(
-            addr_mode=zigpy.types.AddrMode[self.mode.name],  # type: ignore[misc]
+            addr_mode=zigpy.types.AddrMode[self.mode.name],
             address=self.address,
         )
 
