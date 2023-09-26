@@ -343,22 +343,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Z-Stack does not have any way to do this
 
-    async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
+    async def permit_with_link_key(
+        self, node: t.EUI64, link_key: t.KeyData, time_s: int = 60
+    ) -> None:
         """
-        Permits a new device to join with the given IEEE and Install Code.
+        Permits a new device to join with the given IEEE and link key.
         """
-
-        key = zigpy.util.convert_install_code(code)
-        install_code_format = c.app_config.InstallCodeFormat.KeyDerivedFromInstallCode
-
-        if key is None:
-            raise ValueError(f"Invalid install code: {code!r}")
 
         await self._znp.request(
             c.AppConfig.BDBAddInstallCode.Req(
-                InstallCodeFormat=install_code_format,
+                InstallCodeFormat=(
+                    c.app_config.InstallCodeFormat.KeyDerivedFromInstallCode
+                ),
                 IEEE=node,
-                InstallCode=t.Bytes(key),
+                InstallCode=link_key.serialize(),
             ),
             RspStatus=t.Status.SUCCESS,
         )
@@ -383,6 +381,18 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ),
                 RspStatus=t.Status.SUCCESS,
             )
+
+    async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
+        """
+        Permits a new device to join with the given IEEE and Install Code.
+        """
+
+        key = zigpy.util.convert_install_code(code)
+
+        if key is None:
+            raise ValueError(f"Invalid install code: {code!r}")
+
+        await self.permit_with_link_key(node=node, link_key=key, time_s=time_s)
 
     async def _move_network_to_channel(
         self, new_channel: int, new_nwk_update_id: int
