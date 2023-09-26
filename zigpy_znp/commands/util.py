@@ -4,7 +4,7 @@ getting device info, getting NV info, subscribing callbacks, etc."""
 import zigpy_znp.types as t
 
 
-class NodeRelation(t.enum_uint8):
+class NodeRelation(t.enum8):
     PARENT = 0
     CHILD_RFD = 1
     CHILD_RFD_RX_IDLE = 2
@@ -62,7 +62,7 @@ class RandomNumbers(t.FixedList, item_type=t.uint8_t, length=100):
     pass
 
 
-class LEDMode(t.enum_uint8):
+class LEDMode(t.enum8):
     OFF = 0
     ON = 1
     BLINK = 2

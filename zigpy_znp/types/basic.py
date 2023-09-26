@@ -1,12 +1,20 @@
 from __future__ import annotations
 
-import sys
-import enum
-import typing
-
-import zigpy.types as zigpy_t
+from zigpy.types import uint8_t, uint16_t, uint24_t, uint40_t, uint64_t, enum_factory
 
 from zigpy_znp.types.cstruct import CStruct
+
+
+class enum24(enum_factory(uint24_t)):  # type: ignore[misc]
+    pass
+
+
+class enum40(enum_factory(uint40_t)):  # type: ignore[misc]
+    pass
+
+
+class enum64(enum_factory(uint64_t)):  # type: ignore[misc]
+    pass
 
 
 class Bytes(bytes):
@@ -35,132 +43,6 @@ class TrailingBytes(Bytes):
 
 def serialize_list(objects) -> Bytes:
     return Bytes(b"".join([o.serialize() for o in objects]))
-
-
-class FixedIntType(int):
-    _signed: bool
-    _size: int
-
-    def __new__(cls, *args, **kwargs):
-        if getattr(cls, "_signed", None) is None or getattr(cls, "_size", None) is None:
-            raise TypeError(f"{cls} is abstract and cannot be created")
-
-        instance = super().__new__(cls, *args, **kwargs)
-        instance.serialize()
-
-        return instance
-
-    def __init_subclass__(cls, signed=None, size=None, hex_repr=None) -> None:
-        super().__init_subclass__()
-
-        if signed is not None:
-            cls._signed = signed
-
-        if size is not None:
-            cls._size = size
-
-        if hex_repr:
-            fmt = f"0x{{:0{cls._size * 2}X}}"  # type:ignore[operator]
-            cls.__str__ = cls.__repr__ = lambda self: fmt.format(self)
-        elif hex_repr is not None and not hex_repr:
-            cls.__str__ = super().__str__
-            cls.__repr__ = super().__repr__
-
-        if sys.version_info < (3, 10):
-            # XXX: The enum module uses the first class with __new__ in its __dict__
-            #      as the member type. We have to ensure this is true for
-            #      every subclass.
-            # Fixed with https://github.com/python/cpython/pull/26658
-            if "__new__" not in cls.__dict__:
-                cls.__new__ = cls.__new__
-
-    def serialize(self) -> bytes:
-        try:
-            return self.to_bytes(self._size, "little", signed=self._signed)
-        except OverflowError as e:
-            # OverflowError is not a subclass of ValueError, making it annoying to catch
-            raise ValueError(str(e)) from e
-
-    @classmethod
-    def deserialize(cls, data: bytes) -> tuple[FixedIntType, bytes]:
-        if len(data) < cls._size:
-            raise ValueError(f"Data is too short to contain {cls._size} bytes")
-
-        r = cls.from_bytes(data[: cls._size], "little", signed=cls._signed)
-        data = data[cls._size :]
-        return typing.cast(FixedIntType, r), data
-
-
-class uint_t(FixedIntType, signed=False):
-    pass
-
-
-class int_t(FixedIntType, signed=True):
-    pass
-
-
-class int8s(int_t, size=1):
-    pass
-
-
-class int16s(int_t, size=2):
-    pass
-
-
-class int24s(int_t, size=3):
-    pass
-
-
-class int32s(int_t, size=4):
-    pass
-
-
-class int40s(int_t, size=5):
-    pass
-
-
-class int48s(int_t, size=6):
-    pass
-
-
-class int56s(int_t, size=7):
-    pass
-
-
-class int64s(int_t, size=8):
-    pass
-
-
-class uint8_t(uint_t, size=1):
-    pass
-
-
-class uint16_t(uint_t, size=2):
-    pass
-
-
-class uint24_t(uint_t, size=3):
-    pass
-
-
-class uint32_t(uint_t, size=4):
-    pass
-
-
-class uint40_t(uint_t, size=5):
-    pass
-
-
-class uint48_t(uint_t, size=6):
-    pass
-
-
-class uint56_t(uint_t, size=7):
-    pass
-
-
-class uint64_t(uint_t, size=8):
-    pass
 
 
 class ShortBytes(Bytes):
@@ -268,67 +150,3 @@ class CompleteList(BaseListType):
             item, data = cls._deserialize_item(data, align=align)
             r.append(item)
         return r, data
-
-
-class enum_uint8(uint8_t, enum.Enum):
-    pass
-
-
-class enum_uint16(uint16_t, enum.Enum):
-    pass
-
-
-class enum_uint24(uint24_t, enum.Enum):
-    pass
-
-
-class enum_uint32(uint32_t, enum.Enum):
-    pass
-
-
-class enum_uint40(uint40_t, enum.Enum):
-    pass
-
-
-class enum_uint48(uint48_t, enum.Enum):
-    pass
-
-
-class enum_uint56(uint56_t, enum.Enum):
-    pass
-
-
-class enum_uint64(uint64_t, enum.Enum):
-    pass
-
-
-class enum_flag_uint8(zigpy_t.bitmap_factory(uint8_t)):  # type:ignore[misc]
-    pass
-
-
-class enum_flag_uint16(zigpy_t.bitmap_factory(uint16_t)):  # type:ignore[misc]
-    pass
-
-
-class enum_flag_uint24(zigpy_t.bitmap_factory(uint24_t)):  # type:ignore[misc]
-    pass
-
-
-class enum_flag_uint32(zigpy_t.bitmap_factory(uint32_t)):  # type:ignore[misc]
-    pass
-
-
-class enum_flag_uint40(zigpy_t.bitmap_factory(uint40_t)):  # type:ignore[misc]
-    pass
-
-
-class enum_flag_uint48(zigpy_t.bitmap_factory(uint48_t)):  # type:ignore[misc]
-    pass
-
-
-class enum_flag_uint56(zigpy_t.bitmap_factory(uint56_t)):  # type:ignore[misc]
-    pass
-
-
-class enum_flag_uint64(zigpy_t.bitmap_factory(uint64_t)):  # type:ignore[misc]
-    pass

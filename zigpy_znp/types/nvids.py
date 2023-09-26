@@ -1,7 +1,7 @@
 import zigpy_znp.types as t
 
 
-class BaseNvIds(t.enum_uint16):
+class BaseNvIds(t.enum16):
     pass
 
 
@@ -12,7 +12,7 @@ class ZclPortNvIds(BaseNvIds):
     SINK_TABLE = 0x0003
 
 
-class NvSysIds(t.enum_uint8):
+class NvSysIds(t.enum8):
     NVDRVR = 0  # Refrain from use
     ZSTACK = 1
     TIMAC = 2

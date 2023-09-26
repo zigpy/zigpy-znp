@@ -68,7 +68,7 @@ REQUEST_RETRYABLE_ERRORS = REQUEST_TRANSIENT_ERRORS | REQUEST_ROUTING_ERRORS
 LOGGER = logging.getLogger(__name__)
 
 
-class RetryMethod(t.enum_flag_uint8):
+class RetryMethod(t.bitmap8):
     NONE = 0
     AssocRemove = 2 << 0
     RouteDiscovery = 2 << 1

@@ -17,19 +17,19 @@ class SecurityEntry(t.FixedList, item_type=t.uint8_t, length=5):
     pass
 
 
-class StartupState(t.enum_uint8):
+class StartupState(t.enum8):
     RestoredNetworkState = 0x00
     NewNetworkState = 0x01
     NotStarted = 0x02
 
 
-class RouteDiscoveryOptions(t.enum_flag_uint8):
+class RouteDiscoveryOptions(t.bitmap8):
     UNICAST = 0x00
     MTO_WITH_ROUTE_CACHE = 0x01
     MTO_WITHOUT_ROUTE_CACHE = 0x03
 
 
-class RouteStatus(t.enum_uint8):
+class RouteStatus(t.enum8):
     INIT = 0
     ACTIVE = 1
     DISC = 2
@@ -37,7 +37,7 @@ class RouteStatus(t.enum_uint8):
     REPAIR = 4
 
 
-class RouteOptions(t.enum_flag_uint8):
+class RouteOptions(t.bitmap8):
     # Used in option of NLME_RouteDiscoveryRequest() and rtgTable[]
     MTO_ROUTE = 0x01
 
@@ -60,7 +60,7 @@ class RouteOptions(t.enum_flag_uint8):
     MULTICAST_ROUTE = 0x40
 
 
-class RoutingStatus(t.enum_uint8):
+class RoutingStatus(t.enum8):
     SUCCESS = 0
     FAIL = 1
     TBL_FULL = 2
@@ -71,7 +71,7 @@ class RoutingStatus(t.enum_uint8):
     SRC_TBL_FULL = 7
 
 
-class MACCapabilities(t.enum_flag_uint8):
+class MACCapabilities(t.bitmap8):
     PANCoordinator = 1 << 0
     Router = 1 << 1
     MainsPowered = 1 << 2
@@ -82,7 +82,7 @@ class MACCapabilities(t.enum_flag_uint8):
     AllocateShortAddrDuringAssocNeeded = 1 << 7
 
 
-class LeaveOptions(t.enum_flag_uint8):
+class LeaveOptions(t.bitmap8):
     NONE = 0
     Rejoin = 1 << 0
     RemoveChildren = 1 << 1
@@ -136,7 +136,7 @@ class NullableNodeDescriptor(zigpy.zdo.types.NodeDescriptor):
         return super().serialize()
 
 
-class AddrRequestType(t.enum_uint8):
+class AddrRequestType(t.enum8):
     SINGLE = 0x00
     EXTENDED = 0x01
 

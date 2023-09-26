@@ -3,7 +3,7 @@
 import zigpy_znp.types as t
 
 
-class TimeoutIndex(t.enum_uint8):
+class TimeoutIndex(t.enum8):
     Seconds_10 = 0x00
 
     Minutes_2 = 0x01
@@ -22,7 +22,7 @@ class TimeoutIndex(t.enum_uint8):
     Minutes_16384 = 0x0E
 
 
-class CentralizedLinkKeyMode(t.enum_uint8):
+class CentralizedLinkKeyMode(t.enum8):
     UseDefault = 0x00
     UseProvidedInstallCode = 0x01
     UseProvidedInstallCodeAndFallbackToDefault = 0x02
@@ -30,7 +30,7 @@ class CentralizedLinkKeyMode(t.enum_uint8):
     UseProvidedAPSLinkKeyAndFallbackToDefault = 0x04
 
 
-class BDBCommissioningStatus(t.enum_uint8):
+class BDBCommissioningStatus(t.enum8):
     Success = 0x00
     InProgress = 0x01
     NoNetwork = 0x02
@@ -48,7 +48,7 @@ class BDBCommissioningStatus(t.enum_uint8):
     Failure = 0x0E
 
 
-class BDBCommissioningMode(t.enum_flag_uint8):
+class BDBCommissioningMode(t.bitmap8):
     NONE = 0
 
     InitiatorTouchLink = 1 << 0
@@ -59,7 +59,7 @@ class BDBCommissioningMode(t.enum_flag_uint8):
     ParentLost = 1 << 5
 
 
-class InstallCodeFormat(t.enum_uint8):
+class InstallCodeFormat(t.enum8):
     InstallCodeAndCRC = 0x01
     KeyDerivedFromInstallCode = 0x02
 

@@ -22,7 +22,7 @@ def test_status():
     assert rest == extra
     assert r == 0x33
     assert r.value == 0x33
-    assert r.name == "unknown_0x33"
+    assert r.name == "undefined_0x33"
 
 
 def test_addr_mode_address():
@@ -99,24 +99,6 @@ def test_addr_mode_address():
     assert r3 != r4
 
 
-def test_missing_status_enum():
-    class TestEnum(t.MissingEnumMixin, t.enum_uint8):
-        Member = 0x00
-
-    assert 0xFF not in list(TestEnum)
-    assert isinstance(TestEnum(0xFF), TestEnum)
-    assert TestEnum(0xFF).value == 0xFF
-    assert type(TestEnum(0xFF).value) is t.uint8_t
-
-    # Missing members that don't fit can't be created
-    with pytest.raises(ValueError):
-        TestEnum(0xFF + 1)
-
-    # Missing members that aren't integers can't be created
-    with pytest.raises(ValueError):
-        TestEnum("0xFF")
-
-
 def test_zdo_nullable_node_descriptor():
     desc1, data = c.zdo.NullableNodeDescriptor.deserialize(b"\x00")
 
@@ -131,12 +113,3 @@ def test_zdo_nullable_node_descriptor():
 
     assert not data
     assert desc2.serialize() == desc3.serialize()
-
-
-def test_missing_enum_mixin():
-    class TestEnum(t.MissingEnumMixin, t.enum_uint8):
-        FOO = 0x01
-
-    assert TestEnum(0x01) == 0x01 == TestEnum.FOO
-    assert TestEnum(0x02) == 0x02
-    assert 0x02 not in TestEnum._value2member_map_

@@ -5,13 +5,13 @@ as reset, read/write memory, read/write extended address, etc.
 import zigpy_znp.types as t
 
 
-class BootloaderBuildType(t.enum_uint8):
+class BootloaderBuildType(t.enum8):
     NON_BOOTLOADER_BUILD = 0
     BUILT_AS_BIN = 1
     BUILT_AS_HEX = 2
 
 
-class ADCChannel(t.enum_uint8):
+class ADCChannel(t.enum8):
     """The ADC channel."""
 
     AIN0 = 0x00
@@ -26,7 +26,7 @@ class ADCChannel(t.enum_uint8):
     Voltage = 0x0F
 
 
-class ADCResolution(t.enum_uint8):
+class ADCResolution(t.enum8):
     """Resolution of the ADC channel."""
 
     bits_8 = 0x00
@@ -35,7 +35,7 @@ class ADCResolution(t.enum_uint8):
     bits_14 = 0x03
 
 
-class GPIOPinMode(t.enum_flag_uint8):
+class GPIOPinMode(t.bitmap8):
     """Pin state. Any pin with an unspecified state bit is pulled up."""
 
     Tristate0 = 0b0000_0001
@@ -49,7 +49,7 @@ class GPIOPinMode(t.enum_flag_uint8):
     PullDown3 = 0b1000_0000
 
 
-class GPIOPinDirection(t.enum_flag_uint8):
+class GPIOPinDirection(t.bitmap8):
     """Pin direction. Any pin with an unspecified direction bit is an input pin."""
 
     Output0 = 0b0000_0001
@@ -58,7 +58,7 @@ class GPIOPinDirection(t.enum_flag_uint8):
     Output3 = 0b0000_1000
 
 
-class GPIOOperation(t.enum_uint8):
+class GPIOOperation(t.enum8):
     """Specifies the type of operation to perform on the GPIO pins."""
 
     SetDirection = 0x00
@@ -70,7 +70,7 @@ class GPIOOperation(t.enum_uint8):
     HiD = 0x12  # ???
 
 
-class StackTuneOperation(t.enum_uint8):
+class StackTuneOperation(t.enum8):
     """The tuning operation to be executed."""
 
     # XXX: [Value] should correspond to the valid values specified by the

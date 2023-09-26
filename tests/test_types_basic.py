@@ -17,8 +17,8 @@ def test_serialize_list():
     assert t.serialize_list([]) == b""
 
 
-def test_enum_uint():
-    class TestEnum(t.enum_flag_uint16):
+def test_enum():
+    class TestEnum(t.bitmap16):
         ALL = 0xFFFF
         CH_1 = 0x0001
         CH_2 = 0x0002
@@ -37,19 +37,6 @@ def test_enum_uint():
 
     assert r.serialize() == data
     assert TestEnum(0x8012).serialize() == data
-
-
-def test_abstract_ints():
-    assert issubclass(t.uint8_t, t.uint_t)
-    assert not issubclass(t.uint8_t, t.int_t)
-    assert t.int_t._signed is True
-    assert t.uint_t._signed is False
-
-    with pytest.raises(TypeError):
-        t.int_t(0)
-
-    with pytest.raises(TypeError):
-        t.FixedIntType(0)
 
 
 def test_int_too_short():
@@ -132,29 +119,6 @@ def test_lvlist_too_short():
         TestList.deserialize(b"\x04123")
 
 
-def test_hex_repr():
-    class NwkAsHex(t.uint16_t, hex_repr=True):
-        pass
-
-    nwk = NwkAsHex(0x123A)
-    assert str(nwk) == "0x123A"
-    assert repr(nwk) == "0x123A"
-
-    assert str([nwk]) == "[0x123A]"
-    assert repr([nwk]) == "[0x123A]"
-
-    # You can turn it off as well
-    class NwkWithoutHex(NwkAsHex, hex_repr=False):
-        pass
-
-    nwk = NwkWithoutHex(1234)
-    assert str(nwk) == "1234"
-    assert repr(nwk) == "1234"
-
-    assert str([nwk]) == "[1234]"
-    assert repr([nwk]) == "[1234]"
-
-
 def test_fixed_list():
     class TestList(t.FixedList, item_type=t.uint16_t, length=3):
         pass
@@ -187,7 +151,7 @@ def test_fixed_list_deserialize():
 
 
 def test_enum_instance_types():
-    class TestEnum(t.enum_uint8):
+    class TestEnum(t.enum8):
         Member = 0x00
 
     assert TestEnum._member_type_ is t.uint8_t

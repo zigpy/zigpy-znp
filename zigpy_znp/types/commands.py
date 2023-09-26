@@ -12,7 +12,7 @@ import zigpy_znp.types as t
 LOGGER = logging.getLogger(__name__)
 
 
-class CommandType(t.enum_uint8):
+class CommandType(t.enum8):
     """Command Type."""
 
     POLL = 0
@@ -26,7 +26,7 @@ class CommandType(t.enum_uint8):
     RESERVED_7 = 7
 
 
-class ErrorCode(t.MissingEnumMixin, t.enum_uint8):
+class ErrorCode(t.enum8):
     """Error code."""
 
     INVALID_SUBSYSTEM = 0x01
@@ -35,7 +35,7 @@ class ErrorCode(t.MissingEnumMixin, t.enum_uint8):
     INVALID_LENGTH = 0x04
 
 
-class Subsystem(t.enum_uint8):
+class Subsystem(t.enum8):
     """Command subsystem."""
 
     RPCError = 0x00
@@ -72,7 +72,7 @@ class Subsystem(t.enum_uint8):
     RESERVED_31 = 0x1F
 
 
-class CallbackSubsystem(t.enum_uint16):
+class CallbackSubsystem(t.enum16):
     """Subscribe/unsubscribe subsystem callbacks."""
 
     MT_SYS = Subsystem.SYS << 8
@@ -508,7 +508,7 @@ class CommandBase:
     __str__ = __repr__
 
 
-class DeviceState(t.enum_uint8):
+class DeviceState(t.enum8):
     """Indicated device state."""
 
     # Initialized - not started automatically
@@ -545,7 +545,7 @@ class DeviceState(t.enum_uint8):
     RejoinInsecureScanningAllChannels = 0x0F
 
 
-class InterPanCommand(t.enum_uint8):
+class InterPanCommand(t.enum8):
     # Switch channel back to the NIB channel
     Clr = 0x00
     # Set channel for inter-pan communication
@@ -556,7 +556,7 @@ class InterPanCommand(t.enum_uint8):
     Chk = 0x03
 
 
-class MTCapabilities(t.enum_flag_uint16):
+class MTCapabilities(t.bitmap16):
     SYS = 1 << 0
     MAC = 1 << 1
     NWK = 1 << 2

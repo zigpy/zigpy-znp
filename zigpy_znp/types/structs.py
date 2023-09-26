@@ -1,4 +1,4 @@
-from . import basic, named, cstruct, zigpy_types
+from . import basic, cstruct, zigpy_types
 
 
 class NwkKeyDesc(cstruct.CStruct):
@@ -6,7 +6,7 @@ class NwkKeyDesc(cstruct.CStruct):
     Key: zigpy_types.KeyData
 
 
-class NwkState(basic.enum_uint8):
+class NwkState(basic.enum8):
     NWK_INIT = 0
     NWK_JOINING_ORPHAN = 1
     NWK_DISC = 2
@@ -120,7 +120,7 @@ class NwkActiveKeyItems(cstruct.CStruct):
     FrameCounter: basic.uint32_t
 
 
-class KeyType(named.MissingEnumMixin, basic.enum_uint8):
+class KeyType(basic.enum8):
     NONE = 0
 
     # Standard Network Key
@@ -136,7 +136,7 @@ class KeyType(named.MissingEnumMixin, basic.enum_uint8):
     UNKNOWN_6 = 6
 
 
-class KeyAttributes(basic.enum_uint8):
+class KeyAttributes(basic.enum8):
     # Used for IC derived keys
     PROVISIONAL_KEY = 0x00
     # Unique key that is not verified
@@ -177,7 +177,7 @@ class NwkSecMaterialDesc(cstruct.CStruct):
     ExtendedPanID: zigpy_types.EUI64
 
 
-class AddrMgrUserType(basic.enum_flag_uint8):
+class AddrMgrUserType(basic.bitmap8):
     Default = 0x00
     Assoc = 0x01
     Security = 0x02
@@ -195,7 +195,7 @@ class AddressManagerTable(basic.CompleteList, item_type=AddrMgrEntry):
     pass
 
 
-class AuthenticationOption(basic.enum_uint8):
+class AuthenticationOption(basic.enum8):
     NotAuthenticated = 0x00
     AuthenticatedCBCK = 0x01
     AuthenticatedEA = 0x02

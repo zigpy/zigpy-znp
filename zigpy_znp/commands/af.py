@@ -1,7 +1,7 @@
 import zigpy_znp.types as t
 
 
-class TransmitOptions(t.enum_flag_uint8):
+class TransmitOptions(t.bitmap8):
     NONE = 0
 
     # Will force the message to use Wildcard ProfileID
@@ -19,7 +19,7 @@ class TransmitOptions(t.enum_flag_uint8):
     SKIP_ROUTING = 0x80
 
 
-class LatencyReq(t.enum_uint8):
+class LatencyReq(t.enum8):
     NoLatencyReqs = 0x00
     FastBeacons = 0x01
     SlowBeacons = 0x02
