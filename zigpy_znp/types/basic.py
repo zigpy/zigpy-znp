@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-from zigpy.types import uint8_t, uint16_t, uint24_t, uint40_t, uint64_t, enum_factory
+from zigpy.types import (  # noqa: F401
+    enum8,
+    int8s,
+    enum16,
+    bitmap8,
+    uint8_t,
+    bitmap16,
+    uint16_t,
+    uint24_t,
+    uint32_t,
+    uint40_t,
+    uint64_t,
+    enum_factory,
+)
 
 from zigpy_znp.types.cstruct import CStruct
 
