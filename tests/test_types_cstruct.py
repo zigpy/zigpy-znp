@@ -273,7 +273,7 @@ def test_struct_incomplete_serialization():
 def test_old_nib_deserialize():
     PaddingByte: typing_extensions.TypeAlias = t.uint8_t
 
-    class NwkState16(t.enum_uint16):
+    class NwkState16(t.enum16):
         NWK_INIT = 0
         NWK_JOINING_ORPHAN = 1
         NWK_DISC = 2

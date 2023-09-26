@@ -1,7 +1,7 @@
 import zigpy_znp.types as t
 
 
-class ErrorCode(t.enum_uint8):
+class ErrorCode(t.enum8):
     InvalidSubsystem = 0x01
     InvalidCommandId = 0x02
     InvalidParameter = 0x03

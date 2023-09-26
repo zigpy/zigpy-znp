@@ -11,7 +11,7 @@ IMAGE_CRC_OFFSET = 0x90
 FLASH_WORD_SIZE = 4
 
 
-class BootloaderStatus(t.enum_uint8):
+class BootloaderStatus(t.enum8):
     SUCCESS = 0
     FAILURE = 1
     INVALID_FCS = 2
@@ -23,12 +23,12 @@ class BootloaderStatus(t.enum_uint8):
     CANCELED = 8
 
 
-class BootloaderDeviceType(t.enum_uint8):
+class BootloaderDeviceType(t.enum8):
     CC2538 = 1
     CC2530 = 2
 
 
-class BootloaderRunMode(t.enum_uint8):
+class BootloaderRunMode(t.enum8):
     # Read the code, not the spec
     FORCE_BOOT = 0x10
     FORCE_RUN = FORCE_BOOT ^ 0xFF

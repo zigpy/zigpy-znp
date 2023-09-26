@@ -68,7 +68,7 @@ def test_error_code():
 
     r, rest = t.ErrorCode.deserialize(b"\xaa" + extra)
     assert rest == extra
-    assert r.name == "unknown_0xAA"
+    assert r.name == "undefined_0xaa"
 
 
 def _validate_schema(schema):

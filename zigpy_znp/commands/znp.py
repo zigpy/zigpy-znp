@@ -1,7 +1,7 @@
 import zigpy_znp.types as t
 
 
-class DiscreteCommand(t.enum_flag_uint8):
+class DiscreteCommand(t.bitmap8):
     ZDOStart = 0x40
     ResetNwk = 0x80
 

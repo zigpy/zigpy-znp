@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import sys
+import enum
 import typing
 import logging
 import dataclasses
@@ -15,8 +15,10 @@ LOGGER = logging.getLogger(__name__)
 JSONType = typing.Dict[str, typing.Any]
 
 
-class AddrMode(basic.enum_uint8):
+class AddrMode(basic.enum8):
     """Address mode."""
+
+    _missing_ = enum.Enum._missing_  # There are no missing members
 
     NOT_PRESENT = 0x00
     Group = 0x01
@@ -97,11 +99,11 @@ class AddrModeAddress:
         return f"{type(self).__name__}(mode={self.mode!r}, address={self.address!r})"
 
 
-class GroupId(basic.uint16_t, hex_repr=True):
+class GroupId(basic.uint16_t, repr="hex"):  # type: ignore[call-arg]
     """Group ID class"""
 
 
-class ScanType(basic.enum_uint8):
+class ScanType(basic.enum8):
     EnergyDetect = 0x00
     Active = 0x01
     Passive = 0x02
@@ -118,28 +120,7 @@ class Param:
     optional: bool = False
 
 
-class MissingEnumMixin:
-    @classmethod
-    def _missing_(cls, value):
-        if not isinstance(value, int):
-            raise ValueError(f"{value} is not a valid {cls.__name__}")
-
-        new_member = cls._member_type_.__new__(cls, value)
-        new_member._name_ = f"unknown_0x{value:02X}"
-        new_member._value_ = cls._member_type_(value)
-
-        if sys.version_info >= (3, 8):
-            # Show the warning in the calling code, not in this function
-            LOGGER.warning(
-                "Unhandled %s value: %s", cls.__name__, new_member, stacklevel=2
-            )
-        else:
-            LOGGER.warning("Unhandled %s value: %s", cls.__name__, new_member)
-
-        return new_member
-
-
-class Status(MissingEnumMixin, basic.enum_uint8):
+class Status(basic.enum8):
     SUCCESS = 0x00
     FAILURE = 0x01
     INVALID_PARAMETER = 0x02
@@ -349,13 +330,13 @@ class Status(MissingEnumMixin, basic.enum_uint8):
     MAC_AUTOACK_PENDING_ALL_OFF = 0xFF
 
 
-class ResetReason(basic.enum_uint8):
+class ResetReason(basic.enum8):
     PowerUp = 0x00
     External = 0x01
     Watchdog = 0x02
 
 
-class ResetType(basic.enum_uint8):
+class ResetType(basic.enum8):
     Hard = 0x00
     Soft = 0x01
     Shutdown = 0x02
@@ -365,7 +346,7 @@ class KeySource(basic.FixedList, item_type=basic.uint8_t, length=8):
     pass
 
 
-class StartupOptions(basic.enum_flag_uint8):
+class StartupOptions(basic.bitmap8):
     NONE = 0
 
     ClearConfig = 1 << 0
@@ -378,13 +359,13 @@ class StartupOptions(basic.enum_flag_uint8):
     ClearNwkFrameCounter = 1 << 7
 
 
-class DeviceLogicalType(basic.enum_uint8):
+class DeviceLogicalType(basic.enum8):
     Coordinator = 0
     Router = 1
     EndDevice = 2
 
 
-class DeviceTypeCapabilities(basic.enum_flag_uint8):
+class DeviceTypeCapabilities(basic.bitmap8):
     Coordinator = 1 << 0
     Router = 1 << 1
     EndDevice = 1 << 2
@@ -400,7 +381,7 @@ class NWKList(basic.LVList, item_type=zigpy_types.NWK, length_type=basic.uint8_t
     pass
 
 
-class NwkMode(basic.enum_uint8):
+class NwkMode(basic.enum8):
     Star = 0
     Tree = 1
     Mesh = 2
