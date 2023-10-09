@@ -1181,7 +1181,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             t.Param(
                 "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
             ),
-            t.Param("Neighbors", zigpy.zdo.types.Neighbors, "Neighbors"),
+            t.Param("Neighbors", zigpy.zdo.types.Neighbors, "Neighbors", optional=True),
         ),
     )
 
