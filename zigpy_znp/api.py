@@ -31,7 +31,11 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.exceptions import (
+    ControllerResetting,
+    CommandNotRecognized,
+    InvalidCommandResponse,
+)
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 if typing.TYPE_CHECKING:
@@ -991,15 +995,27 @@ class ZNP:
         if self._uart is None:
             raise RuntimeError("Coordinator is disconnected, cannot send request")
 
-        # Immediately send reset requests
-        ctx = (
-            contextlib.AsyncExitStack()
-            if isinstance(request, c.SYS.ResetReq.Req)
-            else self._sync_request_lock
-        )
+        if not isinstance(request, c.SYS.ResetReq.Req):
+            # We should only be sending one SREQ at a time, according to the spec
+            send_ctx = self._sync_request_lock
+        else:
+            # Immediately send reset requests
+            send_ctx = contextlib.AsyncExitStack()
 
-        # We should only be sending one SREQ at a time, according to the spec
-        async with ctx:
+            # Fail all one-shot listeners on a reset
+            for header, listeners in self._listeners.items():
+                # Allow any listeners for a reset indication
+                if header == c.SYS.ResetInd.Callback.header:
+                    continue
+
+                for listener in listeners:
+                    if not isinstance(listener, OneShotResponseListener):
+                        continue
+
+                    LOGGER.log(log.TRACE, "Failing listener %s on reset", listener)
+                    listener.failure(ControllerResetting())
+
+        async with send_ctx:
             LOGGER.debug("Sending request: %s", request)
 
             # If our request has no response, we cannot wait for one

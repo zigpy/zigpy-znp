@@ -25,7 +25,11 @@ import zigpy_znp.config as conf
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.utils import combine_concurrent_calls
-from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.exceptions import (
+    ControllerResetting,
+    CommandNotRecognized,
+    InvalidCommandResponse,
+)
 from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.zigbee.device import ZNPCoordinator
 
@@ -687,6 +691,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
             try:
                 await self._znp.request(c.SYS.Ping.Req())
+            except ControllerResetting:
+                LOGGER.debug("Controller is resetting, ignoring watchdog failure")
             except Exception as e:
                 LOGGER.error(
                     "Watchdog check failed",
