@@ -13,6 +13,10 @@ class CommandNotRecognized(Exception):
     pass
 
 
+class ControllerResetting(Exception):
+    pass
+
+
 class InvalidCommandResponse(DeliveryError):
     def __init__(self, message, response):
         super().__init__(message)

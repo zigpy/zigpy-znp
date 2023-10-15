@@ -76,6 +76,14 @@ class BaseResponseListener:
 
         return self._resolve(response)
 
+    def failure(self, exception: BaseException) -> bool:
+        """
+        Implement by subclasses to have the listener enter into an error state.
+
+        Return value indicates whether or not the listener is failable.
+        """
+        raise NotImplementedError()  # pragma: no cover
+
     def _resolve(self, response: t.CommandBase) -> bool:
         """
         Implemented by subclasses to handle matched commands.
@@ -118,6 +126,13 @@ class OneShotResponseListener(BaseResponseListener):
         self.future.set_result(response)
         return True
 
+    def failure(self, exception: BaseException) -> bool:
+        if self.future.done():
+            return False
+
+        self.future.set_exception(exception)
+        return True
+
     def cancel(self):
         if not self.future.done():
             self.future.cancel()
@@ -149,6 +164,10 @@ class CallbackResponseListener(BaseResponseListener):
         # Callbacks are always resolved
         return True
 
+    def failure(self, exception: BaseException) -> bool:
+        # You can't fail a callback
+        return False
+
     def cancel(self):
         # You can't cancel a callback
         return False
@@ -160,6 +179,9 @@ class CatchAllResponse:
     """
 
     header = object()  # sentinel
+
+    def failure(self, exception: BaseException) -> bool:
+        return False
 
     def matches(self, other) -> bool:
         return True
