@@ -102,7 +102,7 @@ async def test_on_af_message_callback(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
     await app.startup(auto_form=False)
 
-    mocker.patch.object(app, "handle_message")
+    mocker.patch.object(app, "packet_received")
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAABB)
 
     af_message = c.AF.IncomingMsg.Callback(
@@ -125,49 +125,82 @@ async def test_on_af_message_callback(device, make_application, mocker):
     znp_server.send(af_message)
     await asyncio.sleep(0.1)
 
-    app.handle_message.assert_called_once_with(
-        sender=device,
-        profile=260,
-        cluster=2,
-        src_ep=4,
-        dst_ep=1,
-        message=b"test",
-        dst_addressing=zigpy_t.AddrMode.NWK,
+    app.packet_received.assert_called_once_with(
+        zigpy_t.ZigbeePacket(
+            profile_id=260,
+            cluster_id=0x0002,
+            src_ep=4,
+            dst_ep=1,
+            data=t.SerializableBytes(b"test"),
+            src=zigpy_t.AddrModeAddress(
+                addr_mode=zigpy_t.AddrMode.NWK,
+                address=device.nwk,
+            ),
+            dst=zigpy_t.AddrModeAddress(
+                addr_mode=t.AddrMode.NWK,
+                address=app.state.node_info.nwk,
+            ),
+            lqi=19,
+            rssi=None,
+            radius=1,
+        )
     )
 
-    app.handle_message.reset_mock()
+    app.packet_received.reset_mock()
 
     # ZLL message
     znp_server.send(af_message.replace(DstEndpoint=2))
     await asyncio.sleep(0.1)
 
-    app.handle_message.assert_called_once_with(
-        sender=device,
-        profile=49246,
-        cluster=2,
-        src_ep=4,
-        dst_ep=2,
-        message=b"test",
-        dst_addressing=zigpy_t.AddrMode.NWK,
+    app.packet_received.assert_called_once_with(
+        zigpy_t.ZigbeePacket(
+            profile_id=49246,  # Profile ID is missing but inferred from registered EP
+            cluster_id=0x0002,
+            src_ep=4,
+            dst_ep=2,
+            data=t.SerializableBytes(b"test"),
+            src=zigpy_t.AddrModeAddress(
+                addr_mode=zigpy_t.AddrMode.NWK,
+                address=device.nwk,
+            ),
+            dst=zigpy_t.AddrModeAddress(
+                addr_mode=t.AddrMode.NWK,
+                address=app.state.node_info.nwk,
+            ),
+            lqi=19,
+            rssi=None,
+            radius=1,
+        )
     )
 
-    app.handle_message.reset_mock()
+    app.packet_received.reset_mock()
 
     # Message on an unknown endpoint (is this possible?)
     znp_server.send(af_message.replace(DstEndpoint=3))
     await asyncio.sleep(0.1)
 
-    app.handle_message.assert_called_once_with(
-        sender=device,
-        profile=260,
-        cluster=2,
-        src_ep=4,
-        dst_ep=3,
-        message=b"test",
-        dst_addressing=zigpy_t.AddrMode.NWK,
+    app.packet_received.assert_called_once_with(
+        zigpy_t.ZigbeePacket(
+            profile_id=260,
+            cluster_id=0x0002,
+            src_ep=4,
+            dst_ep=3,
+            data=t.SerializableBytes(b"test"),
+            src=zigpy_t.AddrModeAddress(
+                addr_mode=zigpy_t.AddrMode.NWK,
+                address=device.nwk,
+            ),
+            dst=zigpy_t.AddrModeAddress(
+                addr_mode=t.AddrMode.NWK,
+                address=app.state.node_info.nwk,
+            ),
+            lqi=19,
+            rssi=None,
+            radius=1,
+        )
     )
 
-    app.handle_message.reset_mock()
+    app.packet_received.reset_mock()
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
