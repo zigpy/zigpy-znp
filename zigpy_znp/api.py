@@ -121,10 +121,21 @@ class ZNP:
             OsalNvIds.LOGICAL_TYPE, item_type=t.DeviceLogicalType
         )
 
+        if self.version > 3.0:
+            model = "CC2652"
+            fw_variant = "Z-Stack"
+        else:
+            model = "CC2538" if self.nvram.align_structs else "CC2531"
+            fw_variant = "Z-Stack Home 1.2" if self.version == 1.2 else "Z-Stack 3.0.x"
+
+        version = await self.request(c.SYS.Version.Req())
         node_info = zigpy.state.NodeInfo(
             ieee=ieee,
             nwk=nib.nwkDevAddress,
             logical_type=zdo_t.LogicalType(logical_type),
+            manufacturer="Texas Instruments",
+            model=model,
+            version=f"{fw_variant} {version.CodeRevision or 0x00000000}",
         )
 
         key_desc = await self.nvram.osal_read(
@@ -134,8 +145,6 @@ class ZNP:
         nwk_frame_counter = await security.read_nwk_frame_counter(
             self, ext_pan_id=nib.extendedPANID
         )
-
-        version = await self.request(c.SYS.Version.Req())
 
         network_info = zigpy.state.NetworkInfo(
             source=f"zigpy-znp@{importlib.metadata.version('zigpy-znp')}",

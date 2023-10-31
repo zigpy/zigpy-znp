@@ -52,7 +52,11 @@ async def test_state_transfer(from_device, to_device, make_connected_znp):
             metadata=formed_znp.network_info.metadata
         )
 
-    assert formed_znp.node_info == empty_znp.node_info
+    assert formed_znp.node_info == empty_znp.node_info.replace(
+        version=formed_znp.node_info.version,
+        model=formed_znp.node_info.model,
+        manufacturer=formed_znp.node_info.manufacturer,
+    )
 
 
 @pytest.mark.parametrize("device", [FormedZStack3CC2531])
