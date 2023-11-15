@@ -364,18 +364,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 RspStatus=t.Status.SUCCESS,
             )
 
-    async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
-        """
-        Permits a new device to join with the given IEEE and Install Code.
-        """
-
-        key = zigpy.util.convert_install_code(code)
-
-        if key is None:
-            raise ValueError(f"Invalid install code: {code!r}")
-
-        await self.permit_with_link_key(node=node, link_key=key, time_s=time_s)
-
     async def _move_network_to_channel(
         self, new_channel: int, new_nwk_update_id: int
     ) -> None:
