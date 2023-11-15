@@ -4,6 +4,7 @@ import typing
 import asyncio
 import logging
 
+import zigpy.config
 import zigpy.serial
 
 import zigpy_znp.config as conf
@@ -161,9 +162,9 @@ class ZnpMtProtocol(asyncio.Protocol):
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     loop = asyncio.get_running_loop()
 
-    port = config[conf.CONF_DEVICE_PATH]
-    baudrate = config[conf.CONF_DEVICE_BAUDRATE]
-    flow_control = config[conf.CONF_DEVICE_FLOW_CONTROL]
+    port = config[zigpy.config.CONF_DEVICE_PATH]
+    baudrate = config[zigpy.config.CONF_DEVICE_BAUDRATE]
+    flow_control = config[zigpy.config.CONF_DEVICE_FLOW_CONTROL]
 
     LOGGER.debug("Connecting to %s at %s baud", port, baudrate)
 

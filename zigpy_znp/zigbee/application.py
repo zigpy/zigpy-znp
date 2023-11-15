@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import asyncio
 import logging
-import itertools
 
 import zigpy.zcl
 import zigpy.zdo
@@ -77,19 +76,12 @@ class RetryMethod(t.bitmap8):
 
 class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
-    SCHEMA_DEVICE = conf.SCHEMA_DEVICE
 
     def __init__(self, config: conf.ConfigType):
         super().__init__(config=conf.CONFIG_SCHEMA(config))
 
         self._znp: ZNP | None = None
-
-        # It's simpler to work with Task objects if they're never actually None
-        self._reconnect_task: asyncio.Future = asyncio.Future()
-        self._reconnect_task.cancel()
-
         self._version_rsp = None
-
         self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
     ##################################################################
@@ -689,40 +681,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 any_changed = True
 
         return any_changed
-
-    async def _reconnect(self) -> None:
-        """
-        Endlessly tries to reconnect to the currently configured radio.
-
-        Relies on the fact that `self.startup()` only modifies `self` upon a successful
-        connection to be essentially stateless.
-        """
-
-        for attempt in itertools.count(start=1):
-            LOGGER.debug(
-                "Trying to reconnect to %s, attempt %d",
-                self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH],
-                attempt,
-            )
-
-            try:
-                await self.connect()
-                await self.initialize()
-                return
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                LOGGER.error("Failed to reconnect", exc_info=e)
-
-                if self._znp is not None:
-                    self._znp.close()
-                    self._znp = None
-
-                await asyncio.sleep(
-                    self._config[conf.CONF_ZNP_CONFIG][
-                        conf.CONF_AUTO_RECONNECT_RETRY_DELAY
-                    ]
-                )
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """

@@ -7,6 +7,7 @@ from zigpy.config import (  # noqa: F401
     CONF_DEVICE,
     CONF_NWK_KEY,
     CONFIG_SCHEMA,
+    SCHEMA_DEVICE,
     CONF_NWK_PAN_ID,
     CONF_DEVICE_PATH,
     CONF_NWK_CHANNEL,
