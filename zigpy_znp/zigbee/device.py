@@ -8,8 +8,6 @@ import zigpy.application
 
 LOGGER = logging.getLogger(__name__)
 
-NWK_UPDATE_LOOP_DELAY = 1
-
 
 class ZNPCoordinator(zigpy.device.Device):
     """
@@ -22,14 +20,7 @@ class ZNPCoordinator(zigpy.device.Device):
 
     @property
     def model(self):
-        if self.application._znp.version > 3.0:
-            model = "CC1352/CC2652"
-            version = "3.30+"
-        else:
-            model = "CC2538" if self.application._znp.nvram.align_structs else "CC2531"
-            version = "Home 1.2" if self.application._znp.version == 1.2 else "3.0.x"
-
-        return f"{model}, Z-Stack {version} (build {self.application._zstack_build_id})"
+        return "Coordinator"
 
     def request(
         self,

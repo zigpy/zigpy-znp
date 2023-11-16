@@ -158,7 +158,9 @@ async def test_network_backup_formed(device, make_znp_server, tmp_path):
     znp_server = make_znp_server(server_cls=device)
 
     # We verified these settings with Wireshark
-    _, channel, channels, pan_id, ext_pan_id, network_key = DEV_NETWORK_SETTINGS[device]
+    _, _, channel, channels, pan_id, ext_pan_id, network_key = DEV_NETWORK_SETTINGS[
+        device
+    ]
 
     backup_file = tmp_path / "backup.json"
     await network_backup([znp_server._port_path, "-o", str(backup_file)])

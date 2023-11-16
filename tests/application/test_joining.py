@@ -140,12 +140,13 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
     # Consciot bulb
     ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
     code = bytes.fromhex("17D1856872570CEB7ACB53030C5D6DA368B1")
+    link_key = t.KeyData(zigpy.util.convert_install_code(code))
 
     bdb_add_install_code = znp_server.reply_once_to(
         c.AppConfig.BDBAddInstallCode.Req(
             InstallCodeFormat=c.app_config.InstallCodeFormat.KeyDerivedFromInstallCode,
             IEEE=ieee,
-            InstallCode=t.Bytes(zigpy.util.convert_install_code(code)),
+            InstallCode=t.Bytes(link_key),
         ),
         responses=[c.AppConfig.BDBAddInstallCode.Rsp(Status=t.Status.SUCCESS)],
     )
@@ -171,7 +172,7 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
     with contextlib.nullcontext() if permit_result is None else pytest.raises(
         asyncio.TimeoutError
     ):
-        await app.permit_with_key(node=ieee, code=code, time_s=1)
+        await app.permit_with_link_key(node=ieee, link_key=link_key, time_s=1)
 
     await bdb_add_install_code
     await join_enable_install_code
@@ -179,20 +180,6 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
 
     # The install code policy is reset right after
     await join_disable_install_code
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
-async def test_permit_join_with_invalid_key(device, make_application):
-    app, znp_server = make_application(server_cls=device)
-
-    # Consciot bulb
-    ieee = t.EUI64.convert("EC:1B:BD:FF:FE:54:4F:40")
-    code = bytes.fromhex("17D1856872570CEB7ACB53030C5D6DA368B1")[:-1]  # truncate it
-
-    with pytest.raises(ValueError):
-        await app.permit_with_key(node=ieee, code=code, time_s=1)
 
     await app.shutdown()
 

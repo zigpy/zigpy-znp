@@ -22,7 +22,8 @@ from ..conftest import (
 
 DEV_NETWORK_SETTINGS = {
     FormedLaunchpadCC26X2R1: (
-        f"CC1352/CC2652, Z-Stack 3.30+ (build {FormedLaunchpadCC26X2R1.code_revision})",
+        "CC2652",
+        f"Z-Stack {FormedLaunchpadCC26X2R1.code_revision}",
         15,
         t.Channels.from_channel_list([15]),
         0x4402,
@@ -30,7 +31,8 @@ DEV_NETWORK_SETTINGS = {
         t.KeyData.convert("4C:4E:72:B8:41:22:51:79:9A:BF:35:25:12:88:CA:83"),
     ),
     FormedZStack3CC2531: (
-        f"CC2531, Z-Stack 3.0.x (build {FormedZStack3CC2531.code_revision})",
+        "CC2531",
+        f"Z-Stack 3.0.x {FormedZStack3CC2531.code_revision}",
         15,
         t.Channels.from_channel_list([15]),
         0xB6AB,
@@ -38,7 +40,8 @@ DEV_NETWORK_SETTINGS = {
         t.KeyData.convert("6D:DE:24:EA:E2:85:52:B6:DE:29:56:EB:05:85:1A:FA"),
     ),
     FormedZStack1CC2531: (
-        f"CC2531, Z-Stack Home 1.2 (build {FormedZStack1CC2531.code_revision})",
+        "CC2531",
+        f"Z-Stack Home 1.2 {FormedZStack1CC2531.code_revision}",
         11,
         t.Channels.from_channel_list([11]),
         0x1A62,
@@ -50,12 +53,13 @@ DEV_NETWORK_SETTINGS = {
 
 # These settings were extracted from beacon requests and key exchanges in Wireshark
 @pytest.mark.parametrize(
-    "device,model,channel,channels,pan_id,ext_pan_id,network_key",
+    "device,model,version,channel,channels,pan_id,ext_pan_id,network_key",
     [(device_cls,) + settings for device_cls, settings in DEV_NETWORK_SETTINGS.items()],
 )
 async def test_info(
     device,
     model,
+    version,
     channel,
     channels,
     pan_id,
@@ -80,8 +84,9 @@ async def test_info(
     assert app.state.network_info.network_key.key == network_key
     assert app.state.network_info.network_key.seq == 0
 
-    assert app._device.manufacturer == "Texas Instruments"
-    assert app._device.model == model
+    assert app.state.node_info.manufacturer == "Texas Instruments"
+    assert app.state.node_info.model == model
+    assert app.state.node_info.version == version
 
     # Anything to make sure it's set
     assert app._device.node_desc.maximum_outgoing_transfer_size == 160

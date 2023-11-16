@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import asyncio
 import logging
-import itertools
 
 import zigpy.zcl
 import zigpy.zdo
@@ -39,7 +38,6 @@ STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
 EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 DEVICE_JOIN_MAX_DELAY = 5
-WATCHDOG_PERIOD = 30
 
 REQUEST_MAX_RETRIES = 5
 REQUEST_ERROR_RETRY_DELAY = 0.5
@@ -78,22 +76,12 @@ class RetryMethod(t.bitmap8):
 
 class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
-    SCHEMA_DEVICE = conf.SCHEMA_DEVICE
 
     def __init__(self, config: conf.ConfigType):
         super().__init__(config=conf.CONFIG_SCHEMA(config))
 
         self._znp: ZNP | None = None
-
-        # It's simpler to work with Task objects if they're never actually None
-        self._reconnect_task: asyncio.Future = asyncio.Future()
-        self._reconnect_task.cancel()
-
-        self._watchdog_task: asyncio.Future = asyncio.Future()
-        self._watchdog_task.cancel()
-
         self._version_rsp = None
-
         self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
     ##################################################################
@@ -121,9 +109,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._bind_callbacks()
 
     async def disconnect(self):
-        self._reconnect_task.cancel()
-        self._watchdog_task.cancel()
-
         if self._znp is not None:
             try:
                 await self._znp.reset(wait_for_reset=False)
@@ -132,15 +117,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             finally:
                 self._znp.close()
                 self._znp = None
-
-    def close(self):
-        self._reconnect_task.cancel()
-        self._watchdog_task.cancel()
-
-        # This will close the UART, which will then close the transport
-        if self._znp is not None:
-            self._znp.close()
-            self._znp = None
 
     async def add_endpoint(self, descriptor: zdo_t.SimpleDescriptor) -> None:
         """
@@ -252,8 +228,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             LOGGER.warning(
                 "Your network is using the insecure Zigbee2MQTT network key!"
             )
-
-        self._watchdog_task = asyncio.create_task(self._watchdog_loop())
 
     async def set_tx_power(self, dbm: int) -> None:
         """
@@ -382,18 +356,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 RspStatus=t.Status.SUCCESS,
             )
 
-    async def permit_with_key(self, node: t.EUI64, code: bytes, time_s=60):
-        """
-        Permits a new device to join with the given IEEE and Install Code.
-        """
-
-        key = zigpy.util.convert_install_code(code)
-
-        if key is None:
-            raise ValueError(f"Invalid install code: {code!r}")
-
-        await self.permit_with_link_key(node=node, link_key=key, time_s=time_s)
-
     async def _move_network_to_channel(
         self, new_channel: int, new_nwk_update_id: int
     ) -> None:
@@ -410,19 +372,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
             RspStatus=t.Status.SUCCESS,
         )
-
-    def connection_lost(self, exc):
-        """
-        Propagated up from UART through ZNP when the connection is lost.
-        Spawns the auto-reconnect task.
-        """
-
-        LOGGER.debug("Connection lost: %s", exc)
-
-        self.close()
-
-        LOGGER.debug("Restarting background reconnection task")
-        self._reconnect_task = asyncio.create_task(self._reconnect())
 
     #####################################################
     # Z-Stack message callbacks attached during startup #
@@ -671,32 +620,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return self.config[conf.CONF_ZNP_CONFIG]
 
-    async def _watchdog_loop(self):
+    async def _watchdog_feed(self):
         """
         Watchdog loop to periodically test if Z-Stack is still running.
         """
 
-        LOGGER.debug("Starting watchdog loop")
-
-        while True:
-            await asyncio.sleep(WATCHDOG_PERIOD)
-
-            # No point in trying to test the port if it's already disconnected
-            if self._znp is None:
-                break
-
-            try:
-                await self._znp.request(c.SYS.Ping.Req())
-            except Exception as e:
-                LOGGER.error(
-                    "Watchdog check failed",
-                    exc_info=e,
-                )
-
-                # Treat the watchdog failure as a disconnect
-                self.connection_lost(e)
-
-                return
+        await self._znp.request(c.SYS.Ping.Req())
 
     async def _set_led_mode(self, *, led: t.uint8_t, mode: c.util.LEDMode) -> None:
         """
@@ -752,40 +681,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 any_changed = True
 
         return any_changed
-
-    async def _reconnect(self) -> None:
-        """
-        Endlessly tries to reconnect to the currently configured radio.
-
-        Relies on the fact that `self.startup()` only modifies `self` upon a successful
-        connection to be essentially stateless.
-        """
-
-        for attempt in itertools.count(start=1):
-            LOGGER.debug(
-                "Trying to reconnect to %s, attempt %d",
-                self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH],
-                attempt,
-            )
-
-            try:
-                await self.connect()
-                await self.initialize()
-                return
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                LOGGER.error("Failed to reconnect", exc_info=e)
-
-                if self._znp is not None:
-                    self._znp.close()
-                    self._znp = None
-
-                await asyncio.sleep(
-                    self._config[conf.CONF_ZNP_CONFIG][
-                        conf.CONF_AUTO_RECONNECT_RETRY_DELAY
-                    ]
-                )
 
     def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
         """
