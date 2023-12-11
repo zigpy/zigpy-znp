@@ -11,7 +11,7 @@ from __future__ import annotations
 import zigpy.zdo.types
 
 import zigpy_znp.types as t
-
+import zigpy.types
 
 class SecurityEntry(t.FixedList, item_type=t.uint8_t, length=5):
     pass
@@ -797,10 +797,10 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         0x49,
         req_schema=(
             t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
-            # this parameter does not make sense
-            t.Param("Groups", t.uint16_t, "List to hold group IDs"),
         ),
-        rsp_schema=(t.Param("Groups", GroupIdList, "List of Group IDs"),),
+        rsp_schema=(
+            t.Param("Groups", GroupIdList, "List of Group IDs"),
+        ),
     )
 
     # handle the ZDO extension find group message
@@ -811,7 +811,11 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             t.Param("Endpoint", t.uint8_t, "Endpoint to look for"),
             t.Param("GroupId", t.GroupId, "ID to look for group"),
         ),
-        rsp_schema=(t.Param("Group", t.Bytes, "Group information"),),
+        rsp_schema=(
+            t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
+            t.Param("GroupId", zigpy.types.uint16_t, "Found Group ID"),
+            t.Param("GroupName", t.CharacterString, "Group name"),
+        ),
     )
 
     # handle the ZDO extension add group message
