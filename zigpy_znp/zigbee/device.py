@@ -23,20 +23,19 @@ class ZNPEndpoint(zigpy.endpoint.Endpoint):
         result = await znp.request(c.ZDO.ExtFindGroup.Req(Endpoint=self.endpoint_id, GroupId=grp_id))
         if result.Status == t.Status.FAILURE:
             result = await znp.request(c.ZDO.ExtAddGroup.Req(Endpoint=self.endpoint_id, GroupId=grp_id, GroupName=t.CharacterString(name)))
-        if result.Status == t.Status.SUCCESS:
-            group = self.device.application.groups.add_group(grp_id, name)
-            group.add_member(self)
-            return ZCLStatus.SUCCESS
-        return ZCLStatus.FAILURE
+        if result.Status == t.Status.FAILURE:
+            return ZCLStatus.FAILURE
+        group = self.device.application.groups.add_group(grp_id, name)
+        group.add_member(self)
+        return ZCLStatus.SUCCESS
         
-    
     async def remove_from_group(self, grp_id: int) -> ZCLStatus:
         znp: ZNP = self.device.application._znp
         result = await znp.request(c.ZDO.ExtRemoveGroup.Req(Endpoint=self.endpoint_id, GroupId=grp_id))
-        if grp_id in self.device.application.groups:
-            self.device.application.groups[grp_id].remove_member(self)
         if result.Status == t.Status.FAILURE:
             return ZCLStatus.FAILURE
+        if grp_id in self.device.application.groups:
+            self.device.application.groups[grp_id].remove_member(self)
         return ZCLStatus.SUCCESS
 
     

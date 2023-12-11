@@ -11,7 +11,6 @@ from __future__ import annotations
 import zigpy.zdo.types
 
 import zigpy_znp.types as t
-import zigpy.types
 
 class SecurityEntry(t.FixedList, item_type=t.uint8_t, length=5):
     pass
@@ -813,8 +812,8 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
         ),
         rsp_schema=(
             t.Param("Status", t.Status, "Status is either Success (0) or Failure (1)"),
-            t.Param("GroupId", zigpy.types.uint16_t, "Found Group ID"),
-            t.Param("GroupName", t.CharacterString, "Group name"),
+            t.Param("GroupId", t.GroupId, "Found Group ID"),
+            t.Param("GroupName", t.Bytes, "Group name"),
         ),
     )
 
