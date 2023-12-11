@@ -692,6 +692,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if dst_ep == ZDO_ENDPOINT:
             return ZDO_ENDPOINT
 
+        if profile == zigpy.profiles.zgp.PROFILE_ID:
+            return zigpy.profiles.zgp.GREENPOWER_ENDPOINT_ID
+
         # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
         if (
             self._zstack_build_id >= 20210708
