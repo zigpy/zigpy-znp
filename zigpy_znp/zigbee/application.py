@@ -416,6 +416,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             self.on_intentionally_unhandled_message,
         )
 
+        self._znp.callback_for_response(
+            c.ZGP.DataInd.Callback(partial=True),
+            self.on_zgp_data_ind
+        )
+
+    def on_zgp_data_ind(self, msg: c.ZGP.DataInd.Callback) -> None:
+        pass
+
     def on_intentionally_unhandled_message(self, msg: t.CommandBase) -> None:
         """
         Some commands are unhandled but frequently sent by devices on the network. To
@@ -691,6 +699,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         if dst_ep == ZDO_ENDPOINT:
             return ZDO_ENDPOINT
+        
+        if profile == zigpy.profiles.zgp.PROFILE_ID:
+            return zigpy.profiles.zgp.GREENPOWER_ENDPOINT_ID
 
         # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
         if (

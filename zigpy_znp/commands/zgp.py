@@ -97,7 +97,7 @@ class ZGP(t.CommandsBase, subsystem=t.Subsystem.ZGP):
     # This message provides a mechanism for dGP stub to request security data from the
     # Green Power EndPoint in the host processor
     SecReq = t.CommandDef(
-        t.CommandType.AREQ,
+        t.CommandType.SREQ,
         0x03,
         req_schema=(
             t.Param(
@@ -127,6 +127,7 @@ class ZGP(t.CommandsBase, subsystem=t.Subsystem.ZGP):
                 "Handle", t.uint8_t, "dGP stub handle to match req to confirmation"
             ),
         ),
+        rsp_schema=t.STATUS_SCHEMA,
     )
 
     # This message provides a mechanism for identifying and conveying a received
@@ -134,7 +135,7 @@ class ZGP(t.CommandsBase, subsystem=t.Subsystem.ZGP):
     DataInd = t.CommandDef(
         t.CommandType.AREQ,
         0x04,
-        req_schema=(
+        rsp_schema=(
             t.Param("Status", t.uint8_t, "The status code as returned by the dGP stub"),
             t.Param(
                 "RSSI",
