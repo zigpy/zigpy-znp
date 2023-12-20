@@ -16,6 +16,7 @@ import async_timeout
 import zigpy.zdo.types as zdo_t
 import zigpy.exceptions
 from zigpy.exceptions import NetworkNotFormed
+from zigpy.datastructures import PriorityLock
 
 import zigpy_znp.const as const
 import zigpy_znp.types as t
@@ -58,7 +59,7 @@ class ZNP:
         self._config = config
 
         self._listeners = defaultdict(list)
-        self._sync_request_lock = asyncio.Lock()
+        self._sync_request_lock = PriorityLock()
 
         self.capabilities = None  # type: int
         self.version = None  # type: float
@@ -963,6 +964,27 @@ class ZNP:
 
         return self.wait_for_responses([response])
 
+    def get_request_priority(self, request: t.CommandBase) -> int:
+        """
+        Returns the priority of a request.
+        """
+
+        return {
+            # Reset requests always take priority
+            c.SYS.ResetReq.Req: 9999,
+            # Watchdog pings are a close second
+            c.SYS.Ping.Req: 9998,
+            # Network requests are deprioritized
+            c.ZDO.ExtRouteChk.Req: -1,
+            c.ZDO.ExtRouteDisc.Req: -1,
+            c.UTIL.AssocGetWithAddress.Req: -1,
+            c.UTIL.AssocRemove.Req: -1,
+            c.UTIL.AssocAdd.Req: -1,
+            c.AF.DataRequestExt.Req: -1,
+            c.AF.DataRequestSrcRtg.Req: -1,
+            c.ZDO.MgmtPermitJoinReq.Req: -1,
+        }.get(type(request), 0)
+
     async def request(
         self, request: t.CommandBase, timeout: int | None = None, **response_params
     ) -> t.CommandBase | None:
@@ -1004,7 +1026,7 @@ class ZNP:
         ctx = (
             contextlib.AsyncExitStack()
             if isinstance(request, c.SYS.ResetReq.Req)
-            else self._sync_request_lock
+            else self._sync_request_lock(priority=self.get_request_priority(request))
         )
 
         # We should only be sending one SREQ at a time, according to the spec
