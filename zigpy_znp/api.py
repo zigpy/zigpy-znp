@@ -32,7 +32,11 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.exceptions import (
+    InvalidFrame,
+    CommandNotRecognized,
+    InvalidCommandResponse,
+)
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 if typing.TYPE_CHECKING:
@@ -745,7 +749,7 @@ class ZNP:
             self.close()
             raise
 
-        LOGGER.debug("Connected to %s", self._uart.url)
+        LOGGER.debug("Connected to %s", self._uart.get_url())
 
     def connection_made(self) -> None:
         """
@@ -822,7 +826,7 @@ class ZNP:
             counts[OneShotResponseListener],
         )
 
-    def frame_received(self, frame: GeneralFrame) -> bool | None:
+    def frame_received(self, frame: GeneralFrame) -> None:
         """
         Called when a frame has been received. Returns whether or not the frame was
         handled by any listener.
@@ -832,7 +836,7 @@ class ZNP:
 
         if frame.header not in c.COMMANDS_BY_ID:
             LOGGER.error("Received an unknown frame: %s", frame)
-            return False
+            raise InvalidFrame("Invalid command id")
 
         command_cls = c.COMMANDS_BY_ID[frame.header]
 
@@ -843,7 +847,9 @@ class ZNP:
             # https://github.com/home-assistant/core/issues/50005
             if command_cls == c.ZDO.ParentAnnceRsp.Callback:
                 LOGGER.warning("Failed to parse broken %s as %s", frame, command_cls)
-                return False
+                raise InvalidFrame(
+                    "Parsing frame %s ad command %s failed", frame, command_cls
+                )
 
             raise
 
@@ -873,8 +879,6 @@ class ZNP:
 
         if not matched:
             self._unhandled_command(command)
-
-        return matched
 
     def _unhandled_command(self, command: t.CommandBase):
         """

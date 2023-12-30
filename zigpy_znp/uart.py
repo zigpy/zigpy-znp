@@ -11,6 +11,7 @@ import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
 from zigpy_znp.types import Bytes
+from zigpy_znp.thread import EventLoopThread, ThreadsafeProxy
 from zigpy_znp.exceptions import InvalidFrame
 
 LOGGER = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class ZnpMtProtocol(asyncio.Protocol):
         self._api = api
         self._transport = None
         self._connected_event = asyncio.Event()
+        self._connection_done_event = asyncio.Event()
 
         self.url = url
 
@@ -46,6 +48,9 @@ class ZnpMtProtocol(asyncio.Protocol):
 
         if exc is not None:
             LOGGER.warning("Lost connection", exc_info=exc)
+
+        if self._connection_done_event:
+            self._connection_done_event.set()
 
         if self._api is not None:
             self._api.connection_lost(exc)
@@ -158,8 +163,11 @@ class ZnpMtProtocol(asyncio.Protocol):
             f">"
         )
 
+    async def get_url(self):
+        return self.url
 
-async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
+
+async def _connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     loop = asyncio.get_running_loop()
 
     port = config[zigpy.config.CONF_DEVICE_PATH]
@@ -181,4 +189,26 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
 
     LOGGER.debug("Connected to %s at %s baud", port, baudrate)
 
+    return protocol
+
+
+async def connect(
+    config: conf.ConfigType, api, use_thread=True
+) -> ZnpMtProtocol | ThreadsafeProxy:
+    if use_thread:
+        application = ThreadsafeProxy(api, asyncio.get_event_loop())
+        thread = EventLoopThread()
+        await thread.start()
+        try:
+            protocol = await thread.run_coroutine_threadsafe(
+                _connect(config, application)
+            )
+        except Exception:
+            thread.force_stop()
+            raise
+
+        thread_safe_protocol = ThreadsafeProxy(protocol, thread.loop)
+        return thread_safe_protocol
+    else:
+        protocol = await _connect(config, api)
     return protocol
