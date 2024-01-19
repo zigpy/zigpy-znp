@@ -6,6 +6,7 @@ import pytest
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.api import OneShotResponseListener, CallbackResponseListener
+from zigpy_znp.exceptions import ShuttingDown
 
 
 async def test_resolve(event_loop, mocker):
@@ -34,24 +35,24 @@ async def test_resolve(event_loop, mocker):
     assert (await future) == match
 
     # Cancelling a callback will have no effect
-    assert not callback_listener.cancel()
+    callback_listener.set_exception(RuntimeError())
 
     # Cancelling a one-shot listener does not throw any errors
-    assert one_shot_listener.cancel()
-    assert one_shot_listener.cancel()
-    assert one_shot_listener.cancel()
+    one_shot_listener.set_exception(RuntimeError())
+    one_shot_listener.set_exception(RuntimeError())
+    one_shot_listener.set_exception(RuntimeError())
 
 
 async def test_cancel(event_loop):
     # Cancelling a one-shot listener prevents it from being fired
     future = event_loop.create_future()
     one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
-    one_shot_listener.cancel()
+    one_shot_listener.set_exception(RuntimeError())
 
     match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
     assert not one_shot_listener.resolve(match)
 
-    with pytest.raises(asyncio.CancelledError):
+    with pytest.raises(RuntimeError):
         await future
 
 
@@ -95,7 +96,7 @@ async def test_api_cancel_listeners(connected_znp, mocker):
     assert not future.done()
     znp.close()
 
-    with pytest.raises(asyncio.CancelledError):
+    with pytest.raises(ShuttingDown):
         await future
 
     # add_done_callback won't be executed immediately
