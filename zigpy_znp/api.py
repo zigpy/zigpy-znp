@@ -748,15 +748,10 @@ class ZNP:
                 LOGGER.debug("Detected Z-Stack %s", self.version)
         except (Exception, asyncio.CancelledError):
             LOGGER.debug("Connection to %s failed, cleaning up", self._port_path)
-            self.close()
+            await self.disconnect()
             raise
 
         LOGGER.debug("Connected to %s", self._uart.url)
-
-    def connection_made(self) -> None:
-        """
-        Called by the UART object when a connection has been made.
-        """
 
     def connection_lost(self, exc) -> None:
         """
@@ -786,8 +781,16 @@ class ZNP:
         self.version = None
         self.capabilities = None
 
+    async def disconnect(self) -> None:
+        """
+        Disconnects from the ZNP device.
+        """
+
+        self.close()
+
         if self._uart is not None:
             self._uart.close()
+            await self._uart.wait_until_closed()
             self._uart = None
 
     def remove_listener(self, listener: BaseResponseListener) -> None:

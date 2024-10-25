@@ -237,12 +237,3 @@ async def test_connection_lost(dummy_serial_conn, mocker, event_loop):
 
     # Losing a connection propagates up to the ZNP object
     assert (await conn_lost_fut) == exception
-
-
-async def test_connection_made(dummy_serial_conn, mocker):
-    device, _ = dummy_serial_conn
-    znp = mocker.Mock()
-
-    await znp_uart.connect(conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: device}), api=znp)
-
-    znp.connection_made.assert_called_once_with()

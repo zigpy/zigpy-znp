@@ -115,7 +115,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             except Exception as e:
                 LOGGER.warning("Failed to reset before disconnect: %s", e)
             finally:
-                self._znp.close()
+                await self._znp.disconnect()
                 self._znp = None
 
     async def add_endpoint(self, descriptor: zdo_t.SimpleDescriptor) -> None:
