@@ -190,7 +190,7 @@ async def test_wait_responses_empty(connected_znp):
         await znp.wait_for_responses([])
 
 
-async def test_response_callback_simple(connected_znp, event_loop, mocker):
+async def test_response_callback_simple(connected_znp, mocker):
     znp, _ = connected_znp
 
     sync_callback = mocker.Mock()
@@ -207,7 +207,7 @@ async def test_response_callback_simple(connected_znp, event_loop, mocker):
     sync_callback.assert_called_once_with(good_response)
 
 
-async def test_response_callbacks(connected_znp, event_loop, mocker):
+async def test_response_callbacks(connected_znp, mocker):
     znp, _ = connected_znp
 
     sync_callback = mocker.Mock()
@@ -270,7 +270,7 @@ async def test_response_callbacks(connected_znp, event_loop, mocker):
     assert len(async_callback_responses) == 3
 
 
-async def test_wait_for_responses(connected_znp, event_loop):
+async def test_wait_for_responses(connected_znp):
     znp, _ = connected_znp
 
     response1 = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)

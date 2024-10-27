@@ -8,13 +8,13 @@ import zigpy_znp.commands as c
 from zigpy_znp.api import OneShotResponseListener, CallbackResponseListener
 
 
-async def test_resolve(event_loop, mocker):
+async def test_resolve(mocker):
     callback = mocker.Mock()
     callback_listener = CallbackResponseListener(
         [c.SYS.Ping.Rsp(partial=True)], callback
     )
 
-    future = event_loop.create_future()
+    future = asyncio.get_running_loop().create_future()
     one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
 
     match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
@@ -42,9 +42,9 @@ async def test_resolve(event_loop, mocker):
     assert one_shot_listener.cancel()
 
 
-async def test_cancel(event_loop):
+async def test_cancel():
     # Cancelling a one-shot listener prevents it from being fired
-    future = event_loop.create_future()
+    future = asyncio.get_running_loop().create_future()
     one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
     one_shot_listener.cancel()
 
@@ -55,13 +55,13 @@ async def test_cancel(event_loop):
         await future
 
 
-async def test_multi_cancel(event_loop, mocker):
+async def test_multi_cancel(mocker):
     callback = mocker.Mock()
     callback_listener = CallbackResponseListener(
         [c.SYS.Ping.Rsp(partial=True)], callback
     )
 
-    future = event_loop.create_future()
+    future = asyncio.get_running_loop().create_future()
     one_shot_listener = OneShotResponseListener([c.SYS.Ping.Rsp(partial=True)], future)
 
     match = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)

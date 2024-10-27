@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from serial_asyncio import SerialTransport
 
@@ -19,25 +21,25 @@ def connected_uart(mocker):
 
 
 @pytest.fixture
-def dummy_serial_conn(event_loop, mocker):
+async def dummy_serial_conn(mocker):
     device = "/dev/ttyACM0"
 
     serial_interface = mocker.Mock()
     serial_interface.name = device
 
     def create_serial_conn(loop, protocol_factory, url, *args, **kwargs):
-        fut = event_loop.create_future()
+        fut = loop.create_future()
         assert url == device
 
         protocol = protocol_factory()
 
         # Our event loop doesn't really do anything
-        event_loop.add_writer = lambda *args, **kwargs: None
-        event_loop.add_reader = lambda *args, **kwargs: None
-        event_loop.remove_writer = lambda *args, **kwargs: None
-        event_loop.remove_reader = lambda *args, **kwargs: None
+        loop.add_writer = lambda *args, **kwargs: None
+        loop.add_reader = lambda *args, **kwargs: None
+        loop.remove_writer = lambda *args, **kwargs: None
+        loop.remove_reader = lambda *args, **kwargs: None
 
-        transport = SerialTransport(event_loop, protocol, serial_interface)
+        transport = SerialTransport(loop, protocol, serial_interface)
 
         protocol.connection_made(transport)
 
@@ -221,11 +223,11 @@ def test_uart_frame_received_error(connected_uart, mocker):
     assert znp.frame_received.call_count == 3
 
 
-async def test_connection_lost(dummy_serial_conn, mocker, event_loop):
+async def test_connection_lost(dummy_serial_conn, mocker):
     device, _ = dummy_serial_conn
 
     znp = mocker.Mock()
-    conn_lost_fut = event_loop.create_future()
+    conn_lost_fut = asyncio.get_running_loop().create_future()
     znp.connection_lost = conn_lost_fut.set_result
 
     protocol = await znp_uart.connect(

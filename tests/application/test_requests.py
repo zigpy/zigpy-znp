@@ -206,7 +206,7 @@ async def test_mrequest(device, make_application, mocker):
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_mrequest_doesnt_block(device, make_application, event_loop):
+async def test_mrequest_doesnt_block(device, make_application):
     app, znp_server = make_application(server_cls=device)
 
     znp_server.reply_once_to(
@@ -226,7 +226,7 @@ async def test_mrequest_doesnt_block(device, make_application, event_loop):
         Status=t.Status.SUCCESS, Endpoint=1, TSN=2
     )
 
-    request_sent = event_loop.create_future()
+    request_sent = asyncio.get_running_loop().create_future()
     request_sent.add_done_callback(lambda _: znp_server.send(data_confirm_rsp))
 
     await app.startup(auto_form=False)
@@ -398,9 +398,7 @@ async def test_nonstandard_profile(device, make_application):
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
-async def test_request_cancellation_shielding(
-    device, make_application, mocker, event_loop
-):
+async def test_request_cancellation_shielding(device, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
@@ -412,7 +410,7 @@ async def test_request_cancellation_shielding(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    delayed_reply_sent = event_loop.create_future()
+    delayed_reply_sent = asyncio.get_running_loop().create_future()
 
     def delayed_reply(req):
         async def inner():

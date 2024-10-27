@@ -11,7 +11,7 @@ from zigpy_znp.frames import GeneralFrame
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
 
 
-async def test_callback_rsp(connected_znp, event_loop):
+async def test_callback_rsp(connected_znp):
     znp, znp_server = connected_znp
 
     def send_responses():
@@ -20,7 +20,7 @@ async def test_callback_rsp(connected_znp, event_loop):
             c.AF.DataConfirm.Callback(Endpoint=56, TSN=1, Status=t.Status.SUCCESS)
         )
 
-    event_loop.call_soon(send_responses)
+    asyncio.get_running_loop().call_soon(send_responses)
 
     # The UART sometimes replies with a SRSP and an AREQ faster than
     # we can register callbacks for both. This method is a workaround.
@@ -150,7 +150,7 @@ async def test_callback_rsp_background_timeout(connected_znp, mocker):
     assert len(znp._unhandled_command.mock_calls) == 0
 
 
-async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker):
+async def test_callback_rsp_cleanup_concurrent(connected_znp, mocker):
     znp, znp_server = connected_znp
 
     mocker.spy(znp, "_unhandled_command")
@@ -163,7 +163,7 @@ async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker
         znp_server.send(c.SYS.OSALTimerExpired.Callback(Id=0xAB))
         znp_server.send(c.SYS.OSALTimerExpired.Callback(Id=0xCD))
 
-    event_loop.call_soon(send_responses)
+    asyncio.get_running_loop().call_soon(send_responses)
 
     callback_rsp = await znp.request_callback_rsp(
         request=c.UTIL.TimeAlive.Req(),
@@ -183,7 +183,7 @@ async def test_callback_rsp_cleanup_concurrent(connected_znp, event_loop, mocker
     ]
 
 
-async def test_znp_request_kwargs(connected_znp, event_loop):
+async def test_znp_request_kwargs(connected_znp):
     znp, znp_server = connected_znp
 
     # Invalid format
@@ -196,7 +196,7 @@ async def test_znp_request_kwargs(connected_znp, event_loop):
 
     # Valid format, valid name
     ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
-    event_loop.call_soon(znp_server.send, ping_rsp)
+    asyncio.get_running_loop().call_soon(znp_server.send, ping_rsp)
     assert (
         await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.SYS)
     ) == ping_rsp
@@ -227,7 +227,7 @@ async def test_znp_request_kwargs(connected_znp, event_loop):
         )
 
 
-async def test_znp_request_not_recognized(connected_znp, event_loop):
+async def test_znp_request_not_recognized(connected_znp):
     znp, _ = connected_znp
 
     # An error is raise when a bad request is sent
@@ -237,11 +237,11 @@ async def test_znp_request_not_recognized(connected_znp, event_loop):
     )
 
     with pytest.raises(CommandNotRecognized):
-        event_loop.call_soon(znp.frame_received, unknown_rsp.to_frame())
+        asyncio.get_running_loop().call_soon(znp.frame_received, unknown_rsp.to_frame())
         await znp.request(request)
 
 
-async def test_znp_request_wrong_params(connected_znp, event_loop):
+async def test_znp_request_wrong_params(connected_znp):
     znp, _ = connected_znp
 
     # You cannot specify response kwargs for responses with no response
@@ -250,14 +250,14 @@ async def test_znp_request_wrong_params(connected_znp, event_loop):
 
     # An error is raised when a response with bad params is received
     with pytest.raises(InvalidCommandResponse):
-        event_loop.call_soon(
+        asyncio.get_running_loop().call_soon(
             znp.frame_received,
             c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS).to_frame(),
         )
         await znp.request(c.SYS.Ping.Req(), RspCapabilities=t.MTCapabilities.APP)
 
 
-async def test_znp_sreq_srsp(connected_znp, event_loop):
+async def test_znp_sreq_srsp(connected_znp):
     znp, _ = connected_znp
 
     # Each SREQ must have a corresponding SRSP, so this will fail
@@ -267,7 +267,7 @@ async def test_znp_sreq_srsp(connected_znp, event_loop):
 
     # This will work
     ping_rsp = c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)
-    event_loop.call_soon(znp.frame_received, ping_rsp.to_frame())
+    asyncio.get_running_loop().call_soon(znp.frame_received, ping_rsp.to_frame())
 
     await znp.request(c.SYS.Ping.Req())
 
