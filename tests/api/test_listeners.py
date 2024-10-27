@@ -93,7 +93,7 @@ async def test_api_cancel_listeners(connected_znp, mocker):
     )
 
     assert not future.done()
-    znp.close()
+    await znp.disconnect()
 
     with pytest.raises(asyncio.CancelledError):
         await future

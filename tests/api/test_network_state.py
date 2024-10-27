@@ -23,7 +23,7 @@ async def test_state_transfer(from_device, to_device, make_connected_znp):
     formed_znp, _ = await make_connected_znp(server_cls=from_device)
 
     await formed_znp.load_network_info()
-    formed_znp.close()
+    await formed_znp.disconnect()
 
     empty_znp, _ = await make_connected_znp(server_cls=to_device)
 
@@ -72,7 +72,7 @@ async def test_broken_cc2531_load_state(device, make_connected_znp, caplog):
     await znp.load_network_info()
     assert "inconsistent" in caplog.text
 
-    znp.close()
+    await znp.disconnect()
 
 
 @pytest.mark.parametrize("device", [FormedZStack3CC2531])
@@ -80,7 +80,7 @@ async def test_state_write_tclk_zstack3(device, make_connected_znp, caplog):
     formed_znp, _ = await make_connected_znp(server_cls=device)
 
     await formed_znp.load_network_info()
-    formed_znp.close()
+    await formed_znp.disconnect()
 
     empty_znp, _ = await make_connected_znp(server_cls=device)
 
@@ -106,7 +106,7 @@ async def test_state_write_tclk_zstack3(device, make_connected_znp, caplog):
 async def test_write_settings_fast(device, make_connected_znp):
     formed_znp, _ = await make_connected_znp(server_cls=FormedLaunchpadCC26X2R1)
     await formed_znp.load_network_info()
-    formed_znp.close()
+    await formed_znp.disconnect()
 
     znp, _ = await make_connected_znp(server_cls=device)
 
@@ -126,7 +126,7 @@ async def test_write_settings_fast(device, make_connected_znp):
 async def test_formation_failure_on_corrupted_nvram(device, make_connected_znp):
     formed_znp, _ = await make_connected_znp(server_cls=FormedLaunchpadCC26X2R1)
     await formed_znp.load_network_info()
-    formed_znp.close()
+    await formed_znp.disconnect()
 
     znp, znp_server = await make_connected_znp(server_cls=device)
 

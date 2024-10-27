@@ -100,7 +100,7 @@ async def restore_network(
     await znp.connect()
     await znp.write_network_info(network_info=network_info, node_info=node_info)
     await znp.reset()
-    znp.close()
+    await znp.disconnect()
 
 
 async def main(argv: list[str]) -> None:

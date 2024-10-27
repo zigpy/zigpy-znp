@@ -753,6 +753,11 @@ class ZNP:
 
         LOGGER.debug("Connected to %s", self._uart.url)
 
+    def connection_made(self) -> None:
+        """
+        Called by the UART object to indicate that the port was opened.
+        """
+
     def connection_lost(self, exc) -> None:
         """
         Called by the UART object to indicate that the port was closed. Propagates up

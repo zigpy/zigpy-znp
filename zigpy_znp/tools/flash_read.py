@@ -79,7 +79,7 @@ async def main(argv):
         await znp.connect(test_port=False)
 
         data = await read_firmware(znp)
-        znp.close()
+        await znp.disconnect()
 
         f.write(data)
 

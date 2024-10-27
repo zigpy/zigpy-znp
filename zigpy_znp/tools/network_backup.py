@@ -114,7 +114,7 @@ async def main(argv: list[str]) -> None:
         await znp.connect()
 
         backup_obj = await backup_network(znp)
-        znp.close()
+        await znp.disconnect()
 
         f.write(json.dumps(backup_obj, indent=4))
 

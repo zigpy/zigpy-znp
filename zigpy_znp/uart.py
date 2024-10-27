@@ -28,8 +28,8 @@ class ZnpMtProtocol(zigpy.serial.SerialProtocol):
 
     def close(self) -> None:
         """Closes the port."""
-        self._api = None
         super().close()
+        self._api = None
 
     def connection_lost(self, exc: Exception | None) -> None:
         """Connection lost."""
@@ -37,6 +37,12 @@ class ZnpMtProtocol(zigpy.serial.SerialProtocol):
 
         if self._api is not None:
             self._api.connection_lost(exc)
+
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
+        super().connection_made(transport)
+
+        if self._api is not None:
+            self._api.connection_made()
 
     def data_received(self, data: bytes) -> None:
         """Callback when data is received."""

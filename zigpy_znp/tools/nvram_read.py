@@ -90,7 +90,7 @@ async def main(argv):
         await znp.connect()
 
         obj = await nvram_read(znp)
-        znp.close()
+        await znp.disconnect()
 
         f.write(json.dumps(obj, indent=4) + "\n")
 

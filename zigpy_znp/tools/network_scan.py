@@ -96,7 +96,7 @@ async def network_scan(
             await znp.nvram.osal_write(OsalNvIds.NIB, previous_nib, create=True)
 
         await znp.nvram.osal_write(OsalNvIds.CHANLIST, previous_channels)
-        znp.close()
+        await znp.disconnect()
 
 
 async def main(argv):
@@ -151,7 +151,7 @@ async def main(argv):
         duplicates=args.allow_duplicates,
     )
 
-    znp.close()
+    await znp.disconnect()
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ async def test_connect_no_test(make_znp_server):
     # Nothing will be sent
     assert znp_server._uart.data_received.call_count == 0
 
-    znp.close()
+    await znp.disconnect()
 
 
 @pytest.mark.parametrize("work_after_attempt", [1, 2, 3])
@@ -44,7 +44,7 @@ async def test_connect_skip_bootloader(make_znp_server, mocker, work_after_attem
 
     await znp.connect(test_port=True)
 
-    znp.close()
+    await znp.disconnect()
 
 
 async def test_connect_skip_bootloader_batched_rsp(make_znp_server, mocker):
@@ -82,7 +82,7 @@ async def test_connect_skip_bootloader_batched_rsp(make_znp_server, mocker):
 
     await znp.connect(test_port=True)
 
-    znp.close()
+    await znp.disconnect()
 
 
 async def test_connect_skip_bootloader_failure(make_znp_server):
@@ -92,7 +92,7 @@ async def test_connect_skip_bootloader_failure(make_znp_server):
     with pytest.raises(asyncio.TimeoutError):
         await znp.connect(test_port=True)
 
-    znp.close()
+    await znp.disconnect()
 
 
 async def test_connect_skip_bootloader_rts_dtr_pins(make_znp_server, mocker):
@@ -112,7 +112,7 @@ async def test_connect_skip_bootloader_rts_dtr_pins(make_znp_server, mocker):
     assert serial._mock_dtr_prop.mock_calls == [call(False), call(False), call(False)]
     assert serial._mock_rts_prop.mock_calls == [call(False), call(True), call(False)]
 
-    znp.close()
+    await znp.disconnect()
 
 
 async def test_connect_skip_bootloader_config(make_znp_server, mocker):
@@ -133,7 +133,7 @@ async def test_connect_skip_bootloader_config(make_znp_server, mocker):
     assert serial._mock_dtr_prop.called is False
     assert serial._mock_rts_prop.called is False
 
-    znp.close()
+    await znp.disconnect()
 
 
 async def test_api_close(connected_znp, mocker):
@@ -141,16 +141,16 @@ async def test_api_close(connected_znp, mocker):
     uart = znp._uart
     mocker.spy(uart, "close")
 
-    znp.close()
+    await znp.disconnect()
 
     # Make sure our UART was actually closed
     assert znp._uart is None
     assert znp._app is None
     assert uart.close.call_count == 1
 
-    # ZNP.close should not throw any errors if called multiple times
-    znp.close()
-    znp.close()
+    # ZNP.disconnect should not throw any errors if called multiple times
+    await znp.disconnect()
+    await znp.disconnect()
 
     def dict_minus(d, minus):
         return {k: v for k, v in d.items() if k not in minus}
@@ -165,8 +165,8 @@ async def test_api_close(connected_znp, mocker):
         znp2.__dict__, ignored_keys
     )
 
-    znp2.close()
-    znp2.close()
+    await znp2.disconnect()
+    await znp2.disconnect()
 
     assert dict_minus(znp.__dict__, ignored_keys) == dict_minus(
         znp2.__dict__, ignored_keys

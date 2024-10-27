@@ -170,7 +170,7 @@ async def main(argv):
 
     await write_firmware(znp=znp, firmware=firmware, reset_nvram=args.reset)
 
-    znp.close()
+    await znp.disconnect()
 
 
 if __name__ == "__main__":
