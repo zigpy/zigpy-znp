@@ -266,7 +266,10 @@ async def read_devices(
             t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
         ):
             continue
-        elif entry.type == t.AddrMgrUserType.Default:
+        elif entry.type in (
+            t.AddrMgrUserType.Default,
+            t.AddrMgrUserType.Binding,
+        ):
             continue
         elif entry.type in (
             t.AddrMgrUserType.Assoc,
