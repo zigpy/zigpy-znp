@@ -944,41 +944,45 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         # the coordinator to another router, we will not be able to
                         # re-discover a route to it. We have to manually drop the child
                         # to do this.
-                        if not (
+                        if (
                             e.response.Status == t.Status.MAC_TRANSACTION_EXPIRED
                             and device is not None
                             and child_association is None
                             and self._znp.version >= 3.30
                         ):
-                            raise
-
-                        child_association = await self._znp.request(
-                            c.UTIL.AssocGetWithAddress.Req(
-                                IEEE=device.ieee,
-                                NWK=0x0000,  # IEEE takes priority
+                            child_association = await self._znp.request(
+                                c.UTIL.AssocGetWithAddress.Req(
+                                    IEEE=device.ieee,
+                                    NWK=0x0000,  # IEEE takes priority
+                                )
                             )
-                        )
 
-                        if (
-                            child_association.Device.nodeRelation
-                            == c.util.NodeRelation.NOTUSED
-                        ):
-                            raise
+                            if (
+                                child_association.Device.nodeRelation
+                                == c.util.NodeRelation.NOTUSED
+                            ):
+                                raise
 
-                        try:
-                            await self._znp.request(
-                                c.UTIL.AssocRemove.Req(IEEE=device.ieee)
-                            )
-                            tried_assoc_remove = True
+                            try:
+                                await self._znp.request(
+                                    c.UTIL.AssocRemove.Req(IEEE=device.ieee)
+                                )
+                                tried_assoc_remove = True
 
-                            # Route discovery must be performed right after
+                                # Route discovery must be performed right after
+                                await self._discover_route(device.nwk)
+                            except CommandNotRecognized:
+                                LOGGER.debug(
+                                    "The UTIL.AssocRemove command is available only"
+                                    " in Z-Stack 3 releases built after 20201017"
+                                )
+                                raise e from None
+
+                        # Perform route discovery explicitly if the stack fails
+                        if e.response.Status == t.Status.NWK_NO_ROUTE:
                             await self._discover_route(device.nwk)
-                        except CommandNotRecognized:
-                            LOGGER.debug(
-                                "The UTIL.AssocRemove command is available only"
-                                " in Z-Stack 3 releases built after 20201017"
-                            )
-                            raise
+
+                        raise
         except InvalidCommandResponse as e:
             status = e.response.Status
             raise DeliveryError(f"Failed to send request: {status!r}", status=status)
