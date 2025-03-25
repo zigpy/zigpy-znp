@@ -983,6 +983,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                     " in Z-Stack 3 releases built after 20201017"
                                 )
                                 raise e from None
+                            else:
+                                continue
 
                         # Perform route discovery explicitly if the stack fails
                         if e.response.Status == t.Status.NWK_NO_ROUTE:
