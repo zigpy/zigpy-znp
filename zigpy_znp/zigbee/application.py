@@ -490,7 +490,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Perform route discovery (just in case) when a device joins the network so that
         # we can begin initialization as soon as possible.
-        asyncio.create_task(self._discover_route(msg.SrcNwk))
+        self.create_task(self._discover_route(msg.SrcNwk))
 
         if msg.SrcIEEE in self._join_announce_tasks:
             self._join_announce_tasks.pop(msg.SrcIEEE).cancel()
