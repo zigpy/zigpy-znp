@@ -353,10 +353,13 @@ class BaseServerZNP(ZNP):
             await self._send_responses(request, responses)
 
         callback.call_count = 0
+        callback_mock = Mock(side_effect=callback)
 
-        self.callback_for_response(request, lambda r: asyncio.create_task(callback(r)))
+        self.callback_for_response(
+            request, lambda r: asyncio.create_task(callback_mock(r))
+        )
 
-        return callback
+        return callback_mock
 
     def send(self, response):
         if response is not None and self._uart is not None:

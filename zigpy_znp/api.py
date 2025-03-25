@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 import typing
 import asyncio
@@ -12,7 +13,12 @@ import importlib.metadata
 from collections import Counter, defaultdict
 
 import zigpy.state
-import async_timeout
+
+if sys.version_info[:2] < (3, 11):
+    from async_timeout import timeout as asyncio_timeout  # pragma: no cover
+else:
+    from asyncio import timeout as asyncio_timeout  # pragma: no cover
+
 import zigpy.zdo.types as zdo_t
 import zigpy.exceptions
 from zigpy.exceptions import NetworkNotFormed
@@ -296,7 +302,7 @@ class ZNP:
                         )
 
                 # Both versions still end with this callback
-                async with async_timeout.timeout(STARTUP_TIMEOUT):
+                async with asyncio_timeout(STARTUP_TIMEOUT):
                     await started_as_coordinator
             except asyncio.TimeoutError as e:
                 raise zigpy.exceptions.FormationFailure(
@@ -666,7 +672,7 @@ class ZNP:
 
             # First, just try pinging
             try:
-                async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
+                async with asyncio_timeout(CONNECT_PING_TIMEOUT):
                     return await self.request(c.SYS.Ping.Req())
             except asyncio.TimeoutError:
                 pass
@@ -682,7 +688,7 @@ class ZNP:
             # At this point we have nothing left to try
             while True:
                 try:
-                    async with async_timeout.timeout(2 * CONNECT_PING_TIMEOUT):
+                    async with asyncio_timeout(2 * CONNECT_PING_TIMEOUT):
                         return await self.request(c.SYS.Ping.Req())
                 except asyncio.TimeoutError:
                     pass
@@ -691,7 +697,7 @@ class ZNP:
             ping_task = asyncio.create_task(ping_task())
 
             try:
-                async with async_timeout.timeout(CONNECT_PROBE_TIMEOUT):
+                async with asyncio_timeout(CONNECT_PROBE_TIMEOUT):
                     result = await responses.get()
             except Exception:
                 ping_task.cancel()
@@ -706,7 +712,7 @@ class ZNP:
                 LOGGER.debug("Giving ping task %0.2fs to finish", CONNECT_PING_TIMEOUT)
 
                 try:
-                    async with async_timeout.timeout(CONNECT_PING_TIMEOUT):
+                    async with asyncio_timeout(CONNECT_PING_TIMEOUT):
                         result = await ping_task  # type:ignore[misc]
                 except asyncio.TimeoutError:
                     ping_task.cancel()
@@ -1066,7 +1072,7 @@ class ZNP:
             self._uart.send(frame)
 
             # We should get a SRSP in a reasonable amount of time
-            async with async_timeout.timeout(
+            async with asyncio_timeout(
                 timeout or self._znp_config[conf.CONF_SREQ_TIMEOUT]
             ):
                 # We lock until either a sync response is seen or an error occurs
@@ -1108,7 +1114,7 @@ class ZNP:
         # Typical request/response/callbacks are not backgrounded
         if not background:
             try:
-                async with async_timeout.timeout(timeout):
+                async with asyncio_timeout(timeout):
                     await self.request(request, timeout=timeout, **response_params)
 
                     return await callback_rsp
@@ -1119,7 +1125,7 @@ class ZNP:
         start_time = time.monotonic()
 
         try:
-            async with async_timeout.timeout(timeout):
+            async with asyncio_timeout(timeout):
                 request_rsp = await self.request(request, **response_params)
         except Exception:
             # If the SREQ/SRSP pair fails, we must cancel the AREQ listener
@@ -1131,7 +1137,7 @@ class ZNP:
         # the timeout
         async def callback_catcher(timeout):
             try:
-                async with async_timeout.timeout(timeout):
+                async with asyncio_timeout(timeout):
                     await callback_rsp
             finally:
                 self.remove_listener(listener)
