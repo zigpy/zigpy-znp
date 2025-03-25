@@ -1,8 +1,13 @@
+import sys
 import asyncio
 import logging
 
 import pytest
-import async_timeout
+
+if sys.version_info[:2] < (3, 11):
+    from async_timeout import timeout as asyncio_timeout  # pragma: no cover
+else:
+    from asyncio import timeout as asyncio_timeout  # pragma: no cover
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -66,7 +71,7 @@ async def test_cleanup_timeout_external(connected_znp):
 
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
-        async with async_timeout.timeout(0.1):
+        async with asyncio_timeout(0.1):
             await znp.request(c.UTIL.TimeAlive.Req())
 
     # We should be cleaned up
@@ -80,7 +85,7 @@ async def test_callback_rsp_cleanup_timeout_external(connected_znp):
 
     # This request will timeout because we didn't send anything back
     with pytest.raises(asyncio.TimeoutError):
-        async with async_timeout.timeout(0.1):
+        async with asyncio_timeout(0.1):
             await znp.request_callback_rsp(
                 request=c.UTIL.TimeAlive.Req(),
                 callback=c.SYS.ResetInd.Callback(partial=True),
@@ -262,7 +267,7 @@ async def test_znp_sreq_srsp(connected_znp):
 
     # Each SREQ must have a corresponding SRSP, so this will fail
     with pytest.raises(asyncio.TimeoutError):
-        async with async_timeout.timeout(0.5):
+        async with asyncio_timeout(0.5):
             await znp.request(c.SYS.Ping.Req())
 
     # This will work
