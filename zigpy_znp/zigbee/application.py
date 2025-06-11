@@ -39,7 +39,6 @@ ZHA_ENDPOINT = 1
 ZDO_PROFILE = 0x0000
 
 # All of these are in seconds
-PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
 EXTENDED_DATA_CONFIRM_TIMEOUT = 30
@@ -66,14 +65,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
     ##################################################################
-
-    @classmethod
-    async def probe(cls, device_config):
-        try:
-            async with asyncio_timeout(PROBE_TIMEOUT):
-                return await super().probe(device_config)
-        except asyncio.TimeoutError:
-            return False
 
     async def connect(self):
         assert self._znp is None
