@@ -294,7 +294,7 @@ async def test_request_concurrency(device, make_application, mocker):
             nonlocal in_flight_requests
             nonlocal did_lock
 
-            if app._concurrent_requests_semaphore.locked():
+            if app._concurrent_requests_semaphore.locked(priority=0):
                 did_lock = True
 
             in_flight_requests += 1

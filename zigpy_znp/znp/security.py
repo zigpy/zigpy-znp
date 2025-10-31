@@ -296,7 +296,7 @@ async def read_devices(
 
     async for key in read_hashed_link_keys(znp, tclk_seed):
         if key.partner_ieee not in devices:
-            LOGGER.warning(
+            LOGGER.debug(
                 "Skipping hashed link key %s (tx: %s, rx: %s) for unknown device %s",
                 ":".join(f"{b:02x}" for b in key.key),
                 key.tx_counter,
@@ -309,7 +309,7 @@ async def read_devices(
 
     async for key in read_unhashed_link_keys(znp, addr_mgr):
         if key.partner_ieee not in devices:
-            LOGGER.warning(
+            LOGGER.debug(
                 "Skipping unhashed link key %s (tx: %s, rx: %s) for unknown device %s",
                 ":".join(f"{b:02x}" for b in key.key),
                 key.tx_counter,
