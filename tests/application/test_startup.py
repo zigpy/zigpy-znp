@@ -304,7 +304,7 @@ async def test_reset_network_info(device, make_application):
     "device, concurrency",
     [
         (FormedLaunchpadCC26X2R1, 16),
-        (FormedZStack1CC2531, 2),
+        (FormedZStack1CC2531, 4),
     ],
 )
 async def test_concurrency_auto_config(device, concurrency, make_application):
@@ -312,4 +312,4 @@ async def test_concurrency_auto_config(device, concurrency, make_application):
     await app.connect()
     await app.start_network()
 
-    assert app._concurrent_requests_semaphore.max_value == concurrency
+    assert app._concurrent_requests_semaphore.max_concurrency == concurrency

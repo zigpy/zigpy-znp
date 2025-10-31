@@ -187,12 +187,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             None,
             zigpy.config.defaults.CONF_MAX_CONCURRENT_REQUESTS_DEFAULT,
         ):
-            max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
+            max_concurrent_requests = 16 if self._znp.nvram.align_structs else 4
         else:
             max_concurrent_requests = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
         # Update the max value of the concurrent request semaphore at runtime
-        self._concurrent_requests_semaphore.max_value = max_concurrent_requests
+        self._concurrent_requests_semaphore.max_concurrency = max_concurrent_requests
 
         if self.state.network_info.network_key.key == const.Z2M_NETWORK_KEY:
             LOGGER.warning(
