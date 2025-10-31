@@ -154,7 +154,7 @@ def make_znp_server(mocker):
             return fut
 
         mocker.patch(
-            "serial_asyncio.create_serial_connection", new=passthrough_serial_conn
+            "serial_asyncio_fast.create_serial_connection", new=passthrough_serial_conn
         )
 
         # So we don't have to import it every time
