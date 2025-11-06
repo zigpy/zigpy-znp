@@ -56,6 +56,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
 
     def __init__(self, config: conf.ConfigType):
+        # Migrate ZNP-specific config to zigpy config
+        temp_config = self.SCHEMA(config)
+
+        if temp_config[conf.CONF_ZNP_CONFIG][conf.CONF_TX_POWER] is not None:
+            config[zigpy.config.CONF_NWK][zigpy.config.CONF_NWK_TX_POWER] = temp_config[
+                conf.CONF_ZNP_CONFIG
+            ][conf.CONF_TX_POWER]
+
         super().__init__(config=config)
 
         self._znp: ZNP | None = None
@@ -152,9 +160,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await self._znp.reset()
 
-        if self.znp_config[conf.CONF_TX_POWER] is not None:
-            await self.set_tx_power(dbm=self.znp_config[conf.CONF_TX_POWER])
-
         await self._znp.start_network()
 
         self._version_rsp = await self._znp.request(c.SYS.Version.Req())
@@ -197,25 +202,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.state.network_info.network_key.key == const.Z2M_NETWORK_KEY:
             LOGGER.warning(
                 "Your network is using the insecure Zigbee2MQTT network key!"
-            )
-
-    async def set_tx_power(self, dbm: int) -> None:
-        """
-        Sets the radio TX power.
-        """
-
-        rsp = await self._znp.request(c.SYS.SetTxPower.Req(TXPower=dbm))
-
-        if self._znp.version >= 3.30 and rsp.StatusOrPower != t.Status.SUCCESS:
-            # Z-Stack 3's response indicates success or failure
-            raise InvalidCommandResponse(
-                f"Failed to set TX power: {t.Status(rsp.StatusOrPower & 0xFF)!r}", rsp
-            )
-        elif self._znp.version < 3.30 and rsp.StatusOrPower != dbm:
-            # Old Z-Stack releases used the response status field to indicate the power
-            # setting that was actually applied
-            LOGGER.warning(
-                "Requested TX power %d was adjusted to %d", dbm, rsp.StatusOrPower
             )
 
     def get_dst_address(self, cluster: zigpy.zcl.Cluster) -> zdo_t.MultiAddress:
@@ -325,6 +311,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 ),
                 RspStatus=t.Status.SUCCESS,
             )
+
+    async def _set_tx_power(self, tx_power: float) -> float | None:
+        """Set TX power (if supported by the radio), returning the actual TX power."""
+        rsp = await self._znp.request(c.SYS.SetTxPower.Req(TXPower=tx_power))
+
+        if self._znp.version >= 3.30 and rsp.StatusOrPower != t.Status.SUCCESS:
+            # Z-Stack 3's response indicates success or failure
+            raise InvalidCommandResponse(
+                f"Failed to set TX power: {t.Status(rsp.StatusOrPower & 0xFF)!r}", rsp
+            )
+        elif self._znp.version < 3.30:
+            return rsp.StatusOrPower
+        else:
+            return None
 
     async def _move_network_to_channel(
         self, new_channel: int, new_nwk_update_id: int

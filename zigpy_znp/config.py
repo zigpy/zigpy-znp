@@ -19,6 +19,7 @@ from zigpy.config import (  # noqa: F401
     CONF_MAX_CONCURRENT_REQUESTS,
     cv_boolean,
 )
+from zigpy.config.validators import cv_deprecated as cv_deprecated_zigpy
 
 from zigpy_znp.commands.util import LEDMode
 
@@ -92,8 +93,18 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
         vol.Optional(CONF_ZNP_CONFIG, default={}): vol.Schema(
             vol.All(
                 {
-                    vol.Optional(CONF_TX_POWER, default=None): vol.Any(
-                        None, vol.All(int, vol.Range(min=-22, max=22))
+                    vol.Optional(CONF_TX_POWER, default=None): vol.All(
+                        vol.Any(
+                            None,
+                            vol.All(
+                                cv_deprecated_zigpy(
+                                    "`zigpy_config: znp_config: tx_power` has been"
+                                    " renamed to `zigpy_config: tx_power`."
+                                ),
+                                int,
+                                vol.Range(min=-22, max=22),
+                            ),
+                        ),
                     ),
                     vol.Optional(CONF_SREQ_TIMEOUT, default=15): VolPositiveNumber,
                     vol.Optional(CONF_ARSP_TIMEOUT, default=30): VolPositiveNumber,
