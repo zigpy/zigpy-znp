@@ -419,7 +419,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         0x14,
         req_schema=(t.Param("TXPower", t.int8s, "Requested TX power setting, in dBm"),),
         # XXX: Z-Stack 3.30+ returns SUCCESS or INVALID_PARAMETER.
-        #      Z-Stack 1.2 and 3.0 return the cloest TX power setting.
+        #      Z-Stack 1.2 and 3.0 return the closest TX power setting.
         rsp_schema=(
             t.Param("StatusOrPower", t.int8s, "Status code or applied power setting"),
         ),

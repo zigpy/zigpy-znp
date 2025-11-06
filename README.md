@@ -51,12 +51,6 @@ Below are the defaults with the top-level Home Assistant `zha:` key.
 zha:
   zigpy_config:
     znp_config:
-      # Only if your stick has a built-in power amplifier (i.e. CC1352P and CC2592)
-      # If set, must be between:
-      #  * CC1352/2652:  -22 and 19
-      #  * CC253x:       -22 and 22
-      tx_power:  
-
       # Only if your stick has a controllable LED (the CC2531)
       # If set, must be one of: off, on, blink, flash, toggle
       led_mode: off
