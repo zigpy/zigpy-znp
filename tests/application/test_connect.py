@@ -72,7 +72,7 @@ async def test_probe_unsuccessful_slow1(device, make_znp_server, mocker):
         )
     )
 
-    assert not any([t._is_connected for t in znp_server._transports])
+    assert not any(t._is_connected for t in znp_server._transports)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -82,7 +82,7 @@ async def test_probe_successful(device, make_znp_server):
     assert await ControllerApplication.probe(
         conf.SCHEMA_DEVICE({conf.CONF_DEVICE_PATH: znp_server.serial_port})
     )
-    assert not any([t._is_connected for t in znp_server._transports])
+    assert not any(t._is_connected for t in znp_server._transports)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
@@ -97,7 +97,7 @@ async def test_probe_multiple(device, make_znp_server):
     assert await ControllerApplication.probe(config)
     assert await ControllerApplication.probe(config)
     assert await ControllerApplication.probe(config)
-    assert not any([t._is_connected for t in znp_server._transports])
+    assert not any(t._is_connected for t in znp_server._transports)
 
 
 @pytest.mark.parametrize("device", FORMED_DEVICES)
