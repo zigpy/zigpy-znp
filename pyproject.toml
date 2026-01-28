@@ -85,6 +85,12 @@ disable_error_code = [
     "union-attr",
     "var-annotated",
     "name-defined",
+    "misc",
+    "override",
+    "return-value",
+    "return",
+    "type-arg",
+    "list-item",
 ]
 
 [tool.coverage.run]

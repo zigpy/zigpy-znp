@@ -29,11 +29,11 @@ repos:
       - id: isort
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.6.1
+    rev: v1.19.1
     hooks:
       - id: mypy
         additional_dependencies:
-          - zigpy
+          - zigpy>=0.91.2
           - types-setuptools
 
   - repo: https://github.com/asottile/pyupgrade
