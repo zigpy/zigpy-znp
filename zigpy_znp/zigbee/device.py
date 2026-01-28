@@ -21,7 +21,9 @@ class ZNPCoordinator(zigpy.device.Device):
 
     @manufacturer.setter
     def manufacturer(self, value: str) -> None:
-        pass  # Read-only for coordinator
+        # Setter required to match parent class interface (which has read-write properties)
+        # but intentionally does nothing since coordinator manufacturer is hardware-determined
+        pass
 
     @property
     def model(self) -> str:
@@ -29,7 +31,9 @@ class ZNPCoordinator(zigpy.device.Device):
 
     @model.setter
     def model(self, value: str) -> None:
-        pass  # Read-only for coordinator
+        # Setter required to match parent class interface (which has read-write properties)
+        # but intentionally does nothing since coordinator model is hardware-determined
+        pass
 
     async def request(
         self,
