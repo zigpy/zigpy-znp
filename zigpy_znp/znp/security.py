@@ -446,7 +446,7 @@ async def write_devices(
 
     # Z-Stack Home 1.2 does not store keys
     if znp.version < 3.0:
-        return
+        return tclk_seed
 
     # Make sure the new table is the same size as the old table. Because this type is
     # prefixed by the number of entries, the trailing table bytes are not kept track of
@@ -506,3 +506,5 @@ async def write_devices(
             values=aps_key_data_table,
             fill_value=aps_key_data_fill_value,
         )
+
+    return tclk_seed

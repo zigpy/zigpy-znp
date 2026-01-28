@@ -25,4 +25,4 @@ EMPTY_KEY = t.NwkKeyDesc(
 )
 
 # Used only when creating a temporary network during formation
-STARTUP_CHANNELS = t.Channels.from_channel_list([15, 20, 25])
+STARTUP_CHANNELS = t.Channels.from_channel_list([15, 20, 25])  # type: ignore[misc]

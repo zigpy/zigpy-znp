@@ -56,7 +56,7 @@ async def test_mgmt_nwk_update_req(
         request=c.ZDO.MgmtNWKUpdateReq.Req(
             Dst=0x0000,
             DstAddrMode=t.AddrMode.NWK,
-            Channels=t.Channels.from_channel_list([new_channel]),
+            Channels=t.Channels.from_channel_list([new_channel]),  # type: ignore[misc]
             ScanDuration=254,
             # Missing fields in the request cannot be `None` in the Z-Stack command
             ScanCount=0,

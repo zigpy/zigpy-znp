@@ -773,7 +773,7 @@ async def test_send_security_and_packet_source_route(device, make_application, m
         tx_options=(
             zigpy_t.TransmitOptions.ACK | zigpy_t.TransmitOptions.APS_Encryption
         ),
-        source_route=[0xAABB, 0xCCDD],
+        source_route=[zigpy_t.NWK(0xAABB), zigpy_t.NWK(0xCCDD)],
     )
 
     data_req = znp_server.reply_once_to(
