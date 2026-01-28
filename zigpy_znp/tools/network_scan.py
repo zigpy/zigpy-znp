@@ -106,7 +106,8 @@ async def main(argv):
         "-c",
         "--channels",
         dest="channels",
-        type=lambda s: t.Channels.from_channel_list(map(int, s.split(","))),  # type: ignore[misc]
+        # type: ignore[misc]
+        type=lambda s: t.Channels.from_channel_list(map(int, s.split(","))),
         default=t.Channels.ALL_CHANNELS,
         help="Channels on which to scan for networks",
     )

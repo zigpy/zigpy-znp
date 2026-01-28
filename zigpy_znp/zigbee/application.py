@@ -336,7 +336,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             request=c.ZDO.MgmtNWKUpdateReq.Req(
                 Dst=0x0000,
                 DstAddrMode=t.AddrMode.NWK,
-                Channels=t.Channels.from_channel_list([new_channel]),  # type: ignore[misc]
+                # type: ignore[misc]
+                Channels=t.Channels.from_channel_list([new_channel]),
                 ScanDuration=zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
                 ScanCount=0,
                 NwkManagerAddr=0x0000,

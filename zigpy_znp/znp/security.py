@@ -376,7 +376,7 @@ async def write_devices(
     devices: typing.Sequence[StoredDevice],
     counter_increment: t.uint32_t = 2500,
     tclk_seed: t.KeyData = None,
-) -> t.KeyData:
+) -> None:
     hashed_link_key_table = []
     aps_key_data_table = []
     link_key_table = t.APSLinkKeyTable()
@@ -446,7 +446,7 @@ async def write_devices(
 
     # Z-Stack Home 1.2 does not store keys
     if znp.version < 3.0:
-        return tclk_seed
+        return
 
     # Make sure the new table is the same size as the old table. Because this type is
     # prefixed by the number of entries, the trailing table bytes are not kept track of
@@ -506,5 +506,3 @@ async def write_devices(
             values=aps_key_data_table,
             fill_value=aps_key_data_fill_value,
         )
-
-    return tclk_seed

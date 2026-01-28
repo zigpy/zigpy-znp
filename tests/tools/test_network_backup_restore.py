@@ -182,7 +182,8 @@ async def test_network_backup_formed(device, make_znp_server, tmp_path):
     assert backup["nwk_update_id"] == 0
     assert backup["security_level"] == 5
     assert backup["channel"] == channel
-    assert t.Channels.from_channel_list(backup["channel_mask"]) == channels  # type: ignore[misc]
+    # type: ignore[misc]
+    assert t.Channels.from_channel_list(backup["channel_mask"]) == channels
 
     assert t.KeyData(bytes.fromhex(backup["network_key"]["key"])) == network_key
     assert backup["network_key"]["sequence_number"] == 0
