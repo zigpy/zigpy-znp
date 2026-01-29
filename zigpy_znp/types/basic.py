@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing
 
-from zigpy.types import int8s, uint8_t, enum_factory  # noqa: F401
+from zigpy.types import int8s, uint8_t  # noqa: F401
 
 from zigpy_znp.types.cstruct import CStruct
 
@@ -34,6 +34,9 @@ else:
     from zigpy.types import (  # noqa: F401
         enum8,
         enum16,
+        enum24,
+        enum40,
+        enum64,
         bitmap8,
         bitmap16,
         uint16_t,
@@ -42,15 +45,6 @@ else:
         uint40_t,
         uint64_t,
     )
-
-    class enum24(enum_factory(uint24_t)):  # type: ignore[misc]
-        pass
-
-    class enum40(enum_factory(uint40_t)):  # type: ignore[misc]
-        pass
-
-    class enum64(enum_factory(uint64_t)):  # type: ignore[misc]
-        pass
 
 
 class Bytes(bytes):

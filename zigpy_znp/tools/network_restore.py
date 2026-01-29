@@ -36,6 +36,7 @@ def json_backup_to_zigpy_state(
     network_info.nwk_update_id = backup["nwk_update_id"]
     network_info.nwk_manager_id = 0x0000
     network_info.channel = backup["channel"]
+    # type: ignore[misc]
     network_info.channel_mask = t.Channels.from_channel_list(backup["channel_mask"])
     network_info.security_level = backup["security_level"]
     network_info.stack_specific = backup.get("stack_specific")

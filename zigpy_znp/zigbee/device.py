@@ -16,12 +16,22 @@ class ZNPCoordinator(zigpy.device.Device):
     """
 
     @property
-    def manufacturer(self):
+    def manufacturer(self) -> str:
         return "Texas Instruments"
 
+    @manufacturer.setter
+    def manufacturer(self, value: str) -> None:
+        # Setter for parent class interface; no-op (hardware-determined)
+        pass
+
     @property
-    def model(self):
+    def model(self) -> str:
         return "Coordinator"
+
+    @model.setter
+    def model(self, value: str) -> None:
+        # Setter for parent class interface; no-op (hardware-determined)
+        pass
 
     async def request(
         self,
@@ -35,7 +45,7 @@ class ZNPCoordinator(zigpy.device.Device):
         timeout=2 * zigpy.device.APS_REPLY_TIMEOUT,
         use_ieee=False,
         ask_for_ack: bool | None = None,
-        priority: int = zigpy.types.PacketPriority.NORMAL,
+        priority: int | None = zigpy.types.PacketPriority.NORMAL,
     ):
         """
         Normal `zigpy.device.Device:request` except its default timeout is longer.

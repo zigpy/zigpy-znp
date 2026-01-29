@@ -173,7 +173,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.devices[self.state.node_info.ieee] = ZNPCoordinator(
             self, self.state.node_info.ieee, self.state.node_info.nwk
         )
-        await self._device.schedule_initialize()
+        task = self._device.schedule_initialize()
+        if task is not None:
+            await task
 
         # Deprecate ZNP-specific config
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] is not None:
@@ -199,7 +201,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 "Your network is using the insecure Zigbee2MQTT network key!"
             )
 
-    async def set_tx_power(self, dbm: int) -> None:
+    async def set_tx_power(self, dbm: float) -> None:
         """
         Sets the radio TX power.
         """
@@ -237,7 +239,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return dst_addr
 
-    async def permit(self, time_s: int = 60, node: t.EUI64 = None):
+    async def permit(self, time_s: int = 60, node: t.EUI64 | str | None = None):
         """
         Permit joining the network via a specific node or via all router nodes.
         """
@@ -273,7 +275,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await super().permit(time_s=time_s, node=node)
 
-    async def permit_ncp(self, time_s: int) -> None:
+    async def permit_ncp(self, time_s: int = 60) -> None:
         """
         Permits joins only on the coordinator.
         """
@@ -334,6 +336,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             request=c.ZDO.MgmtNWKUpdateReq.Req(
                 Dst=0x0000,
                 DstAddrMode=t.AddrMode.NWK,
+                # type: ignore[misc]
                 Channels=t.Channels.from_channel_list([new_channel]),
                 ScanDuration=zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
                 ScanCount=0,

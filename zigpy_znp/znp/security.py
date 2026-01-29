@@ -376,7 +376,7 @@ async def write_devices(
     devices: typing.Sequence[StoredDevice],
     counter_increment: t.uint32_t = 2500,
     tclk_seed: t.KeyData = None,
-) -> t.KeyData:
+) -> None:
     hashed_link_key_table = []
     aps_key_data_table = []
     link_key_table = t.APSLinkKeyTable()

@@ -122,7 +122,7 @@ def make_znp_server(mocker):
             assert url == FAKE_SERIAL_PORT
 
             # No double connections!
-            if any([t._is_connected for t in transports]):
+            if any(t._is_connected for t in transports):
                 raise RuntimeError(
                     "Cannot open two connections to the same serial port"
                 )

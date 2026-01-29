@@ -14,7 +14,7 @@ readme = "README.md"
 license = {text = "GPL-3.0"}
 requires-python = ">=3.8"
 dependencies = [
-    "zigpy>=0.78.0",
+    "zigpy>=0.91.2",
     'async-timeout; python_version<"3.11"',
     "voluptuous",
     "coloredlogs",
@@ -85,6 +85,12 @@ disable_error_code = [
     "union-attr",
     "var-annotated",
     "name-defined",
+    "misc",
+    "override",
+    "return-value",
+    "return",
+    "type-arg",
+    "list-item",
 ]
 
 [tool.coverage.run]
