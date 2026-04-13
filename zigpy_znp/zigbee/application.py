@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import asyncio
 import logging
 
@@ -11,7 +12,12 @@ import zigpy.state
 import zigpy.types
 import zigpy.config
 import zigpy.device
-import async_timeout
+
+if sys.version_info[:2] < (3, 11):
+    from async_timeout import timeout as asyncio_timeout  # pragma: no cover
+else:
+    from asyncio import timeout as asyncio_timeout  # pragma: no cover
+
 import zigpy.profiles
 import zigpy.zdo.types as zdo_t
 import zigpy.application
@@ -33,35 +39,10 @@ ZHA_ENDPOINT = 1
 ZDO_PROFILE = 0x0000
 
 # All of these are in seconds
-PROBE_TIMEOUT = 5
 STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
 EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 DEVICE_JOIN_MAX_DELAY = 5
-
-REQUEST_MAX_RETRIES = 5
-REQUEST_ERROR_RETRY_DELAY = 0.5
-
-# Errors that go away on their own after waiting for a bit
-REQUEST_TRANSIENT_ERRORS = {
-    t.Status.BUFFER_FULL,
-    t.Status.MAC_CHANNEL_ACCESS_FAILURE,
-    t.Status.MAC_TRANSACTION_OVERFLOW,
-    t.Status.MAC_NO_RESOURCES,
-    t.Status.MEM_ERROR,
-    t.Status.NWK_TABLE_FULL,
-}
-
-REQUEST_ROUTING_ERRORS = {
-    t.Status.APS_NO_ACK,
-    t.Status.APS_NOT_AUTHENTICATED,
-    t.Status.NWK_NO_ROUTE,
-    t.Status.NWK_INVALID_REQUEST,
-    t.Status.MAC_NO_ACK,
-    t.Status.MAC_TRANSACTION_EXPIRED,
-}
-
-REQUEST_RETRYABLE_ERRORS = REQUEST_TRANSIENT_ERRORS | REQUEST_ROUTING_ERRORS
 
 LOGGER = logging.getLogger(__name__)
 
@@ -69,9 +50,6 @@ LOGGER = logging.getLogger(__name__)
 class RetryMethod(t.bitmap8):
     NONE = 0
     AssocRemove = 2 << 0
-    RouteDiscovery = 2 << 1
-    LastGoodRoute = 2 << 2
-    IEEEAddress = 2 << 3
 
 
 class ControllerApplication(zigpy.application.ControllerApplication):
@@ -87,14 +65,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
     ##################################################################
-
-    @classmethod
-    async def probe(cls, device_config):
-        try:
-            async with async_timeout.timeout(PROBE_TIMEOUT):
-                return await super().probe(device_config)
-        except asyncio.TimeoutError:
-            return False
 
     async def connect(self):
         assert self._znp is None
@@ -203,7 +173,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self.devices[self.state.node_info.ieee] = ZNPCoordinator(
             self, self.state.node_info.ieee, self.state.node_info.nwk
         )
-        await self._device.schedule_initialize()
+        task = self._device.schedule_initialize()
+        if task is not None:
+            await task
 
         # Deprecate ZNP-specific config
         if self.znp_config[conf.CONF_MAX_CONCURRENT_REQUESTS] is not None:
@@ -217,19 +189,19 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             None,
             zigpy.config.defaults.CONF_MAX_CONCURRENT_REQUESTS_DEFAULT,
         ):
-            max_concurrent_requests = 16 if self._znp.nvram.align_structs else 2
+            max_concurrent_requests = 16 if self._znp.nvram.align_structs else 4
         else:
             max_concurrent_requests = self._config[conf.CONF_MAX_CONCURRENT_REQUESTS]
 
         # Update the max value of the concurrent request semaphore at runtime
-        self._concurrent_requests_semaphore.max_value = max_concurrent_requests
+        self._concurrent_requests_semaphore.max_concurrency = max_concurrent_requests
 
         if self.state.network_info.network_key.key == const.Z2M_NETWORK_KEY:
             LOGGER.warning(
                 "Your network is using the insecure Zigbee2MQTT network key!"
             )
 
-    async def set_tx_power(self, dbm: int) -> None:
+    async def set_tx_power(self, dbm: float) -> None:
         """
         Sets the radio TX power.
         """
@@ -267,7 +239,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return dst_addr
 
-    async def permit(self, time_s: int = 60, node: t.EUI64 = None):
+    async def permit(self, time_s: int = 60, node: t.EUI64 | str | None = None):
         """
         Permit joining the network via a specific node or via all router nodes.
         """
@@ -303,7 +275,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         await super().permit(time_s=time_s, node=node)
 
-    async def permit_ncp(self, time_s: int) -> None:
+    async def permit_ncp(self, time_s: int = 60) -> None:
         """
         Permits joins only on the coordinator.
         """
@@ -364,6 +336,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             request=c.ZDO.MgmtNWKUpdateReq.Req(
                 Dst=0x0000,
                 DstAddrMode=t.AddrMode.NWK,
+                # type: ignore[misc]
                 Channels=t.Channels.from_channel_list([new_channel]),
                 ScanDuration=zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
                 ScanCount=0,
@@ -511,7 +484,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # Perform route discovery (just in case) when a device joins the network so that
         # we can begin initialization as soon as possible.
-        asyncio.create_task(self._discover_route(msg.SrcNwk))
+        self.create_task(self._discover_route(msg.SrcNwk))
 
         if msg.SrcIEEE in self._join_announce_tasks:
             self._join_announce_tasks.pop(msg.SrcIEEE).cancel()
@@ -636,7 +609,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         # XXX: If Z-Stack is not compiled with HAL_LED, it will just not respond at all
         try:
-            async with async_timeout.timeout(0.5):
+            async with asyncio_timeout(0.5):
                 await self._znp.request(
                     c.UTIL.LEDControl.Req(LED=led, Mode=mode),
                     RspStatus=t.Status.SUCCESS,
@@ -840,7 +813,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # Broadcasts and ZDO requests will not receive a confirmation
             await self._znp.request(request=request, RspStatus=t.Status.SUCCESS)
         else:
-            async with async_timeout.timeout(
+            async with asyncio_timeout(
                 EXTENDED_DATA_CONFIRM_TIMEOUT
                 if extended_timeout
                 else DATA_CONFIRM_TIMEOUT
@@ -919,20 +892,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         dst_addr = t.AddrModeAddress.from_zigpy_type(packet.dst)
 
         succeeded = False
-        association = None
-        force_relays = None
+        child_association = None
+        tried_assoc_remove = False
 
-        if packet.source_route is not None:
-            force_relays = packet.source_route
-
-        retry_methods = RetryMethod.NONE
-        last_retry_method = RetryMethod.NONE
-
-        # Don't release the concurrency-limiting semaphore until we are done trying.
-        # There is no point in allowing requests to take turns getting buffer errors.
         try:
-            async with self._limit_concurrency(priority=packet.priority):
-                for attempt in range(REQUEST_MAX_RETRIES):
+            # We retry sending twice but the only devices that will use the second retry
+            # attempt are sleeping end devices that silently switched parents from the
+            # coordinator, all others will fail immediately
+            for _retry_attempt in range(2):
+                async with self._limit_concurrency(priority=packet.priority):
                     try:
                         # ZDO requests do not generate `AF.DataConfirm` messages
                         # indicating that a route is missing so we need to explicitly
@@ -966,68 +934,23 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             options=options,
                             radius=packet.radius or 0,
                             data=packet.data.serialize(),
-                            relays=force_relays,
+                            relays=packet.source_route,
                             extended_timeout=packet.extended_timeout,
                         )
                         succeeded = True
                         break
                     except InvalidCommandResponse as e:
-                        status = e.response.Status
-
-                        if status not in REQUEST_RETRYABLE_ERRORS:
-                            raise
-
-                        # Just retry if:
-                        #  - this is our first failure
-                        #  - the error is transient and is not a routing issue
-                        #  - or we are not sending a unicast request
-                        if (
-                            attempt == 0
-                            or status in REQUEST_TRANSIENT_ERRORS
-                            or dst_addr.mode not in (t.AddrMode.NWK, t.AddrMode.IEEE)
-                        ):
-                            LOGGER.debug(
-                                "Request failed (%s), retry attempt %s of %s (%s)",
-                                e,
-                                attempt + 1,
-                                REQUEST_MAX_RETRIES,
-                                retry_methods.name,
-                            )
-                            await asyncio.sleep(3 * REQUEST_ERROR_RETRY_DELAY)
-                            continue
-
-                        # If we can't contact the device by forcing a specific route,
-                        # there is no point in trying this more than once.
-                        if (
-                            retry_methods & RetryMethod.LastGoodRoute
-                            and force_relays is not None
-                        ):
-                            force_relays = None
-
-                        # If we fail to contact the device with its IEEE address, don't
-                        # try again.
-                        if (
-                            retry_methods & RetryMethod.IEEEAddress
-                            and dst_addr.mode == t.AddrMode.IEEE
-                            and device is not None
-                        ):
-                            dst_addr = t.AddrModeAddress(
-                                mode=t.AddrMode.NWK,
-                                address=device.nwk,
-                            )
-
                         # Child aging is disabled so if a child switches parents from
                         # the coordinator to another router, we will not be able to
                         # re-discover a route to it. We have to manually drop the child
                         # to do this.
                         if (
-                            status == t.Status.MAC_TRANSACTION_EXPIRED
+                            e.response.Status == t.Status.MAC_TRANSACTION_EXPIRED
                             and device is not None
-                            and association is None
-                            and not retry_methods & RetryMethod.AssocRemove
+                            and child_association is None
                             and self._znp.version >= 3.30
                         ):
-                            association = await self._znp.request(
+                            child_association = await self._znp.request(
                                 c.UTIL.AssocGetWithAddress.Req(
                                     IEEE=device.ieee,
                                     NWK=0x0000,  # IEEE takes priority
@@ -1035,86 +958,46 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             )
 
                             if (
-                                association.Device.nodeRelation
-                                != c.util.NodeRelation.NOTUSED
+                                child_association.Device.nodeRelation
+                                == c.util.NodeRelation.NOTUSED
                             ):
-                                try:
-                                    await self._znp.request(
-                                        c.UTIL.AssocRemove.Req(IEEE=device.ieee)
-                                    )
-                                    retry_methods |= RetryMethod.AssocRemove
-                                    last_retry_method = RetryMethod.AssocRemove
+                                raise
 
-                                    # Route discovery must be performed right after
-                                    await self._discover_route(device.nwk)
-                                except CommandNotRecognized:
-                                    LOGGER.debug(
-                                        "The UTIL.AssocRemove command is available only"
-                                        " in Z-Stack 3 releases built after 20201017"
-                                    )
-                        elif (
-                            not retry_methods & RetryMethod.LastGoodRoute
-                            and device is not None
-                        ):
-                            # `ZDO.SrcRtgInd` callbacks tell us the last path taken by
-                            # messages from the device back to the coordinator. Sending
-                            # packets backwards via this same route may work.
-                            force_relays = (device.relays or [])[::-1]
-                            retry_methods |= RetryMethod.LastGoodRoute
-                            last_retry_method = RetryMethod.LastGoodRoute
-                        elif (
-                            not retry_methods & RetryMethod.RouteDiscovery
-                            and dst_addr.mode == t.AddrMode.NWK
-                        ):
-                            # If that doesn't work, try re-discovering the route.
-                            # While we can in theory poll and wait until it is fixed,
-                            # letting the retry mechanism deal with it simpler.
-                            await self._discover_route(dst_addr.address)
-                            retry_methods |= RetryMethod.RouteDiscovery
-                            last_retry_method = RetryMethod.RouteDiscovery
-                        elif (
-                            not retry_methods & RetryMethod.IEEEAddress
-                            and device is not None
-                            and dst_addr.mode == t.AddrMode.NWK
-                        ):
-                            # Try using the device's IEEE address instead of its NWK.
-                            # If it works, the NWK will be updated when relays arrive.
-                            retry_methods |= RetryMethod.IEEEAddress
-                            last_retry_method = RetryMethod.IEEEAddress
-                            dst_addr = t.AddrModeAddress(
-                                mode=t.AddrMode.IEEE,
-                                address=device.ieee,
-                            )
+                            try:
+                                await self._znp.request(
+                                    c.UTIL.AssocRemove.Req(IEEE=device.ieee)
+                                )
+                                tried_assoc_remove = True
 
-                        LOGGER.debug(
-                            "Request failed (%s), retry attempt %s of %s (%s)",
-                            e,
-                            attempt + 1,
-                            REQUEST_MAX_RETRIES,
-                            retry_methods.name,
-                        )
+                                # Route discovery must be performed right after
+                                await self._discover_route(device.nwk)
+                            except CommandNotRecognized:
+                                LOGGER.debug(
+                                    "The UTIL.AssocRemove command is available only"
+                                    " in Z-Stack 3 releases built after 20201017"
+                                )
+                                raise e from None
+                            else:
+                                continue
 
-                        # We've tried everything already so at this point just wait
-                        await asyncio.sleep(REQUEST_ERROR_RETRY_DELAY)
-                else:
-                    raise DeliveryError(
-                        f"Request failed after {REQUEST_MAX_RETRIES} attempts:"
-                        f" {status!r}",
-                        status=status,
-                    )
+                        # Perform route discovery explicitly if the stack fails
+                        if e.response.Status == t.Status.NWK_NO_ROUTE:
+                            await self._discover_route(device.nwk)
 
-                self.state.counters[f"Retry_{last_retry_method.name}"][
-                    attempt
-                ].increment()
+                        raise
+        except InvalidCommandResponse as e:
+            status = e.response.Status
+            raise DeliveryError(f"Failed to send request: {status!r}", status=status)
         finally:
             # We *must* re-add the device association if we previously removed it but
             # the request still failed. Otherwise, it may be a direct child and we will
             # not be able to find it again.
-            if not succeeded and retry_methods & RetryMethod.AssocRemove:
+            if not succeeded and tried_assoc_remove:
+                assert child_association is not None
                 await self._znp.request(
                     c.UTIL.AssocAdd.Req(
-                        NWK=association.Device.shortAddr,
+                        NWK=child_association.Device.shortAddr,
                         IEEE=device.ieee,
-                        NodeRelation=association.Device.nodeRelation,
+                        NodeRelation=child_association.Device.nodeRelation,
                     )
                 )

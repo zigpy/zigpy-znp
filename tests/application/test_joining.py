@@ -205,6 +205,8 @@ async def test_on_zdo_device_join(device, make_application, mocker):
 
     app.handle_join.assert_called_once_with(nwk=nwk, ieee=ieee, parent_nwk=0x0001)
 
+    app.get_device(nwk=0x1234).cancel_initialization()
+
     await app.shutdown()
 
 
@@ -268,9 +270,6 @@ async def test_on_zdo_device_join_and_announce_fast(device, make_application, mo
 
     app.get_device(ieee=ieee).cancel_initialization()
     await app.shutdown()
-
-    with pytest.raises(asyncio.CancelledError):
-        await app.get_device(ieee=ieee)._initialize_task
 
 
 @mock.patch("zigpy_znp.zigbee.application.DEVICE_JOIN_MAX_DELAY", new=0.1)

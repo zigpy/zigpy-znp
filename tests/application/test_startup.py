@@ -25,7 +25,7 @@ DEV_NETWORK_SETTINGS = {
         "CC2652",
         f"Z-Stack {FormedLaunchpadCC26X2R1.code_revision}",
         15,
-        t.Channels.from_channel_list([15]),
+        t.Channels.from_channel_list([15]),  # type: ignore[misc]
         0x4402,
         t.EUI64.convert("A2:BA:38:A8:B5:E6:83:A0"),
         t.KeyData.convert("4C:4E:72:B8:41:22:51:79:9A:BF:35:25:12:88:CA:83"),
@@ -34,7 +34,7 @@ DEV_NETWORK_SETTINGS = {
         "CC2531",
         f"Z-Stack 3.0.x {FormedZStack3CC2531.code_revision}",
         15,
-        t.Channels.from_channel_list([15]),
+        t.Channels.from_channel_list([15]),  # type: ignore[misc]
         0xB6AB,
         t.EUI64.convert("62:92:32:46:3C:77:2D:B2"),
         t.KeyData.convert("6D:DE:24:EA:E2:85:52:B6:DE:29:56:EB:05:85:1A:FA"),
@@ -43,7 +43,7 @@ DEV_NETWORK_SETTINGS = {
         "CC2531",
         f"Z-Stack Home 1.2 {FormedZStack1CC2531.code_revision}",
         11,
-        t.Channels.from_channel_list([11]),
+        t.Channels.from_channel_list([11]),  # type: ignore[misc]
         0x1A62,
         t.EUI64.convert("DD:DD:DD:DD:DD:DD:DD:DD"),
         t.KeyData([1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
@@ -304,7 +304,7 @@ async def test_reset_network_info(device, make_application):
     "device, concurrency",
     [
         (FormedLaunchpadCC26X2R1, 16),
-        (FormedZStack1CC2531, 2),
+        (FormedZStack1CC2531, 4),
     ],
 )
 async def test_concurrency_auto_config(device, concurrency, make_application):
@@ -312,4 +312,4 @@ async def test_concurrency_auto_config(device, concurrency, make_application):
     await app.connect()
     await app.start_network()
 
-    assert app._concurrent_requests_semaphore.max_value == concurrency
+    assert app._concurrent_requests_semaphore.max_concurrency == concurrency

@@ -31,7 +31,7 @@ class ZnpMtProtocol(zigpy.serial.SerialProtocol):
         super().close()
         self._api = None
 
-    def connection_lost(self, exc: Exception | None) -> None:
+    def connection_lost(self, exc: BaseException | None) -> None:
         """Connection lost."""
         super().connection_lost(exc)
 
@@ -155,4 +155,4 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
 
     await protocol.wait_until_connected()
 
-    return protocol
+    return protocol  # type: ignore[return-value]

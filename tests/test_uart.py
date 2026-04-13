@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from serial_asyncio import SerialTransport
+from serial_asyncio_fast import SerialTransport
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -47,7 +47,7 @@ async def dummy_serial_conn(mocker):
 
         return fut
 
-    mocker.patch("serial_asyncio.create_serial_connection", new=create_serial_conn)
+    mocker.patch("serial_asyncio_fast.create_serial_connection", new=create_serial_conn)
 
     return device, serial_interface
 

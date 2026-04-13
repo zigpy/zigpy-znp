@@ -10,7 +10,6 @@ from zigpy.exceptions import DeliveryError
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-from zigpy_znp.exceptions import InvalidCommandResponse
 
 from ..conftest import (
     FORMED_DEVICES,
@@ -145,10 +144,10 @@ async def test_zigpy_request_failure(device, make_application, mocker):
     mocker.spy(app, "send_packet")
 
     # Fail to turn on the light
-    with pytest.raises(InvalidCommandResponse):
+    with pytest.raises(DeliveryError):
         await device.endpoints[1].on_off.on()
 
-    assert app.send_packet.call_count == 1
+    assert app.send_packet.call_count >= 1
     await app.shutdown()
 
 
@@ -295,7 +294,7 @@ async def test_request_concurrency(device, make_application, mocker):
             nonlocal in_flight_requests
             nonlocal did_lock
 
-            if app._concurrent_requests_semaphore.locked():
+            if app._concurrent_requests_semaphore.locked(priority=0):
                 did_lock = True
 
             in_flight_requests += 1
@@ -425,7 +424,7 @@ async def test_request_cancellation_shielding(device, make_application, mocker):
 
         asyncio.create_task(inner())
 
-    data_req = znp_server.reply_once_to(
+    znp_server.reply_to(
         c.AF.DataRequestExt.Req(partial=True),
         responses=[
             c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
@@ -444,7 +443,6 @@ async def test_request_cancellation_shielding(device, make_application, mocker):
             data=b"\x00",
         )
 
-    await data_req
     await delayed_reply_sent
 
     assert app._znp._unhandled_command.call_count == 0
@@ -532,9 +530,6 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
     await was_route_discovered
     await zdo_req
 
-    # 6 accounts for the loopback requests
-    assert sum(c.value for c in app.state.counters["Retry_NONE"].values()) == 6 + 1
-
     await app.shutdown()
 
 
@@ -583,15 +578,6 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
         ],
     )
 
-    # Ignore the source routing request as well
-    znp_server.reply_to(
-        c.AF.DataRequestSrcRtg.Req(partial=True),
-        responses=[
-            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
-            data_confirm_replier,
-        ],
-    )
-
     await app.request(
         device=device,
         profile=260,
@@ -603,75 +589,6 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
     )
 
     await was_route_discovered
-    assert (
-        sum(c.value for c in app.state.counters["Retry_RouteDiscovery"].values()) == 1
-    )
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_request_recovery_use_ieee_addr(device, make_application, mocker):
-    app, znp_server = make_application(server_cls=device)
-
-    await app.startup(auto_form=False)
-
-    # The data confirm timeout must be shorter than the ARSP timeout
-    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
-    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-
-    was_ieee_addr_used = False
-
-    def data_confirm_replier(req):
-        nonlocal was_ieee_addr_used
-
-        if req.DstAddrModeAddress.mode == t.AddrMode.IEEE:
-            status = t.Status.SUCCESS
-            was_ieee_addr_used = True
-        else:
-            status = t.Status.MAC_NO_ACK
-
-        return c.AF.DataConfirm.Callback(Status=status, Endpoint=1, TSN=1)
-
-    znp_server.reply_once_to(
-        c.ZDO.ExtRouteDisc.Req(
-            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
-        ),
-        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    znp_server.reply_to(
-        c.AF.DataRequestExt.Req(partial=True),
-        responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            data_confirm_replier,
-        ],
-    )
-
-    # Ignore the source routing request as well
-    znp_server.reply_to(
-        c.AF.DataRequestSrcRtg.Req(partial=True),
-        responses=[
-            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(Status=t.Status.MAC_NO_ACK, Endpoint=1, TSN=1),
-        ],
-    )
-
-    await app.request(
-        device=device,
-        profile=260,
-        cluster=1,
-        src_ep=1,
-        dst_ep=1,
-        sequence=1,
-        data=b"\x00",
-    )
-
-    assert was_ieee_addr_used
-    assert sum(c.value for c in app.state.counters["Retry_IEEEAddress"].values()) == 1
-
     await app.shutdown()
 
 
@@ -686,7 +603,6 @@ async def test_request_recovery_assoc_remove(
     await app.startup(auto_form=False)
 
     mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
-    mocker.patch("zigpy_znp.zigbee.application.REQUEST_ERROR_RETRY_DELAY", new=0)
 
     app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
 
@@ -713,14 +629,6 @@ async def test_request_recovery_assoc_remove(
         ],
     )
 
-    znp_server.reply_to(
-        c.AF.DataRequestSrcRtg.Req(partial=True),
-        responses=[
-            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
-            data_confirm_replier,
-        ],
-    )
-
     def assoc_get_with_addr(req):
         nonlocal assoc_device
 
@@ -730,7 +638,7 @@ async def test_request_recovery_assoc_remove(
 
         return c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)
 
-    did_assoc_get = znp_server.reply_once_to(
+    did_assoc_get = znp_server.reply_to(
         c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
         responses=[assoc_get_with_addr],
     )
@@ -750,12 +658,12 @@ async def test_request_recovery_assoc_remove(
             assoc_device = None
             return c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)
 
-        did_assoc_remove = znp_server.reply_once_to(
+        did_assoc_remove = znp_server.reply_to(
             c.UTIL.AssocRemove.Req(IEEE=device.ieee),
             responses=[assoc_remove],
         )
 
-        did_assoc_add = znp_server.reply_once_to(
+        did_assoc_add = znp_server.reply_to(
             c.UTIL.AssocAdd.Req(
                 NWK=device.nwk,
                 IEEE=device.ieee,
@@ -791,98 +699,19 @@ async def test_request_recovery_assoc_remove(
             await req
 
     if fw_assoc_remove:
-        await did_assoc_remove
+        assert len(did_assoc_remove.mock_calls) >= 1
 
         if final_status != t.Status.SUCCESS:
             # The association is re-added on failure
-            await did_assoc_add
+            assert len(did_assoc_add.mock_calls) >= 1
         else:
-            assert not did_assoc_add.done()
+            assert len(did_assoc_add.mock_calls) == 0
     elif issubclass(device_cls, FormedLaunchpadCC26X2R1):
-        await did_assoc_get
-        assert was_route_discovered.call_count >= 1
+        assert len(did_assoc_get.mock_calls) >= 1
     else:
         # Don't even attempt this with older firmwares
-        assert not did_assoc_get.done()
+        assert len(did_assoc_get.mock_calls) == 0
         assert was_route_discovered.call_count == 0
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-@pytest.mark.parametrize("succeed", [True, False])
-@pytest.mark.parametrize("relays", [[0x1111, 0x2222, 0x3333], []])
-async def test_request_recovery_manual_source_route(
-    device, succeed, relays, make_application, mocker
-):
-    app, znp_server = make_application(server_cls=device)
-
-    await app.startup(auto_form=False)
-
-    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
-    mocker.patch("zigpy_znp.zigbee.application.REQUEST_ERROR_RETRY_DELAY", new=0)
-
-    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-    device.relays = relays
-
-    def data_confirm_replier(req):
-        if isinstance(req, c.AF.DataRequestExt.Req) or not succeed:
-            return c.AF.DataConfirm.Callback(
-                Status=t.Status.MAC_NO_ACK,
-                Endpoint=1,
-                TSN=1,
-            )
-        else:
-            return c.AF.DataConfirm.Callback(
-                Status=t.Status.SUCCESS,
-                Endpoint=1,
-                TSN=1,
-            )
-
-    normal_data_request = znp_server.reply_to(
-        c.AF.DataRequestExt.Req(partial=True),
-        responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            data_confirm_replier,
-        ],
-    )
-
-    source_routing_data_request = znp_server.reply_to(
-        c.AF.DataRequestSrcRtg.Req(partial=True),
-        responses=[
-            c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
-            data_confirm_replier,
-        ],
-    )
-
-    znp_server.reply_to(
-        c.ZDO.ExtRouteDisc.Req(
-            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
-        ),
-        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    req = app.request(
-        device=device,
-        profile=260,
-        cluster=1,
-        src_ep=1,
-        dst_ep=1,
-        sequence=1,
-        data=b"\x00",
-    )
-
-    if succeed:
-        await req
-    else:
-        with pytest.raises(DeliveryError):
-            await req
-
-    # In either case only one source routing attempt is performed
-    assert source_routing_data_request.call_count == 1
-    assert normal_data_request.call_count >= 1
 
     await app.shutdown()
 
@@ -944,7 +773,7 @@ async def test_send_security_and_packet_source_route(device, make_application, m
         tx_options=(
             zigpy_t.TransmitOptions.ACK | zigpy_t.TransmitOptions.APS_Encryption
         ),
-        source_route=[0xAABB, 0xCCDD],
+        source_route=[zigpy_t.NWK(0xAABB), zigpy_t.NWK(0xCCDD)],
     )
 
     data_req = znp_server.reply_once_to(

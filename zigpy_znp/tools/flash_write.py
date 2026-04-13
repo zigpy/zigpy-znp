@@ -4,7 +4,11 @@ import sys
 import asyncio
 import logging
 
-import async_timeout
+if sys.version_info[:2] < (3, 11):
+    from async_timeout import timeout as asyncio_timeout  # pragma: no cover
+else:
+    from asyncio import timeout as asyncio_timeout  # pragma: no cover
+
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
@@ -70,7 +74,7 @@ async def write_firmware(znp: ZNP, firmware: bytes, reset_nvram: bool):
         )
 
     try:
-        async with async_timeout.timeout(5):
+        async with asyncio_timeout(5):
             handshake_rsp = await znp.request_callback_rsp(
                 request=c.UBL.HandshakeReq.Req(),
                 callback=c.UBL.HandshakeRsp.Callback(partial=True),

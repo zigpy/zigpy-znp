@@ -122,7 +122,7 @@ def make_znp_server(mocker):
             assert url == FAKE_SERIAL_PORT
 
             # No double connections!
-            if any([t._is_connected for t in transports]):
+            if any(t._is_connected for t in transports):
                 raise RuntimeError(
                     "Cannot open two connections to the same serial port"
                 )
@@ -154,7 +154,7 @@ def make_znp_server(mocker):
             return fut
 
         mocker.patch(
-            "serial_asyncio.create_serial_connection", new=passthrough_serial_conn
+            "serial_asyncio_fast.create_serial_connection", new=passthrough_serial_conn
         )
 
         # So we don't have to import it every time
@@ -353,10 +353,13 @@ class BaseServerZNP(ZNP):
             await self._send_responses(request, responses)
 
         callback.call_count = 0
+        callback_mock = Mock(side_effect=callback)
 
-        self.callback_for_response(request, lambda r: asyncio.create_task(callback(r)))
+        self.callback_for_response(
+            request, lambda r: asyncio.create_task(callback_mock(r))
+        )
 
-        return callback
+        return callback_mock
 
     def send(self, response):
         if response is not None and self._uart is not None:
