@@ -5,7 +5,7 @@ import asyncio
 import logging
 
 import zigpy.config
-import zigpy.serial
+from zigpy.serial import SerialProtocol, create_serial_connection
 
 import zigpy_znp.config as conf
 import zigpy_znp.frames as frames
@@ -20,7 +20,7 @@ class BufferTooShort(Exception):
     pass
 
 
-class ZnpMtProtocol(zigpy.serial.SerialProtocol):
+class ZnpMtProtocol(SerialProtocol):
     def __init__(self, api, *, url: str | None = None) -> None:
         super().__init__()
         self._api = api
@@ -74,15 +74,9 @@ class ZnpMtProtocol(zigpy.serial.SerialProtocol):
         LOGGER.log(log.TRACE, "Sending data: %s", Bytes.__repr__(data))
         self._transport.write(data)
 
-    def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
-        # TCP transport does not have DTR or RTS pins
-        if not hasattr(self._transport, "serial"):
-            return
-
+    async def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
         LOGGER.debug("Setting serial pin states: DTR=%s, RTS=%s", dtr, rts)
-
-        self._transport.serial.dtr = dtr
-        self._transport.serial.rts = rts
+        await self._transport.set_modem_pins(dtr=dtr, rts=rts)
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""
@@ -145,7 +139,7 @@ class ZnpMtProtocol(zigpy.serial.SerialProtocol):
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
     port = config[zigpy.config.CONF_DEVICE_PATH]
 
-    _, protocol = await zigpy.serial.create_serial_connection(
+    _, protocol = await create_serial_connection(
         loop=asyncio.get_running_loop(),
         protocol_factory=lambda: ZnpMtProtocol(api, url=port),
         url=port,

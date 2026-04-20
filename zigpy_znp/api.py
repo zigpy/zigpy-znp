@@ -667,7 +667,7 @@ class ZNP:
                 self._znp_config[conf.CONF_CONNECT_DTR_STATES],
                 self._znp_config[conf.CONF_CONNECT_RTS_STATES],
             ):
-                self._uart.set_dtr_rts(dtr=dtr, rts=rts)
+                await self._uart.set_dtr_rts(dtr=dtr, rts=rts)
                 await asyncio.sleep(BOOTLOADER_PIN_TOGGLE_DELAY)
 
             # First, just try pinging
