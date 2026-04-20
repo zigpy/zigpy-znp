@@ -3,7 +3,7 @@ import asyncio
 import inspect
 import logging
 import pathlib
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 import zigpy.types
@@ -56,8 +56,10 @@ class ForwardingSerialTransport:
         self.serial = Mock()
         self.serial.name = FAKE_SERIAL_PORT
         self.serial.baudrate = 45678
-        type(self.serial).dtr = self._mock_dtr_prop = PropertyMock(return_value=None)
-        type(self.serial).rts = self._mock_rts_prop = PropertyMock(return_value=None)
+        self._mock_set_modem_pins = Mock()
+
+    async def set_modem_pins(self, *, dtr=None, rts=None, **kwargs):
+        self._mock_set_modem_pins(dtr=dtr, rts=rts, **kwargs)
 
     def _connect(self):
         assert not self._is_connected
@@ -154,7 +156,7 @@ def make_znp_server(mocker):
             return fut
 
         mocker.patch(
-            "serial_asyncio_fast.create_serial_connection", new=passthrough_serial_conn
+            "zigpy_znp.uart.create_serial_connection", new=passthrough_serial_conn
         )
 
         # So we don't have to import it every time

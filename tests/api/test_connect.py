@@ -109,8 +109,11 @@ async def test_connect_skip_bootloader_rts_dtr_pins(make_znp_server, mocker):
     await znp.connect(test_port=True)
 
     serial = znp._uart._transport
-    assert serial._mock_dtr_prop.mock_calls == [call(False), call(False), call(False)]
-    assert serial._mock_rts_prop.mock_calls == [call(False), call(True), call(False)]
+    assert serial._mock_set_modem_pins.mock_calls == [
+        call(dtr=False, rts=False),
+        call(dtr=False, rts=True),
+        call(dtr=False, rts=False),
+    ]
 
     await znp.disconnect()
 
@@ -130,8 +133,7 @@ async def test_connect_skip_bootloader_config(make_znp_server, mocker):
     await znp.connect(test_port=True)
 
     serial = znp._uart._transport
-    assert serial._mock_dtr_prop.called is False
-    assert serial._mock_rts_prop.called is False
+    assert len(serial._mock_set_modem_pins.mock_calls) == 0
 
     await znp.disconnect()
 

@@ -2,11 +2,6 @@ import sys
 import asyncio
 import logging
 
-if sys.version_info[:2] < (3, 11):
-    from async_timeout import timeout as asyncio_timeout  # pragma: no cover
-else:
-    from asyncio import timeout as asyncio_timeout  # pragma: no cover
-
 import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
@@ -17,7 +12,7 @@ LOGGER = logging.getLogger(__name__)
 
 async def read_firmware(znp: ZNP) -> bytearray:
     try:
-        async with asyncio_timeout(5):
+        async with asyncio.timeout(5):
             handshake_rsp = await znp.request_callback_rsp(
                 request=c.UBL.HandshakeReq.Req(),
                 callback=c.UBL.HandshakeRsp.Callback(partial=True),

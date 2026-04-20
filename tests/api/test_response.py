@@ -1,12 +1,6 @@
-import sys
 import asyncio
 
 import pytest
-
-if sys.version_info[:2] < (3, 11):
-    from async_timeout import timeout as asyncio_timeout  # pragma: no cover
-else:
-    from asyncio import timeout as asyncio_timeout  # pragma: no cover
 
 import zigpy_znp.types as t
 import zigpy_znp.commands as c
@@ -66,7 +60,7 @@ async def test_response_timeouts(connected_znp):
 
     asyncio.create_task(send_soon(0.1))
 
-    async with asyncio_timeout(0.5):
+    async with asyncio.timeout(0.5):
         assert (await znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))) == response
 
     # The response was successfully received so we should have no outstanding listeners
@@ -76,7 +70,7 @@ async def test_response_timeouts(connected_znp):
     asyncio.create_task(send_soon(0.6))
 
     with pytest.raises(asyncio.TimeoutError):
-        async with asyncio_timeout(0.5):
+        async with asyncio.timeout(0.5):
             assert (
                 await znp.wait_for_response(c.SYS.Ping.Rsp(partial=True))
             ) == response

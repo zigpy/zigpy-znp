@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-from serial_asyncio_fast import SerialTransport
 
 import zigpy_znp.types as t
 import zigpy_znp.config as conf
@@ -33,13 +32,8 @@ async def dummy_serial_conn(mocker):
 
         protocol = protocol_factory()
 
-        # Our event loop doesn't really do anything
-        loop.add_writer = lambda *args, **kwargs: None
-        loop.add_reader = lambda *args, **kwargs: None
-        loop.remove_writer = lambda *args, **kwargs: None
-        loop.remove_reader = lambda *args, **kwargs: None
-
-        transport = SerialTransport(loop, protocol, serial_interface)
+        transport = mocker.Mock()
+        transport.serial = serial_interface
 
         protocol.connection_made(transport)
 
@@ -47,7 +41,7 @@ async def dummy_serial_conn(mocker):
 
         return fut
 
-    mocker.patch("serial_asyncio_fast.create_serial_connection", new=create_serial_conn)
+    mocker.patch("zigpy_znp.uart.create_serial_connection", new=create_serial_conn)
 
     return device, serial_interface
 
