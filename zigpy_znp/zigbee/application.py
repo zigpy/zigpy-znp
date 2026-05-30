@@ -978,9 +978,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 continue
 
                         # Perform route discovery explicitly if the stack fails and
-                        # then retry the request. zigpy no longer retries failed
-                        # requests at the application level (zigpy #1824), so the retry
-                        # must happen here for route rediscovery to take effect.
+                        # then retry the request
                         if (
                             e.response.Status == t.Status.NWK_NO_ROUTE
                             and device is not None
