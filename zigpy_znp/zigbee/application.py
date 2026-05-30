@@ -887,6 +887,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         succeeded = False
         child_association = None
         tried_assoc_remove = False
+        last_error = None
 
         try:
             # We retry sending twice but the only devices that will use the second retry
@@ -934,6 +935,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         succeeded = True
                         break
                     except InvalidCommandResponse as e:
+                        last_error = e
+
                         # Child aging is disabled so if a child switches parents from
                         # the coordinator to another router, we will not be able to
                         # re-discover a route to it. We have to manually drop the child
@@ -987,6 +990,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             continue
 
                         raise
+            else:
+                # Every attempt was consumed by a recovery `continue` without a
+                # successful send (e.g. NWK_NO_ROUTE followed by a first-time
+                # MAC_TRANSACTION_EXPIRED on the final attempt). Surface the last
+                # error instead of silently reporting the send as successful.
+                if last_error is not None:
+                    raise last_error
         except InvalidCommandResponse as e:
             status = e.response.Status
             raise DeliveryError(f"Failed to send request: {status!r}", status=status)

@@ -592,6 +592,93 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
     await app.shutdown()
 
 
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_request_recovery_route_rediscovery_then_assoc_failure(
+    device, make_application, mocker
+):
+    # A NWK_NO_ROUTE failure that consumes the first attempt, followed by a
+    # first-time MAC_TRANSACTION_EXPIRED recovery on the final attempt, must surface
+    # as a DeliveryError rather than silently reporting a successful send.
+    app, znp_server = make_application(server_cls=device)
+
+    await app.startup(auto_form=False)
+
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+
+    assoc_device, _ = c.util.Device.deserialize(b"\xFF" * 100)
+    assoc_device.shortAddr = device.nwk
+    assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
+
+    # First attempt fails with NWK_NO_ROUTE, the retried attempt fails with a
+    # first-time MAC_TRANSACTION_EXPIRED association failure
+    data_confirm_statuses = iter(
+        [t.Status.NWK_NO_ROUTE, t.Status.MAC_TRANSACTION_EXPIRED]
+    )
+
+    def data_confirm_replier(req):
+        return c.AF.DataConfirm.Callback(
+            Status=next(data_confirm_statuses),
+            Endpoint=1,
+            TSN=1,
+        )
+
+    znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
+    znp_server.reply_to(
+        c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
+        responses=[c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)],
+    )
+
+    did_assoc_remove = znp_server.reply_to(
+        c.UTIL.AssocRemove.Req(IEEE=device.ieee),
+        responses=[c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    did_assoc_add = znp_server.reply_to(
+        c.UTIL.AssocAdd.Req(
+            NWK=device.nwk,
+            IEEE=device.ieee,
+            NodeRelation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+        ),
+        responses=[c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    was_route_discovered = znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(
+            Dst=device.nwk, Options=c.zdo.RouteDiscoveryOptions.UNICAST, partial=True
+        ),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    with pytest.raises(DeliveryError):
+        await app.request(
+            device=device,
+            profile=260,
+            cluster=1,
+            src_ep=1,
+            dst_ep=1,
+            sequence=1,
+            data=b"\x00",
+        )
+
+    # The route was rediscovered after the first failure
+    assert was_route_discovered.call_count >= 1
+    # The association removed on the final attempt must be re-added on failure
+    assert len(did_assoc_remove.mock_calls) >= 1
+    assert len(did_assoc_add.mock_calls) >= 1
+
+    await app.shutdown()
+
+
 @pytest.mark.parametrize("device_cls", FORMED_DEVICES)
 @pytest.mark.parametrize("fw_assoc_remove", [True, False])
 @pytest.mark.parametrize("final_status", [t.Status.SUCCESS, t.Status.APS_NO_ACK])
