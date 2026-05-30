@@ -670,11 +670,13 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
             data=b"\x00",
         )
 
-    # The route was rediscovered after the first failure
-    assert was_route_discovered.call_count >= 1
-    # The association removed on the final attempt must be re-added on failure
-    assert len(did_assoc_remove.mock_calls) >= 1
-    assert len(did_assoc_add.mock_calls) >= 1
+    # Route discovery runs once for the first-attempt NWK_NO_ROUTE and once during
+    # the final-attempt MAC_TRANSACTION_EXPIRED recovery
+    assert was_route_discovered.call_count == 2
+    # The association is removed exactly once during recovery and, since the send
+    # ultimately fails, must be re-added exactly once
+    assert len(did_assoc_remove.mock_calls) == 1
+    assert len(did_assoc_add.mock_calls) == 1
 
     await app.shutdown()
 
