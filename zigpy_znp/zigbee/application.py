@@ -887,12 +887,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         succeeded = False
         child_association = None
         tried_assoc_remove = False
+        last_error = None
 
         try:
             # We retry sending twice but the only devices that will use the second retry
             # attempt are sleeping end devices that silently switched parents from the
-            # coordinator, all others will fail immediately
-            for _retry_attempt in range(2):
+            # coordinator, as well as devices for which we just rediscovered a route.
+            # All others will fail immediately.
+            for retry_attempt in range(2):
                 async with self._limit_concurrency(priority=packet.priority):
                     try:
                         # ZDO requests do not generate `AF.DataConfirm` messages
@@ -933,6 +935,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         succeeded = True
                         break
                     except InvalidCommandResponse as e:
+                        last_error = e
+
                         # Child aging is disabled so if a child switches parents from
                         # the coordinator to another router, we will not be able to
                         # re-discover a route to it. We have to manually drop the child
@@ -973,11 +977,24 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             else:
                                 continue
 
-                        # Perform route discovery explicitly if the stack fails
-                        if e.response.Status == t.Status.NWK_NO_ROUTE:
+                        # Perform route discovery explicitly if the stack fails and
+                        # then retry the request
+                        if (
+                            e.response.Status == t.Status.NWK_NO_ROUTE
+                            and device is not None
+                            and retry_attempt < 1
+                        ):
                             await self._discover_route(device.nwk)
+                            continue
 
                         raise
+            else:
+                # Every attempt was consumed by a recovery `continue` without a
+                # successful send (e.g. NWK_NO_ROUTE followed by a first-time
+                # MAC_TRANSACTION_EXPIRED on the final attempt). Surface the last
+                # error instead of silently reporting the send as successful.
+                if last_error is not None:
+                    raise last_error
         except InvalidCommandResponse as e:
             status = e.response.Status
             raise DeliveryError(f"Failed to send request: {status!r}", status=status)
