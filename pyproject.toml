@@ -14,7 +14,7 @@ readme = "README.md"
 license = {text = "GPL-3.0"}
 requires-python = ">=3.11"
 dependencies = [
-    "zigpy>=1.3.0",
+    "zigpy>=1.5.0",
     "voluptuous",
     "coloredlogs",
     "jsonschema",
