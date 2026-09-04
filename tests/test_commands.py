@@ -559,3 +559,19 @@ def test_neighbors_missing_payload():
         Src=0x821F,
         Status=t.ZDOStatus.NOT_SUPPORTED,
     )
+
+
+def test_routes_missing_payload():
+    frame = frames.GeneralFrame(
+        header=t.CommandHeader(
+            id=0xB2,
+            subsystem=t.Subsystem.ZDO,
+            type=t.CommandType.AREQ,
+        ),
+        data=b"\x85\xCC\x84",
+    )
+
+    assert c.ZDO.MgmtRtgRsp.Callback.from_frame(frame) == c.ZDO.MgmtRtgRsp.Callback(
+        Src=0xCC85,
+        Status=t.ZDOStatus.NOT_SUPPORTED,
+    )
