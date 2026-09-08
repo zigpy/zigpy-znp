@@ -1,14 +1,14 @@
-import keyword
-import dataclasses
 from collections import defaultdict
+import dataclasses
+import keyword
 
 import pytest
 import zigpy.types as zigpy_t
 import zigpy.zdo.types
 
-import zigpy_znp.frames as frames
-import zigpy_znp.commands as c
 from zigpy_znp import types as t
+import zigpy_znp.commands as c
+import zigpy_znp.frames as frames
 
 
 def test_command_header():
@@ -552,7 +552,7 @@ def test_neighbors_missing_payload():
             subsystem=t.Subsystem.ZDO,
             type=t.CommandType.AREQ,
         ),
-        data=b"\x1F\x82\x84",
+        data=b"\x1f\x82\x84",
     )
 
     assert c.ZDO.MgmtLqiRsp.Callback.from_frame(frame) == c.ZDO.MgmtLqiRsp.Callback(

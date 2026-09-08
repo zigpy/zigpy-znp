@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import sys
 import asyncio
 import logging
+import sys
 
-import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+import zigpy_znp.commands as c
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.tools.common import ClosableFileType, setup_parser
 from zigpy_znp.tools.nvram_reset import nvram_reset
+import zigpy_znp.types as t
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ async def write_firmware(znp: ZNP, firmware: bytes, reset_nvram: bool):
                 request=c.UBL.HandshakeReq.Req(),
                 callback=c.UBL.HandshakeRsp.Callback(partial=True),
             )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise RuntimeError(
             "Did not receive a bootloader handshake response!"
             " Make sure your adapter has just been plugged in and"

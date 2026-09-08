@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import enum
-import typing
-import logging
 import dataclasses
+import enum
+import logging
+import typing
 
 import zigpy.zdo.types
 
@@ -307,7 +307,7 @@ class CommandBase:
         all_params = [p.name for p in self.schema]
         optional_params = [p.name for p in self.schema if p.optional]
         given_params = set(params.keys())
-        given_optional = [p for p in params.keys() if p in optional_params]
+        given_optional = [p for p in params if p in optional_params]
 
         unknown_params = given_params - set(all_params)
         missing_params = (set(all_params) - set(optional_params)) - given_params
@@ -503,7 +503,7 @@ class CommandBase:
     def __repr__(self):
         params = [f"{p.name}={v!r}" for p, v in self._bound_params.values()]
 
-        return f'{self.__class__.__qualname__}({", ".join(params)})'
+        return f"{self.__class__.__qualname__}({', '.join(params)})"
 
     __str__ = __repr__
 

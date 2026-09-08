@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
-from zigpy_znp.utils import deduplicate_commands, combine_concurrent_calls
+import zigpy_znp.types as t
+from zigpy_znp.utils import combine_concurrent_calls, deduplicate_commands
 
 
 def test_command_deduplication_simple():

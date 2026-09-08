@@ -1,14 +1,14 @@
-import json
 import asyncio
 import inspect
+import json
 import logging
 import pathlib
 from unittest.mock import Mock, patch
 
 import pytest
-import zigpy.types
 import zigpy.config
 import zigpy.device
+import zigpy.types
 
 try:
     # Python 3.8 already has this
@@ -19,14 +19,14 @@ except ImportError:
 import zigpy.endpoint
 import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.const as const
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
-from zigpy_znp.uart import ZnpMtProtocol
+import zigpy_znp.commands as c
+import zigpy_znp.config as conf
+import zigpy_znp.const as const
 from zigpy_znp.nvram import NVRAMHelper
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import ExNvIds, NvSysIds, OsalNvIds, is_secure_nvid
+from zigpy_znp.uart import ZnpMtProtocol
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
@@ -515,12 +515,12 @@ class BaseZStackDevice(BaseServerZNP):
             FrameCounter=2500,
         )
 
-        self._nvram[ExNvIds.LEGACY][
-            OsalNvIds.NWK_ACTIVE_KEY_INFO
-        ] = self.nvram_serialize(key_info.Active)
-        self._nvram[ExNvIds.LEGACY][
-            OsalNvIds.NWK_ALTERN_KEY_INFO
-        ] = self.nvram_serialize(key_info.Active)
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.NWK_ACTIVE_KEY_INFO] = (
+            self.nvram_serialize(key_info.Active)
+        )
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.NWK_ALTERN_KEY_INFO] = (
+            self.nvram_serialize(key_info.Active)
+        )
         self._nvram[ExNvIds.LEGACY][OsalNvIds.NWKKEY] = self.nvram_serialize(key_info)
 
     def _default_nib(self):
@@ -805,7 +805,7 @@ class BaseZStackDevice(BaseServerZNP):
         if len(req.Value) > req.ItemLen:
             return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.INVALID_PARAMETER)
 
-        self._nvram[ExNvIds.LEGACY][req.Id] = req.Value.ljust(req.ItemLen, b"\xFF")
+        self._nvram[ExNvIds.LEGACY][req.Id] = req.Value.ljust(req.ItemLen, b"\xff")
 
         return c.SYS.OSALNVItemInit.Rsp(Status=t.Status.NV_ITEM_UNINIT)
 
@@ -858,9 +858,9 @@ class BaseZStackDevice(BaseServerZNP):
 
             if startup & t.StartupOptions.ClearState:
                 self._create_network_nvram()
-                self._nvram[ExNvIds.LEGACY][
-                    OsalNvIds.STARTUP_OPTION
-                ] = t.StartupOptions.NONE.serialize()
+                self._nvram[ExNvIds.LEGACY][OsalNvIds.STARTUP_OPTION] = (
+                    t.StartupOptions.NONE.serialize()
+                )
 
         # Resetting recreates the EXTADDR NVRAM item
         if (
@@ -914,7 +914,7 @@ class BaseZStackDevice(BaseServerZNP):
 
     @reply_to(c.UTIL.AssocFindDevice.Req(Index=0))
     def assoc_find_dev_responder(self, req):
-        return req.Rsp(Device=t.Bytes(b"\xFF" * (36 if self.align_structs else 28)))
+        return req.Rsp(Device=t.Bytes(b"\xff" * (36 if self.align_structs else 28)))
 
 
 class BaseZStack1CC2531(BaseZStackDevice):
@@ -1170,7 +1170,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
 
     def _create_network_nvram(self):
         super()._create_network_nvram()
-        self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xFF" * 20
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xff" * 20
         self._nvram[ExNvIds.ADDRMGR] = {
             addr: self.nvram_serialize(const.EMPTY_ADDR_MGR_ENTRY_ZSTACK3)
             for addr in range(0x0000, 0x0100 + 1)
@@ -1309,7 +1309,7 @@ class BaseZStack3CC2531(BaseZStack3Device):
 
     def _create_network_nvram(self):
         super()._create_network_nvram()
-        self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xFF" * 17
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.APS_LINK_KEY_TABLE] = b"\xff" * 17
         self._nvram[ExNvIds.LEGACY][OsalNvIds.ADDRMGR] = 124 * self.nvram_serialize(
             const.EMPTY_ADDR_MGR_ENTRY_ZSTACK1
         )
@@ -1317,21 +1317,21 @@ class BaseZStack3CC2531(BaseZStack3Device):
     def create_nib(self, _=None):
         super().create_nib()
 
-        self._nvram[ExNvIds.LEGACY][
-            OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START
-        ] = self.nvram_serialize(
-            t.NwkSecMaterialDesc(
-                FrameCounter=2500,
-                ExtendedPanID=self.nib.extendedPANID,
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START] = (
+            self.nvram_serialize(
+                t.NwkSecMaterialDesc(
+                    FrameCounter=2500,
+                    ExtendedPanID=self.nib.extendedPANID,
+                )
             )
         )
 
-        self._nvram[ExNvIds.LEGACY][
-            OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END
-        ] = self.nvram_serialize(
-            t.NwkSecMaterialDesc(
-                FrameCounter=0xFFFFFFFF,
-                ExtendedPanID=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+        self._nvram[ExNvIds.LEGACY][OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_END] = (
+            self.nvram_serialize(
+                t.NwkSecMaterialDesc(
+                    FrameCounter=0xFFFFFFFF,
+                    ExtendedPanID=t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
+                )
             )
         )
 

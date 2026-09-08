@@ -1,38 +1,38 @@
 from __future__ import annotations
 
-import os
-import time
-import typing
 import asyncio
-import logging
-import itertools
+from collections import Counter, defaultdict
 import contextlib
 import dataclasses
 import importlib.metadata
-from collections import Counter, defaultdict
+import itertools
+import logging
+import os
+import time
+import typing
 
-import zigpy.state
-import zigpy.zdo.types as zdo_t
+from zigpy.datastructures import PriorityLock
 import zigpy.exceptions
 from zigpy.exceptions import NetworkNotFormed
-from zigpy.datastructures import PriorityLock
+import zigpy.state
+import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.const as const
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
-import zigpy_znp.logger as log
-import zigpy_znp.commands as c
 from zigpy_znp import uart
-from zigpy_znp.nvram import NVRAMHelper
-from zigpy_znp.utils import (
-    CatchAllResponse,
-    BaseResponseListener,
-    OneShotResponseListener,
-    CallbackResponseListener,
-)
-from zigpy_znp.frames import GeneralFrame
+import zigpy_znp.commands as c
+import zigpy_znp.config as conf
+import zigpy_znp.const as const
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.frames import GeneralFrame
+import zigpy_znp.logger as log
+from zigpy_znp.nvram import NVRAMHelper
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
+from zigpy_znp.utils import (
+    BaseResponseListener,
+    CallbackResponseListener,
+    CatchAllResponse,
+    OneShotResponseListener,
+)
 
 if typing.TYPE_CHECKING:
     import typing_extensions
@@ -297,7 +297,7 @@ class ZNP:
                 # Both versions still end with this callback
                 async with asyncio.timeout(STARTUP_TIMEOUT):
                     await started_as_coordinator
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 raise zigpy.exceptions.FormationFailure(
                     "Network formation refused: there is too much RF interference."
                     " Make sure your coordinator is on a USB 2.0 extension cable and"
@@ -667,7 +667,7 @@ class ZNP:
             try:
                 async with asyncio.timeout(CONNECT_PING_TIMEOUT):
                     return await self.request(c.SYS.Ping.Req())
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
             # If that doesn't work, send the bootloader skip bytes and try again.
@@ -683,7 +683,7 @@ class ZNP:
                 try:
                     async with asyncio.timeout(2 * CONNECT_PING_TIMEOUT):
                         return await self.request(c.SYS.Ping.Req())
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
         async with self.capture_responses([CatchAllResponse()]) as responses:
@@ -707,7 +707,7 @@ class ZNP:
                 try:
                     async with asyncio.timeout(CONNECT_PING_TIMEOUT):
                         result = await ping_task  # type:ignore[misc]
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     ping_task.cancel()
 
         if isinstance(result, c.SYS.Ping.Rsp):
@@ -939,14 +939,12 @@ class ZNP:
     @typing.overload
     def wait_for_responses(
         self, responses, *, context: typing_extensions.Literal[False] = ...
-    ) -> asyncio.Future:
-        ...
+    ) -> asyncio.Future: ...
 
     @typing.overload
     def wait_for_responses(
         self, responses, *, context: typing_extensions.Literal[True]
-    ) -> tuple[asyncio.Future, OneShotResponseListener]:
-        ...
+    ) -> tuple[asyncio.Future, OneShotResponseListener]: ...
 
     def wait_for_responses(
         self, responses, *, context: bool = False

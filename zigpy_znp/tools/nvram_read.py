@@ -1,14 +1,14 @@
-import sys
-import json
 import asyncio
+import json
 import logging
+import sys
 
-import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.exceptions import SecurityError, CommandNotRecognized
-from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
+from zigpy_znp.exceptions import CommandNotRecognized, SecurityError
 from zigpy_znp.tools.common import ClosableFileType, setup_parser
+import zigpy_znp.types as t
+from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
 

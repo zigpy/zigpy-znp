@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import typing
-import inspect
 import dataclasses
+import inspect
+import typing
 
 import zigpy.types as zigpy_t
 
@@ -40,7 +40,7 @@ class CStructField:
 
 
 class CStruct:
-    _padding_byte = b"\xFF"
+    _padding_byte = b"\xff"
 
     def __init_subclass__(cls):
         super().__init_subclass__()

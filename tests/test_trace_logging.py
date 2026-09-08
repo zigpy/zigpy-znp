@@ -20,7 +20,7 @@ def test_existing_trace_level(trace_level, monkeypatch):
     monkeypatch_addLevelName(monkeypatch, trace_level, "TRACE")
 
     monkeypatch.setattr(logging, "TRACE", trace_level, raising=False)
-    assert logging.TRACE == trace_level
+    assert trace_level == logging.TRACE
 
     # If a TRACE level already exists and TRACE < DEBUG, we use it
     assert _find_trace_level() == trace_level

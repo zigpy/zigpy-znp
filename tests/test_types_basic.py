@@ -11,7 +11,7 @@ def test_serialize_list():
 
     assert (
         t.serialize_list([t.uint8_t(0xF0), t.Bytes(b"asd"), TestList([0xAB, 0xCD])])
-        == b"\xF0asd\x02\xAB\xCD"
+        == b"\xf0asd\x02\xab\xcd"
     )
 
     assert t.serialize_list([]) == b""

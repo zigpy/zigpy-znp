@@ -1,5 +1,4 @@
-"""Serial bootloader interface. Implemented in sb_exec_v2.c
-"""
+"""Serial bootloader interface. Implemented in sb_exec_v2.c"""
 
 import zigpy_znp.types as t
 

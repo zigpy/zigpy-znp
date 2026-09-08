@@ -1,15 +1,15 @@
+import asyncio
+import itertools
+import logging
 import sys
 import time
-import asyncio
-import logging
-import itertools
 
-import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+import zigpy_znp.commands as c
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.types.nvids import OsalNvIds
 from zigpy_znp.tools.common import setup_parser
+import zigpy_znp.types as t
+from zigpy_znp.types.nvids import OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
 

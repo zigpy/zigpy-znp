@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import sys
-import json
 import asyncio
+import json
+import sys
 
 import zigpy.state
 import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.const as const
-import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
+import zigpy_znp.const as const
 from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
+import zigpy_znp.types as t
 from zigpy_znp.zigbee.application import ControllerApplication
 
 

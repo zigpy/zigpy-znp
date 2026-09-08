@@ -1,30 +1,30 @@
 from __future__ import annotations
 
-import os
 import asyncio
 import logging
+import os
 
-import zigpy.zcl
-import zigpy.zdo
-import zigpy.util
+import zigpy.application
+import zigpy.config
+import zigpy.config.defaults
+import zigpy.device
+from zigpy.exceptions import DeliveryError
+import zigpy.profiles
 import zigpy.state
 import zigpy.types
-import zigpy.config
-import zigpy.device
-import zigpy.profiles
+import zigpy.util
+import zigpy.zcl
+import zigpy.zdo
 import zigpy.zdo.types as zdo_t
-import zigpy.application
-import zigpy.config.defaults
-from zigpy.exceptions import DeliveryError
 
-import zigpy_znp.const as const
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
-from zigpy_znp.utils import combine_concurrent_calls
+import zigpy_znp.commands as c
+import zigpy_znp.config as conf
+import zigpy_znp.const as const
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import OsalNvIds
+from zigpy_znp.utils import combine_concurrent_calls
 from zigpy_znp.zigbee.device import ZNPCoordinator
 
 ZDO_ENDPOINT = 0
@@ -607,7 +607,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     c.UTIL.LEDControl.Req(LED=led, Mode=mode),
                     RspStatus=t.Status.SUCCESS,
                 )
-        except (asyncio.TimeoutError, CommandNotRecognized):
+        except (TimeoutError, CommandNotRecognized):
             LOGGER.info("This build of Z-Stack does not appear to support LED control")
 
     async def _write_stack_settings(self) -> bool:
@@ -779,8 +779,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 )
             ) or (
                 # Or a direct unicast request
-                dst_addr.mode == t.AddrMode.NWK
-                and dst_addr.address == self._device.nwk
+                dst_addr.mode == t.AddrMode.NWK and dst_addr.address == self._device.nwk
             ):
                 self.packet_received(
                     zigpy.types.ZigbeePacket(

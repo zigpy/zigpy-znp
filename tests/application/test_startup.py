@@ -2,22 +2,22 @@ import pytest
 import voluptuous as vol
 from zigpy.exceptions import NetworkNotFormed
 
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+import zigpy_znp.commands as c
+import zigpy_znp.config as conf
 from zigpy_znp.exceptions import InvalidCommandResponse
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
     ALL_DEVICES,
     EMPTY_DEVICES,
     FORMED_DEVICES,
-    CoroutineMock,
     BaseZStack3Device,
+    CoroutineMock,
+    FormedLaunchpadCC26X2R1,
     FormedZStack1CC2531,
     FormedZStack3CC2531,
-    FormedLaunchpadCC26X2R1,
 )
 
 DEV_NETWORK_SETTINGS = {

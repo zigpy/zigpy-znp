@@ -3,11 +3,11 @@ import logging
 
 import pytest
 
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
 import zigpy_znp.commands as c
-from zigpy_znp.frames import GeneralFrame
+import zigpy_znp.config as conf
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.frames import GeneralFrame
+import zigpy_znp.types as t
 
 
 async def test_callback_rsp(connected_znp):
@@ -293,7 +293,7 @@ async def test_handling_known_bad_command_parsing(connected_znp, caplog):
         header=t.CommandHeader(
             id=0x9F, subsystem=t.Subsystem.ZDO, type=t.CommandType.AREQ
         ),
-        data=b"\x13\xDB\x84\x01\x21",
+        data=b"\x13\xdb\x84\x01\x21",
     )
 
     caplog.set_level(logging.WARNING)
@@ -312,7 +312,7 @@ async def test_handling_unknown_bad_command_parsing(connected_znp):
         header=t.CommandHeader(
             id=0xCB, subsystem=t.Subsystem.ZDO, type=t.CommandType.AREQ
         ),
-        data=b"\x13\xDB\x84\x01\x21",
+        data=b"\x13\xdb\x84\x01\x21",
     )
 
     with pytest.raises(ValueError):

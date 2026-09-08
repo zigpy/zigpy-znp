@@ -32,13 +32,13 @@ if typing.TYPE_CHECKING:
 
 else:
     from zigpy.types import (  # noqa: F401
+        bitmap8,
+        bitmap16,
         enum8,
         enum16,
         enum24,
         enum40,
         enum64,
-        bitmap8,
-        bitmap16,
         uint16_t,
         uint24_t,
         uint32_t,

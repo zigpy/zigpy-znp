@@ -2,11 +2,11 @@ import asyncio
 
 import pytest
 
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
-import zigpy_znp.commands as c
 from zigpy_znp import uart as znp_uart
+import zigpy_znp.commands as c
+import zigpy_znp.config as conf
 from zigpy_znp.frames import TransportFrame
+import zigpy_znp.types as t
 
 
 @pytest.fixture
@@ -187,9 +187,9 @@ def test_uart_rx_sof_stress(connected_uart):
     test_frame_bytes = TransportFrame(test_frame).serialize()
 
     # We include an almost-valid frame and many stray SoF markers
-    uart.data_received(b"\xFE" + b"\xFE" + b"\xFE" + test_frame_bytes[:-1] + b"\x00")
-    uart.data_received(b"\xFE\xFE\x00\xFE\x01")
-    uart.data_received(b"\xFE" + b"\xFE" + b"\xFE" + test_frame_bytes + b"\x00\x00")
+    uart.data_received(b"\xfe" + b"\xfe" + b"\xfe" + test_frame_bytes[:-1] + b"\x00")
+    uart.data_received(b"\xfe\xfe\x00\xfe\x01")
+    uart.data_received(b"\xfe" + b"\xfe" + b"\xfe" + test_frame_bytes + b"\x00\x00")
 
     # We should see the valid frame exactly once
     znp.frame_received.assert_called_once_with(test_frame)

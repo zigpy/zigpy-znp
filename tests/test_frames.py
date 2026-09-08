@@ -1,8 +1,8 @@
 import pytest
 
-import zigpy_znp.types as t
-import zigpy_znp.frames as frames
 from zigpy_znp.exceptions import InvalidFrame
+import zigpy_znp.frames as frames
+import zigpy_znp.types as t
 
 
 def test_general_frame():

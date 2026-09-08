@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import typing
-import logging
 import dataclasses
+import logging
+import typing
 
 import zigpy.state
 import zigpy.zdo.types as zdo_t
 
+from zigpy_znp.api import ZNP
 import zigpy_znp.const as const
 import zigpy_znp.types as t
-from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
@@ -264,9 +264,7 @@ async def read_devices(
         if entry.extAddr in (
             t.EUI64.convert("00:00:00:00:00:00:00:00"),
             t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
-        ):
-            continue
-        elif entry.type in (
+        ) or entry.type in (
             t.AddrMgrUserType.Default,
             t.AddrMgrUserType.Binding,
         ):

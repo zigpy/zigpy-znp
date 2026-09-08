@@ -1,28 +1,28 @@
-import typing
 import numbers
+import typing
 
 import voluptuous as vol
 from zigpy.config import (  # noqa: F401
-    CONF_NWK,
     CONF_DEVICE,
-    CONF_NWK_KEY,
-    CONFIG_SCHEMA,
-    SCHEMA_DEVICE,
-    CONF_NWK_PAN_ID,
     CONF_DEVICE_PATH,
+    CONF_MAX_CONCURRENT_REQUESTS,
+    CONF_NWK,
     CONF_NWK_CHANNEL,
     CONF_NWK_CHANNELS,
-    CONF_NWK_UPDATE_ID,
+    CONF_NWK_EXTENDED_PAN_ID,
+    CONF_NWK_KEY,
+    CONF_NWK_PAN_ID,
     CONF_NWK_TC_ADDRESS,
     CONF_NWK_TC_LINK_KEY,
-    CONF_NWK_EXTENDED_PAN_ID,
-    CONF_MAX_CONCURRENT_REQUESTS,
+    CONF_NWK_UPDATE_ID,
+    CONFIG_SCHEMA,
+    SCHEMA_DEVICE,
     cv_boolean,
 )
 
 from zigpy_znp.commands.util import LEDMode
 
-ConfigType = typing.Dict[str, typing.Any]
+ConfigType = dict[str, typing.Any]
 
 VolPositiveNumber = vol.All(numbers.Real, vol.Range(min=0))
 

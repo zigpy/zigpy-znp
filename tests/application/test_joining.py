@@ -3,20 +3,20 @@ import contextlib
 from unittest import mock
 
 import pytest
-import zigpy.util
 import zigpy.types
+import zigpy.util
 import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
+import zigpy_znp.types as t
 
 from ..conftest import (
     FORMED_DEVICES,
     FORMED_ZSTACK3_DEVICES,
     CoroutineMock,
     FormedLaunchpadCC26X2R1,
-    zdo_request_matcher,
     serialize_zdo_command,
+    zdo_request_matcher,
 )
 
 
@@ -132,7 +132,7 @@ async def test_join_device(device, make_application):
 
 
 @pytest.mark.parametrize("device", FORMED_ZSTACK3_DEVICES)
-@pytest.mark.parametrize("permit_result", [None, asyncio.TimeoutError()])
+@pytest.mark.parametrize("permit_result", [None, TimeoutError()])
 async def test_permit_join_with_key(device, permit_result, make_application, mocker):
     app, znp_server = make_application(server_cls=device)
 
@@ -168,8 +168,10 @@ async def test_permit_join_with_key(device, permit_result, make_application, moc
 
     mocker.patch.object(app, "permit", new=CoroutineMock(side_effect=permit_result))
 
-    with contextlib.nullcontext() if permit_result is None else pytest.raises(
-        asyncio.TimeoutError
+    with (
+        contextlib.nullcontext()
+        if permit_result is None
+        else pytest.raises(asyncio.TimeoutError)
     ):
         await app.permit_with_link_key(node=ieee, link_key=link_key, time_s=1)
 
