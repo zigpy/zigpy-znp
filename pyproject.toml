@@ -25,7 +25,7 @@ exclude = ["tests", "tests.*"]
 
 [dependency-groups]
 testing = [
-    "mypy==1.19.1",
+    "mypy==2.3.1",
     "pre-commit",
     "coverage[toml]",
     "pytest>=7.3.1",
@@ -95,7 +95,6 @@ combine-as-imports = true
 split-on-trailing-comma = false
 
 [tool.codespell]
-ignore-words-list = ["ser", "nd", "hass", "checkin", "SUBSTRUCT", "substruct"]
 skip = ["./.*", "tests/*", "pyproject.toml"]
 quiet-level = 2
 
