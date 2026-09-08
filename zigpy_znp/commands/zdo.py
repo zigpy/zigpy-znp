@@ -1194,7 +1194,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             t.Param(
                 "Status", t.ZDOStatus, "Status is either Success (0) or Failure (1)"
             ),
-            t.Param("Routes", zigpy.zdo.types.Routes, "Routes"),
+            t.Param("Routes", zigpy.zdo.types.Routes, "Routes", optional=True),
         ),
     )
 
