@@ -1,14 +1,14 @@
-import sys
 import asyncio
-import logging
+from collections import defaultdict, deque
 import itertools
-from collections import deque, defaultdict
+import logging
+import sys
 
-import zigpy.zdo.types as zdo_t
 from zigpy.exceptions import NetworkNotFormed
+import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.types as t
 from zigpy_znp.tools.common import setup_parser
+import zigpy_znp.types as t
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LOGGER = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ async def perform_energy_scan(radio_path, num_scans=None):
 
         _, scanned_channels, _, _, energy_values = rsp
 
-        for channel, energy in zip(scanned_channels, energy_values):
+        for channel, energy in zip(scanned_channels, energy_values, strict=False):
             energies = channel_energies[channel]
             energies.append(energy)
 

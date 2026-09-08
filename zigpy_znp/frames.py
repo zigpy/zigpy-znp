@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import functools
 import dataclasses
+import functools
 
-import zigpy_znp.types as t
 from zigpy_znp.exceptions import InvalidFrame
+import zigpy_znp.types as t
 
 
 @dataclasses.dataclass(frozen=True)

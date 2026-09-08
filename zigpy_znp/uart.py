@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import typing
 import asyncio
 import logging
+import typing
 
 import zigpy.config
 from zigpy.serial import SerialProtocol, create_serial_connection
 
 import zigpy_znp.config as conf
+from zigpy_znp.exceptions import InvalidFrame
 import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
 from zigpy_znp.types import Bytes
-from zigpy_znp.exceptions import InvalidFrame
 
 LOGGER = logging.getLogger(__name__)
 
@@ -128,12 +128,7 @@ class ZnpMtProtocol(SerialProtocol):
         return frame
 
     def __repr__(self) -> str:
-        return (
-            f"<"
-            f"{type(self).__name__} connected to {self.url!r}"
-            f" (api: {self._api})"
-            f">"
-        )
+        return f"<{type(self).__name__} connected to {self.url!r} (api: {self._api})>"
 
 
 async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:

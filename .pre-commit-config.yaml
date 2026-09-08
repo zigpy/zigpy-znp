@@ -1,47 +1,24 @@
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
     hooks:
-      - id: debug-statements
+      - id: ruff
+        args: ["--fix", "--exit-non-zero-on-fix", "--config", "pyproject.toml"]
+      - id: ruff-format
+        args: ["--config", "pyproject.toml"]
 
-  - repo: https://github.com/psf/black
-    rev: 23.10.1
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
     hooks:
-      - id: black
-
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        entry: pflake8
-        additional_dependencies: 
-          - pyproject-flake8==7.0.0
-          - flake8-bugbear==24.2.6
-          - flake8-comprehensions==3.14.0
-          - flake8_2020==1.8.1
-          - mccabe==0.7.0
-          - pycodestyle==2.11.1
-          - pyflakes==3.2.0
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
+      - id: codespell
+        additional_dependencies: [tomli]
+        args: ["--toml", "pyproject.toml"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+    rev: v2.3.1
     hooks:
       - id: mypy
         additional_dependencies:
-          - zigpy>=0.91.2
+          - zigpy>=1.5.0
           - types-setuptools
-
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.15.0
-    hooks:
-      - id: pyupgrade
-
-  - repo: https://github.com/fsouza/autoflake8
-    rev: v0.4.1
-    hooks:
-      - id: autoflake8
+        exclude: ^tests/

@@ -1,38 +1,38 @@
 from __future__ import annotations
 
-import os
-import time
-import typing
 import asyncio
-import logging
-import itertools
+from collections import Counter, defaultdict
 import contextlib
 import dataclasses
 import importlib.metadata
-from collections import Counter, defaultdict
+import itertools
+import logging
+import os
+import time
+import typing
 
-import zigpy.state
-import zigpy.zdo.types as zdo_t
+from zigpy.datastructures import PriorityLock
 import zigpy.exceptions
 from zigpy.exceptions import NetworkNotFormed
-from zigpy.datastructures import PriorityLock
+import zigpy.state
+import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.const as const
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
-import zigpy_znp.logger as log
-import zigpy_znp.commands as c
 from zigpy_znp import uart
-from zigpy_znp.nvram import NVRAMHelper
-from zigpy_znp.utils import (
-    CatchAllResponse,
-    BaseResponseListener,
-    OneShotResponseListener,
-    CallbackResponseListener,
-)
-from zigpy_znp.frames import GeneralFrame
+import zigpy_znp.commands as c
+import zigpy_znp.config as conf
+import zigpy_znp.const as const
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.frames import GeneralFrame
+import zigpy_znp.logger as log
+from zigpy_znp.nvram import NVRAMHelper
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
+from zigpy_znp.utils import (
+    BaseResponseListener,
+    CallbackResponseListener,
+    CatchAllResponse,
+    OneShotResponseListener,
+)
 
 if typing.TYPE_CHECKING:
     import typing_extensions
@@ -297,7 +297,7 @@ class ZNP:
                 # Both versions still end with this callback
                 async with asyncio.timeout(STARTUP_TIMEOUT):
                     await started_as_coordinator
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 raise zigpy.exceptions.FormationFailure(
                     "Network formation refused: there is too much RF interference."
                     " Make sure your coordinator is on a USB 2.0 extension cable and"
@@ -366,7 +366,7 @@ class ZNP:
             raise zigpy.exceptions.FormationFailure(
                 "Network formation failed: NVRAM is corrupted, re-flash your adapter's"
                 " firmware."
-            )
+            ) from rsp
 
         # Form a network with completely random settings to get NVRAM to a known state
         for item, value in {
@@ -375,7 +375,7 @@ class ZNP:
             OsalNvIds.PRECFGKEY: os.urandom(16),
             # XXX: Z2M requires this item to be False
             OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),
-            # Z-Stack will scan all of thse channels during formation
+            # Z-Stack will scan all of these channels during formation
             OsalNvIds.CHANLIST: const.STARTUP_CHANNELS,
         }.items():
             await self.nvram.osal_write(item, value, create=True)
@@ -608,7 +608,9 @@ class ZNP:
                 if entries != fixed_entries:
                     LOGGER.warning(
                         "Repairing %d invalid empty address manager entries (total %d)",
-                        sum(i != j for i, j in zip(entries, fixed_entries)),
+                        sum(
+                            i != j for i, j in zip(entries, fixed_entries, strict=True)
+                        ),
                         len(entries),
                     )
                     await security.write_addr_manager_entries(self, fixed_entries)
@@ -659,6 +661,7 @@ class ZNP:
             for dtr, rts in zip(
                 self._znp_config[conf.CONF_CONNECT_DTR_STATES],
                 self._znp_config[conf.CONF_CONNECT_RTS_STATES],
+                strict=True,
             ):
                 await self._uart.set_dtr_rts(dtr=dtr, rts=rts)
                 await asyncio.sleep(BOOTLOADER_PIN_TOGGLE_DELAY)
@@ -667,7 +670,7 @@ class ZNP:
             try:
                 async with asyncio.timeout(CONNECT_PING_TIMEOUT):
                     return await self.request(c.SYS.Ping.Req())
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
             # If that doesn't work, send the bootloader skip bytes and try again.
@@ -683,7 +686,7 @@ class ZNP:
                 try:
                     async with asyncio.timeout(2 * CONNECT_PING_TIMEOUT):
                         return await self.request(c.SYS.Ping.Req())
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
         async with self.capture_responses([CatchAllResponse()]) as responses:
@@ -707,7 +710,7 @@ class ZNP:
                 try:
                     async with asyncio.timeout(CONNECT_PING_TIMEOUT):
                         result = await ping_task  # type:ignore[misc]
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     ping_task.cancel()
 
         if isinstance(result, c.SYS.Ping.Rsp):
@@ -812,10 +815,8 @@ class ZNP:
         LOGGER.log(log.TRACE, "Removing listener %s", listener)
 
         for header in listener.matching_headers():
-            try:
+            with contextlib.suppress(ValueError):
                 self._listeners[header].remove(listener)
-            except ValueError:
-                pass
 
             if not self._listeners[header]:
                 LOGGER.log(
@@ -939,14 +940,12 @@ class ZNP:
     @typing.overload
     def wait_for_responses(
         self, responses, *, context: typing_extensions.Literal[False] = ...
-    ) -> asyncio.Future:
-        ...
+    ) -> asyncio.Future: ...
 
     @typing.overload
     def wait_for_responses(
         self, responses, *, context: typing_extensions.Literal[True]
-    ) -> tuple[asyncio.Future, OneShotResponseListener]:
-        ...
+    ) -> tuple[asyncio.Future, OneShotResponseListener]: ...
 
     def wait_for_responses(
         self, responses, *, context: bool = False

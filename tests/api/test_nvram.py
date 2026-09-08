@@ -1,9 +1,9 @@
 import pytest
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
-from zigpy_znp.types import nvids
 from zigpy_znp.exceptions import SecurityError
+import zigpy_znp.types as t
+from zigpy_znp.types import nvids
 
 
 async def test_osal_writes_invalid(connected_znp):
@@ -271,7 +271,7 @@ async def test_osal_read_security_bypass(connected_znp, nvid, value):
 
 
 @pytest.mark.parametrize("nvid", [nvids.OsalNvIds.POLL_RATE_OLD16])
-@pytest.mark.parametrize("value", [b"\xAB\xCD"])
+@pytest.mark.parametrize("value", [b"\xab\xcd"])
 async def test_osal_read_proxied(connected_znp, nvid, value):
     znp, znp_server = connected_znp
 

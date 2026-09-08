@@ -1,13 +1,13 @@
 from zigpy.types import (  # noqa: F401
-    NWK,
     EUI64,
+    NWK,
     Bool,
-    PanId,
-    Struct,
-    KeyData,
     Channels,
+    CharacterString,
     ClusterId,
     ExtendedPanId,
-    CharacterString,
+    KeyData,
+    PanId,
     SerializableBytes,
+    Struct,
 )

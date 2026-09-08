@@ -1,8 +1,8 @@
 import pytest
 
+import zigpy_znp.commands as c
 import zigpy_znp.const as const
 import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import FORMED_DEVICES, FormedZStack3CC2531

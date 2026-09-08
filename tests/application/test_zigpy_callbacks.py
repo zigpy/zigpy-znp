@@ -5,8 +5,8 @@ import pytest
 import zigpy.types as zigpy_t
 import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
+import zigpy_znp.types as t
 
 from ..conftest import FORMED_DEVICES, serialize_zdo_command
 
@@ -258,7 +258,7 @@ async def test_receive_af_broadcast(device, make_application, mocker):
         SecurityUse=t.Bool.false,
         TimeStamp=4442962,
         TSN=0,
-        Data=b"\x11\xA6\x00\x74\xB5\x7C\x00\x02\x5F",
+        Data=b"\x11\xa6\x00\x74\xb5\x7c\x00\x02\x5f",
         MacSrcAddr=0x0000,
         MsgResultRadius=0,
     )
@@ -303,7 +303,7 @@ async def test_receive_af_group(device, make_application, mocker):
         SecurityUse=t.Bool.false,
         TimeStamp=4442962,
         TSN=0,
-        Data=b"\x11\xA6\x00\x74\xB5\x7C\x00\x02\x5F",
+        Data=b"\x11\xa6\x00\x74\xb5\x7c\x00\x02\x5f",
         MacSrcAddr=0x0000,
         MsgResultRadius=0,
     )

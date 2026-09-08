@@ -1,10 +1,10 @@
-import logging
 import itertools
+import logging
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
+from zigpy_znp.exceptions import InvalidCommandResponse, SecurityError
+import zigpy_znp.types as t
 from zigpy_znp.types import nvids
-from zigpy_znp.exceptions import SecurityError, InvalidCommandResponse
 
 LOGGER = logging.getLogger(__name__)
 
@@ -190,7 +190,7 @@ class NVRAMHelper:
             if not self.znp.capabilities & t.MTCapabilities.SAPI or nv_id > 0xFF:
                 raise SecurityError(
                     f"NV item cannot be read due to security constraints: {nv_id!r}"
-                )
+                ) from e
 
             read_rsp = await self.znp.request(
                 c.SAPI.ZBReadConfiguration.Req(ConfigId=nv_id),

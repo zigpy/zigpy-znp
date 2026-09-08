@@ -1,9 +1,9 @@
-import sys
 import asyncio
 import logging
+import sys
 
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+import zigpy_znp.commands as c
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.tools.common import ClosableFileType, setup_parser
 
@@ -17,13 +17,13 @@ async def read_firmware(znp: ZNP) -> bytearray:
                 request=c.UBL.HandshakeReq.Req(),
                 callback=c.UBL.HandshakeRsp.Callback(partial=True),
             )
-    except asyncio.TimeoutError:
+    except TimeoutError as e:
         raise RuntimeError(
             "Did not receive a bootloader handshake response!"
             " Make sure your adapter has just been plugged in and"
             " nothing else has had a chance to communicate with it. Alternatively,"
             " press the button furthest from the USB port. The LED should turn red."
-        )
+        ) from e
 
     if handshake_rsp.Status != c.ubl.BootloaderStatus.SUCCESS:
         raise RuntimeError(f"Bad bootloader handshake response: {handshake_rsp}")

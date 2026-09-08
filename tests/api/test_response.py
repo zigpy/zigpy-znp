@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
+import zigpy_znp.types as t
 from zigpy_znp.utils import deduplicate_commands
 
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import enum
-import typing
-import logging
 import dataclasses
+import enum
+import logging
+import typing
 
 import zigpy.zdo.types
 
@@ -307,7 +307,7 @@ class CommandBase:
         all_params = [p.name for p in self.schema]
         optional_params = [p.name for p in self.schema if p.optional]
         given_params = set(params.keys())
-        given_optional = [p for p in params.keys() if p in optional_params]
+        given_optional = [p for p in params if p in optional_params]
 
         unknown_params = given_params - set(all_params)
         missing_params = (set(all_params) - set(optional_params)) - given_params
@@ -415,7 +415,7 @@ class CommandBase:
                     params[param.name], data = param.type.deserialize(data, align=align)
                 else:
                     params[param.name], data = param.type.deserialize(data)
-            except ValueError:
+            except ValueError as e:
                 if not data and param.optional:
                     # If we're out of data and the parameter is optional, we're done
                     break
@@ -424,7 +424,7 @@ class CommandBase:
                     raise ValueError(
                         f"Frame data is truncated (parsed {params}),"
                         f" required parameter remains: {param}"
-                    )
+                    ) from e
                 else:
                     # Otherwise, let the exception happen
                     raise
@@ -442,7 +442,9 @@ class CommandBase:
 
         assert self.header == other.header
 
-        param_pairs = zip(self._bound_params.values(), other._bound_params.values())
+        param_pairs = zip(
+            self._bound_params.values(), other._bound_params.values(), strict=True
+        )
 
         for (
             (expected_param, expected_value),
@@ -503,7 +505,7 @@ class CommandBase:
     def __repr__(self):
         params = [f"{p.name}={v!r}" for p, v in self._bound_params.values()]
 
-        return f'{self.__class__.__qualname__}({", ".join(params)})'
+        return f"{self.__class__.__qualname__}({', '.join(params)})"
 
     __str__ = __repr__
 
@@ -539,9 +541,9 @@ class DeviceState(t.enum8):
     BackoffBeforeRejoin = 0x0C
     # ReJoining a PAN in secure mode scanning in all channels, only for end devices
     RejoinSecureScanningAllChannels = 0x0D
-    # ReJoining a PAN in unsecure mode scanning in current channel, only for end devices
+    # ReJoining a PAN in insecure mode scanning in current channel, only for end devices
     RejoinInsecureScanningCurrentChannel = 0x0E
-    # ReJoining a PAN in unsecure mode scanning in all channels, only for end devices
+    # ReJoining a PAN in insecure mode scanning in all channels, only for end devices
     RejoinInsecureScanningAllChannels = 0x0F
 
 

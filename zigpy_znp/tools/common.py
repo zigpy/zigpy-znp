@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import argparse
+import logging
 import sys
 import typing
-import logging
-import argparse
 
-import jsonschema
 import coloredlogs
+import jsonschema
 
-import zigpy_znp.types as t
 import zigpy_znp.logger as log
+import zigpy_znp.types as t
 
 LOG_LEVELS = [logging.INFO, logging.DEBUG, log._TRACE]
 OPEN_COORDINATOR_BACKUP_SCHEMA = {

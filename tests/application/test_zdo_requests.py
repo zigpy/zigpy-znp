@@ -3,8 +3,8 @@ import asyncio
 import pytest
 import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
+import zigpy_znp.types as t
 
 from tests.conftest import FormedLaunchpadCC26X2R1
 

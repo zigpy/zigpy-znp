@@ -23,37 +23,25 @@ dependencies = [
 [tool.setuptools.packages.find]
 exclude = ["tests", "tests.*"]
 
-[project.optional-dependencies]
+[dependency-groups]
 testing = [
+    "mypy==2.3.1",
+    "pre-commit",
+    "coverage[toml]",
     "pytest>=7.3.1",
     "pytest-asyncio>=0.21.0",
-    "pytest-timeout>=2.1.0",
-    "pytest-mock>=3.10.0",
     "pytest-cov>=4.1.0",
+    "pytest-mock>=3.10.0",
+    "pytest-timeout>=2.1.0",
+]
+ci = [
+    {include-group = "testing"},
+    "pytest-github-actions-annotate-failures",
+    "pytest-xdist",
 ]
 
 [tool.setuptools-git-versioning]
 enabled = true
-
-
-[tool.black]
-safe = true
-quiet = true
-
-[tool.isort]
-multi_line_output = 3
-length_sort = true
-balanced_wrapping = true
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-line_length = 88
-indent = "    "
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-default_section = "THIRDPARTY"
-known_first_party = ["zigpy_znp", "tests"]
-forced_separate = "tests"
-combine_as_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--showlocals --verbose"
@@ -64,19 +52,59 @@ log_date_format = "%Y-%m-%d %H:%M:%S"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
-[tool.flake8]
-exclude = ".venv,.git,.tox,docs,venv,bin,lib,deps,build"
-# To work with Black
-max-line-length = 88
-# W503: Line break occurred before a binary operator
-# E203: Whitespace before ':'
-# D202 No blank lines allowed after function docstring
-ignore = "W503,E203,D202"
+[tool.ruff]
+required-version = ">=0.5.0"
+target-version = "py311"
+line-length = 88
+
+exclude = [
+    ".venv",
+    ".git",
+    ".tox",
+    "docs",
+    "venv",
+    "bin",
+    "lib",
+    "deps",
+    "build",
+]
+
+[tool.ruff.lint]
+select = [
+    "B", # flake8-bugbear
+    "C", # complexity
+    "E", # pycodestyle
+    "F", # pyflakes/autoflake
+    "I", # isort
+    "SIM", # flake8-simplify
+    "UP", # pyupgrade
+    "W", # pycodestyle
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 25
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = [
+    "zigpy_znp",
+    "tests",
+]
+forced-separate = ["tests"]
+combine-as-imports = true
+split-on-trailing-comma = false
+
+[tool.codespell]
+skip = ["./.*", "tests/*", "pyproject.toml"]
+quiet-level = 2
 
 [tool.mypy]
+ignore_missing_imports = true
 check_untyped_defs = true
 show_error_codes = true
 show_error_context = true
+error_summary = true
+exclude = ["^tests/"]
 disable_error_code = [
     "attr-defined",
     "assignment",
@@ -95,5 +123,11 @@ disable_error_code = [
 [tool.coverage.run]
 source = ["zigpy_znp"]
 
-[tool.pyupgrade]
-py311plus = true
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "raise NotImplementedError()",
+]

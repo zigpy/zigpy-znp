@@ -1,12 +1,12 @@
 import pytest
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.exceptions import InvalidCommandResponse
-from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.network_scan import main as network_scan
+import zigpy_znp.types as t
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
-from ..conftest import FormedZStack1CC2531, FormedLaunchpadCC26X2R1
+from ..conftest import FormedLaunchpadCC26X2R1, FormedZStack1CC2531
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])

@@ -3,9 +3,9 @@ from unittest.mock import call
 
 import pytest
 
-import zigpy_znp.types as t
-import zigpy_znp.commands as c
 from zigpy_znp.api import ZNP
+import zigpy_znp.commands as c
+import zigpy_znp.types as t
 
 from ..conftest import BaseServerZNP, CoroutineMock, config_for_port_path
 

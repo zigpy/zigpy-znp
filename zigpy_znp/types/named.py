@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import enum
-import typing
-import logging
 import dataclasses
+import enum
+import logging
+import typing
 
 import zigpy.types
 from zigpy.zdo.types import Status as ZDOStatus  # noqa: F401
@@ -12,7 +12,7 @@ from . import basic, zigpy_types
 
 LOGGER = logging.getLogger(__name__)
 
-JSONType = typing.Dict[str, typing.Any]
+JSONType = dict[str, typing.Any]
 
 
 class AddrMode(basic.enum8):

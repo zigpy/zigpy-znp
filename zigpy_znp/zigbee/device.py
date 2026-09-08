@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 
-import zigpy.zdo
-import zigpy.device
 import zigpy.application
+import zigpy.device
+import zigpy.zdo
 
 LOGGER = logging.getLogger(__name__)
 

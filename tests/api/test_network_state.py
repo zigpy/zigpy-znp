@@ -4,16 +4,16 @@ from unittest import mock
 import pytest
 from zigpy.exceptions import FormationFailure
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 from ..conftest import (
     ALL_DEVICES,
     FORMED_DEVICES,
     BaseZStack1CC2531,
-    FormedZStack3CC2531,
     FormedLaunchpadCC26X2R1,
+    FormedZStack3CC2531,
 )
 
 
@@ -64,9 +64,9 @@ async def test_broken_cc2531_load_state(device, make_connected_znp, caplog):
     znp, znp_server = await make_connected_znp(server_cls=device)
 
     # "Bad" TCLK seed is a TCLK from Z-Stack 1 with the first 16 bytes overwritten
-    znp_server._nvram[ExNvIds.LEGACY][
-        OsalNvIds.TCLK_SEED
-    ] += b"liance092\x00\x00\x00\x00\x00\x00\x00"
+    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.TCLK_SEED] += (
+        b"liance092\x00\x00\x00\x00\x00\x00\x00"
+    )
 
     caplog.set_level(logging.ERROR)
     await znp.load_network_info()

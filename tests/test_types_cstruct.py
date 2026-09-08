@@ -118,12 +118,12 @@ def test_struct_aligned_serialization_deserialization():
 
     expected = b""
     expected += t.uint8_t(1).serialize()
-    expected += b"\xFF" + t.uint16_t(2).serialize()
+    expected += b"\xff" + t.uint16_t(2).serialize()
     expected += t.uint32_t(3).serialize()
     expected += t.uint8_t(4).serialize()
-    expected += b"\xFF\xFF\xFF" + t.uint32_t(5).serialize()
+    expected += b"\xff\xff\xff" + t.uint32_t(5).serialize()
     expected += t.uint8_t(6).serialize()
-    expected += b"\xFF\xFF\xFF"
+    expected += b"\xff\xff\xff"
 
     struct = TestStruct(a=1, b=2, c=3, d=4, e=5, f=6)
     assert struct.serialize(align=True) == expected
@@ -138,14 +138,14 @@ def test_struct_aligned_serialization_deserialization():
 
 def test_struct_aligned_nested_serialization_deserialization():
     class Inner(t.CStruct):
-        _padding_byte = b"\xCD"
+        _padding_byte = b"\xcd"
 
         c: t.uint8_t
         d: t.uint32_t
         e: t.uint8_t
 
     class TestStruct(t.CStruct):
-        _padding_byte = b"\xAB"
+        _padding_byte = b"\xab"
 
         a: t.uint8_t
         b: Inner
@@ -155,13 +155,13 @@ def test_struct_aligned_nested_serialization_deserialization():
     expected += t.uint8_t(1).serialize()
 
     # Inner struct
-    expected += b"\xAB\xAB\xAB" + t.uint8_t(2).serialize()
-    expected += b"\xCD\xCD\xCD" + t.uint32_t(3).serialize()
+    expected += b"\xab\xab\xab" + t.uint8_t(2).serialize()
+    expected += b"\xcd\xcd\xcd" + t.uint32_t(3).serialize()
     expected += t.uint8_t(4).serialize()
-    expected += b"\xCD\xCD\xCD"  # Aligned to 4 bytes
+    expected += b"\xcd\xcd\xcd"  # Aligned to 4 bytes
 
     expected += t.uint16_t(5).serialize()
-    expected += b"\xAB\xAB"  # Also aligned to 4 bytes due to inner struct
+    expected += b"\xab\xab"  # Also aligned to 4 bytes due to inner struct
 
     struct = TestStruct(a=1, b=Inner(c=2, d=3, e=4), f=5)
     assert struct.serialize(align=True) == expected

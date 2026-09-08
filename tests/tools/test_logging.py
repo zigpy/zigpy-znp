@@ -4,7 +4,7 @@ import logging
 import pytest
 
 from zigpy_znp.logger import _TRACE
-from zigpy_znp.tools.common import UnclosableFile, ClosableFileType, setup_parser
+from zigpy_znp.tools.common import ClosableFileType, UnclosableFile, setup_parser
 
 
 @pytest.mark.parametrize(

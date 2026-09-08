@@ -1,16 +1,16 @@
-import sys
 import asyncio
 import logging
+import sys
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
+from zigpy_znp.tools.common import setup_parser
 from zigpy_znp.types.nvids import (
-    NWK_NVID_TABLES,
     NWK_NVID_TABLE_KEYS,
+    NWK_NVID_TABLES,
     ExNvIds,
     OsalNvIds,
 )
-from zigpy_znp.tools.common import setup_parser
 
 LOGGER = logging.getLogger(__name__)
 

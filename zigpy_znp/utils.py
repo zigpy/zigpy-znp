@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import typing
 import asyncio
+import dataclasses
+import functools
 import inspect
 import logging
-import functools
-import dataclasses
+import typing
 
 import zigpy_znp.types as t
 

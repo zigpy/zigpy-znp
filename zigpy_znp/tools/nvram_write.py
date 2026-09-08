@@ -1,12 +1,12 @@
-import sys
-import json
 import asyncio
+import json
 import logging
+import sys
 
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
-from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import ClosableFileType, setup_parser
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
 

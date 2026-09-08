@@ -3,15 +3,15 @@ import asyncio
 import pytest
 import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.tools.energy_scan import main as energy_scan
+import zigpy_znp.types as t
 
 from ..conftest import (
     EMPTY_DEVICES,
     FORMED_DEVICES,
-    serialize_zdo_command,
     deserialize_zdo_command,
+    serialize_zdo_command,
 )
 
 

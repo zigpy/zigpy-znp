@@ -3,12 +3,12 @@ import logging
 
 import pytest
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
-from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
 from zigpy_znp.tools.nvram_read import main as nvram_read
 from zigpy_znp.tools.nvram_reset import main as nvram_reset
 from zigpy_znp.tools.nvram_write import main as nvram_write
+import zigpy_znp.types as t
+from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
 
 from ..conftest import ALL_DEVICES, BaseZStack1CC2531, FormedLaunchpadCC26X2R1
 
@@ -43,15 +43,15 @@ async def test_nvram_read(device, make_znp_server, tmp_path, mocker):
     znp_server = make_znp_server(server_cls=device)
 
     # Make one reaaally long, requiring multiple writes to read it
-    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\xFF" * 300
+    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\xff" * 300
 
     # Make a few secure but unreadable
     if issubclass(device, BaseZStack1CC2531):
         # Normal NVID
-        znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.TCLK_SEED] = b"\xFF" * 32
+        znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.TCLK_SEED] = b"\xff" * 32
 
         # Part of a table
-        znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.LEGACY_TCLK_TABLE_START] = b"\xFF"
+        znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.LEGACY_TCLK_TABLE_START] = b"\xff"
 
     # XXX: this is not a great way to do it but deepcopy won't work here
     old_nvram_repr = repr(znp_server._nvram)
@@ -110,10 +110,10 @@ async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
     znp_server._nvram = {ExNvIds.LEGACY: {}}
 
     # This has a differing length
-    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1] = b"\xEE\xEE"
+    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK1] = b"\xee\xee"
 
     # This already exists
-    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\xBB"
+    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.HAS_CONFIGURED_ZSTACK3] = b"\xbb"
 
     await nvram_write([znp_server._port_path, "-i", str(backup_file)])
 
@@ -131,7 +131,7 @@ async def test_nvram_write(device, make_znp_server, tmp_path, mocker):
 @pytest.mark.parametrize("device", ALL_DEVICES)
 async def test_nvram_reset(device, make_znp_server):
     znp_server = make_znp_server(server_cls=device)
-    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.STARTUP_OPTION] = b"\xFF"
+    znp_server._nvram[ExNvIds.LEGACY][OsalNvIds.STARTUP_OPTION] = b"\xff"
 
     await nvram_reset([znp_server._port_path])
 

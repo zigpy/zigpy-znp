@@ -3,9 +3,9 @@ from unittest.mock import call
 
 import pytest
 
-import zigpy_znp.types as t
+from zigpy_znp.api import CallbackResponseListener, OneShotResponseListener
 import zigpy_znp.commands as c
-from zigpy_znp.api import OneShotResponseListener, CallbackResponseListener
+import zigpy_znp.types as t
 
 
 async def test_resolve(mocker):

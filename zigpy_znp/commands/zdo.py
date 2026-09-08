@@ -516,8 +516,7 @@ class ZDO(t.CommandsBase, subsystem=t.Subsystem.ZDO):
             t.Param(
                 "RemoveChildren_Rejoin",
                 LeaveOptions,
-                "Specifies actions to be performed by "
-                "device when leaving the network.",
+                "Specifies actions to be performed by device when leaving the network.",
             ),
         ),
         rsp_schema=t.STATUS_SCHEMA,

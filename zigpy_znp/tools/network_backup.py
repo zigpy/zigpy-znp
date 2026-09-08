@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import sys
-import json
 import asyncio
-import logging
 import datetime
 import importlib.metadata
+import json
+import logging
+import sys
 
 import zigpy.state
 
-import zigpy_znp.types as t
 from zigpy_znp.api import ZNP
 from zigpy_znp.tools.common import ClosableFileType, setup_parser, validate_backup_json
+import zigpy_znp.types as t
 from zigpy_znp.zigbee.application import ControllerApplication
 
 LIB_VERSION = importlib.metadata.version("zigpy-znp")

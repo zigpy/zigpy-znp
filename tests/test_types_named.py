@@ -1,7 +1,7 @@
 import pytest
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
+import zigpy_znp.types as t
 
 
 def test_status():
@@ -72,7 +72,7 @@ def test_addr_mode_address():
 
     with pytest.raises(ValueError):
         # 0xab is not a valid mode
-        data = b"\xAB\xaa\x55\x02\x03\x04\x05\x06\x07"
+        data = b"\xab\xaa\x55\x02\x03\x04\x05\x06\x07"
         t.AddrModeAddress.deserialize(data)
 
     with pytest.raises(ValueError):
@@ -81,8 +81,8 @@ def test_addr_mode_address():
         t.AddrModeAddress.deserialize(data)
 
     # Bytes at the end for NWK address mode are ignored
-    data1 = b"\x02\x0E\xAD" + b"\xC0\x8C\x97\x83\xB0\x20\x33"
-    data2 = b"\x02\x0E\xAD" + b"\x3F\xB9\x5B\x64\x20\x86\xD6"
+    data1 = b"\x02\x0e\xad" + b"\xc0\x8c\x97\x83\xb0\x20\x33"
+    data2 = b"\x02\x0e\xad" + b"\x3f\xb9\x5b\x64\x20\x86\xd6"
 
     r1, _ = t.AddrModeAddress.deserialize(data1)
     r2, _ = t.AddrModeAddress.deserialize(data2)
@@ -90,8 +90,8 @@ def test_addr_mode_address():
     assert r1 == r2
 
     # All of the bytes are used for IEEE address mode
-    data1 = b"\x02\x0E\xAD\xC0\x8C\x97\x83\xB0\x20\x33"
-    data2 = b"\x02\x0E\xAD\x3F\xB9\x5B\x64\x20\x86\xD6"
+    data1 = b"\x02\x0e\xad\xc0\x8c\x97\x83\xb0\x20\x33"
+    data2 = b"\x02\x0e\xad\x3f\xb9\x5b\x64\x20\x86\xd6"
 
     r3, _ = t.AddrModeAddress.deserialize(b"\x03" + data1[1:])
     r4, _ = t.AddrModeAddress.deserialize(b"\x03" + data2[1:])

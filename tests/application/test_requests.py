@@ -1,22 +1,22 @@
 import asyncio
 
 import pytest
-import zigpy.types as zigpy_t
 import zigpy.endpoint
-import zigpy.profiles
-import zigpy.zdo.types as zdo_t
 from zigpy.exceptions import DeliveryError
+import zigpy.profiles
+import zigpy.types as zigpy_t
+import zigpy.zdo.types as zdo_t
 
-import zigpy_znp.types as t
-import zigpy_znp.config as conf
 import zigpy_znp.commands as c
+import zigpy_znp.config as conf
+import zigpy_znp.types as t
 
 from ..conftest import (
     FORMED_DEVICES,
     CoroutineMock,
     FormedLaunchpadCC26X2R1,
-    zdo_request_matcher,
     serialize_zdo_command,
+    zdo_request_matcher,
 )
 
 
@@ -382,7 +382,7 @@ async def test_nonstandard_profile(device, make_application):
                 SecurityUse=t.Bool(False),
                 TimeStamp=12345678,
                 TSN=0,
-                Data=b"\x08" + bytes([req.TSN]) + b"\x0B\x00\x00",
+                Data=b"\x08" + bytes([req.TSN]) + b"\x0b\x00\x00",
                 MacSrcAddr=device.nwk,
                 MsgResultRadius=29,
             ),
@@ -608,7 +608,7 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    assoc_device, _ = c.util.Device.deserialize(b"\xFF" * 100)
+    assoc_device, _ = c.util.Device.deserialize(b"\xff" * 100)
     assoc_device.shortAddr = device.nwk
     assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
 
@@ -697,7 +697,7 @@ async def test_request_recovery_assoc_remove(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    assoc_device, _ = c.util.Device.deserialize(b"\xFF" * 100)
+    assoc_device, _ = c.util.Device.deserialize(b"\xff" * 100)
     assoc_device.shortAddr = device.nwk
     assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
 
@@ -722,7 +722,7 @@ async def test_request_recovery_assoc_remove(
         nonlocal assoc_device
 
         if assoc_device is None:
-            dev, _ = c.util.Device.deserialize(b"\xFF" * 100)
+            dev, _ = c.util.Device.deserialize(b"\xff" * 100)
             return c.UTIL.AssocGetWithAddress.Rsp(Device=dev)
 
         return c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)

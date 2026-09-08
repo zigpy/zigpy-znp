@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import typing
-import logging
 import dataclasses
+import logging
+import typing
 
 import zigpy.state
 import zigpy.zdo.types as zdo_t
 
+from zigpy_znp.api import ZNP
 import zigpy_znp.const as const
 import zigpy_znp.types as t
-from zigpy_znp.api import ZNP
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
@@ -31,11 +31,15 @@ def rotate(lst: list, n: int) -> list:
 
 def compute_key(ieee: t.EUI64, tclk_seed: t.KeyData, shift: int) -> t.KeyData:
     rotated_tclk_seed = rotate(tclk_seed, n=shift)
-    return t.KeyData([a ^ b for a, b in zip(rotated_tclk_seed, 2 * ieee.serialize())])
+    return t.KeyData(
+        [a ^ b for a, b in zip(rotated_tclk_seed, 2 * ieee.serialize(), strict=True)]
+    )
 
 
 def compute_tclk_seed(ieee: t.EUI64, key: t.KeyData, shift: int) -> t.KeyData:
-    rotated_tclk_seed = bytes(a ^ b for a, b in zip(key, 2 * ieee.serialize()))
+    rotated_tclk_seed = bytes(
+        a ^ b for a, b in zip(key, 2 * ieee.serialize(), strict=True)
+    )
     return t.KeyData(rotate(rotated_tclk_seed, n=-shift))
 
 
@@ -264,9 +268,7 @@ async def read_devices(
         if entry.extAddr in (
             t.EUI64.convert("00:00:00:00:00:00:00:00"),
             t.EUI64.convert("FF:FF:FF:FF:FF:FF:FF:FF"),
-        ):
-            continue
-        elif entry.type in (
+        ) or entry.type in (
             t.AddrMgrUserType.Default,
             t.AddrMgrUserType.Binding,
         ):

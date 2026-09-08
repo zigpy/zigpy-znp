@@ -1,30 +1,30 @@
-import json
 import asyncio
 import dataclasses
+import json
 
-import pytest
-import zigpy.state
 from jsonschema import ValidationError
+import pytest
 from zigpy.exceptions import NetworkNotFormed
+import zigpy.state
 
-import zigpy_znp.types as t
-from zigpy_znp.znp import security
-from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 from zigpy_znp.tools.common import validate_backup_json
 from zigpy_znp.tools.network_backup import main as network_backup
 from zigpy_znp.tools.network_restore import main as network_restore
+import zigpy_znp.types as t
+from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
+from zigpy_znp.znp import security
 
+from ..application.test_startup import DEV_NETWORK_SETTINGS
 from ..conftest import (
     ALL_DEVICES,
     EMPTY_DEVICES,
     FORMED_DEVICES,
+    BaseLaunchpadCC26X2R1,
     BaseZStack1CC2531,
     BaseZStack3CC2531,
     FormedZStack1CC2531,
-    BaseLaunchpadCC26X2R1,
     ResetLaunchpadCC26X2R1,
 )
-from ..application.test_startup import DEV_NETWORK_SETTINGS
 
 BARE_NETWORK_INFO = zigpy.state.NetworkInfo(
     extended_pan_id=t.EUI64.convert("ab:de:fa:bc:de:fa:bc:de"),
@@ -257,7 +257,7 @@ async def test_network_restore_pick_optimal_tclk(
 async def test_nwk_frame_counter_zstack1(make_connected_znp):
     znp, znp_server = await make_connected_znp(BaseZStack1CC2531)
     znp_server._nvram[ExNvIds.LEGACY] = {
-        OsalNvIds.NWKKEY: b"\x01" + b"\xAB" * 16 + b"\x78\x56\x34\x12"
+        OsalNvIds.NWKKEY: b"\x01" + b"\xab" * 16 + b"\x78\x56\x34\x12"
     }
 
     assert (await security.read_nwk_frame_counter(znp)) == 0x12345678
@@ -272,7 +272,7 @@ async def test_nwk_frame_counter_zstack30(make_connected_znp):
     znp.node_info = BARE_NODE_INFO
     znp_server._nvram[ExNvIds.LEGACY] = {
         # This value is ignored
-        OsalNvIds.NWKKEY: b"\x01" + b"\xAB" * 16 + b"\x78\x56\x34\x12",
+        OsalNvIds.NWKKEY: b"\x01" + b"\xab" * 16 + b"\x78\x56\x34\x12",
         # Wrong EPID, ignored
         OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START: bytes.fromhex(
             "0f000000058eea0f004b1200"
@@ -282,7 +282,7 @@ async def test_nwk_frame_counter_zstack30(make_connected_znp):
         + BARE_NETWORK_INFO.extended_pan_id.serialize(),
         # Generic EPID but ignored since EPID matches
         (OsalNvIds.LEGACY_NWK_SEC_MATERIAL_TABLE_START + 2): bytes.fromhex("02000000")
-        + b"\xFF" * 8,
+        + b"\xff" * 8,
     }
 
     assert (await security.read_nwk_frame_counter(znp)) == 0x00000001

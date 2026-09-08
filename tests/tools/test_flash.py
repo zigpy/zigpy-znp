@@ -2,10 +2,10 @@ import random
 
 import pytest
 
-import zigpy_znp.types as t
 import zigpy_znp.commands as c
 from zigpy_znp.tools.flash_read import main as flash_read
-from zigpy_znp.tools.flash_write import main as flash_write, get_firmware_crcs
+from zigpy_znp.tools.flash_write import get_firmware_crcs, main as flash_write
+import zigpy_znp.types as t
 
 from ..conftest import BaseServerZNP, CoroutineMock
 
@@ -138,7 +138,7 @@ async def test_flash_write_bad_size(make_znp_server, tmp_path, mocker):
 
     # Add an extra byte
     BAD_FIRMWARE = bytearray(len(FAKE_FLASH))
-    BAD_FIRMWARE += b"\xFF"
+    BAD_FIRMWARE += b"\xff"
 
     # No communication will happen because the CRC will be invalid
     firmware_file = tmp_path / "bad-firmware.bin"
