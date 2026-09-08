@@ -31,7 +31,11 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
 )
 from zigpy_znp.frames import GeneralFrame
-from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
+from zigpy_znp.exceptions import (
+    ShuttingDown,
+    CommandNotRecognized,
+    InvalidCommandResponse,
+)
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 if typing.TYPE_CHECKING:
@@ -779,7 +783,7 @@ class ZNP:
 
         for _header, listeners in self._listeners.items():
             for listener in listeners:
-                listener.cancel()
+                listener.set_exception(ShuttingDown())
 
         self._listeners.clear()
         self.version = None

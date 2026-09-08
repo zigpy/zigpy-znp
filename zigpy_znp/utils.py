@@ -86,7 +86,7 @@ class BaseResponseListener:
 
         raise NotImplementedError()  # pragma: no cover
 
-    def cancel(self):
+    def set_exception(self, exc: BaseException) -> None:
         """
         Implement by subclasses to cancel the listener.
 
@@ -118,11 +118,9 @@ class OneShotResponseListener(BaseResponseListener):
         self.future.set_result(response)
         return True
 
-    def cancel(self):
+    def set_exception(self, exc: BaseException) -> None:
         if not self.future.done():
-            self.future.cancel()
-
-        return True
+            self.future.set_exception(exc)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -149,9 +147,9 @@ class CallbackResponseListener(BaseResponseListener):
         # Callbacks are always resolved
         return True
 
-    def cancel(self):
+    def set_exception(self, exc: BaseException) -> None:
         # You can't cancel a callback
-        return False
+        pass
 
 
 class CatchAllResponse:
