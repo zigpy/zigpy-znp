@@ -996,7 +996,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     raise last_error
         except InvalidCommandResponse as e:
             status = e.response.Status
-            raise DeliveryError(f"Failed to send request: {status!r}", status=status)
+            raise DeliveryError(
+                f"Failed to send request: {status!r}", status=status
+            ) from e
         finally:
             # We *must* re-add the device association if we previously removed it but
             # the request still failed. Otherwise, it may be a direct child and we will

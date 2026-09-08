@@ -415,7 +415,7 @@ class CommandBase:
                     params[param.name], data = param.type.deserialize(data, align=align)
                 else:
                     params[param.name], data = param.type.deserialize(data)
-            except ValueError:
+            except ValueError as e:
                 if not data and param.optional:
                     # If we're out of data and the parameter is optional, we're done
                     break
@@ -424,7 +424,7 @@ class CommandBase:
                     raise ValueError(
                         f"Frame data is truncated (parsed {params}),"
                         f" required parameter remains: {param}"
-                    )
+                    ) from e
                 else:
                     # Otherwise, let the exception happen
                     raise
@@ -442,7 +442,9 @@ class CommandBase:
 
         assert self.header == other.header
 
-        param_pairs = zip(self._bound_params.values(), other._bound_params.values())
+        param_pairs = zip(
+            self._bound_params.values(), other._bound_params.values(), strict=True
+        )
 
         for (
             (expected_param, expected_value),
@@ -539,9 +541,9 @@ class DeviceState(t.enum8):
     BackoffBeforeRejoin = 0x0C
     # ReJoining a PAN in secure mode scanning in all channels, only for end devices
     RejoinSecureScanningAllChannels = 0x0D
-    # ReJoining a PAN in unsecure mode scanning in current channel, only for end devices
+    # ReJoining a PAN in insecure mode scanning in current channel, only for end devices
     RejoinInsecureScanningCurrentChannel = 0x0E
-    # ReJoining a PAN in unsecure mode scanning in all channels, only for end devices
+    # ReJoining a PAN in insecure mode scanning in all channels, only for end devices
     RejoinInsecureScanningAllChannels = 0x0F
 
 

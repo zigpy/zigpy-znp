@@ -114,7 +114,7 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
             t.Param(
                 "Capabilities",
                 t.MTCapabilities,
-                "Represents the intefaces this device can handle",
+                "Represents the interfaces this device can handle",
             ),
         ),
     )

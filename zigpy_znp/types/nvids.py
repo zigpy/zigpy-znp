@@ -200,7 +200,7 @@ class OsalNvIds(BaseNvIds):
     TCLK_JOIN_DEV = (
         0x0102  # Nv Id where Joining device store their APS key. Key is in plain text.
     )
-    TCLK_DEFAULT = 0x0103  # Not accually a Nv Item but Id used by SecMgr
+    TCLK_DEFAULT = 0x0103  # Not actually a Nv Item but Id used by SecMgr
 
     LEGACY_TCLK_IC_TABLE_START = 0x0104  # Deprecated. Refer to EX_TCLK_IC_TABLE
     LEGACY_TCLK_IC_TABLE_END = 0x0110  # IC keys, referred with shift byte
@@ -275,11 +275,8 @@ def is_secure_nvid(nvid: OsalNvIds) -> bool:
     if OsalNvIds.LEGACY_TCLK_TABLE_START <= nvid <= OsalNvIds.LEGACY_TCLK_TABLE_END:
         return True
 
-    if (
+    return (
         OsalNvIds.LEGACY_APS_LINK_KEY_DATA_START
         <= nvid
         <= OsalNvIds.LEGACY_APS_LINK_KEY_DATA_END
-    ):
-        return True
-
-    return False
+    )

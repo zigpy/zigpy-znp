@@ -47,7 +47,7 @@ async def perform_energy_scan(radio_path, num_scans=None):
 
         _, scanned_channels, _, _, energy_values = rsp
 
-        for channel, energy in zip(scanned_channels, energy_values):
+        for channel, energy in zip(scanned_channels, energy_values, strict=False):
             energies = channel_energies[channel]
             energies.append(energy)
 

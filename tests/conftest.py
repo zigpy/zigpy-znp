@@ -417,7 +417,7 @@ def deserialize_zdo_command(command_id, data):
     field_names, field_types = zdo_t.CLUSTERS[command_id]
     args, data = zigpy.types.deserialize(data, field_types)
 
-    return dict(zip(field_names, args))
+    return dict(zip(field_names, args, strict=True))
 
 
 class BaseZStackDevice(BaseServerZNP):

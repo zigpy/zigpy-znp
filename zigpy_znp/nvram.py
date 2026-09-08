@@ -190,7 +190,7 @@ class NVRAMHelper:
             if not self.znp.capabilities & t.MTCapabilities.SAPI or nv_id > 0xFF:
                 raise SecurityError(
                     f"NV item cannot be read due to security constraints: {nv_id!r}"
-                )
+                ) from e
 
             read_rsp = await self.znp.request(
                 c.SAPI.ZBReadConfiguration.Req(ConfigId=nv_id),

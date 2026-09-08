@@ -366,7 +366,7 @@ class ZNP:
             raise zigpy.exceptions.FormationFailure(
                 "Network formation failed: NVRAM is corrupted, re-flash your adapter's"
                 " firmware."
-            )
+            ) from rsp
 
         # Form a network with completely random settings to get NVRAM to a known state
         for item, value in {
@@ -375,7 +375,7 @@ class ZNP:
             OsalNvIds.PRECFGKEY: os.urandom(16),
             # XXX: Z2M requires this item to be False
             OsalNvIds.PRECFGKEYS_ENABLE: t.Bool(False),
-            # Z-Stack will scan all of thse channels during formation
+            # Z-Stack will scan all of these channels during formation
             OsalNvIds.CHANLIST: const.STARTUP_CHANNELS,
         }.items():
             await self.nvram.osal_write(item, value, create=True)
@@ -608,7 +608,9 @@ class ZNP:
                 if entries != fixed_entries:
                     LOGGER.warning(
                         "Repairing %d invalid empty address manager entries (total %d)",
-                        sum(i != j for i, j in zip(entries, fixed_entries)),
+                        sum(
+                            i != j for i, j in zip(entries, fixed_entries, strict=True)
+                        ),
                         len(entries),
                     )
                     await security.write_addr_manager_entries(self, fixed_entries)
@@ -659,6 +661,7 @@ class ZNP:
             for dtr, rts in zip(
                 self._znp_config[conf.CONF_CONNECT_DTR_STATES],
                 self._znp_config[conf.CONF_CONNECT_RTS_STATES],
+                strict=True,
             ):
                 await self._uart.set_dtr_rts(dtr=dtr, rts=rts)
                 await asyncio.sleep(BOOTLOADER_PIN_TOGGLE_DELAY)
@@ -812,10 +815,8 @@ class ZNP:
         LOGGER.log(log.TRACE, "Removing listener %s", listener)
 
         for header in listener.matching_headers():
-            try:
+            with contextlib.suppress(ValueError):
                 self._listeners[header].remove(listener)
-            except ValueError:
-                pass
 
             if not self._listeners[header]:
                 LOGGER.log(

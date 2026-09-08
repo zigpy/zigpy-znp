@@ -73,13 +73,13 @@ async def write_firmware(znp: ZNP, firmware: bytes, reset_nvram: bool):
                 request=c.UBL.HandshakeReq.Req(),
                 callback=c.UBL.HandshakeRsp.Callback(partial=True),
             )
-    except TimeoutError:
+    except TimeoutError as e:
         raise RuntimeError(
             "Did not receive a bootloader handshake response!"
             " Make sure your adapter has just been plugged in and"
             " nothing else has had a chance to communicate with it. Alternatively, "
             " press the button furthest from the USB port. The LED should turn red."
-        )
+        ) from e
 
     if handshake_rsp.Status != c.ubl.BootloaderStatus.SUCCESS:
         raise RuntimeError(f"Bad bootloader handshake response: {handshake_rsp}")

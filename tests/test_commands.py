@@ -214,7 +214,7 @@ def test_command_param_binding():
 
     # Invalid ones cannot
     with pytest.raises(AttributeError):
-        ping_rsp.Oops
+        _ = ping_rsp.Oops
 
     # bytes are converted into t.ShortBytes
     cmd = c.SYS.NVWrite.Req(

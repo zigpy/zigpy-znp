@@ -81,14 +81,8 @@ select = [
     "W", # pycodestyle
 ]
 
-ignore = [
-    "B008", # Do not perform function call in argument defaults
-    "C901", # Function is too complex
-    "E501", # Line too long
-    "SIM102", # Use a single if statement instead of nested if statements
-    "SIM108", # Use ternary operator instead of if-else-block
-    "SIM117", # Merge with-statements that use the same scope
-]
+[tool.ruff.lint.mccabe]
+max-complexity = 25
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
@@ -106,6 +100,7 @@ skip = ["./.*", "tests/*", "pyproject.toml"]
 quiet-level = 2
 
 [tool.mypy]
+ignore_missing_imports = true
 check_untyped_defs = true
 show_error_codes = true
 show_error_context = true

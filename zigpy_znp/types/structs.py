@@ -222,7 +222,7 @@ class APSLinkKeyTable(
 class LinkInfo(cstruct.CStruct):
     # Counter of transmission success/failures
     txCounter: basic.uint8_t
-    # Average of sending rssi values if link staus is enabled
+    # Average of sending rssi values if link status is enabled
     # i.e. NWK_LINK_STATUS_PERIOD is defined as non zero
     txCost: basic.uint8_t
     # average of received rssi values.

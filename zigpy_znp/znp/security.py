@@ -31,11 +31,15 @@ def rotate(lst: list, n: int) -> list:
 
 def compute_key(ieee: t.EUI64, tclk_seed: t.KeyData, shift: int) -> t.KeyData:
     rotated_tclk_seed = rotate(tclk_seed, n=shift)
-    return t.KeyData([a ^ b for a, b in zip(rotated_tclk_seed, 2 * ieee.serialize())])
+    return t.KeyData(
+        [a ^ b for a, b in zip(rotated_tclk_seed, 2 * ieee.serialize(), strict=True)]
+    )
 
 
 def compute_tclk_seed(ieee: t.EUI64, key: t.KeyData, shift: int) -> t.KeyData:
-    rotated_tclk_seed = bytes(a ^ b for a, b in zip(key, 2 * ieee.serialize()))
+    rotated_tclk_seed = bytes(
+        a ^ b for a, b in zip(key, 2 * ieee.serialize(), strict=True)
+    )
     return t.KeyData(rotate(rotated_tclk_seed, n=-shift))
 
 
