@@ -9,7 +9,7 @@ jobs:
     uses: zigpy/workflows/.github/workflows/ci.yml@main
     with:
       CODE_FOLDER: zigpy_znp
-      CACHE_VERSION: 2
+      CACHE_VERSION: 3
       MINIMUM_COVERAGE_PERCENTAGE: 95
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

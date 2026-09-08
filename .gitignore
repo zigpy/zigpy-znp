@@ -79,3 +79,4 @@ ENV/
 TI Z-Stack/
 
 zigpy-znp-*.*.*/
+uv.lock
