@@ -98,15 +98,27 @@ in **[`TOOLS.md`](./TOOLS.md)** but a brief description of each tool is included
  - **`nvram_write`**: Writes all NVRAM entries from a JSON document.
 
 # Hardware requirements
-USB-adapters, GPIO-modules, and development-boards flashed with TI's Z-Stack are compatible with zigpy-znp:
 
- - CC2652P/CC2652R/CC2652RB USB stick and dev board hardware
- - CC1352P/CC1352R USB stick and dev board hardware
+USB-adapters, GPIO-modules/shields/hats, and development-boards with TI's Z-Stack Coordinator firmware are compatible with zigpy-znp.
+
+Note! CC26x2 and CC13x2 are currently the only ZNP based adapters that fully support forming a Zigbee 3.0 network and using ZGP.
+
+### TI ZNP adapters recommended for new purchase
+
+The adapters below are recommended because they use powerful chips, can handle large networks and firmware is well maintained:
+
+ - CC2652P/CC2652R/CC2652RB USB stick and dev board hardware (**recommended with [latest stable community firmware](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin)**)
+ - CC1352P/CC1352R USB stick and dev board hardware (**recommended with [latest stable community firmware](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin)**)
+
+Tip! CC26x2/CC13x2adapters listed as [recommended by Zigbee2MQTT](https://www.zigbee2mqtt.io/guide/adapters/#recommended) are also compatible with zigpy-znp.
+
+### Older supported ZNP adapters no longer recommended for new purchase
+
+The adapters below are well-supported for legacy installations but use outdated chips and firmware is no longer maintained:
+   
  - CC2538 + CC2592 USB stick and dev board hardware (**not recommended, old hardware and end-of-life firmware**)
  - CC2531 USB stick hardware (**not recommended for Zigbee networks with more than 20 devices**)
  - CC2530 + CC2591/CC2592 USB stick hardware (**not recommended for Zigbee networks with more than 20 devices**)
-
-Tip! Adapters listed as "[Texas Instruments sticks compatible with Zigbee2MQTT](https://www.zigbee2mqtt.io/information/supported_adapters)" also works with zigpy-znp.
 
 ## Reference hardware for this project
 These specific adapters are used as reference hardware for development and testing by zigpy-znp developers:
