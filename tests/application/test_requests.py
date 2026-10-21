@@ -762,14 +762,16 @@ async def test_request_recovery_assoc_remove(
     await app.shutdown()
 
 
-def koenkk_absent_lookup(znp_server):
-    # Koenkk's builds answer a lookup miss with 0xFFFE and zeroes (`PARENT`)
+def absent_lookup_with_address_0xfffe(znp_server, relation=c.util.NodeRelation.PARENT):
+    # A lookup miss answers 0xFFFE: Koenkk's builds zero the rest (`PARENT`), stock
+    # Z-Stack leaves uninitialized memory, which may read as a child relation
     def lookup(req):
         device = znp_server.assoc_get(ieee=req.IEEE, nwk=req.NWK)
 
         if device is None:
             device, _ = c.util.Device.deserialize(b"\x00" * 100)
             device.shortAddr = t.NWK(0xFFFE)
+            device.nodeRelation = relation
 
         return c.UTIL.AssocGetWithAddress.Rsp(Device=device)
 
@@ -780,19 +782,20 @@ def koenkk_absent_lookup(znp_server):
 
 @pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
 @pytest.mark.parametrize(
-    ("relation", "koenkk_lookup", "retried"),
+    ("relation", "absent_relation", "retried"),
     [
-        # Absent: stock firmware reports `NOTUSED`, which ends the send at once
-        (None, False, False),
-        (None, True, True),
+        # Absent: the default model reports `NOTUSED`, which ends the send at once
+        (None, None, False),
+        (None, c.util.NodeRelation.PARENT, True),
+        (None, c.util.NodeRelation.CHILD_RFD, True),
         # Found, but not a direct child of the coordinator
-        (c.util.NodeRelation.PARENT, False, True),
-        (c.util.NodeRelation.NEIGHBOR, False, True),
-        (c.util.NodeRelation.OTHER, False, True),
+        (c.util.NodeRelation.PARENT, None, True),
+        (c.util.NodeRelation.NEIGHBOR, None, True),
+        (c.util.NodeRelation.OTHER, None, True),
     ],
 )
 async def test_request_recovery_assoc_not_a_child(
-    device_cls, relation, koenkk_lookup, retried, make_application, mocker
+    device_cls, relation, absent_relation, retried, make_application, mocker
 ):
     app, znp_server = make_application(server_cls=device_cls)
 
@@ -808,8 +811,8 @@ async def test_request_recovery_assoc_not_a_child(
             nwk=device.nwk, ieee=device.ieee, node_relation=relation
         )
 
-    if koenkk_lookup:
-        koenkk_absent_lookup(znp_server)
+    if absent_relation is not None:
+        absent_lookup_with_address_0xfffe(znp_server, absent_relation)
 
     did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
     did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
@@ -889,7 +892,7 @@ async def test_request_recovery_assoc_restore(
     assoc_add_new(nwk=device.nwk, ieee=device.ieee, node_relation=relation)
 
     if scenario == "koenkk_lookup":
-        koenkk_absent_lookup(znp_server)
+        absent_lookup_with_address_0xfffe(znp_server)
 
     assoc_get = znp_server.assoc_get
 
