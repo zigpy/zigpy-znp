@@ -36,6 +36,8 @@ STARTUP_TIMEOUT = 5
 DATA_CONFIRM_TIMEOUT = 8
 EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 DEVICE_JOIN_MAX_DELAY = 5
+# First Koenkk Z-Stack 3.x.0 build with child aging enabled (and Xiaomi exempted)
+CHILD_AGING_MIN_BUILD_ID = 20230507
 
 LOGGER = logging.getLogger(__name__)
 
@@ -139,6 +141,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if self.state.node_info == zigpy.state.NodeInfo():
             await self.load_network_info()
 
+        # Needed by the stack settings below
+        self._version_rsp = await self._znp.request(c.SYS.Version.Req())
+
         if not read_only:
             await self._znp.migrate_nvram()
             await self._write_stack_settings()
@@ -149,8 +154,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             await self.set_tx_power(dbm=self.znp_config[conf.CONF_TX_POWER])
 
         await self._znp.start_network()
-
-        self._version_rsp = await self._znp.request(c.SYS.Version.Req())
 
         # The CC2531 running Z-Stack Home 1.2 overrides the LED setting if it is changed
         # before the coordinator has started.
@@ -624,7 +627,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             OsalNvIds.CONCENTRATOR_DISCOVERY: t.uint8_t(120),
             OsalNvIds.CONCENTRATOR_RC: t.Bool(True),
             OsalNvIds.SRC_RTG_EXPIRY_TIME: t.uint8_t(255),
-            OsalNvIds.NWK_CHILD_AGE_ENABLE: t.Bool(False),
+            # Koenkk's builds enable child aging from 20230507 on and skip the leave
+            # for Xiaomi devices, which do not implement it. Older builds have no such
+            # exception, so aging stays off there. The value is written either way
+            # because an earlier zigpy-znp may have left `False` in NVRAM.
+            OsalNvIds.NWK_CHILD_AGE_ENABLE: t.Bool(
+                self._zstack_build_id >= CHILD_AGING_MIN_BUILD_ID
+            ),
             # Default is 20 in Z-Stack 3.0.1, 30 in Z-Stack 3/4
             OsalNvIds.BCAST_DELIVERY_TIME: t.uint8_t(30),
             # We want to receive all ZDO callbacks to proxy them back to zigpy
@@ -936,8 +945,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     except InvalidCommandResponse as e:
                         last_error = e
 
-                        # Child aging is disabled so if a child switches parents from
-                        # the coordinator to another router, we will not be able to
+                        # Without child aging (older builds) if a child switches parents
+                        # from the coordinator to another router, we will not be able to
                         # re-discover a route to it. We have to manually drop the child
                         # to do this.
                         if (

@@ -313,3 +313,32 @@ async def test_concurrency_auto_config(device, concurrency, make_application):
     await app.start_network()
 
     assert app._concurrent_requests_semaphore.max_concurrency == concurrency
+
+
+@pytest.mark.parametrize(
+    ("code_revision", "expected"),
+    [
+        (None, False),
+        (20190608, False),
+        (20221226, False),
+        (20230506, False),
+        (20230507, True),
+        (20250321, True),
+    ],
+)
+async def test_child_aging_by_build(code_revision, expected, make_application, mocker):
+    app, znp_server = make_application(FormedLaunchpadCC26X2R1)
+    mocker.patch.object(
+        type(app),
+        "_zstack_build_id",
+        mocker.PropertyMock(return_value=code_revision or 0),
+    )
+
+    await app.startup(auto_form=False)
+
+    value = await app._znp.nvram.osal_read(
+        OsalNvIds.NWK_CHILD_AGE_ENABLE, item_type=t.Bool
+    )
+    assert value == expected
+
+    await app.shutdown()
