@@ -970,11 +970,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 raise
 
                             # Only a direct child can be dropped and restored. A failed
-                            # lookup returns `INVALID_NODE_ADDR` (0xFFFE) followed by
-                            # uninitialized memory on stock Z-Stack or by zeroes
-                            # (`NodeRelation.PARENT`) on Koenkk's builds, and would be
-                            # restored as a bogus entry (Koenkk/zigbee-herdsman#685).
-                            # Rediscover the route and retry without touching the table.
+                            # lookup returns 0xFFFE and a non-child relation on some
+                            # builds (Koenkk/zigbee-herdsman#685).
                             if (
                                 child_association.Device.shortAddr == 0xFFFE
                                 or child_association.Device.nodeRelation
@@ -1031,21 +1028,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 assert child_association is not None
                 removed = child_association.Device
 
-                # Restore only the entry we removed, and only while nothing newer is
-                # known. `UTIL.AssocAdd` calls `AssocAddNew`, which TI documents as
-                # "create a new or update a previous association": for an IEEE that is
-                # already in the table it overwrites that entry in place, short address
-                # included (measured on Koenkk's build 20250321; the implementation is
-                # in TI's library). A device that rejoined under a new address during
-                # the recovery would be listed under its old one again.
-                #
-                # The host's address is compared again once the lookup has returned,
-                # which covers every address change the host has seen until the
-                # `AssocAdd` is handed to `ZNP.request`. A join that the firmware
-                # handles after the lookup's snapshot, including while `ZNP.request`
-                # waits for `_sync_request_lock`, cannot be excluded by the lookup
-                # alone; the create-or-update above then decides. Serializing table
-                # changes per IEEE is out of scope.
+                # `AssocAdd` updates an existing entry in place, so skip it if the
+                # device rejoined, possibly under a new address, since the removal
                 if device.nwk == removed.shortAddr:
                     current = await self._znp.request(
                         c.UTIL.AssocGetWithAddress.Req(
@@ -1054,9 +1038,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         )
                     )
 
-                    # The host may have handled a join while the lookup was awaited.
-                    # The firmware must still answer "absent", as for the failed
-                    # lookups above.
                     if device.nwk == removed.shortAddr and (
                         current.Device.shortAddr == 0xFFFE
                         or current.Device.nodeRelation == c.util.NodeRelation.NOTUSED

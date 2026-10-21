@@ -9,7 +9,6 @@ import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
-from zigpy_znp.exceptions import CommandNotRecognized
 import zigpy_znp.types as t
 
 from ..conftest import (
@@ -763,169 +762,37 @@ async def test_request_recovery_assoc_remove(
     await app.shutdown()
 
 
-def assoc_lookup_rsp(fill: bytes, nwk: int, relation: c.util.NodeRelation):
-    """Build a `UTIL.AssocGetWithAddress` answer, with `fill` in the other fields."""
-    assoc_device, _ = c.util.Device.deserialize(fill * 100)
-    assoc_device.shortAddr = t.NWK(nwk)
-    assoc_device.nodeRelation = relation
+def koenkk_absent_lookup(znp_server):
+    # Koenkk's builds answer a lookup miss with 0xFFFE and zeroes (`PARENT`)
+    def lookup(req):
+        device = znp_server.assoc_get(ieee=req.IEEE, nwk=req.NWK)
 
-    return c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)
+        if device is None:
+            device, _ = c.util.Device.deserialize(b"\x00" * 100)
+            device.shortAddr = t.NWK(0xFFFE)
 
+        return c.UTIL.AssocGetWithAddress.Rsp(Device=device)
 
-ASSOC_NOT_FOUND_ZEROED = assoc_lookup_rsp(b"\x00", 0xFFFE, c.util.NodeRelation.PARENT)
-ASSOC_NOT_FOUND_NOTUSED = assoc_lookup_rsp(b"\xff", 0xFFFF, c.util.NodeRelation.NOTUSED)
-
-
-class AssocTable:
-    """
-    Association table of a simulated coordinator. It applies `UTIL.AssocRemove` and
-    `UTIL.AssocAdd`, answers lookups for absent devices with `not_found` (Koenkk's
-    builds: `0xFFFE`, then zeroes) and logs every request in order. `on_remove` runs
-    right after a removal, `on_lookup` once a lookup's answer is built but before
-    the host receives it.
-    """
-
-    def __init__(self, znp_server, entries, *, not_found=None, assoc_add=True):
-        self.entries = dict(entries)
-        self.not_found = not_found or ASSOC_NOT_FOUND_ZEROED
-        self.assoc_add = assoc_add
-        self.on_remove = None
-        self.on_lookup = None
-        self.log = []
-
-        znp_server.reply_to(
-            c.UTIL.AssocGetWithAddress.Req(partial=True), responses=[self.get]
-        )
-        znp_server.reply_to(
-            c.UTIL.AssocRemove.Req(partial=True), responses=[self.remove]
-        )
-        znp_server.reply_to(c.UTIL.AssocAdd.Req(partial=True), responses=[self.add])
-
-    def get(self, req):
-        self.log.append(("AssocGetWithAddress", req.IEEE))
-
-        if req.IEEE not in self.entries:
-            rsp = self.not_found
-        else:
-            rsp = assoc_lookup_rsp(b"\x00", *self.entries[req.IEEE])
-
-        if self.on_lookup is not None:
-            self.on_lookup()
-
-        return rsp
-
-    def remove(self, req):
-        self.log.append(("AssocRemove", req.IEEE))
-        self.entries.pop(req.IEEE, None)
-
-        if self.on_remove is not None:
-            self.on_remove()
-
-        return c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)
-
-    def add(self, req):
-        self.log.append(("AssocAdd", req.IEEE, req.NWK, req.NodeRelation))
-
-        # Koenkk's builds 20200805 and 20200925 have `AssocRemove`, not `AssocAdd`
-        if not self.assoc_add:
-            return c.RPCError.CommandNotRecognized.Rsp(
-                ErrorCode=c.rpc_error.ErrorCode.InvalidCommandId,
-                RequestHeader=req.to_frame().header,
-            )
-
-        self.entries[req.IEEE] = (req.NWK, req.NodeRelation)
-
-        return c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)
-
-
-async def request_with_failed_recovery(
-    app,
-    znp_server,
-    device,
-    during_retry=None,
-    statuses=(t.Status.MAC_TRANSACTION_EXPIRED, t.Status.NWK_NO_ROUTE),
-):
-    """
-    Send a request whose two attempts fail with `statuses`. By default the first
-    one expires, starting the association recovery, and the retry finds no route.
-    `during_retry` runs while the second attempt is in flight.
-    """
-
-    attempts = 0
-
-    async def data_request(req):
-        nonlocal attempts
-        attempts += 1
-
-        yield c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS)
-
-        if attempts == 2 and during_retry is not None:
-            during_retry()
-
-        yield c.AF.DataConfirm.Callback(
-            Status=statuses[attempts - 1], Endpoint=1, TSN=1
-        )
-
-    znp_server.reply_to(c.AF.DataRequestExt.Req(partial=True), responses=[data_request])
     znp_server.reply_to(
-        c.ZDO.ExtRouteDisc.Req(partial=True),
-        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    await app.request(
-        device=device,
-        profile=260,
-        cluster=1,
-        src_ep=1,
-        dst_ep=1,
-        sequence=1,
-        data=b"\x00",
+        c.UTIL.AssocGetWithAddress.Req(partial=True), responses=[lookup], override=True
     )
 
 
 @pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
 @pytest.mark.parametrize(
-    ("lookup_rsp", "retried"),
+    ("relation", "koenkk_lookup", "retried"),
     [
-        # Not found: Z-Stack returns `INVALID_NODE_ADDR`. Koenkk's firmware zeroes
-        # the remainder, which reads as `PARENT`. Stock firmware leaves it
-        # uninitialized, so it may even contain a child relation.
-        pytest.param(
-            assoc_lookup_rsp(b"\x00", 0xFFFE, c.util.NodeRelation.PARENT),
-            True,
-            id="not_found_zeroed",
-        ),
-        pytest.param(
-            assoc_lookup_rsp(b"\xa5", 0xFFFE, c.util.NodeRelation.CHILD_RFD),
-            True,
-            id="not_found_garbage",
-        ),
+        # Absent: stock firmware reports `NOTUSED`, which ends the send at once
+        (None, False, False),
+        (None, True, True),
         # Found, but not a direct child of the coordinator
-        pytest.param(
-            assoc_lookup_rsp(b"\x00", 0xABCD, c.util.NodeRelation.PARENT),
-            True,
-            id="parent",
-        ),
-        pytest.param(
-            assoc_lookup_rsp(b"\x00", 0xABCD, c.util.NodeRelation.NEIGHBOR),
-            True,
-            id="neighbor",
-        ),
-        pytest.param(
-            assoc_lookup_rsp(b"\x00", 0xABCD, c.util.NodeRelation.OTHER),
-            True,
-            id="other",
-        ),
-        # Unchanged: `NOTUSED` ends the send at once
-        pytest.param(
-            assoc_lookup_rsp(b"\xff", 0xABCD, c.util.NodeRelation.NOTUSED),
-            False,
-            id="notused",
-        ),
+        (c.util.NodeRelation.PARENT, False, True),
+        (c.util.NodeRelation.NEIGHBOR, False, True),
+        (c.util.NodeRelation.OTHER, False, True),
     ],
 )
 async def test_request_recovery_assoc_not_a_child(
-    device_cls, lookup_rsp, retried, make_application, mocker
+    device_cls, relation, koenkk_lookup, retried, make_application, mocker
 ):
     app, znp_server = make_application(server_cls=device_cls)
 
@@ -936,81 +803,16 @@ async def test_request_recovery_assoc_not_a_child(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    data_req = znp_server.reply_to(
-        c.AF.DataRequestExt.Req(partial=True),
-        responses=[
-            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(
-                Status=t.Status.MAC_TRANSACTION_EXPIRED, Endpoint=1, TSN=1
-            ),
-        ],
-    )
-
-    did_assoc_get = znp_server.reply_to(
-        c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
-        responses=[lookup_rsp],
-    )
-
-    # Match any arguments: neither command may be sent at all
-    did_assoc_remove = znp_server.reply_to(
-        c.UTIL.AssocRemove.Req(partial=True),
-        responses=[c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    did_assoc_add = znp_server.reply_to(
-        c.UTIL.AssocAdd.Req(partial=True),
-        responses=[c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    was_route_discovered = znp_server.reply_to(
-        c.ZDO.ExtRouteDisc.Req(Dst=device.nwk, partial=True),
-        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    with pytest.raises(DeliveryError) as exc_info:
-        await app.request(
-            device=device,
-            profile=260,
-            cluster=1,
-            src_ep=1,
-            dst_ep=1,
-            sequence=1,
-            data=b"\x00",
+    if relation is not None:
+        znp_server.assoc_add_new(
+            nwk=device.nwk, ieee=device.ieee, node_relation=relation
         )
 
-    # The association table is left alone. Other than `NOTUSED`, the route is
-    # rediscovered and the send retried once, as before, then the error propagates.
-    assert exc_info.value.status == t.Status.MAC_TRANSACTION_EXPIRED
-    assert data_req.call_count == (2 if retried else 1)
-    assert did_assoc_get.call_count == 1
-    assert did_assoc_remove.call_count == 0
-    assert did_assoc_add.call_count == 0
-    assert was_route_discovered.call_count == (1 if retried else 0)
+    if koenkk_lookup:
+        koenkk_absent_lookup(znp_server)
 
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
-@pytest.mark.parametrize(
-    "relation",
-    [
-        c.util.NodeRelation.CHILD_RFD,
-        c.util.NodeRelation.CHILD_RFD_RX_IDLE,
-        c.util.NodeRelation.CHILD_FFD,
-        c.util.NodeRelation.CHILD_FFD_RX_IDLE,
-    ],
-)
-async def test_request_recovery_assoc_remove_child_relations(
-    device_cls, relation, make_application, mocker
-):
-    app, znp_server = make_application(server_cls=device_cls)
-
-    await app.startup(auto_form=False)
-
-    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
-    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
 
     data_req = znp_server.reply_to(
         c.AF.DataRequestExt.Req(partial=True),
@@ -1021,8 +823,6 @@ async def test_request_recovery_assoc_remove_child_relations(
             ),
         ],
     )
-
-    table = AssocTable(znp_server, {device.ieee: (device.nwk, relation)})
 
     was_route_discovered = znp_server.reply_to(
         c.ZDO.ExtRouteDisc.Req(Dst=device.nwk, partial=True),
@@ -1040,23 +840,38 @@ async def test_request_recovery_assoc_remove_child_relations(
             data=b"\x00",
         )
 
-    # Every child relation is still removed, retried once and restored as it was
-    assert data_req.call_count == 2
-    assert was_route_discovered.call_count == 1
-    assert table.log == [
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocRemove", device.ieee),
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocAdd", device.ieee, device.nwk, relation),
-    ]
+    # The table is left alone, the route is rediscovered and the send retried
+    assert data_req.call_count == (2 if retried else 1)
+    assert was_route_discovered.call_count == (1 if retried else 0)
+    assert did_assoc_remove.call_count == 0
+    assert did_assoc_add.call_count == 0
 
     await app.shutdown()
 
 
+RFD = c.util.NodeRelation.CHILD_RFD
+
+
 @pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
-@pytest.mark.parametrize("rejoin", ["never", "during_retry", "during_restore_lookup"])
-async def test_request_recovery_assoc_restore_after_rejoin(
-    device_cls, rejoin, make_application, mocker
+@pytest.mark.parametrize(
+    ("scenario", "relation", "restored"),
+    [
+        # Every direct child relation is removed and restored as it was
+        ("unchanged", c.util.NodeRelation.CHILD_RFD, True),
+        ("unchanged", c.util.NodeRelation.CHILD_RFD_RX_IDLE, True),
+        ("unchanged", c.util.NodeRelation.CHILD_FFD, True),
+        ("unchanged", c.util.NodeRelation.CHILD_FFD_RX_IDLE, True),
+        ("koenkk_lookup", RFD, True),
+        # The host learned a new address, so the old one must not be written back
+        ("rejoin_during_retry", RFD, False),
+        ("rejoin_during_restore_lookup", RFD, False),
+        # The firmware has the device again, `AssocAdd` would overwrite the entry
+        ("re_associated", RFD, False),
+        ("re_associated_new_nwk", RFD, False),
+    ],
+)
+async def test_request_recovery_assoc_restore(
+    device_cls, scenario, relation, restored, make_application, mocker
 ):
     app, znp_server = make_application(server_cls=device_cls)
 
@@ -1070,205 +885,83 @@ async def test_request_recovery_assoc_restore_after_rejoin(
     # A rejoin only updates the device here, it does not start a new interview
     mocker.patch.object(device, "schedule_initialize")
 
-    table = AssocTable(
-        znp_server, {device.ieee: (0xABCD, c.util.NodeRelation.CHILD_RFD)}
-    )
+    assoc_add_new = znp_server.assoc_add_new
+    assoc_add_new(nwk=device.nwk, ieee=device.ieee, node_relation=relation)
 
-    def rejoin_if(when):
-        if rejoin == when:
-            # The device rejoins through a router under a new address. The host learns
-            # it from `ZDO.TCDevInd` or the announcement, both end in `handle_join`.
-            # The coordinator's table does not list it.
+    if scenario == "koenkk_lookup":
+        koenkk_absent_lookup(znp_server)
+
+    assoc_get = znp_server.assoc_get
+
+    def rejoin_on_restore_lookup(**kwargs):
+        # Only the restore looks the device up after its removal
+        entry = assoc_get(**kwargs)
+
+        if entry is None and scenario == "rejoin_during_restore_lookup":
             app.handle_join(nwk=0x1234, ieee=device.ieee, parent_nwk=0x5678)
 
-    def on_lookup():
-        # Only the restore looks the device up after its removal
-        if ("AssocRemove", device.ieee) in table.log:
-            rejoin_if("during_restore_lookup")
+        return entry
 
-    table.on_lookup = on_lookup
+    mocker.patch.object(znp_server, "assoc_get", side_effect=rejoin_on_restore_lookup)
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
 
-    with pytest.raises(DeliveryError) as exc_info:
-        await request_with_failed_recovery(
-            app, znp_server, device, lambda: rejoin_if("during_retry")
+    attempts = 0
+
+    def data_confirm_replier(req):
+        nonlocal attempts
+        attempts += 1
+
+        # The first attempt expires and starts the recovery, the retry finds no route
+        if attempts == 2:
+            if scenario == "rejoin_during_retry":
+                app.handle_join(nwk=0x1234, ieee=device.ieee, parent_nwk=0x5678)
+            elif scenario.startswith("re_associated"):
+                nwk = 0x1234 if scenario.endswith("new_nwk") else device.nwk
+                assoc_add_new(nwk=nwk, ieee=device.ieee, node_relation=relation)
+
+        return c.AF.DataConfirm.Callback(
+            Status=(
+                t.Status.MAC_TRANSACTION_EXPIRED
+                if attempts == 1
+                else t.Status.NWK_NO_ROUTE
+            ),
+            Endpoint=1,
+            TSN=1,
         )
 
-    assert exc_info.value.status == t.Status.NWK_NO_ROUTE
-
-    removal = [
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocRemove", device.ieee),
-    ]
-    restore_lookup = ("AssocGetWithAddress", device.ieee)
-
-    if rejoin == "never":
-        assert device.nwk == 0xABCD
-        assert table.log == removal + [
-            restore_lookup,
-            ("AssocAdd", device.ieee, 0xABCD, c.util.NodeRelation.CHILD_RFD),
-        ]
-    elif rejoin == "during_retry":
-        # The old address is not written back over the one the host now knows
-        assert device.nwk == 0x1234
-        assert table.log == removal
-    else:
-        # The address is checked again once the restore's lookup has returned
-        assert device.nwk == 0x1234
-        assert table.log == removal + [restore_lookup]
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
-async def test_request_recovery_assoc_restore_trace_1730(
-    device_cls, make_application, mocker
-):
-    # Order of a production log (2026-10-20 17:30, Koenkk's build 20250321): the
-    # recovery runs on the final attempt, the device announces itself under its old
-    # address and leaves while the route is rediscovered, the restore follows, and
-    # the device rejoins under a new address five seconds later.
-    app, znp_server = make_application(server_cls=device_cls)
-
-    await app.startup(auto_form=False)
-
-    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
-    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-    mocker.patch.object(device, "schedule_initialize")
-    mocker.patch.object(device, "schedule_group_membership_scan")
-
-    table = AssocTable(
-        znp_server, {device.ieee: (0xABCD, c.util.NodeRelation.CHILD_RFD)}
+    znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
     )
 
-    def announce_and_leave():
-        # Whether Z-Stack re-adds the entry at the announcement or drops it at the
-        # leave is not measured; the table keeps it removed
-        app.handle_join(nwk=0xABCD, ieee=device.ieee, parent_nwk=None)
-        app.handle_leave(nwk=0xABCD, ieee=device.ieee)
-
-    table.on_remove = announce_and_leave
-
-    with pytest.raises(DeliveryError) as exc_info:
-        await request_with_failed_recovery(
-            app,
-            znp_server,
-            device,
-            statuses=(t.Status.NWK_NO_ROUTE, t.Status.MAC_TRANSACTION_EXPIRED),
-        )
-
-    assert exc_info.value.status == t.Status.MAC_TRANSACTION_EXPIRED
-
-    app.handle_join(nwk=0x1234, ieee=device.ieee, parent_nwk=0x0000)
-    assert device.nwk == 0x1234
-
-    # The new address arrives after the restore, so neither guard can apply
-    assert table.log == [
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocRemove", device.ieee),
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocAdd", device.ieee, 0xABCD, c.util.NodeRelation.CHILD_RFD),
-    ]
-
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
-@pytest.mark.parametrize(
-    ("entry_at_restore", "not_found", "restored"),
-    [
-        # Absent: the device is still removed, so it is restored as it was
-        pytest.param(None, ASSOC_NOT_FOUND_ZEROED, True, id="absent_zeroed"),
-        pytest.param(None, ASSOC_NOT_FOUND_NOTUSED, True, id="absent_notused"),
-        # Present: Z-Stack re-associated the device before the host heard of it.
-        # `UTIL.AssocAdd` would overwrite this entry in place.
-        pytest.param(
-            (0xABCD, c.util.NodeRelation.CHILD_RFD), None, False, id="present"
-        ),
-        pytest.param(
-            (0x1234, c.util.NodeRelation.CHILD_RFD), None, False, id="present_new_nwk"
-        ),
-        pytest.param(
-            (0xABCD, c.util.NodeRelation.NEIGHBOR), None, False, id="present_neighbor"
-        ),
-    ],
-)
-async def test_request_recovery_assoc_restore_lookup(
-    device_cls, entry_at_restore, not_found, restored, make_application, mocker
-):
-    app, znp_server = make_application(server_cls=device_cls)
-
-    await app.startup(auto_form=False)
-
-    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
-    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-
-    table = AssocTable(
-        znp_server,
-        {device.ieee: (0xABCD, c.util.NodeRelation.CHILD_RFD)},
-        not_found=not_found,
+    znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(partial=True),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
     )
-
-    def during_retry():
-        if entry_at_restore is not None:
-            table.entries[device.ieee] = entry_at_restore
 
     with pytest.raises(DeliveryError):
-        await request_with_failed_recovery(app, znp_server, device, during_retry)
-
-    expected = [
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocRemove", device.ieee),
-        ("AssocGetWithAddress", device.ieee),
-    ]
-
-    if restored:
-        expected.append(
-            ("AssocAdd", device.ieee, 0xABCD, c.util.NodeRelation.CHILD_RFD)
+        await app.request(
+            device=device,
+            profile=260,
+            cluster=1,
+            src_ep=1,
+            dst_ep=1,
+            sequence=1,
+            data=b"\x00",
         )
 
-    assert table.log == expected
+    assert did_assoc_remove.call_count == 1
 
-    await app.shutdown()
-
-
-@pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
-async def test_request_recovery_assoc_add_unsupported(
-    device_cls, make_application, mocker
-):
-    app, znp_server = make_application(server_cls=device_cls)
-
-    await app.startup(auto_form=False)
-
-    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
-    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
-
-    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
-
-    table = AssocTable(
-        znp_server,
-        {device.ieee: (0xABCD, c.util.NodeRelation.CHILD_RFD)},
-        assoc_add=False,
-    )
-
-    # Unchanged behaviour: the failed restore replaces the `DeliveryError`
-    with pytest.raises(CommandNotRecognized) as exc_info:
-        await request_with_failed_recovery(app, znp_server, device)
-
-    assert isinstance(exc_info.value.__context__, DeliveryError)
-    assert exc_info.value.__context__.status == t.Status.NWK_NO_ROUTE
-    assert table.log == [
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocRemove", device.ieee),
-        ("AssocGetWithAddress", device.ieee),
-        ("AssocAdd", device.ieee, 0xABCD, c.util.NodeRelation.CHILD_RFD),
-    ]
-
-    # The device stays removed
-    assert device.ieee not in table.entries
+    if restored:
+        did_assoc_add.assert_called_once_with(
+            nwk=0xABCD, ieee=device.ieee, node_relation=relation
+        )
+    else:
+        did_assoc_add.assert_not_called()
 
     await app.shutdown()
 
