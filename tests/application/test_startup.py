@@ -326,12 +326,22 @@ async def test_concurrency_auto_config(device, concurrency, make_application):
         (20250321, True),
     ],
 )
-async def test_child_aging_by_build(code_revision, expected, make_application, mocker):
+async def test_child_aging_by_build(code_revision, expected, make_application):
     app, znp_server = make_application(FormedLaunchpadCC26X2R1)
-    mocker.patch.object(
-        type(app),
-        "_zstack_build_id",
-        mocker.PropertyMock(return_value=code_revision or 0),
+
+    znp_server.reply_to(
+        c.SYS.Version.Req(),
+        responses=c.SYS.Version.Rsp(
+            TransportRev=2,
+            ProductId=1,
+            MajorRel=2,
+            MinorRel=7,
+            MaintRel=1,
+            CodeRevision=code_revision,
+            BootloaderBuildType=None,
+            BootloaderRevision=None,
+        ),
+        override=True,
     )
 
     await app.startup(auto_form=False)

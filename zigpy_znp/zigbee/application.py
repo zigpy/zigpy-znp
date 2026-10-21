@@ -945,10 +945,10 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     except InvalidCommandResponse as e:
                         last_error = e
 
-                        # Without child aging (older builds) if a child switches parents
-                        # from the coordinator to another router, we will not be able to
-                        # re-discover a route to it. We have to manually drop the child
-                        # to do this.
+                        # Child aging is off on older builds, so if a child switches
+                        # parents from the coordinator to another router, we will not be
+                        # able to re-discover a route to it. We have to manually drop the
+                        # child to do this.
                         if (
                             e.response.Status == t.Status.MAC_TRANSACTION_EXPIRED
                             and device is not None
