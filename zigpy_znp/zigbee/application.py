@@ -37,7 +37,7 @@ DATA_CONFIRM_TIMEOUT = 8
 EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 DEVICE_JOIN_MAX_DELAY = 5
 
-# Association table entries that the `send_packet` recovery may remove and restore
+# Child relations the recovery may drop and restore
 CHILD_NODE_RELATIONS = frozenset(
     {
         c.util.NodeRelation.CHILD_RFD,
@@ -969,9 +969,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             ):
                                 raise
 
-                            # Only a direct child can be dropped and restored. A failed
-                            # lookup returns 0xFFFE and a non-child relation on some
-                            # builds (Koenkk/zigbee-herdsman#685).
+                            # Not a direct child, or a miss (0xFFFE, see
+                            # Koenkk/zigbee-herdsman#685): retry only
                             if (
                                 child_association.Device.shortAddr == 0xFFFE
                                 or child_association.Device.nodeRelation
@@ -1028,8 +1027,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                 assert child_association is not None
                 removed = child_association.Device
 
-                # `AssocAdd` updates an existing entry in place, so skip it if the
-                # device rejoined, possibly under a new address, since the removal
+                # `AssocAdd` overwrites in place: skip if the device rejoined
                 if device.nwk == removed.shortAddr:
                     current = await self._znp.request(
                         c.UTIL.AssocGetWithAddress.Req(
@@ -1038,6 +1036,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         )
                     )
 
+                    # Again: a join may have arrived during the lookup
                     if device.nwk == removed.shortAddr and (
                         current.Device.shortAddr == 0xFFFE
                         or current.Device.nodeRelation == c.util.NodeRelation.NOTUSED

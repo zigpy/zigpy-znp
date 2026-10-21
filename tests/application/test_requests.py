@@ -763,8 +763,8 @@ async def test_request_recovery_assoc_remove(
 
 
 def absent_lookup_with_address_0xfffe(znp_server, relation=c.util.NodeRelation.PARENT):
-    # A lookup miss answers 0xFFFE: Koenkk's builds zero the rest (`PARENT`), stock
-    # Z-Stack leaves uninitialized memory, which may read as a child relation
+    # Real miss: 0xFFFE, then zeros on Koenkk's builds (`PARENT`) or garbage on stock
+    # Z-Stack, which may read as a child
     def lookup(req):
         device = znp_server.assoc_get(ieee=req.IEEE, nwk=req.NWK)
 
@@ -784,11 +784,11 @@ def absent_lookup_with_address_0xfffe(znp_server, relation=c.util.NodeRelation.P
 @pytest.mark.parametrize(
     ("relation", "absent_relation", "retried"),
     [
-        # Absent: the default model reports `NOTUSED`, which ends the send at once
+        # Miss as `NOTUSED` (model default): send ends at once
         (None, None, False),
         (None, c.util.NodeRelation.PARENT, True),
         (None, c.util.NodeRelation.CHILD_RFD, True),
-        # Found, but not a direct child of the coordinator
+        # Found, not a direct child
         (c.util.NodeRelation.PARENT, None, True),
         (c.util.NodeRelation.NEIGHBOR, None, True),
         (c.util.NodeRelation.OTHER, None, True),
@@ -843,7 +843,7 @@ async def test_request_recovery_assoc_not_a_child(
             data=b"\x00",
         )
 
-    # The table is left alone, the route is rediscovered and the send retried
+    # Table untouched, route rediscovered, send retried
     assert data_req.call_count == (2 if retried else 1)
     assert was_route_discovered.call_count == (1 if retried else 0)
     assert did_assoc_remove.call_count == 0
@@ -859,16 +859,16 @@ RFD = c.util.NodeRelation.CHILD_RFD
 @pytest.mark.parametrize(
     ("scenario", "relation", "restored"),
     [
-        # Every direct child relation is removed and restored as it was
+        # Each child relation: removed, restored as it was
         ("unchanged", c.util.NodeRelation.CHILD_RFD, True),
         ("unchanged", c.util.NodeRelation.CHILD_RFD_RX_IDLE, True),
         ("unchanged", c.util.NodeRelation.CHILD_FFD, True),
         ("unchanged", c.util.NodeRelation.CHILD_FFD_RX_IDLE, True),
         ("koenkk_lookup", RFD, True),
-        # The host learned a new address, so the old one must not be written back
+        # Host knows a new address: no restore
         ("rejoin_during_retry", RFD, False),
         ("rejoin_during_restore_lookup", RFD, False),
-        # The firmware has the device again, `AssocAdd` would overwrite the entry
+        # Firmware has the device again: no overwrite
         ("re_associated", RFD, False),
         ("re_associated_new_nwk", RFD, False),
     ],
@@ -885,7 +885,7 @@ async def test_request_recovery_assoc_restore(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    # A rejoin only updates the device here, it does not start a new interview
+    # Rejoin only updates the device, no interview
     mocker.patch.object(device, "schedule_initialize")
 
     assoc_add_new = znp_server.assoc_add_new
@@ -897,7 +897,7 @@ async def test_request_recovery_assoc_restore(
     assoc_get = znp_server.assoc_get
 
     def rejoin_on_restore_lookup(**kwargs):
-        # Only the restore looks the device up after its removal
+        # Only the restore looks up after the removal
         entry = assoc_get(**kwargs)
 
         if entry is None and scenario == "rejoin_during_restore_lookup":
@@ -915,7 +915,7 @@ async def test_request_recovery_assoc_restore(
         nonlocal attempts
         attempts += 1
 
-        # The first attempt expires and starts the recovery, the retry finds no route
+        # Attempt 1 expires (recovery), retry: no route
         if attempts == 2:
             if scenario == "rejoin_during_retry":
                 app.handle_join(nwk=0x1234, ieee=device.ieee, parent_nwk=0x5678)
