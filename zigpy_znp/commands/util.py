@@ -477,8 +477,7 @@ class UTIL(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
-    # Z2M firmware: proxy call to AssocAddNew. The IEEE address comes first: the
-    # firmware calls `AssocAddNew(BUILD_UINT16(pBuf[8], pBuf[9]), pBuf, pBuf[10])`
+    # Z2M firmware: proxy call to AssocAddNew
     AssocAdd = t.CommandDef(
         t.CommandType.SREQ,
         0x64,
