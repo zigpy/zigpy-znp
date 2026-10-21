@@ -559,3 +559,68 @@ def test_neighbors_missing_payload():
         Src=0x821F,
         Status=t.ZDOStatus.NOT_SUPPORTED,
     )
+
+
+def parse_assoc_add_like_firmware(data: bytes) -> tuple[t.EUI64, t.NWK, int]:
+    """Read a `UTIL.AssocAdd` payload the way Koenkk's `MT_UtilAssocAdd` does."""
+    ieee, rest = t.EUI64.deserialize(data[0:8])
+    assert not rest
+    nwk, rest = t.NWK.deserialize(data[8:10])
+    assert not rest
+
+    return ieee, nwk, data[10]
+
+
+def test_util_assoc_add_field_order():
+    ieee = t.EUI64.convert("68:0a:e2:ff:fe:32:db:95")
+    nwk = t.NWK(0x725E)
+
+    req = c.UTIL.AssocAdd.Req(
+        NWK=nwk, IEEE=ieee, NodeRelation=c.util.NodeRelation.CHILD_RFD
+    )
+
+    assert req.to_frame().data == ieee.serialize() + nwk.serialize() + b"\x01"
+    assert parse_assoc_add_like_firmware(req.to_frame().data) == (ieee, nwk, 1)
+
+
+@pytest.mark.parametrize(
+    ("ieee", "nwk", "phantom_ieee", "phantom_nwk"),
+    [
+        # Test network, 2026-10-21: `UTIL.AssocFindDevice` afterwards found this entry
+        pytest.param(
+            "68:0a:e2:ff:fe:32:db:95",
+            0x725E,
+            "e2:ff:fe:32:db:95:72:5e",
+            0x680A,
+            id="test_network",
+        ),
+        # Home network, 2026-10-20: this IEEE then showed up in the zigpy
+        # network backup under `nwk_addresses`
+        pytest.param(
+            "84:2e:14:ff:fe:70:1b:9b",
+            0x434B,
+            "14:ff:fe:70:1b:9b:43:4b",
+            0x842E,
+            id="home_network",
+        ),
+    ],
+)
+def test_util_assoc_add_old_field_order(ieee, nwk, phantom_ieee, phantom_nwk):
+    ieee = t.EUI64.convert(ieee)
+    nwk = t.NWK(nwk)
+
+    # The NWK address used to be sent first. The firmware read it as the first two
+    # bytes of the IEEE address and took the IEEE address's top two bytes as the
+    # NWK address, so the entry it added belonged to no real device.
+    old_payload = nwk.serialize() + ieee.serialize() + b"\x01"
+
+    assert parse_assoc_add_like_firmware(old_payload) == (
+        t.EUI64.convert(phantom_ieee),
+        t.NWK(phantom_nwk),
+        1,
+    )
+
+    req = c.UTIL.AssocAdd.Req(
+        NWK=nwk, IEEE=ieee, NodeRelation=c.util.NodeRelation.CHILD_RFD
+    )
+    assert parse_assoc_add_like_firmware(req.to_frame().data) == (ieee, nwk, 1)
