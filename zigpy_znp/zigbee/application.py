@@ -37,6 +37,16 @@ DATA_CONFIRM_TIMEOUT = 8
 EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 DEVICE_JOIN_MAX_DELAY = 5
 
+# Association table entries that the `send_packet` recovery may remove and restore
+CHILD_NODE_RELATIONS = frozenset(
+    {
+        c.util.NodeRelation.CHILD_RFD,
+        c.util.NodeRelation.CHILD_RFD_RX_IDLE,
+        c.util.NodeRelation.CHILD_FFD,
+        c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+    }
+)
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -959,6 +969,20 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             ):
                                 raise
 
+                            # Only a direct child can be dropped and restored. A failed
+                            # lookup returns `INVALID_NODE_ADDR` (0xFFFE) followed by
+                            # uninitialized memory on stock Z-Stack or by zeroes
+                            # (`NodeRelation.PARENT`) on Koenkk's builds, and would be
+                            # restored as a bogus entry (Koenkk/zigbee-herdsman#685).
+                            # Rediscover the route and retry without touching the table.
+                            if (
+                                child_association.Device.shortAddr == 0xFFFE
+                                or child_association.Device.nodeRelation
+                                not in CHILD_NODE_RELATIONS
+                            ):
+                                await self._discover_route(device.nwk)
+                                continue
+
                             try:
                                 await self._znp.request(
                                     c.UTIL.AssocRemove.Req(IEEE=device.ieee)
@@ -1005,10 +1029,42 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # not be able to find it again.
             if not succeeded and tried_assoc_remove:
                 assert child_association is not None
-                await self._znp.request(
-                    c.UTIL.AssocAdd.Req(
-                        NWK=child_association.Device.shortAddr,
-                        IEEE=device.ieee,
-                        NodeRelation=child_association.Device.nodeRelation,
+                removed = child_association.Device
+
+                # Restore only the entry we removed, and only while nothing newer is
+                # known. `UTIL.AssocAdd` calls `AssocAddNew`, which TI documents as
+                # "create a new or update a previous association": for an IEEE that is
+                # already in the table it overwrites that entry in place, short address
+                # included (measured on Koenkk's build 20250321; the implementation is
+                # in TI's library). A device that rejoined under a new address during
+                # the recovery would be listed under its old one again.
+                #
+                # The host's address is compared again once the lookup has returned,
+                # which covers every address change the host has seen until the
+                # `AssocAdd` is handed to `ZNP.request`. A join that the firmware
+                # handles after the lookup's snapshot, including while `ZNP.request`
+                # waits for `_sync_request_lock`, cannot be excluded by the lookup
+                # alone; the create-or-update above then decides. Serializing table
+                # changes per IEEE is out of scope.
+                if device.nwk == removed.shortAddr:
+                    current = await self._znp.request(
+                        c.UTIL.AssocGetWithAddress.Req(
+                            IEEE=device.ieee,
+                            NWK=0x0000,  # IEEE takes priority
+                        )
                     )
-                )
+
+                    # The host may have handled a join while the lookup was awaited.
+                    # The firmware must still answer "absent", as for the failed
+                    # lookups above.
+                    if device.nwk == removed.shortAddr and (
+                        current.Device.shortAddr == 0xFFFE
+                        or current.Device.nodeRelation == c.util.NodeRelation.NOTUSED
+                    ):
+                        await self._znp.request(
+                            c.UTIL.AssocAdd.Req(
+                                NWK=removed.shortAddr,
+                                IEEE=device.ieee,
+                                NodeRelation=removed.nodeRelation,
+                            )
+                        )
