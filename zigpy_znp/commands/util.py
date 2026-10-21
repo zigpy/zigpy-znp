@@ -482,8 +482,8 @@ class UTIL(t.CommandsBase, subsystem=t.Subsystem.UTIL):
         t.CommandType.SREQ,
         0x64,
         req_schema=(
-            t.Param("NWK", t.NWK, "Short address of the device"),
             t.Param("IEEE", t.EUI64, "Extended address of the device to add"),
+            t.Param("NWK", t.NWK, "Short address of the device"),
             t.Param(
                 "NodeRelation",
                 NodeRelation,
