@@ -947,8 +947,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
                         # Child aging is off on older builds, so if a child switches
                         # parents from the coordinator to another router, we will not be
-                        # able to re-discover a route to it. We have to manually drop the
-                        # child to do this.
+                        # able to re-discover a route to it. We have to manually drop
+                        # the child to do this.
                         if (
                             e.response.Status == t.Status.MAC_TRANSACTION_EXPIRED
                             and device is not None
