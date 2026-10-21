@@ -431,6 +431,9 @@ class BaseZStackDevice(BaseServerZNP):
         self.device_state = t.DeviceState.InitializedNotStarted
         self.zdo_callbacks = set()
 
+        self._assoc_table = {}
+        self._assoc_next_addr_idx = 0
+
         # Handle the decorators
         for name in dir(self):
             func = getattr(self, name)
@@ -916,6 +919,85 @@ class BaseZStackDevice(BaseServerZNP):
     def assoc_find_dev_responder(self, req):
         return req.Rsp(Device=t.Bytes(b"\xff" * (36 if self.align_structs else 28)))
 
+    # Simulated association table, modeled on the Z-Stack `AssocAddNew`/`AssocRemove`/
+    # `AssocGetWithAddress` functions. Keyed by IEEE, like the address manager lookup.
+    def assoc_get(self, *, ieee=None, nwk=None):
+        # The IEEE takes priority; all-zeroes means "use the NWK address instead"
+        if ieee is not None and any(ieee):
+            return self._assoc_table.get(ieee)
+
+        for device in self._assoc_table.values():
+            if device.shortAddr == nwk:
+                return device
+
+        return None
+
+    def assoc_add_new(self, *, nwk, ieee, node_relation):
+        # `AssocAddNew` updates an existing entry in place (keeping its addrIdx) or
+        # allocates a new one when the IEEE is not already known.
+        node_relation = c.util.NodeRelation(node_relation)
+        existing = self._assoc_table.get(ieee)
+
+        if existing is not None:
+            addr_idx = existing.addrIdx
+        else:
+            addr_idx = self._assoc_next_addr_idx
+            self._assoc_next_addr_idx += 1
+
+        is_child = (
+            c.util.NodeRelation.CHILD_RFD
+            <= node_relation
+            <= c.util.NodeRelation.CHILD_FFD_RX_IDLE
+        )
+        # Only RFD children age out and track keepalives; routers don't
+        is_aging_child = node_relation in (
+            c.util.NodeRelation.CHILD_RFD,
+            c.util.NodeRelation.CHILD_RFD_RX_IDLE,
+        )
+
+        device = c.util.Device(
+            shortAddr=t.NWK(nwk),
+            addrIdx=addr_idx,
+            nodeRelation=node_relation,
+            devStatus=(
+                c.util.DeviceStatus.SEC_INIT if is_child else c.util.DeviceStatus.NONE
+            ),
+            assocCnt=0,
+            age=0,
+            linkInfo=c.util.LinkInfo(
+                txCounter=0,
+                txCost=1,
+                rxLqi=0xAA,
+                inKeySeqNum=0,
+                inFrmCntr=0,
+                txFailure=0,
+            ),
+            endDev=c.util.AgingEndDevice(
+                endDevCfg=0,
+                deviceTimeout=0 if is_aging_child else 0xFFFFFFFE,
+            ),
+            timeoutCounter=0 if is_aging_child else 0xFFFFFFFE,
+            keepaliveRcv=1 if is_aging_child else 0,
+            ctrl=0x80,  # ASSOC_LIST_CTRL_SAVE
+        )
+        self._assoc_table[ieee] = device
+
+        return device
+
+    def assoc_remove(self, ieee):
+        # `AssocRemove` frees the slot and returns whether it was present
+        return self._assoc_table.pop(ieee, None) is not None
+
+    @reply_to(c.UTIL.AssocGetWithAddress.Req(partial=True))
+    def on_util_assoc_get_with_address(self, req):
+        device = self.assoc_get(ieee=req.IEEE, nwk=req.NWK)
+
+        if device is None:
+            # The firmware packs INVALID_NODE_ADDR / NOTUSED for an unknown device
+            device, _ = c.util.Device.deserialize(b"\xff" * 100)
+
+        return c.UTIL.AssocGetWithAddress.Rsp(Device=device)
+
 
 class BaseZStack1CC2531(BaseZStackDevice):
     align_structs = False
@@ -1356,6 +1438,29 @@ class BaseZStack3CC2531(BaseZStack3Device):
 
 
 class FormedLaunchpadCC26X2R1(BaseLaunchpadCC26X2R1):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._nvram = load_nvram_json("CC2652R-ZStack4.formed.json")
+        self._orig_nvram = simple_deepcopy(self._nvram)
+
+    # Koenkk Z-Stack 3.x firmware (post-20201017) adds the custom AssocAdd/AssocRemove
+    # MT commands. Both proxy into the association table but always reply with a single
+    # SUCCESS status byte, ignoring the proxied call's result.
+    @reply_to(c.UTIL.AssocRemove.Req(partial=True))
+    def on_util_assoc_remove(self, req):
+        self.assoc_remove(req.IEEE)
+
+        return c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)
+
+    @reply_to(c.UTIL.AssocAdd.Req(partial=True))
+    def on_util_assoc_add(self, req):
+        self.assoc_add_new(nwk=req.NWK, ieee=req.IEEE, node_relation=req.NodeRelation)
+
+        return c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)
+
+
+class FormedLaunchpadCC26X2R1WithoutAssocCommands(BaseLaunchpadCC26X2R1):
+    # Models an older firmware build that lacks the custom AssocAdd/AssocRemove commands
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._nvram = load_nvram_json("CC2652R-ZStack4.formed.json")

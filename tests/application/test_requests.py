@@ -14,8 +14,10 @@ import zigpy_znp.types as t
 
 from ..conftest import (
     FORMED_DEVICES,
+    BaseLaunchpadCC26X2R1,
     CoroutineMock,
     FormedLaunchpadCC26X2R1,
+    FormedLaunchpadCC26X2R1WithoutAssocCommands,
     serialize_zdo_command,
     zdo_request_matcher,
 )
@@ -609,9 +611,11 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    assoc_device, _ = c.util.Device.deserialize(b"\xff" * 100)
-    assoc_device.shortAddr = device.nwk
-    assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
+    znp_server.assoc_add_new(
+        nwk=device.nwk,
+        ieee=device.ieee,
+        node_relation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+    )
 
     # First attempt fails with NWK_NO_ROUTE, the retried attempt fails with a
     # first-time MAC_TRANSACTION_EXPIRED association failure
@@ -634,31 +638,9 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
         ],
     )
 
-    def assoc_get_with_addr(req):
-        # Once removed, the device is no longer found and the restore goes ahead
-        if did_assoc_remove.call_count:
-            return assoc_lookup_rsp(b"\x00", 0xFFFE, c.util.NodeRelation.PARENT)
-
-        return c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)
-
-    znp_server.reply_to(
-        c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
-        responses=[assoc_get_with_addr],
-    )
-
-    did_assoc_remove = znp_server.reply_to(
-        c.UTIL.AssocRemove.Req(IEEE=device.ieee),
-        responses=[c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    did_assoc_add = znp_server.reply_to(
-        c.UTIL.AssocAdd.Req(
-            NWK=device.nwk,
-            IEEE=device.ieee,
-            NodeRelation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
-        ),
-        responses=[c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
-    )
+    # The association table responds on its own; just watch the mutations
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
 
     was_route_discovered = znp_server.reply_to(
         c.ZDO.ExtRouteDisc.Req(
@@ -689,12 +671,18 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device_cls", FORMED_DEVICES)
-@pytest.mark.parametrize("fw_assoc_remove", [True, False])
+@pytest.mark.parametrize(
+    "device_cls", FORMED_DEVICES + [FormedLaunchpadCC26X2R1WithoutAssocCommands]
+)
 @pytest.mark.parametrize("final_status", [t.Status.SUCCESS, t.Status.APS_NO_ACK])
 async def test_request_recovery_assoc_remove(
-    device_cls, fw_assoc_remove, final_status, make_application, mocker
+    device_cls, final_status, make_application, mocker
 ):
+    # Only the newer Z-Stack 3 firmware builds expose the custom AssocAdd/AssocRemove
+    # commands that back the child-association recovery flow
+    is_launchpad = issubclass(device_cls, BaseLaunchpadCC26X2R1)
+    fw_assoc_remove = issubclass(device_cls, FormedLaunchpadCC26X2R1)
+
     app, znp_server = make_application(server_cls=device_cls)
 
     await app.startup(auto_form=False)
@@ -705,12 +693,20 @@ async def test_request_recovery_assoc_remove(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    assoc_device, _ = c.util.Device.deserialize(b"\xff" * 100)
-    assoc_device.shortAddr = device.nwk
-    assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
+    znp_server.assoc_add_new(
+        nwk=device.nwk,
+        ieee=device.ieee,
+        node_relation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+    )
+
+    # The association table responds on its own; just watch the mutations
+    did_assoc_get = mocker.spy(znp_server, "assoc_get")
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
 
     def data_confirm_replier(req):
-        bad_assoc = assoc_device
+        # The child stops expiring transactions once its association is dropped
+        bad_assoc = len(did_assoc_remove.mock_calls) == 0
 
         return c.AF.DataConfirm.Callback(
             Status=t.Status.MAC_TRANSACTION_EXPIRED if bad_assoc else final_status,
@@ -725,52 +721,6 @@ async def test_request_recovery_assoc_remove(
             data_confirm_replier,
         ],
     )
-
-    def assoc_get_with_addr(req):
-        nonlocal assoc_device
-
-        if assoc_device is None:
-            dev, _ = c.util.Device.deserialize(b"\xff" * 100)
-            return c.UTIL.AssocGetWithAddress.Rsp(Device=dev)
-
-        return c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)
-
-    did_assoc_get = znp_server.reply_to(
-        c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
-        responses=[assoc_get_with_addr],
-    )
-
-    if not issubclass(device_cls, FormedLaunchpadCC26X2R1):
-        fw_assoc_remove = False
-
-    # Not all firmwares support Add/Remove
-    if fw_assoc_remove:
-
-        def assoc_remove(req):
-            nonlocal assoc_device
-
-            if assoc_device is None:
-                return c.UTIL.AssocRemove.Rsp(Status=t.Status.FAILURE)
-
-            assoc_device = None
-            return c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)
-
-        did_assoc_remove = znp_server.reply_to(
-            c.UTIL.AssocRemove.Req(IEEE=device.ieee),
-            responses=[assoc_remove],
-        )
-
-        did_assoc_add = znp_server.reply_to(
-            c.UTIL.AssocAdd.Req(
-                NWK=device.nwk,
-                IEEE=device.ieee,
-                NodeRelation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
-            ),
-            responses=[c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
-        )
-    else:
-        did_assoc_remove = None
-        did_assoc_add = None
 
     was_route_discovered = znp_server.reply_to(
         c.ZDO.ExtRouteDisc.Req(
@@ -803,7 +753,7 @@ async def test_request_recovery_assoc_remove(
             assert len(did_assoc_add.mock_calls) >= 1
         else:
             assert len(did_assoc_add.mock_calls) == 0
-    elif issubclass(device_cls, FormedLaunchpadCC26X2R1):
+    elif is_launchpad:
         assert len(did_assoc_get.mock_calls) >= 1
     else:
         # Don't even attempt this with older firmwares
