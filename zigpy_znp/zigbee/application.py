@@ -16,6 +16,7 @@ import zigpy.util
 import zigpy.zcl
 import zigpy.zdo
 import zigpy.zdo.types as zdo_t
+import zigpy.zgp
 
 from zigpy_znp.api import ZNP
 import zigpy_znp.commands as c
@@ -38,6 +39,16 @@ EXTENDED_DATA_CONFIRM_TIMEOUT = 30
 DEVICE_JOIN_MAX_DELAY = 5
 # First Koenkk Z-Stack 3.x.0 build with child aging enabled (and Xiaomi exempted)
 CHILD_AGING_MIN_BUILD_ID = 20230507
+
+# Child relations the recovery may drop and restore
+CHILD_NODE_RELATIONS = frozenset(
+    {
+        c.util.NodeRelation.CHILD_RFD,
+        c.util.NodeRelation.CHILD_RFD_RX_IDLE,
+        c.util.NodeRelation.CHILD_FFD,
+        c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+    }
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -668,7 +679,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return ZDO_ENDPOINT
 
         if profile == zigpy.profiles.zgp.PROFILE_ID:
-            return zigpy.profiles.zgp.GREENPOWER_ENDPOINT_ID
+            return zigpy.zgp.GP_ENDPOINT
 
         # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
         if (
@@ -968,6 +979,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             ):
                                 raise
 
+                            # Not a direct child, or a miss (0xFFFE, see
+                            # Koenkk/zigbee-herdsman#685): retry only
+                            if (
+                                child_association.Device.shortAddr == 0xFFFE
+                                or child_association.Device.nodeRelation
+                                not in CHILD_NODE_RELATIONS
+                            ):
+                                await self._discover_route(device.nwk)
+                                continue
+
                             try:
                                 await self._znp.request(
                                     c.UTIL.AssocRemove.Req(IEEE=device.ieee)
@@ -1014,10 +1035,26 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # not be able to find it again.
             if not succeeded and tried_assoc_remove:
                 assert child_association is not None
-                await self._znp.request(
-                    c.UTIL.AssocAdd.Req(
-                        NWK=child_association.Device.shortAddr,
-                        IEEE=device.ieee,
-                        NodeRelation=child_association.Device.nodeRelation,
+                removed = child_association.Device
+
+                # `AssocAdd` overwrites in place: skip if the device rejoined
+                if device.nwk == removed.shortAddr:
+                    current = await self._znp.request(
+                        c.UTIL.AssocGetWithAddress.Req(
+                            IEEE=device.ieee,
+                            NWK=0x0000,  # IEEE takes priority
+                        )
                     )
-                )
+
+                    # Again: a join may have arrived during the lookup
+                    if device.nwk == removed.shortAddr and (
+                        current.Device.shortAddr == 0xFFFE
+                        or current.Device.nodeRelation == c.util.NodeRelation.NOTUSED
+                    ):
+                        await self._znp.request(
+                            c.UTIL.AssocAdd.Req(
+                                NWK=removed.shortAddr,
+                                IEEE=device.ieee,
+                                NodeRelation=removed.nodeRelation,
+                            )
+                        )

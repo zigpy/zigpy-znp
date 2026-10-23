@@ -13,8 +13,10 @@ import zigpy_znp.types as t
 
 from ..conftest import (
     FORMED_DEVICES,
+    BaseLaunchpadCC26X2R1,
     CoroutineMock,
     FormedLaunchpadCC26X2R1,
+    FormedLaunchpadCC26X2R1WithoutAssocCommands,
     serialize_zdo_command,
     zdo_request_matcher,
 )
@@ -608,9 +610,11 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    assoc_device, _ = c.util.Device.deserialize(b"\xff" * 100)
-    assoc_device.shortAddr = device.nwk
-    assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
+    znp_server.assoc_add_new(
+        nwk=device.nwk,
+        ieee=device.ieee,
+        node_relation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+    )
 
     # First attempt fails with NWK_NO_ROUTE, the retried attempt fails with a
     # first-time MAC_TRANSACTION_EXPIRED association failure
@@ -633,24 +637,9 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
         ],
     )
 
-    znp_server.reply_to(
-        c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
-        responses=[c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)],
-    )
-
-    did_assoc_remove = znp_server.reply_to(
-        c.UTIL.AssocRemove.Req(IEEE=device.ieee),
-        responses=[c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)],
-    )
-
-    did_assoc_add = znp_server.reply_to(
-        c.UTIL.AssocAdd.Req(
-            NWK=device.nwk,
-            IEEE=device.ieee,
-            NodeRelation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
-        ),
-        responses=[c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
-    )
+    # The association table responds on its own; just watch the mutations
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
 
     was_route_discovered = znp_server.reply_to(
         c.ZDO.ExtRouteDisc.Req(
@@ -681,12 +670,18 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
     await app.shutdown()
 
 
-@pytest.mark.parametrize("device_cls", FORMED_DEVICES)
-@pytest.mark.parametrize("fw_assoc_remove", [True, False])
+@pytest.mark.parametrize(
+    "device_cls", FORMED_DEVICES + [FormedLaunchpadCC26X2R1WithoutAssocCommands]
+)
 @pytest.mark.parametrize("final_status", [t.Status.SUCCESS, t.Status.APS_NO_ACK])
 async def test_request_recovery_assoc_remove(
-    device_cls, fw_assoc_remove, final_status, make_application, mocker
+    device_cls, final_status, make_application, mocker
 ):
+    # Only the newer Z-Stack 3 firmware builds expose the custom AssocAdd/AssocRemove
+    # commands that back the child-association recovery flow
+    is_launchpad = issubclass(device_cls, BaseLaunchpadCC26X2R1)
+    fw_assoc_remove = issubclass(device_cls, FormedLaunchpadCC26X2R1)
+
     app, znp_server = make_application(server_cls=device_cls)
 
     await app.startup(auto_form=False)
@@ -697,12 +692,20 @@ async def test_request_recovery_assoc_remove(
 
     device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
 
-    assoc_device, _ = c.util.Device.deserialize(b"\xff" * 100)
-    assoc_device.shortAddr = device.nwk
-    assoc_device.nodeRelation = c.util.NodeRelation.CHILD_FFD_RX_IDLE
+    znp_server.assoc_add_new(
+        nwk=device.nwk,
+        ieee=device.ieee,
+        node_relation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
+    )
+
+    # The association table responds on its own; just watch the mutations
+    did_assoc_get = mocker.spy(znp_server, "assoc_get")
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
 
     def data_confirm_replier(req):
-        bad_assoc = assoc_device
+        # The child stops expiring transactions once its association is dropped
+        bad_assoc = len(did_assoc_remove.mock_calls) == 0
 
         return c.AF.DataConfirm.Callback(
             Status=t.Status.MAC_TRANSACTION_EXPIRED if bad_assoc else final_status,
@@ -717,52 +720,6 @@ async def test_request_recovery_assoc_remove(
             data_confirm_replier,
         ],
     )
-
-    def assoc_get_with_addr(req):
-        nonlocal assoc_device
-
-        if assoc_device is None:
-            dev, _ = c.util.Device.deserialize(b"\xff" * 100)
-            return c.UTIL.AssocGetWithAddress.Rsp(Device=dev)
-
-        return c.UTIL.AssocGetWithAddress.Rsp(Device=assoc_device)
-
-    did_assoc_get = znp_server.reply_to(
-        c.UTIL.AssocGetWithAddress.Req(IEEE=device.ieee, partial=True),
-        responses=[assoc_get_with_addr],
-    )
-
-    if not issubclass(device_cls, FormedLaunchpadCC26X2R1):
-        fw_assoc_remove = False
-
-    # Not all firmwares support Add/Remove
-    if fw_assoc_remove:
-
-        def assoc_remove(req):
-            nonlocal assoc_device
-
-            if assoc_device is None:
-                return c.UTIL.AssocRemove.Rsp(Status=t.Status.FAILURE)
-
-            assoc_device = None
-            return c.UTIL.AssocRemove.Rsp(Status=t.Status.SUCCESS)
-
-        did_assoc_remove = znp_server.reply_to(
-            c.UTIL.AssocRemove.Req(IEEE=device.ieee),
-            responses=[assoc_remove],
-        )
-
-        did_assoc_add = znp_server.reply_to(
-            c.UTIL.AssocAdd.Req(
-                NWK=device.nwk,
-                IEEE=device.ieee,
-                NodeRelation=c.util.NodeRelation.CHILD_FFD_RX_IDLE,
-            ),
-            responses=[c.UTIL.AssocAdd.Rsp(Status=t.Status.SUCCESS)],
-        )
-    else:
-        did_assoc_remove = None
-        did_assoc_add = None
 
     was_route_discovered = znp_server.reply_to(
         c.ZDO.ExtRouteDisc.Req(
@@ -795,12 +752,219 @@ async def test_request_recovery_assoc_remove(
             assert len(did_assoc_add.mock_calls) >= 1
         else:
             assert len(did_assoc_add.mock_calls) == 0
-    elif issubclass(device_cls, FormedLaunchpadCC26X2R1):
+    elif is_launchpad:
         assert len(did_assoc_get.mock_calls) >= 1
     else:
         # Don't even attempt this with older firmwares
         assert len(did_assoc_get.mock_calls) == 0
         assert was_route_discovered.call_count == 0
+
+    await app.shutdown()
+
+
+def absent_lookup_with_address_0xfffe(znp_server, relation=c.util.NodeRelation.PARENT):
+    # Real miss: 0xFFFE, then zeros on Koenkk's builds (`PARENT`) or garbage on stock
+    # Z-Stack, which may read as a child
+    def lookup(req):
+        device = znp_server.assoc_get(ieee=req.IEEE, nwk=req.NWK)
+
+        if device is None:
+            device, _ = c.util.Device.deserialize(b"\x00" * 100)
+            device.shortAddr = t.NWK(0xFFFE)
+            device.nodeRelation = relation
+
+        return c.UTIL.AssocGetWithAddress.Rsp(Device=device)
+
+    znp_server.reply_to(
+        c.UTIL.AssocGetWithAddress.Req(partial=True), responses=[lookup], override=True
+    )
+
+
+@pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
+@pytest.mark.parametrize(
+    ("relation", "absent_relation", "retried"),
+    [
+        # Miss as `NOTUSED` (model default): send ends at once
+        (None, None, False),
+        (None, c.util.NodeRelation.PARENT, True),
+        (None, c.util.NodeRelation.CHILD_RFD, True),
+        # Found, not a direct child
+        (c.util.NodeRelation.PARENT, None, True),
+        (c.util.NodeRelation.NEIGHBOR, None, True),
+        (c.util.NodeRelation.OTHER, None, True),
+    ],
+)
+async def test_request_recovery_assoc_not_a_child(
+    device_cls, relation, absent_relation, retried, make_application, mocker
+):
+    app, znp_server = make_application(server_cls=device_cls)
+
+    await app.startup(auto_form=False)
+
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+
+    if relation is not None:
+        znp_server.assoc_add_new(
+            nwk=device.nwk, ieee=device.ieee, node_relation=relation
+        )
+
+    if absent_relation is not None:
+        absent_lookup_with_address_0xfffe(znp_server, absent_relation)
+
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
+
+    data_req = znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            c.AF.DataConfirm.Callback(
+                Status=t.Status.MAC_TRANSACTION_EXPIRED, Endpoint=1, TSN=1
+            ),
+        ],
+    )
+
+    was_route_discovered = znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(Dst=device.nwk, partial=True),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    with pytest.raises(DeliveryError):
+        await app.request(
+            device=device,
+            profile=260,
+            cluster=1,
+            src_ep=1,
+            dst_ep=1,
+            sequence=1,
+            data=b"\x00",
+        )
+
+    # Table untouched, route rediscovered, send retried
+    assert data_req.call_count == (2 if retried else 1)
+    assert was_route_discovered.call_count == (1 if retried else 0)
+    assert did_assoc_remove.call_count == 0
+    assert did_assoc_add.call_count == 0
+
+    await app.shutdown()
+
+
+RFD = c.util.NodeRelation.CHILD_RFD
+
+
+@pytest.mark.parametrize("device_cls", [FormedLaunchpadCC26X2R1])
+@pytest.mark.parametrize(
+    ("scenario", "relation", "restored"),
+    [
+        # Each child relation: removed, restored as it was
+        ("unchanged", c.util.NodeRelation.CHILD_RFD, True),
+        ("unchanged", c.util.NodeRelation.CHILD_RFD_RX_IDLE, True),
+        ("unchanged", c.util.NodeRelation.CHILD_FFD, True),
+        ("unchanged", c.util.NodeRelation.CHILD_FFD_RX_IDLE, True),
+        ("koenkk_lookup", RFD, True),
+        # Host knows a new address: no restore
+        ("rejoin_during_retry", RFD, False),
+        ("rejoin_during_restore_lookup", RFD, False),
+        # Firmware has the device again: no overwrite
+        ("re_associated", RFD, False),
+        ("re_associated_new_nwk", RFD, False),
+    ],
+)
+async def test_request_recovery_assoc_restore(
+    device_cls, scenario, relation, restored, make_application, mocker
+):
+    app, znp_server = make_application(server_cls=device_cls)
+
+    await app.startup(auto_form=False)
+
+    mocker.patch("zigpy_znp.zigbee.application.DATA_CONFIRM_TIMEOUT", new=0.1)
+    app._znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_ARSP_TIMEOUT] = 1
+
+    device = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xABCD)
+
+    # Rejoin only updates the device, no interview
+    mocker.patch.object(device, "schedule_initialize")
+
+    assoc_add_new = znp_server.assoc_add_new
+    assoc_add_new(nwk=device.nwk, ieee=device.ieee, node_relation=relation)
+
+    if scenario == "koenkk_lookup":
+        absent_lookup_with_address_0xfffe(znp_server)
+
+    assoc_get = znp_server.assoc_get
+
+    def rejoin_on_restore_lookup(**kwargs):
+        # Only the restore looks up after the removal
+        entry = assoc_get(**kwargs)
+
+        if entry is None and scenario == "rejoin_during_restore_lookup":
+            app.handle_join(nwk=0x1234, ieee=device.ieee, parent_nwk=0x5678)
+
+        return entry
+
+    mocker.patch.object(znp_server, "assoc_get", side_effect=rejoin_on_restore_lookup)
+    did_assoc_remove = mocker.spy(znp_server, "assoc_remove")
+    did_assoc_add = mocker.spy(znp_server, "assoc_add_new")
+
+    attempts = 0
+
+    def data_confirm_replier(req):
+        nonlocal attempts
+        attempts += 1
+
+        # Attempt 1 expires (recovery), retry: no route
+        if attempts == 2:
+            if scenario == "rejoin_during_retry":
+                app.handle_join(nwk=0x1234, ieee=device.ieee, parent_nwk=0x5678)
+            elif scenario.startswith("re_associated"):
+                nwk = 0x1234 if scenario.endswith("new_nwk") else device.nwk
+                assoc_add_new(nwk=nwk, ieee=device.ieee, node_relation=relation)
+
+        return c.AF.DataConfirm.Callback(
+            Status=(
+                t.Status.MAC_TRANSACTION_EXPIRED
+                if attempts == 1
+                else t.Status.NWK_NO_ROUTE
+            ),
+            Endpoint=1,
+            TSN=1,
+        )
+
+    znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            data_confirm_replier,
+        ],
+    )
+
+    znp_server.reply_to(
+        c.ZDO.ExtRouteDisc.Req(partial=True),
+        responses=[c.ZDO.ExtRouteDisc.Rsp(Status=t.Status.SUCCESS)],
+    )
+
+    with pytest.raises(DeliveryError):
+        await app.request(
+            device=device,
+            profile=260,
+            cluster=1,
+            src_ep=1,
+            dst_ep=1,
+            sequence=1,
+            data=b"\x00",
+        )
+
+    assert did_assoc_remove.call_count == 1
+
+    if restored:
+        did_assoc_add.assert_called_once_with(
+            nwk=0xABCD, ieee=device.ieee, node_relation=relation
+        )
+    else:
+        did_assoc_add.assert_not_called()
 
     await app.shutdown()
 
