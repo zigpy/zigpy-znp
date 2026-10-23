@@ -39,7 +39,7 @@ async def test_permit_join(device, mocker, make_application):
         request=zdo_request_matcher(
             dst_addr=t.AddrModeAddress(t.AddrMode.Broadcast, 0xFFFC),
             command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_req,
-            TSN=2,
+            TSN=4,
             zdo_PermitDuration=10,
             zdo_TC_Significant=0,
         ),

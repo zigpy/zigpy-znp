@@ -18,6 +18,7 @@ except ImportError:
 
 import zigpy.endpoint
 import zigpy.zdo.types as zdo_t
+import zigpy.zgp
 
 from zigpy_znp.api import ZNP
 import zigpy_znp.commands as c
@@ -596,6 +597,16 @@ class BaseZStackDevice(BaseServerZNP):
             c.ZDO.MgmtPermitJoinReq.Rsp(Status=t.Status.SUCCESS),
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ]
+
+    @reply_to(
+        c.AF.DataRequestExt.Req(
+            partial=True,
+            DstEndpoint=zigpy.zgp.GP_ENDPOINT,
+            SrcEndpoint=zigpy.zgp.GP_ENDPOINT,
+        )
+    )
+    def on_gp_broadcast(self, req):
+        return c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS)
 
     @reply_to(c.AF.DataRequestExt.Req(partial=True, DstEndpoint=0))
     def on_zdo_request(self, req):

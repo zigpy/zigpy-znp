@@ -16,6 +16,7 @@ import zigpy.util
 import zigpy.zcl
 import zigpy.zdo
 import zigpy.zdo.types as zdo_t
+import zigpy.zgp
 
 from zigpy_znp.api import ZNP
 import zigpy_znp.commands as c
@@ -669,7 +670,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             return ZDO_ENDPOINT
 
         if profile == zigpy.profiles.zgp.PROFILE_ID:
-            return zigpy.profiles.zgp.GREENPOWER_ENDPOINT_ID
+            return zigpy.zgp.GP_ENDPOINT
 
         # Newer Z-Stack releases ignore profiles and will work properly with endpoint 1
         if (
