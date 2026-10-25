@@ -1,6 +1,7 @@
 import pytest
 import voluptuous as vol
 from zigpy.exceptions import NetworkNotFormed
+import zigpy.zgp
 
 from zigpy_znp.api import ZNP
 import zigpy_znp.commands as c
@@ -103,10 +104,10 @@ async def test_endpoints(device, make_application):
 
     await app.startup(auto_form=False)
 
-    # We currently just register two endpoints
-    assert len(endpoints) == 2
+    assert len(endpoints) == 3
     assert 1 in app._device.endpoints
     assert 2 in app._device.endpoints
+    assert zigpy.zgp.GP_ENDPOINT in app._device.endpoints
 
     await app.shutdown()
 

@@ -16,6 +16,19 @@ class NodeRelation(t.enum8):
     NOTUSED = 0xFF
 
 
+class DeviceStatus(t.bitmap8):
+    # Bitmap of an associated device's status fields (AssocList.h)
+    NONE = 0x00
+    LINK_STATUS = 0x01  # link is in-active
+    LINK_REPAIR = 0x02  # link repair in progress
+    SEC_INIT = 0x04  # security init
+    SEC_AUTH = 0x08  # security authenticated
+    SEC_AUTH_TC_REJOIN = 0x10  # assumed-secure device that performs a TC rejoin
+    SECURED_JOIN = 0x20  # device joined secure
+    REJOIN = 0x40  # device rejoined
+    HIGH_SEC = 0x80  # device joined as High Security
+
+
 class BindEntry(t.Struct):
     srcEP: t.uint8_t
     dstGroupMode: t.uint8_t  # 0 - Normal address index, 1 - Group address
@@ -44,7 +57,7 @@ class Device(t.CStruct):
     shortAddr: t.NWK
     addrIdx: t.uint16_t
     nodeRelation: NodeRelation
-    devStatus: t.uint8_t
+    devStatus: DeviceStatus
     assocCnt: t.uint8_t
     age: t.uint8_t
     linkInfo: LinkInfo
