@@ -534,7 +534,10 @@ async def test_request_recovery_route_rediscovery_zdo(device, make_application, 
 
 
 @pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
-async def test_request_recovery_route_rediscovery_af(device, make_application, mocker):
+@pytest.mark.parametrize("failure", [t.Status.NWK_NO_ROUTE, t.Status.APS_NO_ACK])
+async def test_request_recovery_route_rediscovery_af(
+    device, failure, make_application, mocker
+):
     app, znp_server = make_application(server_cls=device)
 
     await app.startup(auto_form=False)
@@ -552,7 +555,7 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
         nonlocal route_discovered
 
         return c.AF.DataConfirm.Callback(
-            Status=t.Status.SUCCESS if route_discovered else t.Status.NWK_NO_ROUTE,
+            Status=t.Status.SUCCESS if route_discovered else failure,
             Endpoint=1,
             TSN=1,
         )

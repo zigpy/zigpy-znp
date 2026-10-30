@@ -986,9 +986,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                 continue
 
                         # Perform route discovery explicitly if the stack fails and
-                        # then retry the request
+                        # then retry the request. `APS_NO_ACK` is included because a
+                        # stale next hop can still MAC-ACK without forwarding, and the
+                        # stack reports no `NWK_NO_ROUTE` in that case.
                         if (
-                            e.response.Status == t.Status.NWK_NO_ROUTE
+                            e.response.Status
+                            in (t.Status.NWK_NO_ROUTE, t.Status.APS_NO_ACK)
                             and device is not None
                             and retry_attempt < 1
                         ):
