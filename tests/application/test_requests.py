@@ -5,6 +5,7 @@ import zigpy.endpoint
 from zigpy.exceptions import DeliveryError
 import zigpy.profiles
 import zigpy.types as zigpy_t
+import zigpy.zcl.foundation
 import zigpy.zdo.types as zdo_t
 
 import zigpy_znp.commands as c
@@ -68,16 +69,15 @@ async def test_zigpy_request(device, make_application):
             DstEndpoint=1,
             SrcEndpoint=1,
             ClusterId=6,
-            TSN=TSN,
             Data=bytes([0x01, TSN, 0x01]),
             partial=True,
         ),
         responses=[
             c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(
+            lambda req: c.AF.DataConfirm.Callback(
                 Status=t.Status.SUCCESS,
                 Endpoint=1,
-                TSN=TSN,
+                TSN=req.TSN,
             ),
             c.ZDO.SrcRtgInd.Callback(DstAddr=device.nwk, Relays=[]),
             c.AF.IncomingMsg.Callback(
@@ -127,16 +127,15 @@ async def test_zigpy_request_failure(device, make_application, mocker):
             DstEndpoint=1,
             SrcEndpoint=1,
             ClusterId=6,
-            TSN=TSN,
             Data=bytes([0x01, TSN, 0x01]),
             partial=True,
         ),
         responses=[
             c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(
+            lambda req: c.AF.DataConfirm.Callback(
                 Status=t.Status.FAILURE,
                 Endpoint=1,
-                TSN=TSN,
+                TSN=req.TSN,
             ),
         ],
     )
@@ -251,7 +250,6 @@ async def test_broadcast(device, make_application, mocker):
             DstPanId=0x0000,
             SrcEndpoint=1,
             ClusterId=3,
-            TSN=1,
             Radius=3,
             Data=b"???",
             partial=True,
@@ -341,6 +339,72 @@ async def test_request_concurrency(device, make_application, mocker):
     await app.shutdown()
 
 
+@pytest.mark.parametrize("device", [FormedLaunchpadCC26X2R1])
+async def test_concurrent_same_tsn_requests(device, make_application):
+    app, znp_server = make_application(server_cls=device)
+    await app.startup(auto_form=False)
+
+    device1 = app.add_initialized_device(ieee=t.EUI64(range(8)), nwk=0xAAAA)
+    device2 = app.add_initialized_device(ieee=t.EUI64(range(1, 9)), nwk=0xBBBB)
+
+    requests = {}
+    both_sent = asyncio.Event()
+
+    def delayed_confirm(req):
+        requests[req.DstAddrModeAddress.address] = req
+
+        if len(requests) == 2:
+            both_sent.set()
+
+        async def inner():
+            await both_sent.wait()
+
+            # The second device fails and its confirm arrives first
+            if req.DstAddrModeAddress.address == device1.nwk:
+                await asyncio.sleep(0.1)
+                status = t.Status.SUCCESS
+            else:
+                status = t.Status.MAC_NO_ACK
+
+            znp_server.send(
+                c.AF.DataConfirm.Callback(Status=status, Endpoint=1, TSN=req.TSN)
+            )
+
+        asyncio.create_task(inner())
+
+    znp_server.reply_to(
+        c.AF.DataRequestExt.Req(partial=True),
+        responses=[
+            c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
+            delayed_confirm,
+        ],
+    )
+
+    # Both requests use the same ZCL TSN
+    rsp1, rsp2 = await asyncio.gather(
+        *[
+            app.request(
+                device=dev,
+                profile=260,
+                cluster=1,
+                src_ep=1,
+                dst_ep=1,
+                sequence=1,
+                data=b"\x00\x01\x00",
+            )
+            for dev in (device1, device2)
+        ],
+        return_exceptions=True,
+    )
+
+    assert requests[device1.nwk].TSN != requests[device2.nwk].TSN
+    assert rsp1 == (zigpy.zcl.foundation.Status.SUCCESS, "")
+    assert isinstance(rsp2, DeliveryError)
+    assert rsp2.status == t.Status.MAC_NO_ACK
+
+    await app.shutdown()
+
+
 @pytest.mark.parametrize("device", FORMED_DEVICES)
 async def test_nonstandard_profile(device, make_application):
     app, znp_server = make_application(server_cls=device)
@@ -382,7 +446,7 @@ async def test_nonstandard_profile(device, make_application):
                 SecurityUse=t.Bool(False),
                 TimeStamp=12345678,
                 TSN=0,
-                Data=b"\x08" + bytes([req.TSN]) + b"\x0b\x00\x00",
+                Data=b"\x08" + bytes([req.Data[1]]) + b"\x0b\x00\x00",
                 MacSrcAddr=device.nwk,
                 MsgResultRadius=29,
             ),
@@ -554,7 +618,7 @@ async def test_request_recovery_route_rediscovery_af(device, make_application, m
         return c.AF.DataConfirm.Callback(
             Status=t.Status.SUCCESS if route_discovered else t.Status.NWK_NO_ROUTE,
             Endpoint=1,
-            TSN=1,
+            TSN=req.TSN,
         )
 
     def set_route_discovered(req):
@@ -622,7 +686,7 @@ async def test_request_recovery_route_rediscovery_then_assoc_failure(
         return c.AF.DataConfirm.Callback(
             Status=next(data_confirm_statuses),
             Endpoint=1,
-            TSN=1,
+            TSN=req.TSN,
         )
 
     znp_server.reply_to(
@@ -707,7 +771,7 @@ async def test_request_recovery_assoc_remove(
         return c.AF.DataConfirm.Callback(
             Status=t.Status.MAC_TRANSACTION_EXPIRED if bad_assoc else final_status,
             Endpoint=1,
-            TSN=1,
+            TSN=req.TSN,
         )
 
     znp_server.reply_to(
@@ -871,17 +935,16 @@ async def test_send_security_and_packet_source_route(device, make_application, m
             DstEndpoint=packet.dst_ep,
             # SrcEndpoint=packet.src_ep,
             ClusterId=packet.cluster_id,
-            TSN=packet.tsn,
             Data=packet.data.serialize(),
             SourceRoute=packet.source_route,
             partial=True,
         ),
         responses=[
             c.AF.DataRequestSrcRtg.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(
+            lambda req: c.AF.DataConfirm.Callback(
                 Status=t.Status.SUCCESS,
                 Endpoint=packet.dst_ep,
-                TSN=packet.tsn,
+                TSN=req.TSN,
             ),
         ],
     )
@@ -918,10 +981,10 @@ async def test_send_packet_failure(device, make_application, mocker):
         request=c.AF.DataRequestExt.Req(partial=True),
         responses=[
             c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS),
-            c.AF.DataConfirm.Callback(
+            lambda req: c.AF.DataConfirm.Callback(
                 Status=t.Status.MAC_NO_ACK,
                 Endpoint=packet.dst_ep,
-                TSN=packet.tsn,
+                TSN=req.TSN,
             ),
         ],
     )

@@ -57,6 +57,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self._version_rsp = None
         self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
+        # Z-Stack only echoes the AF `TransID` back in `AF.DataConfirm`, it must be
+        # unique among in-flight requests. The FIFO delays reuse of recent IDs.
+        self._free_trans_ids: asyncio.Queue[int] = asyncio.Queue()
+
+        for trans_id in range(256):
+            self._free_trans_ids.put_nowait(trans_id)
+
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
     ##################################################################
@@ -722,31 +729,6 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         # We pick ours based on the registered endpoints when using an older firmware
         src_ep = self._find_endpoint(dst_ep=dst_ep, profile=profile, cluster=cluster)
 
-        if relays is None:
-            request = c.AF.DataRequestExt.Req(
-                DstAddrModeAddress=dst_addr,
-                DstEndpoint=dst_ep or 0,
-                DstPanId=0x0000,
-                SrcEndpoint=src_ep,
-                ClusterId=cluster,
-                TSN=sequence,
-                Options=options,
-                Radius=radius,
-                Data=data,
-            )
-        else:
-            request = c.AF.DataRequestSrcRtg.Req(
-                DstAddr=dst_addr.address,
-                DstEndpoint=dst_ep or 0,
-                SrcEndpoint=src_ep,
-                ClusterId=cluster,
-                TSN=sequence,
-                Options=options,
-                Radius=radius,
-                SourceRoute=relays,  # force the packet to go through specific parents
-                Data=data,
-            )
-
         if self._znp is None:
             raise DeliveryError("Coordinator is disconnected, cannot send request")
 
@@ -810,39 +792,73 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                     )
                 )
 
-        if dst_ep == ZDO_ENDPOINT or dst_addr.mode == t.AddrMode.Broadcast:
-            # Broadcasts and ZDO requests will not receive a confirmation
-            await self._znp.request(request=request, RspStatus=t.Status.SUCCESS)
-        else:
-            async with asyncio.timeout(
-                EXTENDED_DATA_CONFIRM_TIMEOUT
-                if extended_timeout
-                else DATA_CONFIRM_TIMEOUT
-            ):
-                # Shield from cancellation to prevent requests that time out in higher
-                # layers from missing expected responses
-                response = await asyncio.shield(
-                    self._znp.request_callback_rsp(
-                        request=request,
-                        RspStatus=t.Status.SUCCESS,
-                        callback=c.AF.DataConfirm.Callback(
-                            partial=True,
-                            TSN=sequence,
-                            # XXX: can this ever not match?
-                            # Endpoint=src_ep,
-                        ),
-                        # Multicasts eventually receive a confirmation but waiting for
-                        # it is unnecessary
-                        background=(dst_addr.mode == t.AddrMode.Group),
-                    )
+        trans_id = await self._free_trans_ids.get()
+        confirm_task = None
+
+        try:
+            if relays is None:
+                request = c.AF.DataRequestExt.Req(
+                    DstAddrModeAddress=dst_addr,
+                    DstEndpoint=dst_ep or 0,
+                    DstPanId=0x0000,
+                    SrcEndpoint=src_ep,
+                    ClusterId=cluster,
+                    TSN=trans_id,
+                    Options=options,
+                    Radius=radius,
+                    Data=data,
+                )
+            else:
+                request = c.AF.DataRequestSrcRtg.Req(
+                    DstAddr=dst_addr.address,
+                    DstEndpoint=dst_ep or 0,
+                    SrcEndpoint=src_ep,
+                    ClusterId=cluster,
+                    TSN=trans_id,
+                    Options=options,
+                    Radius=radius,
+                    SourceRoute=relays,  # force the packet through specific parents
+                    Data=data,
                 )
 
-                # Both the callback and the response can have an error status
-                if response.Status != t.Status.SUCCESS:
-                    raise InvalidCommandResponse(
-                        f"Unsuccessful request status code: {response.Status!r}",
-                        response,
-                    )
+            if dst_ep == ZDO_ENDPOINT or dst_addr.mode == t.AddrMode.Broadcast:
+                # Broadcasts and ZDO requests will not receive a confirmation
+                await self._znp.request(request=request, RspStatus=t.Status.SUCCESS)
+                return
+
+            confirm_task = asyncio.create_task(
+                self._znp.request_callback_rsp(
+                    request=request,
+                    RspStatus=t.Status.SUCCESS,
+                    callback=c.AF.DataConfirm.Callback(partial=True, TSN=trans_id),
+                    # Multicasts eventually receive a confirmation but waiting for
+                    # it is unnecessary
+                    background=(dst_addr.mode == t.AddrMode.Group),
+                )
+            )
+        finally:
+            if confirm_task is None:
+                self._free_trans_ids.put_nowait(trans_id)
+            else:
+                # The confirm listener can outlive this coroutine, keep the ID until
+                # it is gone
+                confirm_task.add_done_callback(
+                    lambda _: self._free_trans_ids.put_nowait(trans_id)
+                )
+
+        async with asyncio.timeout(
+            EXTENDED_DATA_CONFIRM_TIMEOUT if extended_timeout else DATA_CONFIRM_TIMEOUT
+        ):
+            # Shield from cancellation to prevent requests that time out in higher
+            # layers from missing expected responses
+            response = await asyncio.shield(confirm_task)
+
+        # Both the callback and the response can have an error status
+        if response.Status != t.Status.SUCCESS:
+            raise InvalidCommandResponse(
+                f"Unsuccessful request status code: {response.Status!r}",
+                response,
+            )
 
     @combine_concurrent_calls
     async def _discover_route(self, nwk: t.NWK) -> None:
