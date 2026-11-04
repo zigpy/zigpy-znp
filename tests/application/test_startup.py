@@ -103,10 +103,11 @@ async def test_endpoints(device, make_application):
 
     await app.startup(auto_form=False)
 
-    # We currently just register two endpoints
-    assert len(endpoints) == 2
+    # ZHA, ZLL, and Green Power
+    assert len(endpoints) == 3
     assert 1 in app._device.endpoints
     assert 2 in app._device.endpoints
+    assert 242 in app._device.endpoints
 
     await app.shutdown()
 
