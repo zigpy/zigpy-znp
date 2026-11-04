@@ -17,7 +17,9 @@ except ImportError:
     from asynctest import CoroutineMock  # type:ignore[no-redef]  # noqa: F401
 
 import zigpy.endpoint
+from zigpy.zcl.clusters.greenpower import GreenPowerProxy
 import zigpy.zdo.types as zdo_t
+import zigpy.zgp
 
 from zigpy_znp.api import ZNP
 import zigpy_znp.commands as c
@@ -288,6 +290,7 @@ def zdo_request_matcher(
     zdo_kwargs = {k: v for k, v in kwargs.items() if k.startswith("zdo_")}
 
     kwargs = {k: v for k, v in kwargs.items() if not k.startswith("zdo_")}
+    zdo_tsn = kwargs.pop("TSN")
     kwargs.setdefault("DstEndpoint", 0x00)
     kwargs.setdefault("DstPanId", 0x0000)
     kwargs.setdefault("SrcEndpoint", 0x00)
@@ -297,7 +300,7 @@ def zdo_request_matcher(
     return c.AF.DataRequestExt.Req(
         DstAddrModeAddress=dst_addr,
         ClusterId=command_id,
-        Data=bytes([kwargs["TSN"]]) + serialize_zdo_command(command_id, **zdo_kwargs),
+        Data=bytes([zdo_tsn]) + serialize_zdo_command(command_id, **zdo_kwargs),
         **kwargs,
         partial=True,
     )
@@ -594,6 +597,16 @@ class BaseZStackDevice(BaseServerZNP):
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ]
 
+    @reply_to(
+        c.AF.DataRequestExt.Req(
+            partial=True,
+            DstEndpoint=zigpy.zgp.GP_ENDPOINT,
+            ClusterId=GreenPowerProxy.cluster_id,
+        )
+    )
+    def on_gp_broadcast(self, req):
+        return [c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS)]
+
     @reply_to(c.AF.DataRequestExt.Req(partial=True, DstEndpoint=0))
     def on_zdo_request(self, req):
         kwargs = deserialize_zdo_command(req.ClusterId, req.Data[1:])
@@ -623,7 +636,7 @@ class BaseZStackDevice(BaseServerZNP):
                     IsBroadcast=t.Bool.false,
                     ClusterId=zdo_t.ZDOCmd.Mgmt_Permit_Joining_rsp,
                     SecurityUse=0,
-                    TSN=req.TSN,
+                    TSN=req.Data[0],
                     MacDst=0x0000,
                     Data=serialize_zdo_command(
                         command_id=zdo_t.ZDOCmd.Mgmt_Permit_Joining_rsp,
@@ -648,7 +661,7 @@ class BaseZStackDevice(BaseServerZNP):
                 IsBroadcast=t.Bool.false,
                 ClusterId=zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
                 SecurityUse=0,
-                TSN=req.TSN,
+                TSN=req.Data[0],
                 MacDst=0x0000,
                 Data=serialize_zdo_command(
                     command_id=zdo_t.ZDOCmd.Mgmt_NWK_Update_rsp,
@@ -683,7 +696,7 @@ class BaseZStackDevice(BaseServerZNP):
                     IsBroadcast=t.Bool.false,
                     ClusterId=zdo_t.ZDOCmd.Active_EP_rsp,
                     SecurityUse=0,
-                    TSN=req.TSN,
+                    TSN=req.Data[0],
                     MacDst=0x0000,
                     Data=serialize_zdo_command(
                         command_id=zdo_t.ZDOCmd.Active_EP_rsp,
@@ -743,7 +756,7 @@ class BaseZStackDevice(BaseServerZNP):
                     IsBroadcast=t.Bool.false,
                     ClusterId=zdo_t.ZDOCmd.Simple_Desc_rsp,
                     SecurityUse=0,
-                    TSN=req.TSN,
+                    TSN=req.Data[0],
                     MacDst=0x0000,
                     Data=serialize_zdo_command(
                         command_id=zdo_t.ZDOCmd.Simple_Desc_rsp,
@@ -1026,7 +1039,7 @@ class BaseZStack1CC2531(BaseZStackDevice):
                     IsBroadcast=t.Bool.false,
                     ClusterId=zdo_t.ZDOCmd.Node_Desc_rsp,
                     SecurityUse=0,
-                    TSN=req.TSN,
+                    TSN=req.Data[0],
                     MacDst=0x0000,
                     Data=serialize_zdo_command(
                         command_id=zdo_t.ZDOCmd.Node_Desc_rsp,
@@ -1281,7 +1294,7 @@ class BaseLaunchpadCC26X2R1(BaseZStack3Device):
                     IsBroadcast=t.Bool.false,
                     ClusterId=zdo_t.ZDOCmd.Node_Desc_rsp,
                     SecurityUse=0,
-                    TSN=req.TSN,
+                    TSN=req.Data[0],
                     MacDst=0x0000,
                     Data=serialize_zdo_command(
                         command_id=zdo_t.ZDOCmd.Node_Desc_rsp,

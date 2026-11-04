@@ -60,6 +60,9 @@ async def test_permit_join(device, mocker, make_application):
     )
 
     await app.startup(auto_form=False)
+
+    # Green Power commissioning also consumes sequence numbers
+    mocker.patch.object(app, "get_sequence", return_value=2)
     await app.permit(time_s=10)
 
     await permit_join_broadcast
