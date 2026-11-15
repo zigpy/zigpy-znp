@@ -6,7 +6,7 @@ import pytest
 import zigpy_znp.commands as c
 import zigpy_znp.config as conf
 from zigpy_znp.exceptions import CommandNotRecognized, InvalidCommandResponse
-from zigpy_znp.frames import GeneralFrame
+from zigpy_znp.frames import GeneralFrame, TransportFrame
 import zigpy_znp.types as t
 
 
@@ -327,3 +327,73 @@ async def test_send_failure_when_disconnected(connected_znp):
         await znp.request(c.SYS.Ping.Req())
 
     assert "Coordinator is disconnected" in str(e.value)
+
+
+def wire_bytes(znp_server) -> bytes:
+    return b"".join(m.args[0] for m in znp_server._uart.data_received.mock_calls)
+
+
+async def test_srsp_timeout_resyncs_uart(connected_znp, mocker):
+    znp, znp_server = connected_znp
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
+    mocker.patch.object(znp, "connection_lost")
+
+    znp_server.reply_to(
+        c.SYS.Ping.Req(), responses=[c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)]
+    )
+
+    with pytest.raises(asyncio.TimeoutError):
+        await znp.request(c.UTIL.TimeAlive.Req())
+
+    # The request is followed by the flush and a ping, in that order
+    assert wire_bytes(znp_server) == (
+        TransportFrame(c.UTIL.TimeAlive.Req().to_frame()).serialize()
+        + b"\x01"
+        + b"\x00" * 257
+        + TransportFrame(c.SYS.Ping.Req().to_frame()).serialize()
+    )
+
+    # The radio answered the ping, so we stay connected
+    assert len(znp.connection_lost.mock_calls) == 0
+    assert not any(znp._listeners.values())
+
+
+async def test_srsp_timeout_resync_failure_disconnects(connected_znp, mocker):
+    znp, znp_server = connected_znp
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
+    mocker.patch.object(znp, "connection_lost")
+
+    with pytest.raises(asyncio.TimeoutError):
+        await znp.request(c.UTIL.TimeAlive.Req())
+
+    assert len(znp.connection_lost.mock_calls) == 1
+    assert isinstance(znp.connection_lost.mock_calls[0].args[0], TimeoutError)
+    assert not any(znp._listeners.values())
+
+
+async def test_srsp_resync_blocks_other_requests(connected_znp):
+    znp, znp_server = connected_znp
+    znp._config[conf.CONF_ZNP_CONFIG][conf.CONF_SREQ_TIMEOUT] = 0.1
+
+    znp_server.reply_to(
+        c.SYS.Ping.Req(), responses=[c.SYS.Ping.Rsp(Capabilities=t.MTCapabilities.SYS)]
+    )
+
+    lost = asyncio.create_task(znp.request(c.UTIL.TimeAlive.Req()))
+    await asyncio.sleep(0)
+    ping = asyncio.create_task(znp.request(c.SYS.Ping.Req()))
+
+    with pytest.raises(asyncio.TimeoutError):
+        await lost
+
+    await ping
+
+    # The queued ping is sent only after the resync ping
+    ping_frame = TransportFrame(c.SYS.Ping.Req().to_frame()).serialize()
+    assert wire_bytes(znp_server) == (
+        TransportFrame(c.UTIL.TimeAlive.Req().to_frame()).serialize()
+        + b"\x01"
+        + b"\x00" * 257
+        + ping_frame
+        + ping_frame
+    )

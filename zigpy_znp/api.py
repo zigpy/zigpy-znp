@@ -761,6 +761,38 @@ class ZNP:
 
         LOGGER.debug("Connected to %s", self._uart.url)
 
+    def flood_uart(self) -> None:
+        """
+        Pushes the firmware's MT frame parser out of a frame with lost bytes. The worst
+        case is a parser locked onto a SoF and 0xFF length inside a frame's payload,
+        which needs 258 more bytes. The filler XORs to 0x01 at every length, so the
+        broken frame passes the FCS check with only a ~1/256 chance. It also contains
+        no SoF, so the parser cannot lock onto a new frame in the middle of the filler.
+        """
+
+        LOGGER.debug("Flooding radio UART to reset the MT frame parser")
+        self._uart.write(b"\x01" + b"\x00" * 257)
+
+    async def _resync_uart(self) -> None:
+        """
+        Recovers from a lost SRSP. Must be called with the request lock held, so that
+        no other frame is eaten by a stuck parser. Reconnects if the radio stays silent.
+        """
+
+        ping_rsp = self.wait_for_response(c.SYS.Ping.Rsp(partial=True))
+
+        self.flood_uart()
+        self._uart.send(c.SYS.Ping.Req().to_frame(align=self.nvram.align_structs))
+
+        try:
+            async with asyncio.timeout(self._znp_config[conf.CONF_SREQ_TIMEOUT]):
+                await ping_rsp
+        except TimeoutError as exc:
+            LOGGER.warning("Radio did not respond after UART resync")
+            self.connection_lost(exc)
+        else:
+            LOGGER.debug("Radio responded after UART resync")
+
     def connection_made(self) -> None:
         """
         Called by the UART object to indicate that the port was opened.
@@ -1070,11 +1102,20 @@ class ZNP:
             self._uart.send(frame)
 
             # We should get a SRSP in a reasonable amount of time
-            async with asyncio.timeout(
-                timeout or self._znp_config[conf.CONF_SREQ_TIMEOUT]
-            ):
-                # We lock until either a sync response is seen or an error occurs
-                response = await response_future
+            try:
+                async with asyncio.timeout(
+                    timeout or self._znp_config[conf.CONF_SREQ_TIMEOUT]
+                ):
+                    # We lock until either a sync response is seen or an error occurs
+                    response = await response_future
+            except TimeoutError:
+                # Z-Stack's MT frame parser has no timeout. If the radio drops bytes of
+                # our frame (e.g. a silent UART RX overrun), the parser waits for the
+                # rest and eats the start of the next frames. A lost SRSP is the only
+                # sign of this, so resync before any other request is sent.
+                LOGGER.warning("No SRSP for %s, resynchronizing UART", request)
+                await self._resync_uart()
+                raise
 
         if isinstance(response, c.RPCError.CommandNotRecognized.Rsp):
             raise CommandNotRecognized(
