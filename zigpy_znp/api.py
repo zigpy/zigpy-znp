@@ -859,6 +859,13 @@ class ZNP:
                 LOGGER.warning("Failed to parse broken %s as %s", frame, command_cls)
                 return False
 
+            # Z-Stack reports a failed Simple_Desc_rsp as a "default error" response
+            # (`MtZdoDef_rsp`, `NWK + Status`) with the same ID as `StateChangeInd`.
+            # The full response is also received as a `ZDO.MsgCbIncoming` callback.
+            if command_cls == c.ZDO.StateChangeInd.Callback and len(frame.data) == 3:
+                LOGGER.debug("Ignoring Z-Stack default ZDO error response %s", frame)
+                return False
+
             raise
 
         LOGGER.debug("Received command: %s", command)

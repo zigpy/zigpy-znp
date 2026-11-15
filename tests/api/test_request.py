@@ -305,6 +305,23 @@ async def test_handling_known_bad_command_parsing(connected_znp, caplog):
     assert repr(bad_frame) in caplog.messages[0]
 
 
+async def test_handling_zdo_default_error_rsp(connected_znp, caplog):
+    znp, _ = connected_znp
+
+    # Z-Stack sends a failed Simple_Desc_rsp (here INVALID_EP from 0xDED6) as a
+    # default error response, sharing its ID with `ZDO.StateChangeInd`
+    frame = GeneralFrame(
+        header=t.CommandHeader(
+            id=0xC0, subsystem=t.Subsystem.ZDO, type=t.CommandType.AREQ
+        ),
+        data=b"\xd6\xde\x82",
+    )
+
+    caplog.set_level(logging.WARNING)
+    assert znp.frame_received(frame) is False
+    assert not caplog.records
+
+
 async def test_handling_unknown_bad_command_parsing(connected_znp):
     znp, _ = connected_znp
 
