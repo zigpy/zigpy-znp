@@ -95,7 +95,10 @@ CONFIG_SCHEMA = CONFIG_SCHEMA.extend(
                     vol.Optional(CONF_TX_POWER, default=None): vol.Any(
                         None, vol.All(int, vol.Range(min=-22, max=22))
                     ),
-                    vol.Optional(CONF_SREQ_TIMEOUT, default=15): VolPositiveNumber,
+                    # SRSPs from user logs take under 150 ms on healthy setups and
+                    # under 2.4 s on stalled hosts. A lost SRSP holds the request lock
+                    # until this timeout, so it should not be much longer than that.
+                    vol.Optional(CONF_SREQ_TIMEOUT, default=3): VolPositiveNumber,
                     vol.Optional(CONF_ARSP_TIMEOUT, default=30): VolPositiveNumber,
                     vol.Optional(
                         CONF_AUTO_RECONNECT_RETRY_DELAY, default=5
