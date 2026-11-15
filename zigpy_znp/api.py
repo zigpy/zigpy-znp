@@ -45,6 +45,8 @@ LOGGER = logging.getLogger(__name__)
 STARTUP_TIMEOUT = 15
 AFTER_BOOTLOADER_SKIP_BYTE_DELAY = 2.5
 NETWORK_COMMISSIONING_TIMEOUT = 60
+# The firmware starts the network before it sends the SRSP
+NETWORK_START_SREQ_TIMEOUT = 15
 BOOTLOADER_PIN_TOGGLE_DELAY = 0.15
 CONNECT_PING_TIMEOUT = 0.50
 CONNECT_PROBE_TIMEOUT = 10
@@ -270,6 +272,7 @@ class ZNP:
                             RemainingModes=c.app_config.BDBCommissioningMode.NONE,
                         ),
                         timeout=NETWORK_COMMISSIONING_TIMEOUT,
+                        sreq_timeout=NETWORK_START_SREQ_TIMEOUT,
                     )
 
                     # This is the correct startup sequence according to the forums,
@@ -284,7 +287,10 @@ class ZNP:
                         )
                 else:
                     # In Z-Stack 1.2.2, StartupFromApp actually does what it says
-                    rsp = await self.request(c.ZDO.StartupFromApp.Req(StartDelay=100))
+                    rsp = await self.request(
+                        c.ZDO.StartupFromApp.Req(StartDelay=100),
+                        timeout=NETWORK_START_SREQ_TIMEOUT,
+                    )
 
                     if rsp.State not in (
                         c.zdo.StartupState.NewNetworkState,
@@ -1084,7 +1090,14 @@ class ZNP:
         return response
 
     async def request_callback_rsp(
-        self, *, request, callback, timeout=None, background=False, **response_params
+        self,
+        *,
+        request,
+        callback,
+        timeout=None,
+        sreq_timeout=None,
+        background=False,
+        **response_params,
     ):
         """
         Sends an SREQ, gets its SRSP confirmation, and waits for its real AREQ response.
@@ -1103,11 +1116,14 @@ class ZNP:
 
         callback_rsp, listener = self.wait_for_responses([callback], context=True)
 
+        # The SRSP gets its own timeout: reusing the callback timeout would hold the
+        # request lock for that long if the SRSP is lost
+
         # Typical request/response/callbacks are not backgrounded
         if not background:
             try:
                 async with asyncio.timeout(timeout):
-                    await self.request(request, timeout=timeout, **response_params)
+                    await self.request(request, timeout=sreq_timeout, **response_params)
 
                     return await callback_rsp
             finally:
@@ -1118,7 +1134,9 @@ class ZNP:
 
         try:
             async with asyncio.timeout(timeout):
-                request_rsp = await self.request(request, **response_params)
+                request_rsp = await self.request(
+                    request, timeout=sreq_timeout, **response_params
+                )
         except Exception:
             # If the SREQ/SRSP pair fails, we must cancel the AREQ listener
             self.remove_listener(listener)
