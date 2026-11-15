@@ -594,6 +594,16 @@ class BaseZStackDevice(BaseServerZNP):
             c.ZDO.MgmtPermitJoinRsp.Callback(Src=0x0000, Status=t.ZDOStatus.SUCCESS),
         ]
 
+    @reply_to(
+        c.AF.DataRequestExt.Req(
+            partial=True, DstEndpoint=242, SrcEndpoint=242, ClusterId=0x0021
+        )
+    )
+    def on_green_power_broadcast(self, req):
+        # Newer zigpy sends a Green Power broadcast (e.g. a commissioning window
+        # request) to the GP endpoint. Just acknowledge it.
+        return c.AF.DataRequestExt.Rsp(Status=t.Status.SUCCESS)
+
     @reply_to(c.AF.DataRequestExt.Req(partial=True, DstEndpoint=0))
     def on_zdo_request(self, req):
         kwargs = deserialize_zdo_command(req.ClusterId, req.Data[1:])
