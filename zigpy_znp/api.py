@@ -129,6 +129,15 @@ class ZNP:
             model = "CC2538" if self.nvram.align_structs else "CC2531"
             fw_variant = "Z-Stack Home 1.2" if self.version == 1.2 else "Z-Stack 3.0.x"
 
+        try:
+            model_rsp = (
+                await self.request(c.SYS.Model.Req(), timeout=5)
+            ).Model.decode("utf-8", errors="replace")
+        except (CommandNotRecognized, TimeoutError):
+            model_rsp = None
+        if model_rsp:
+            model = model_rsp
+
         version = await self.request(c.SYS.Version.Req())
         node_info = zigpy.state.NodeInfo(
             ieee=ieee,

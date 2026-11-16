@@ -604,6 +604,13 @@ class SYS(t.CommandsBase, subsystem=t.Subsystem.SYS):
         rsp_schema=t.STATUS_SCHEMA,
     )
 
+    Model = t.CommandDef(
+        t.CommandType.SREQ,
+        0x40,
+        req_schema=(),
+        rsp_schema=(t.Param("Model", t.ShortBytes, "Chip Model"),),
+    )
+
     # MT SYS Callbacks
     # This command is sent by the device to indicate the reset
     ResetInd = t.CommandDef(
