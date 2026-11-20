@@ -30,7 +30,14 @@ MYPY_FLAGS = [
 
 def run_mypy() -> list[str]:
     """Run mypy with no error codes disabled and capture output."""
-    stdout, stderr, _ = mypy_api.run(MYPY_FLAGS)
+    stdout, stderr, status = mypy_api.run(MYPY_FLAGS)
+
+    # Status 1 means type errors, which are what we record. Status 2 is a fatal
+    # error (a syntax error, a bad flag, a crash) that leaves the output incomplete,
+    # so stop before the overrides are rewritten from it.
+    if status == 2:
+        raise SystemExit(f"mypy failed, overrides left unchanged:\n{stdout}{stderr}")
+
     return stdout.splitlines() + stderr.splitlines()
 
 
