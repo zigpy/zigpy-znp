@@ -1,50 +1,23 @@
 from __future__ import annotations
 
-import typing
-
-from zigpy.types import int8s, uint8_t  # noqa: F401
+from zigpy.types import (
+    bitmap8 as bitmap8,
+    bitmap16 as bitmap16,
+    enum8 as enum8,
+    enum16 as enum16,
+    enum24 as enum24,
+    enum40 as enum40,
+    enum64 as enum64,
+    int8s as int8s,
+    uint8_t as uint8_t,
+    uint16_t as uint16_t,
+    uint24_t as uint24_t,
+    uint32_t as uint32_t,
+    uint40_t as uint40_t,
+    uint64_t as uint64_t,
+)
 
 from zigpy_znp.types.cstruct import CStruct
-
-if typing.TYPE_CHECKING:
-    import enum
-
-    class enum8(int, enum.Enum):
-        pass
-
-    class enum16(int, enum.Enum):
-        pass
-
-    class enum24(int, enum.Enum):
-        pass
-
-    class enum40(int, enum.Enum):
-        pass
-
-    class enum64(int, enum.Enum):
-        pass
-
-    class bitmap8(enum.IntFlag):
-        pass
-
-    class bitmap16(enum.IntFlag):
-        pass
-
-else:
-    from zigpy.types import (  # noqa: F401
-        bitmap8,
-        bitmap16,
-        enum8,
-        enum16,
-        enum24,
-        enum40,
-        enum64,
-        uint16_t,
-        uint24_t,
-        uint32_t,
-        uint40_t,
-        uint64_t,
-    )
 
 
 class Bytes(bytes):

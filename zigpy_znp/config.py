@@ -2,23 +2,23 @@ import numbers
 import typing
 
 import voluptuous as vol
-from zigpy.config import (  # noqa: F401
-    CONF_DEVICE,
-    CONF_DEVICE_PATH,
-    CONF_MAX_CONCURRENT_REQUESTS,
-    CONF_NWK,
-    CONF_NWK_CHANNEL,
-    CONF_NWK_CHANNELS,
-    CONF_NWK_EXTENDED_PAN_ID,
-    CONF_NWK_KEY,
-    CONF_NWK_PAN_ID,
-    CONF_NWK_TC_ADDRESS,
-    CONF_NWK_TC_LINK_KEY,
-    CONF_NWK_UPDATE_ID,
-    CONFIG_SCHEMA,
-    SCHEMA_DEVICE,
-    cv_boolean,
+from zigpy.config import (
+    CONF_DEVICE as CONF_DEVICE,
+    CONF_DEVICE_PATH as CONF_DEVICE_PATH,
+    CONF_MAX_CONCURRENT_REQUESTS as CONF_MAX_CONCURRENT_REQUESTS,
+    CONF_NWK as CONF_NWK,
+    CONF_NWK_CHANNEL as CONF_NWK_CHANNEL,
+    CONF_NWK_CHANNELS as CONF_NWK_CHANNELS,
+    CONF_NWK_EXTENDED_PAN_ID as CONF_NWK_EXTENDED_PAN_ID,
+    CONF_NWK_KEY as CONF_NWK_KEY,
+    CONF_NWK_PAN_ID as CONF_NWK_PAN_ID,
+    CONF_NWK_TC_ADDRESS as CONF_NWK_TC_ADDRESS,
+    CONF_NWK_TC_LINK_KEY as CONF_NWK_TC_LINK_KEY,
+    CONF_NWK_UPDATE_ID as CONF_NWK_UPDATE_ID,
+    CONFIG_SCHEMA as CONFIG_SCHEMA,
+    SCHEMA_DEVICE as SCHEMA_DEVICE,
 )
+from zigpy.config.validators import cv_boolean as cv_boolean
 
 from zigpy_znp.commands.util import LEDMode
 

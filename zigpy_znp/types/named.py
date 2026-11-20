@@ -6,11 +6,13 @@ import logging
 import typing
 
 import zigpy.types
-from zigpy.zdo.types import Status as ZDOStatus  # noqa: F401
+import zigpy.zdo.types
 
 from . import basic, zigpy_types
 
 LOGGER = logging.getLogger(__name__)
+
+ZDOStatus = zigpy.zdo.types.Status
 
 JSONType = dict[str, typing.Any]
 
