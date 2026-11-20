@@ -11,6 +11,9 @@ import zigpy_znp.types as t
 
 LOGGER = logging.getLogger(__name__)
 
+_P = typing.ParamSpec("_P")
+_R = typing.TypeVar("_R")
+
 
 def deduplicate_commands(
     commands: typing.Iterable[t.CommandBase],
@@ -22,7 +25,7 @@ def deduplicate_commands(
 
     # We essentially need to find the "maximal" commands, if you treat the relationship
     # between two commands as a partial order.
-    maximal_commands = []
+    maximal_commands: list[t.CommandBase] = []
 
     # Command matching as a relation forms a partially ordered set.
     for command in commands:
@@ -47,9 +50,9 @@ def deduplicate_commands(
 
 @dataclasses.dataclass(frozen=True)
 class BaseResponseListener:
-    matching_commands: tuple[t.CommandBase]
+    matching_commands: tuple[t.CommandBase, ...]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         commands = deduplicate_commands(self.matching_commands)
 
         if not commands:
@@ -86,7 +89,7 @@ class BaseResponseListener:
 
         raise NotImplementedError()  # pragma: no cover
 
-    def cancel(self):
+    def cancel(self) -> bool:
         """
         Implement by subclasses to cancel the listener.
 
@@ -102,7 +105,7 @@ class OneShotResponseListener(BaseResponseListener):
     A response listener that resolves a single future exactly once.
     """
 
-    future: asyncio.Future = dataclasses.field(
+    future: asyncio.Future[t.CommandBase] = dataclasses.field(
         default_factory=lambda: asyncio.get_running_loop().create_future()
     )
 
@@ -118,7 +121,7 @@ class OneShotResponseListener(BaseResponseListener):
         self.future.set_result(response)
         return True
 
-    def cancel(self):
+    def cancel(self) -> bool:
         if not self.future.done():
             self.future.cancel()
 
@@ -135,8 +138,7 @@ class CallbackResponseListener(BaseResponseListener):
 
     def _resolve(self, response: t.CommandBase) -> bool:
         try:
-            # https://github.com/python/mypy/issues/5485
-            result = self.callback(response)  # type:ignore[misc]
+            result = self.callback(response)
 
             # Run coroutines in the background
             if asyncio.iscoroutine(result):
@@ -149,7 +151,7 @@ class CallbackResponseListener(BaseResponseListener):
         # Callbacks are always resolved
         return True
 
-    def cancel(self):
+    def cancel(self) -> bool:
         # You can't cancel a callback
         return False
 
@@ -161,22 +163,22 @@ class CatchAllResponse:
 
     header = object()  # sentinel
 
-    def matches(self, other) -> bool:
+    def matches(self, other: typing.Any) -> bool:
         return True
 
 
 def combine_concurrent_calls(
-    function: typing.CoroutineFunction,
-) -> typing.CoroutineFunction:
+    function: typing.Callable[_P, typing.Coroutine[typing.Any, typing.Any, _R]],
+) -> typing.Callable[_P, typing.Coroutine[typing.Any, typing.Any, _R]]:
     """
     Decorator that allows concurrent calls to expensive coroutines to share a result.
     """
 
-    tasks = {}
+    tasks: dict[tuple[tuple[str, typing.Any], ...], asyncio.Task[_R]] = {}
     signature = inspect.signature(function)
 
     @functools.wraps(function)
-    async def replacement(*args, **kwargs):
+    async def replacement(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         bound = signature.bind(*args, **kwargs)
         bound.apply_defaults()
 

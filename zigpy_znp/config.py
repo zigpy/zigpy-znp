@@ -1,3 +1,4 @@
+import enum
 import numbers
 import typing
 
@@ -27,8 +28,10 @@ ConfigType = dict[str, typing.Any]
 VolPositiveNumber = vol.All(numbers.Real, vol.Range(min=0))
 
 
-def EnumValue(enum, transformer=str):
-    def validator(v):
+def EnumValue(
+    enum: type[enum.Enum], transformer: typing.Callable[[typing.Any], str] = str
+) -> typing.Callable[[typing.Any], typing.Any]:
+    def validator(v: typing.Any) -> typing.Any:
         if isinstance(v, enum):
             return v
 
@@ -37,8 +40,10 @@ def EnumValue(enum, transformer=str):
     return validator
 
 
-def keys_have_same_length(*keys):
-    def validator(config):
+def keys_have_same_length(
+    *keys: str,
+) -> typing.Callable[[ConfigType], ConfigType]:
+    def validator(config: ConfigType) -> ConfigType:
         lengths = [len(config[k]) for k in keys]
 
         if len(set(lengths)) != 1:

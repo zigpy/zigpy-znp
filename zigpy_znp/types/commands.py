@@ -9,6 +9,9 @@ import zigpy.zdo.types
 
 import zigpy_znp.types as t
 
+if typing.TYPE_CHECKING:
+    from zigpy_znp.frames import GeneralFrame
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -93,9 +96,14 @@ class CommandHeader(t.uint16_t):
     """CommandHeader class."""
 
     def __new__(
-        cls, value: int = 0x0000, *, id=None, subsystem=None, type=None
+        cls,
+        value: int = 0x0000,
+        *,
+        id: int | None = None,
+        subsystem: Subsystem | None = None,
+        type: CommandType | None = None,
     ) -> CommandHeader:
-        instance = super().__new__(cls, value)
+        instance: CommandHeader = super().__new__(cls, value)
 
         if id is not None:
             instance = instance.with_id(id)
@@ -134,7 +142,7 @@ class CommandHeader(t.uint16_t):
         """Return command type."""
         return CommandType(self.cmd0 >> 5)
 
-    def with_type(self, value) -> CommandHeader:
+    def with_type(self, value: CommandType) -> CommandHeader:
         return type(self)(self & 0xFF1F | (value & 0x07) << 5)
 
     def __str__(self) -> str:
@@ -170,10 +178,21 @@ class CommandsMeta(type):
     Metaclass that creates `Command` subclasses out of the `CommandDef` definitions
     """
 
-    def __new__(cls, name: str, bases, classdict, *, subsystem):
+    _commands: list[type[typing.Any]]
+
+    def __new__(
+        cls,
+        name: str,
+        bases: tuple[type, ...],
+        classdict: dict[str, typing.Any],
+        *,
+        subsystem: Subsystem | None,
+    ) -> CommandsMeta:
         # Ignore CommandsBase
         if not bases:
             return type.__new__(cls, name, bases, classdict)
+
+        assert subsystem is not None
 
         classdict["_commands"] = []
 
@@ -220,6 +239,8 @@ class CommandsMeta(type):
                     Req.Callback = None
                     helper_class_dict["Req"] = Req
                 else:
+                    assert definition.rsp_schema is not None, definition
+
                     req_header = header
                     rsp_header = CommandHeader(0x0040 + req_header)
 
@@ -290,7 +311,7 @@ class CommandsMeta(type):
 
         return type.__new__(cls, name, bases, classdict)
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[type[typing.Any]]:
         return iter(self._commands)
 
 
@@ -307,12 +328,14 @@ class CommandBase:
     header: CommandHeader
     schema: tuple[t.Param, ...]
 
-    def __init_subclass__(cls, *, header, schema):
+    def __init_subclass__(
+        cls, *, header: CommandHeader, schema: tuple[t.Param, ...]
+    ) -> None:
         super().__init_subclass__()
         cls.header = header
         cls.schema = schema
 
-    def __init__(self, *, partial=False, **params):
+    def __init__(self, *, partial: bool = False, **params: typing.Any) -> None:
         super().__setattr__("_partial", partial)
         super().__setattr__("_bound_params", {})
 
@@ -341,7 +364,7 @@ class CommandBase:
             if missing_params:
                 raise KeyError(f"Missing parameters: {set(all_params) - given_params}")
 
-        bound_params = {}
+        bound_params: dict[str, tuple[t.Param, typing.Any]] = {}
 
         for param in self.schema:
             if params.get(param.name) is None and (partial or param.optional):
@@ -391,13 +414,13 @@ class CommandBase:
 
         super().__setattr__("_bound_params", bound_params)
 
-    def to_frame(self, *, align=False):
+    def to_frame(self, *, align: bool = False) -> GeneralFrame:
         if self._partial:
             raise ValueError(f"Cannot serialize a partial frame: {self}")
 
         from zigpy_znp.frames import GeneralFrame
 
-        chunks = []
+        chunks: list[bytes] = []
 
         for param, value in self._bound_params.values():
             # At this point the optional params are assumed to be in a valid order
@@ -409,17 +432,17 @@ class CommandBase:
             else:
                 chunks.append(value.serialize())
 
-        return GeneralFrame(self.header, b"".join(chunks))
+        return GeneralFrame(self.header, t.Bytes(b"".join(chunks)))
 
     @classmethod
-    def from_frame(cls, frame, *, align=False) -> CommandBase:
+    def from_frame(cls, frame: GeneralFrame, *, align: bool = False) -> typing.Self:
         if frame.header != cls.header:
             raise ValueError(
                 f"Wrong frame header in {cls}: {cls.header} != {frame.header}"
             )
 
-        data = frame.data
-        params = {}
+        data: bytes = frame.data
+        params: dict[str, typing.Any] = {}
 
         for param in cls.schema:
             try:
@@ -443,7 +466,7 @@ class CommandBase:
 
         if data:
             raise ValueError(
-                f"Frame {frame} contains trailing data after parsing: {data}"
+                f"Frame {frame} contains trailing data after parsing: {data!r}"
             )
 
         return cls(**params)
@@ -470,7 +493,7 @@ class CommandBase:
 
         return True
 
-    def replace(self, **kwargs) -> CommandBase:
+    def replace(self, **kwargs: typing.Any) -> typing.Self:
         """
         Returns a copy of the current command with replaced parameters.
         """
@@ -487,14 +510,14 @@ class CommandBase:
 
         return {p.name: v for p, v in self._bound_params.values()}
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return type(self) is type(other) and self._bound_params == other._bound_params
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         params = tuple(self._bound_params.items())
         return hash((type(self), self.header, self.schema, params))
 
-    def __getattribute__(self, key):
+    def __getattribute__(self, key: str) -> typing.Any:
         try:
             return object.__getattribute__(self, key)
         except AttributeError:
@@ -508,13 +531,13 @@ class CommandBase:
 
         raise AttributeError(f"{self} has no attribute {key!r}")
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: typing.Any) -> typing.NoReturn:
         raise RuntimeError("Command instances are immutable")
 
-    def __delattr__(self, key):
+    def __delattr__(self, key: str) -> typing.NoReturn:
         raise RuntimeError("Command instances are immutable")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         params = [f"{p.name}={v!r}" for p, v in self._bound_params.values()]
 
         return f"{self.__class__.__qualname__}({', '.join(params)})"

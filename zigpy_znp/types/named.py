@@ -31,7 +31,14 @@ class AddrMode(basic.enum8):
 
 
 class AddrModeAddress:
-    def __new__(cls, mode=None, address=None):
+    mode: AddrMode | None
+    address: zigpy_types.NWK | zigpy_types.EUI64 | None
+
+    def __new__(
+        cls,
+        mode: AddrModeAddress | AddrMode | int | None = None,
+        address: typing.Any = None,
+    ) -> typing.Self:
         if mode is not None and address is None and isinstance(mode, cls):
             other = mode
             return cls(mode=other.mode, address=other.address)
@@ -58,12 +65,16 @@ class AddrModeAddress:
         )
 
     def as_zigpy_type(self) -> zigpy.types.AddrModeAddress:
+        assert self.mode is not None
         return zigpy.types.AddrModeAddress(
             addr_mode=zigpy.types.AddrMode[self.mode.name],
             address=self.address,
         )
 
-    def _get_address_type(self):
+    def _get_address_type(
+        self,
+    ) -> type[zigpy_types.NWK] | type[zigpy_types.EUI64]:
+        assert self.mode is not None
         return {
             AddrMode.NWK: zigpy_types.NWK,
             AddrMode.Group: zigpy_types.NWK,
@@ -72,26 +83,28 @@ class AddrModeAddress:
         }[self.mode]
 
     @classmethod
-    def deserialize(cls, data: bytes) -> tuple[AddrModeAddress, bytes]:
+    def deserialize(cls, data: bytes) -> tuple[typing.Self, bytes]:
         mode, data = AddrMode.deserialize(data)
-        address, data = zigpy_types.EUI64.deserialize(data)
+        ieee, data = zigpy_types.EUI64.deserialize(data)
+        address: zigpy_types.NWK | zigpy_types.EUI64 = ieee
 
         if mode != AddrMode.IEEE:
-            address, _ = zigpy_types.NWK.deserialize(address.serialize())
+            address, _ = zigpy_types.NWK.deserialize(ieee.serialize())
 
         return cls(mode=mode, address=address), data
 
     def serialize(self) -> bytes:
-        result = (
-            self.mode.serialize() + self._get_address_type()(self.address).serialize()
-        )
+        assert self.mode is not None
+        # The address is converted again in case it was replaced after construction
+        address_type: type[typing.Any] = self._get_address_type()
+        result: bytes = self.mode.serialize() + address_type(self.address).serialize()
 
         if self.mode != AddrMode.IEEE:
             result += b"\x00\x00\x00\x00\x00\x00"
 
         return result
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
             return NotImplemented
 
@@ -101,7 +114,7 @@ class AddrModeAddress:
         return f"{type(self).__name__}(mode={self.mode!r}, address={self.address!r})"
 
 
-class GroupId(basic.uint16_t, repr="hex"):  # type: ignore[call-arg]
+class GroupId(basic.uint16_t, repr="hex"):
     """Group ID class"""
 
 
@@ -117,7 +130,8 @@ class Param:
     """Schema parameter"""
 
     name: str
-    type: type = None
+    # Every schema parameter is given a type
+    type: type[typing.Any] = None  # type: ignore[assignment]
     description: str = ""
     optional: bool = False
 

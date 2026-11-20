@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import typing
 
 from zigpy_znp.exceptions import InvalidFrame
 import zigpy_znp.types as t
@@ -13,12 +14,16 @@ class GeneralFrame:
     data: t.Bytes
 
     def __post_init__(self) -> None:
-        # We're frozen so `self.header = ...` is disallowed
-        if not isinstance(self.header, t.CommandHeader):
-            object.__setattr__(self, "header", t.CommandHeader(self.header))
+        # Callers may pass a plain int and bytes, typed as such to keep the checks
+        header: int = self.header
+        data: bytes = self.data
 
-        if not isinstance(self.data, t.Bytes):
-            object.__setattr__(self, "data", t.Bytes(self.data))
+        # We're frozen so `self.header = ...` is disallowed
+        if not isinstance(header, t.CommandHeader):
+            object.__setattr__(self, "header", t.CommandHeader(header))
+
+        if not isinstance(data, t.Bytes):
+            object.__setattr__(self, "data", t.Bytes(data))
 
         if self.length > 250:
             raise InvalidFrame(
@@ -31,7 +36,7 @@ class GeneralFrame:
         return t.uint8_t(len(self.data))
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data: bytes) -> tuple[typing.Self, bytes]:
         """Deserialize frame and sanity checks."""
         length, data = t.uint8_t.deserialize(data)
 
@@ -43,7 +48,7 @@ class GeneralFrame:
 
         header, data = t.CommandHeader.deserialize(data)
         payload, data = data[:length], data[length:]
-        return cls(header, payload), data
+        return cls(header, t.Bytes(payload)), data
 
     def serialize(self) -> bytes:
         return self.length.serialize() + self.header.serialize() + self.data.serialize()

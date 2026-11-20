@@ -9,7 +9,7 @@ import zigpy.types as zigpy_t
 import zigpy_znp.types as t
 
 
-class ListSubclass(list):
+class ListSubclass(list["CStructField"]):
     # So we can call `setattr()` on it
     pass
 
@@ -17,13 +17,13 @@ class ListSubclass(list):
 @dataclasses.dataclass(frozen=True)
 class CStructField:
     name: str
-    type: type
+    type: type[typing.Any]
 
     def __post_init__(self) -> None:
         # Throw an error early
         self.get_size_and_alignment()
 
-    def get_size_and_alignment(self, align=False) -> tuple[int, int]:
+    def get_size_and_alignment(self, align: bool = False) -> tuple[int, int]:
         if issubclass(self.type, zigpy_t.FixedIntType):
             assert self.type._size is not None
             return self.type._size, (self.type._size if align else 1)
@@ -42,7 +42,12 @@ class CStructField:
 class CStruct:
     _padding_byte = b"\xff"
 
-    def __init_subclass__(cls):
+    if typing.TYPE_CHECKING:
+        # Set by `__init_subclass__`. Not annotated at runtime: every annotation of a
+        # subclass is one of its fields.
+        fields: typing.ClassVar[ListSubclass]
+
+    def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
         fields = ListSubclass()
@@ -58,7 +63,7 @@ class CStruct:
 
         cls.fields = fields
 
-    def __new__(cls, *args, **kwargs) -> CStruct:
+    def __new__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing.Self:
         # Like a copy constructor
         if len(args) == 1 and isinstance(args[0], cls):
             if kwargs:
@@ -107,7 +112,7 @@ class CStruct:
 
     @classmethod
     def get_padded_fields(
-        cls, *, align=False
+        cls, *, align: bool = False
     ) -> typing.Iterable[tuple[int, int, CStructField]]:
         offset = 0
 
@@ -119,7 +124,7 @@ class CStruct:
             yield padding, size, field
 
     @classmethod
-    def get_alignment(cls, *, align=False) -> int:
+    def get_alignment(cls, *, align: bool = False) -> int:
         alignments = []
 
         for field in cls.fields:
@@ -129,7 +134,7 @@ class CStruct:
         return max(alignments)
 
     @classmethod
-    def get_size(cls, *, align=False) -> int:
+    def get_size(cls, *, align: bool = False) -> int:
         total_size = 0
 
         for padding, size, _field in cls.get_padded_fields(align=align):
@@ -139,7 +144,7 @@ class CStruct:
 
         return total_size + final_padding
 
-    def serialize(self, *, align=False) -> bytes:
+    def serialize(self, *, align: bool = False) -> bytes:
         result = b""
 
         for padding, _, field in self.get_padded_fields(align=align):
@@ -167,7 +172,9 @@ class CStruct:
         return result.ljust(self.get_size(align=align), self._padding_byte)
 
     @classmethod
-    def deserialize(cls, data: bytes, *, align=False) -> tuple[CStruct, bytes]:
+    def deserialize(
+        cls, data: bytes, *, align: bool = False
+    ) -> tuple[typing.Self, bytes]:
         instance = cls()
 
         orig_length = len(data)
@@ -193,7 +200,7 @@ class CStruct:
 
         return instance, data
 
-    def replace(self, **kwargs) -> CStruct:
+    def replace(self, **kwargs: typing.Any) -> typing.Self:
         d = self.as_dict().copy()
         d.update(kwargs)
 

@@ -13,6 +13,9 @@ import zigpy_znp.frames as frames
 import zigpy_znp.logger as log
 from zigpy_znp.types import Bytes
 
+if typing.TYPE_CHECKING:
+    from zigpy_znp.api import ZNP
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -21,9 +24,9 @@ class BufferTooShort(Exception):
 
 
 class ZnpMtProtocol(SerialProtocol):
-    def __init__(self, api, *, url: str | None = None) -> None:
+    def __init__(self, api: ZNP, *, url: str | None = None) -> None:
         super().__init__()
-        self._api = api
+        self._api: ZNP | None = api
         self.url = url
 
     def close(self) -> None:
@@ -47,12 +50,14 @@ class ZnpMtProtocol(SerialProtocol):
     def data_received(self, data: bytes) -> None:
         """Callback when data is received."""
         super().data_received(data)
-        LOGGER.log(log.TRACE, "Received data: %s", Bytes.__repr__(data))
+        LOGGER.log(log.TRACE, "Received data: %r", Bytes(data))
 
         for frame in self._extract_frames():
             LOGGER.log(log.TRACE, "Parsed frame: %s", frame)
 
             try:
+                # A closed protocol has no API: this fails and is logged below
+                assert self._api is not None
                 self._api.frame_received(frame.payload)
             except Exception as e:
                 LOGGER.error(
@@ -71,11 +76,13 @@ class ZnpMtProtocol(SerialProtocol):
         directly writing to the transport with `transport.write`.
         """
 
-        LOGGER.log(log.TRACE, "Sending data: %s", Bytes.__repr__(data))
+        LOGGER.log(log.TRACE, "Sending data: %r", Bytes(data))
+        assert self._transport is not None
         self._transport.write(data)
 
     async def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
         LOGGER.debug("Setting serial pin states: DTR=%s, RTS=%s", dtr, rts)
+        assert self._transport is not None
         await self._transport.set_modem_pins(dtr=dtr, rts=rts)
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
@@ -120,7 +127,7 @@ class ZnpMtProtocol(SerialProtocol):
 
         # At this point we should have a complete frame
         # If not, deserialization will fail and the error will propapate up
-        frame, rest = frames.TransportFrame.deserialize(self._buffer)
+        frame, rest = frames.TransportFrame.deserialize(bytes(self._buffer))
 
         # If we get this far then we have a valid frame. Update the buffer.
         del self._buffer[: len(self._buffer) - len(rest)]
@@ -131,7 +138,7 @@ class ZnpMtProtocol(SerialProtocol):
         return f"<{type(self).__name__} connected to {self.url!r} (api: {self._api})>"
 
 
-async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
+async def connect(config: conf.ConfigType, api: ZNP) -> ZnpMtProtocol:
     port = config[zigpy.config.CONF_DEVICE_PATH]
 
     _, protocol = await create_serial_connection(
@@ -142,6 +149,8 @@ async def connect(config: conf.ConfigType, api) -> ZnpMtProtocol:
         flow_control=config[zigpy.config.CONF_DEVICE_FLOW_CONTROL],
     )
 
-    await protocol.wait_until_connected()
+    # `protocol_factory` creates a `ZnpMtProtocol`
+    znp_protocol = typing.cast(ZnpMtProtocol, protocol)
+    await znp_protocol.wait_until_connected()
 
-    return protocol  # type: ignore[return-value]
+    return znp_protocol

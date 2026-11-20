@@ -10,7 +10,8 @@ def _find_trace_level() -> int:
         return _TRACE
     elif hasattr(logging, "TRACE") and logging.NOTSET < logging.TRACE < logging.DEBUG:
         # If a valid TRACE level exists that is between 0 and 10, use it
-        return logging.TRACE
+        trace_level: int = logging.TRACE
+        return trace_level
     elif LOGGER.level == logging.DEBUG:
         # If `zigpy_znp.logger` is explicitly passed `DEBUG` as a log level, enable
         # `TRACE` logging under the `DEBUG` level

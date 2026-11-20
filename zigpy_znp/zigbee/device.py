@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import typing
 
 import zigpy.application
+import zigpy.const
 import zigpy.device
 import zigpy.zdo
 
@@ -34,10 +36,10 @@ class ZNPCoordinator(zigpy.device.Device):
 
     async def request(
         self,
-        *args,
-        timeout=2 * zigpy.device.APS_REPLY_TIMEOUT,
-        **kwargs,
-    ):
+        *args: typing.Any,
+        timeout: float = 2 * zigpy.const.APS_REPLY_TIMEOUT,
+        **kwargs: typing.Any,
+    ) -> typing.Any:
         """
         Normal `zigpy.device.Device.request` except its default timeout is longer.
         """

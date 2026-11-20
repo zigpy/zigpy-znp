@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import typing
+
 from zigpy.types import (
+    FixedIntType,
     bitmap8 as bitmap8,
     bitmap16 as bitmap16,
     enum8 as enum8,
@@ -21,11 +24,11 @@ from zigpy_znp.types.cstruct import CStruct
 
 
 class Bytes(bytes):
-    def serialize(self) -> Bytes:
+    def serialize(self) -> bytes:
         return self
 
     @classmethod
-    def deserialize(cls, data: bytes) -> tuple[Bytes, bytes]:
+    def deserialize(cls, data: bytes) -> tuple[typing.Self, bytes]:
         return cls(data), b""
 
     def __repr__(self) -> str:
@@ -44,18 +47,18 @@ class TrailingBytes(Bytes):
     """
 
 
-def serialize_list(objects) -> Bytes:
+def serialize_list(objects: typing.Iterable[typing.Any]) -> Bytes:
     return Bytes(b"".join([o.serialize() for o in objects]))
 
 
 class ShortBytes(Bytes):
-    _header = uint8_t
+    _header: type[FixedIntType] = uint8_t
 
-    def serialize(self) -> Bytes:
-        return self._header(len(self)).serialize() + self  # type:ignore[return-value]
+    def serialize(self) -> bytes:
+        return self._header(len(self)).serialize() + self
 
     @classmethod
-    def deserialize(cls, data: bytes) -> tuple[Bytes, bytes]:
+    def deserialize(cls, data: bytes) -> tuple[typing.Self, bytes]:
         length, data = cls._header.deserialize(data)
         if length > len(data):
             raise ValueError(f"Data is too short to contain {length} bytes of data")
@@ -66,43 +69,61 @@ class LongBytes(ShortBytes):
     _header = uint16_t
 
 
-class BaseListType(list):
-    _item_type = None
+class BaseListType(list[typing.Any]):
+    _item_type: type[typing.Any] | None = None
 
     @classmethod
-    def _serialize_item(cls, item, *, align):
+    def _serialize_item(cls, item: typing.Any, *, align: bool) -> bytes:
+        assert cls._item_type is not None
+
         if not isinstance(item, cls._item_type):
-            item = cls._item_type(item)  # type:ignore[misc]
+            item = cls._item_type(item)
+
+        data: bytes
 
         if issubclass(cls._item_type, CStruct):
-            return item.serialize(align=align)
+            data = item.serialize(align=align)
         else:
-            return item.serialize()
+            data = item.serialize()
+
+        return data
 
     @classmethod
-    def _deserialize_item(cls, data, *, align):
+    def _deserialize_item(cls, data: bytes, *, align: bool) -> tuple[typing.Any, bytes]:
+        assert cls._item_type is not None
+
+        result: tuple[typing.Any, bytes]
+
         if issubclass(cls._item_type, CStruct):
-            return cls._item_type.deserialize(data, align=align)
+            result = cls._item_type.deserialize(data, align=align)
         else:
-            return cls._item_type.deserialize(data)
+            result = cls._item_type.deserialize(data)
+
+        return result
 
 
 class LVList(BaseListType):
-    _header = None
+    _header: type[FixedIntType] | None = None
 
-    def __init_subclass__(cls, *, item_type, length_type) -> None:
+    def __init_subclass__(
+        cls, *, item_type: type[typing.Any], length_type: type[FixedIntType]
+    ) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
         cls._header = length_type
 
-    def serialize(self, *, align=False) -> bytes:
+    def serialize(self, *, align: bool = False) -> bytes:
         assert self._item_type is not None
+        assert self._header is not None
         return self._header(len(self)).serialize() + b"".join(
             [self._serialize_item(i, align=align) for i in self]
         )
 
     @classmethod
-    def deserialize(cls, data: bytes, *, align=False) -> tuple[LVList, bytes]:
+    def deserialize(
+        cls, data: bytes, *, align: bool = False
+    ) -> tuple[typing.Self, bytes]:
+        assert cls._header is not None
         length, data = cls._header.deserialize(data)
         r = cls()
         for _i in range(length):
@@ -112,14 +133,14 @@ class LVList(BaseListType):
 
 
 class FixedList(BaseListType):
-    _length = None
+    _length: int | None = None
 
-    def __init_subclass__(cls, *, item_type, length) -> None:
+    def __init_subclass__(cls, *, item_type: type[typing.Any], length: int) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
         cls._length = length
 
-    def serialize(self, *, align=False) -> bytes:
+    def serialize(self, *, align: bool = False) -> bytes:
         assert self._length is not None
 
         if len(self) != self._length:
@@ -130,7 +151,10 @@ class FixedList(BaseListType):
         return b"".join([self._serialize_item(i, align=align) for i in self])
 
     @classmethod
-    def deserialize(cls, data: bytes, *, align=False) -> tuple[FixedList, bytes]:
+    def deserialize(
+        cls, data: bytes, *, align: bool = False
+    ) -> tuple[typing.Self, bytes]:
+        assert cls._length is not None
         r = cls()
         for _i in range(cls._length):
             item, data = cls._deserialize_item(data, align=align)
@@ -139,15 +163,17 @@ class FixedList(BaseListType):
 
 
 class CompleteList(BaseListType):
-    def __init_subclass__(cls, *, item_type) -> None:
+    def __init_subclass__(cls, *, item_type: type[typing.Any]) -> None:
         super().__init_subclass__()
         cls._item_type = item_type
 
-    def serialize(self, *, align=False) -> bytes:
+    def serialize(self, *, align: bool = False) -> bytes:
         return b"".join([self._serialize_item(i, align=align) for i in self])
 
     @classmethod
-    def deserialize(cls, data: bytes, *, align=False) -> tuple[CompleteList, bytes]:
+    def deserialize(
+        cls, data: bytes, *, align: bool = False
+    ) -> tuple[typing.Self, bytes]:
         r = cls()
         while data:
             item, data = cls._deserialize_item(data, align=align)
