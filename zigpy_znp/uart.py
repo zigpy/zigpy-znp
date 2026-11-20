@@ -56,9 +56,9 @@ class ZnpMtProtocol(SerialProtocol):
             LOGGER.log(log.TRACE, "Parsed frame: %s", frame)
 
             try:
-                # A closed protocol has no API: this fails and is logged below
-                assert self._api is not None
-                self._api.frame_received(frame.payload)
+                # A closed protocol has no API: this raises `AttributeError`, which
+                # is logged below
+                typing.cast("ZNP", self._api).frame_received(frame.payload)
             except Exception as e:
                 LOGGER.error(
                     "Received an exception while passing frame to API: %s",
@@ -77,13 +77,16 @@ class ZnpMtProtocol(SerialProtocol):
         """
 
         LOGGER.log(log.TRACE, "Sending data: %r", Bytes(data))
-        assert self._transport is not None
-        self._transport.write(data)
+        # Between `connection_lost` and `disconnect()` there is no transport: this
+        # raises `AttributeError` then
+        self._transport.write(data)  # type: ignore[union-attr]
 
     async def set_dtr_rts(self, *, dtr: bool, rts: bool) -> None:
         LOGGER.debug("Setting serial pin states: DTR=%s, RTS=%s", dtr, rts)
-        assert self._transport is not None
-        await self._transport.set_modem_pins(dtr=dtr, rts=rts)
+        # Like `write`, raises `AttributeError` without a transport
+        await self._transport.set_modem_pins(  # type: ignore[union-attr]
+            dtr=dtr, rts=rts
+        )
 
     def _extract_frames(self) -> typing.Iterator[frames.TransportFrame]:
         """Extracts frames from the buffer until it is exhausted."""

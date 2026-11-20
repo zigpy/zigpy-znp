@@ -166,8 +166,10 @@ class CommandDef:
 
     if typing.TYPE_CHECKING:
         # `CommandsMeta` replaces every `CommandDef` in a `CommandsBase` subclass with
-        # a class carrying the generated command classes. Only the ones matching the
-        # definition exist (the others are `None`), callers know which ones they use.
+        # a class carrying the generated command classes. A variant the definition
+        # doesn't have is `None` at runtime (e.g. `SYS.ResetReq.Rsp`): these
+        # declarations deliberately don't model that, since typing them as optional
+        # would need a check at every use of every command.
         Req: typing.ClassVar[type[CommandBase]]
         Rsp: typing.ClassVar[type[CommandBase]]
         Callback: typing.ClassVar[type[CommandBase]]

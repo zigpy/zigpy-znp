@@ -83,6 +83,7 @@ def iter_seed_candidates(
 async def read_nwk_frame_counter(
     znp: ZNP, *, ext_pan_id: t.EUI64 | None = None
 ) -> t.uint32_t:
+    # `network_info` is `None` until `load_network_info`, which calls this function
     if ext_pan_id is None and znp.network_info is not None:
         ext_pan_id = znp.network_info.extended_pan_id
 
@@ -135,6 +136,8 @@ async def write_nwk_frame_counter(
         return
 
     if ext_pan_id is None:
+        # Callers that don't pass the extended PAN ID have loaded the network info
+        assert znp.network_info is not None
         ext_pan_id = znp.network_info.extended_pan_id
 
     entry = t.NwkSecMaterialDesc(

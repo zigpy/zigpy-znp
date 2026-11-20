@@ -64,15 +64,18 @@ class ZNP:
         )
         self._sync_request_lock = PriorityLock()
 
-        # These are only valid once connected
+        # Both are `None` until `connect()` probes the radio, which it skips with
+        # `test_port=False` (the firmware tools), and again after `close()`. They are
+        # typed as their values anyway: every use expects a probed radio, and making
+        # them optional would need a check at each of the ~35 uses.
         self.capabilities: int = None  # type: ignore[assignment]
         self.version: float = None  # type: ignore[assignment]
 
         self.nvram = NVRAMHelper(self)
 
-        # These are only valid once the network info is loaded
-        self.network_info: zigpy.state.NetworkInfo = None  # type: ignore[assignment]
-        self.node_info: zigpy.state.NodeInfo = None  # type: ignore[assignment]
+        # Set by `load_network_info`
+        self.network_info: zigpy.state.NetworkInfo | None = None
+        self.node_info: zigpy.state.NodeInfo | None = None
 
     def set_application(self, app: ControllerApplication) -> None:
         assert self._app is None
@@ -804,6 +807,7 @@ class ZNP:
                 listener.cancel()
 
         self._listeners.clear()
+        # See `__init__`
         self.version = None  # type: ignore[assignment]
         self.capabilities = None  # type: ignore[assignment]
 

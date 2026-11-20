@@ -429,13 +429,23 @@ class NVRAMHelper:
             except KeyError:
                 break
 
+    @typing.overload
+    def read_table(
+        self, *, sys_id: int = ..., item_id: int
+    ) -> typing.AsyncIterator[t.Bytes]: ...
+
+    @typing.overload
+    def read_table(
+        self, *, sys_id: int = ..., item_id: int, item_type: type[_T]
+    ) -> typing.AsyncIterator[_T]: ...
+
     async def read_table(
         self,
         *,
         sys_id: int = nvids.NvSysIds.ZSTACK,
         item_id: int,
-        item_type: type[_T] = t.Bytes,  # type: ignore[assignment]
-    ) -> typing.AsyncIterator[_T]:
+        item_type: type[typing.Any] = t.Bytes,
+    ) -> typing.AsyncIterator[typing.Any]:
         for sub_id in range(0x0000, 0xFFFF + 1):
             try:
                 yield await self.read(
@@ -447,12 +457,22 @@ class NVRAMHelper:
             except KeyError:
                 break
 
+    @typing.overload
+    def osal_read_table(
+        self, start_nvid: int, end_nvid: int
+    ) -> typing.AsyncIterator[t.Bytes]: ...
+
+    @typing.overload
+    def osal_read_table(
+        self, start_nvid: int, end_nvid: int, item_type: type[_T]
+    ) -> typing.AsyncIterator[_T]: ...
+
     async def osal_read_table(
         self,
         start_nvid: int,
         end_nvid: int,
-        item_type: type[_T] = t.Bytes,  # type: ignore[assignment]
-    ) -> typing.AsyncIterator[_T]:
+        item_type: type[typing.Any] = t.Bytes,
+    ) -> typing.AsyncIterator[typing.Any]:
         for nvid in range(start_nvid, end_nvid + 1):
             try:
                 yield await self.osal_read(nvid, item_type=item_type)

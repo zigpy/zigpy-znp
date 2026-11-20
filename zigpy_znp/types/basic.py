@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 
 from zigpy.types import (
-    FixedIntType,
+    FixedIntType as _FixedIntType,
     bitmap8 as bitmap8,
     bitmap16 as bitmap16,
     enum8 as enum8,
@@ -52,7 +52,7 @@ def serialize_list(objects: typing.Iterable[typing.Any]) -> Bytes:
 
 
 class ShortBytes(Bytes):
-    _header: type[FixedIntType] = uint8_t
+    _header: type[_FixedIntType] = uint8_t
 
     def serialize(self) -> bytes:
         return self._header(len(self)).serialize() + self
@@ -113,10 +113,10 @@ class BaseListType(list[typing.Any]):
 
 
 class LVList(BaseListType):
-    _header: type[FixedIntType] | None = None
+    _header: type[_FixedIntType] | None = None
 
     def __init_subclass__(
-        cls, *, item_type: type[typing.Any], length_type: type[FixedIntType]
+        cls, *, item_type: type[typing.Any], length_type: type[_FixedIntType]
     ) -> None:
         super().__init_subclass__()
         cls._item_type = item_type

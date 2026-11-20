@@ -77,6 +77,8 @@ def zigpy_state_to_json_backup(
 
 async def backup_network(znp: ZNP) -> t.JSONType:
     await znp.load_network_info(load_devices=True)
+    assert znp.network_info is not None
+    assert znp.node_info is not None
 
     obj = zigpy_state_to_json_backup(
         network_info=znp.network_info,
