@@ -72,6 +72,16 @@ class LongBytes(ShortBytes):
 class BaseListType(list[typing.Any]):
     _item_type: type[typing.Any] | None = None
 
+    if typing.TYPE_CHECKING:
+        # Every concrete subclass implements these
+
+        def serialize(self, *, align: bool = False) -> bytes: ...
+
+        @classmethod
+        def deserialize(
+            cls, data: bytes, *, align: bool = False
+        ) -> tuple[typing.Self, bytes]: ...
+
     @classmethod
     def _serialize_item(cls, item: typing.Any, *, align: bool) -> bytes:
         assert cls._item_type is not None

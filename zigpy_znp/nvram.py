@@ -1,12 +1,20 @@
+from __future__ import annotations
+
 import itertools
 import logging
+import typing
 
 import zigpy_znp.commands as c
 from zigpy_znp.exceptions import InvalidCommandResponse, SecurityError
 import zigpy_znp.types as t
 from zigpy_znp.types import nvids
 
+if typing.TYPE_CHECKING:
+    from zigpy_znp.api import ZNP
+
 LOGGER = logging.getLogger(__name__)
+
+_T = typing.TypeVar("_T")
 
 
 # Some NVIDs don't really exist and Z-Stack doesn't behave consistently when operations
@@ -15,9 +23,9 @@ PROXIED_NVIDS = {nvids.OsalNvIds.POLL_RATE_OLD16}
 
 
 class NVRAMHelper:
-    def __init__(self, znp):
+    def __init__(self, znp: ZNP) -> None:
         self.znp = znp
-        self.align_structs = None
+        self.align_structs: bool | None = None
 
     async def determine_alignment(self) -> None:
         """
@@ -29,6 +37,7 @@ class NVRAMHelper:
         # representation over serial.
         LOGGER.debug("Detecting struct alignment")
         rsp = await self.znp.request(c.UTIL.AssocFindDevice.Req(Index=0))
+        assert rsp is not None
 
         if len(rsp.Device) == 28:
             self.align_structs = False
@@ -41,52 +50,64 @@ class NVRAMHelper:
 
         LOGGER.debug("Detected struct alignment: %s", self.align_structs)
 
-    def serialize(self, value) -> bytes:
+    def serialize(self, value: typing.Any) -> bytes | bytearray:
         """
         Serialize an object, automatically computing struct padding based on the target
         platform.
         """
 
+        data: bytes | bytearray
+
         if hasattr(value, "serialize"):
             if isinstance(value, (t.CStruct, t.BaseListType)):
                 assert self.align_structs is not None
-                value = value.serialize(align=self.align_structs)
+                data = value.serialize(align=self.align_structs)
             else:
-                value = value.serialize()
+                data = value.serialize()
         elif not isinstance(value, (bytes, bytearray)):
             raise TypeError(
                 f"Only bytes or serializable types can be written to NVRAM."
                 f" Got {value!r} (type {type(value)})"
             )
+        else:
+            data = value
 
-        if not value:
+        if not data:
             raise ValueError("NVRAM value cannot be empty")
 
-        return value
+        return data
 
-    def deserialize(self, data: bytes, item_type, *, allow_trailing=False):
+    def deserialize(
+        self, data: bytes, item_type: type[_T], *, allow_trailing: bool = False
+    ) -> _T:
         """
         Serialize raw bytes, automatically computing struct padding based on the target
         platform.
         """
 
+        value: _T
+        remaining: bytes
+
         if issubclass(item_type, (t.CStruct, t.BaseListType)):
             assert self.align_structs is not None
             value, remaining = item_type.deserialize(data, align=self.align_structs)
         else:
-            value, remaining = item_type.deserialize(data)
+            # The item types share no base class, each one has a `deserialize`
+            value, remaining = typing.cast(typing.Any, item_type).deserialize(data)
 
         if remaining and not allow_trailing:
             raise ValueError(f"Data left after deserialization: {remaining!r}")
 
         return value
 
-    async def osal_delete(self, nv_id: t.uint16_t) -> bool:
+    async def osal_delete(self, nv_id: int) -> bool:
         """
         Deletes an item from NVRAM. Returns whether or not the item existed.
         """
 
-        length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
+        length_rsp = await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))
+        assert length_rsp is not None
+        length = length_rsp.ItemLen
 
         if length == 0:
             return False
@@ -94,10 +115,13 @@ class NVRAMHelper:
         delete_rsp = await self.znp.request(
             c.SYS.OSALNVDelete.Req(Id=nv_id, ItemLen=length)
         )
+        assert delete_rsp is not None
 
-        return delete_rsp.Status == t.Status.SUCCESS
+        return bool(delete_rsp.Status == t.Status.SUCCESS)
 
-    async def osal_write(self, nv_id: t.uint16_t, value, *, create: bool = False):
+    async def osal_write(
+        self, nv_id: int, value: typing.Any, *, create: bool = False
+    ) -> None:
         """
         Writes a complete value to NVRAM, optionally resizing and creating the item if
         necessary.
@@ -106,7 +130,9 @@ class NVRAMHelper:
         """
 
         value = self.serialize(value)
-        length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
+        length_rsp = await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))
+        assert length_rsp is not None
+        length = length_rsp.ItemLen
 
         # Recreate the item if the length is not correct
         if length != len(value) and nv_id not in PROXIED_NVIDS:
@@ -145,7 +171,7 @@ class NVRAMHelper:
                 RspStatus=t.Status.SUCCESS,
             )
 
-    async def osal_read(self, nv_id: t.uint16_t, *, item_type):
+    async def osal_read(self, nv_id: int, *, item_type: type[_T]) -> _T:
         """
         Reads a complete value from NVRAM.
 
@@ -158,6 +184,7 @@ class NVRAMHelper:
                 c.SYS.OSALNVRead.Req(Id=nv_id, Offset=0),
                 RspStatus=t.Status.SUCCESS,
             )
+            assert read_rsp is not None
 
             value = self.deserialize(read_rsp.Value, item_type)
             LOGGER.debug('Read NVRAM["LEGACY"][0x%04x] = %r', nv_id, value)
@@ -165,7 +192,9 @@ class NVRAMHelper:
             return value
 
         # Every item has a length, even missing ones
-        length = (await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))).ItemLen
+        length_rsp = await self.znp.request(c.SYS.OSALNVLength.Req(Id=nv_id))
+        assert length_rsp is not None
+        length = length_rsp.ItemLen
 
         if length == 0:
             raise KeyError(f"NV item does not exist: {nv_id!r}")
@@ -178,6 +207,7 @@ class NVRAMHelper:
                     c.SYS.OSALNVReadExt.Req(Id=nv_id, Offset=len(data)),
                     RspStatus=t.Status.SUCCESS,
                 )
+                assert read_rsp is not None
 
                 data += read_rsp.Value
         except InvalidCommandResponse as e:
@@ -197,6 +227,7 @@ class NVRAMHelper:
                 RspStatus=t.Status.SUCCESS,
                 RspConfigId=nv_id,
             )
+            assert read_rsp is not None
 
             data = read_rsp.Value
 
@@ -210,9 +241,9 @@ class NVRAMHelper:
     async def delete(
         self,
         *,
-        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
-        item_id: t.uint16_t,
-        sub_id: t.uint16_t,
+        sys_id: int = nvids.NvSysIds.ZSTACK,
+        item_id: int,
+        sub_id: int,
     ) -> bool:
         """
         Deletes a subitem from NVRAM. Returns whether or not the item existed.
@@ -221,16 +252,17 @@ class NVRAMHelper:
         delete_rsp = await self.znp.request(
             c.SYS.NVDelete.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
         )
+        assert delete_rsp is not None
 
-        return delete_rsp.Status == t.Status.SUCCESS
+        return bool(delete_rsp.Status == t.Status.SUCCESS)
 
     async def write(
         self,
         *,
-        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
-        item_id: t.uint16_t,
-        sub_id: t.uint16_t,
-        value,
+        sys_id: int = nvids.NvSysIds.ZSTACK,
+        item_id: int,
+        sub_id: int,
+        value: typing.Any,
         create: bool = True,
     ) -> None:
         """
@@ -241,11 +273,11 @@ class NVRAMHelper:
         """
 
         value = self.serialize(value)
-        length = (
-            await self.znp.request(
-                c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
-            )
-        ).Length
+        length_rsp = await self.znp.request(
+            c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
+        )
+        assert length_rsp is not None
+        length = length_rsp.Length
 
         if length != len(value) and not (
             sys_id == nvids.NvSysIds.ZSTACK
@@ -278,6 +310,7 @@ class NVRAMHelper:
                     Length=len(value),
                 )
             )
+            assert create_rsp is not None
 
             if create_rsp.Status not in (t.Status.SUCCESS, t.Status.NV_ITEM_UNINIT):
                 raise InvalidCommandResponse("Bad create status", create_rsp)
@@ -298,11 +331,11 @@ class NVRAMHelper:
     async def read(
         self,
         *,
-        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
-        item_id: t.uint16_t,
-        sub_id: t.uint16_t,
-        item_type,
-    ) -> bytes:
+        sys_id: int = nvids.NvSysIds.ZSTACK,
+        item_id: int,
+        sub_id: int,
+        item_type: type[_T],
+    ) -> _T:
         """
         Reads a value from NVRAM for the specified subsystem, item, and subitem.
 
@@ -315,6 +348,7 @@ class NVRAMHelper:
         length_rsp = await self.znp.request(
             c.SYS.NVLength.Req(SysId=sys_id, ItemId=item_id, SubId=sub_id)
         )
+        assert length_rsp is not None
         length = length_rsp.Length
 
         if length == 0:
@@ -336,6 +370,7 @@ class NVRAMHelper:
                 ),
                 RspStatus=t.Status.SUCCESS,
             )
+            assert read_rsp is not None
 
             data += read_rsp.Value
 
@@ -349,10 +384,10 @@ class NVRAMHelper:
     async def write_table(
         self,
         *,
-        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
-        item_id: t.uint16_t,
-        values,
-        fill_value,
+        sys_id: int = nvids.NvSysIds.ZSTACK,
+        item_id: int,
+        values: typing.Iterable[typing.Any],
+        fill_value: typing.Any,
     ) -> None:
         for sub_id, value in itertools.zip_longest(
             range(0x0000, 0xFFFF + 1), values, fillvalue=fill_value
@@ -371,7 +406,12 @@ class NVRAMHelper:
                 break
 
     async def osal_write_table(
-        self, start_nvid: t.uint16_t, end_nvid: t.uint16_t, values, *, fill_value
+        self,
+        start_nvid: int,
+        end_nvid: int,
+        values: typing.Iterable[typing.Any],
+        *,
+        fill_value: typing.Any,
     ) -> None:
         values = list(values)
 
@@ -392,10 +432,10 @@ class NVRAMHelper:
     async def read_table(
         self,
         *,
-        sys_id: t.uint8_t = nvids.NvSysIds.ZSTACK,
-        item_id: t.uint16_t,
-        item_type=t.Bytes,
-    ):
+        sys_id: int = nvids.NvSysIds.ZSTACK,
+        item_id: int,
+        item_type: type[_T] = t.Bytes,  # type: ignore[assignment]
+    ) -> typing.AsyncIterator[_T]:
         for sub_id in range(0x0000, 0xFFFF + 1):
             try:
                 yield await self.read(
@@ -409,10 +449,10 @@ class NVRAMHelper:
 
     async def osal_read_table(
         self,
-        start_nvid: t.uint16_t,
-        end_nvid: t.uint16_t,
-        item_type=t.Bytes,
-    ):
+        start_nvid: int,
+        end_nvid: int,
+        item_type: type[_T] = t.Bytes,  # type: ignore[assignment]
+    ) -> typing.AsyncIterator[_T]:
         for nvid in range(start_nvid, end_nvid + 1):
             try:
                 yield await self.osal_read(nvid, item_type=item_type)

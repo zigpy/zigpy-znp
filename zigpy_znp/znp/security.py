@@ -14,6 +14,8 @@ from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
 
+_SeqT = typing.TypeVar("_SeqT", list[typing.Any], bytes)
+
 
 @dataclasses.dataclass(frozen=True)
 class StoredDevice:
@@ -21,11 +23,11 @@ class StoredDevice:
     key: zigpy.state.Key | None
     is_child: bool = False
 
-    def replace(self, **kwargs) -> StoredDevice:
+    def replace(self, **kwargs: typing.Any) -> StoredDevice:
         return dataclasses.replace(self, **kwargs)
 
 
-def rotate(lst: list, n: int) -> list:
+def rotate(lst: _SeqT, n: int) -> _SeqT:
     return lst[n:] + lst[:n]
 
 
@@ -43,7 +45,9 @@ def compute_tclk_seed(ieee: t.EUI64, key: t.KeyData, shift: int) -> t.KeyData:
     return t.KeyData(rotate(rotated_tclk_seed, n=-shift))
 
 
-def find_key_shift(ieee: t.EUI64, key: t.KeyData, tclk_seed: t.KeyData) -> int | None:
+def find_key_shift(
+    ieee: t.EUI64, key: t.KeyData, tclk_seed: t.KeyData | None
+) -> int | None:
     for shift in range(0x00, 0x0F + 1):
         if tclk_seed == compute_tclk_seed(ieee, key, shift):
             return shift
@@ -76,7 +80,9 @@ def iter_seed_candidates(
         yield count, tclk_seed
 
 
-async def read_nwk_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.uint32_t:
+async def read_nwk_frame_counter(
+    znp: ZNP, *, ext_pan_id: t.EUI64 | None = None
+) -> t.uint32_t:
     if ext_pan_id is None and znp.network_info is not None:
         ext_pan_id = znp.network_info.extended_pan_id
 
@@ -116,7 +122,7 @@ async def read_nwk_frame_counter(znp: ZNP, *, ext_pan_id: t.EUI64 = None) -> t.u
 
 
 async def write_nwk_frame_counter(
-    znp: ZNP, counter: t.uint32_t, *, ext_pan_id: t.EUI64 = None
+    znp: ZNP, counter: t.uint32_t, *, ext_pan_id: t.EUI64 | None = None
 ) -> None:
     if znp.version == 1.2:
         key_info = await znp.nvram.osal_read(
@@ -177,7 +183,7 @@ async def read_addr_manager_entries(znp: ZNP) -> typing.Sequence[t.AddrMgrEntry]
     return entries
 
 
-async def read_hashed_link_keys(  # type:ignore[misc]
+async def read_hashed_link_keys(
     znp: ZNP, tclk_seed: t.KeyData
 ) -> typing.AsyncGenerator[zigpy.state.Key, None]:
     if znp.version >= 3.30:
@@ -355,7 +361,7 @@ async def write_addr_manager_entries(
 
 
 def find_optimal_tclk_seed(
-    devices: typing.Sequence[StoredDevice], tclk_seed: t.KeyData
+    devices: typing.Iterable[StoredDevice], tclk_seed: t.KeyData
 ) -> t.KeyData:
     keys = [d.key for d in devices if d.key]
 
@@ -376,8 +382,8 @@ def find_optimal_tclk_seed(
 async def write_devices(
     znp: ZNP,
     devices: typing.Sequence[StoredDevice],
-    counter_increment: t.uint32_t = 2500,
-    tclk_seed: t.KeyData = None,
+    counter_increment: int = 2500,
+    tclk_seed: t.KeyData | None = None,
 ) -> None:
     hashed_link_key_table = []
     aps_key_data_table = []

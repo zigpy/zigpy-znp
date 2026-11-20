@@ -32,10 +32,11 @@ from zigpy_znp.utils import (
     CallbackResponseListener,
     CatchAllResponse,
     OneShotResponseListener,
+    ResponseMatcher,
 )
 
 if typing.TYPE_CHECKING:
-    import typing_extensions
+    from zigpy_znp.zigbee.application import ControllerApplication
 
 LIB_VERSION = importlib.metadata.version("zigpy-znp")
 LOGGER = logging.getLogger(__name__)
@@ -53,22 +54,27 @@ NVRAM_MIGRATION_ID = 1
 
 
 class ZNP:
-    def __init__(self, config: conf.ConfigType):
-        self._uart = None
-        self._app = None
+    def __init__(self, config: conf.ConfigType) -> None:
+        self._uart: uart.ZnpMtProtocol | None = None
+        self._app: ControllerApplication | None = None
         self._config = config
 
-        self._listeners = defaultdict(list)
+        self._listeners: defaultdict[object, list[BaseResponseListener]] = defaultdict(
+            list
+        )
         self._sync_request_lock = PriorityLock()
 
-        self.capabilities = None  # type: int
-        self.version = None  # type: float
+        # These are only valid once connected
+        self.capabilities: int = None  # type: ignore[assignment]
+        self.version: float = None  # type: ignore[assignment]
 
         self.nvram = NVRAMHelper(self)
-        self.network_info: zigpy.state.NetworkInfo = None
-        self.node_info: zigpy.state.NodeInfo = None
 
-    def set_application(self, app):
+        # These are only valid once the network info is loaded
+        self.network_info: zigpy.state.NetworkInfo = None  # type: ignore[assignment]
+        self.node_info: zigpy.state.NodeInfo = None  # type: ignore[assignment]
+
+    def set_application(self, app: ControllerApplication) -> None:
         assert self._app is None
         self._app = app
 
@@ -94,7 +100,7 @@ class ZNP:
         except CommandNotRecognized:
             return 3.0
 
-    async def _load_network_info(self, *, load_devices=False):
+    async def _load_network_info(self, *, load_devices: bool = False) -> None:
         """
         Loads low-level network information from NVRAM.
         Loading key data greatly increases the runtime so it not enabled by default.
@@ -130,6 +136,7 @@ class ZNP:
             fw_variant = "Z-Stack Home 1.2" if self.version == 1.2 else "Z-Stack 3.0.x"
 
         version = await self.request(c.SYS.Version.Req())
+        assert version is not None
         node_info = zigpy.state.NodeInfo(
             ieee=ieee,
             nwk=nib.nwkDevAddress,
@@ -228,7 +235,7 @@ class ZNP:
         self.network_info = network_info
         self.node_info = node_info
 
-    async def load_network_info(self, *, load_devices=False):
+    async def load_network_info(self, *, load_devices: bool = False) -> None:
         """
         Loads low-level network information from NVRAM.
         Loading key data greatly increases the runtime so it not enabled by default.
@@ -239,7 +246,7 @@ class ZNP:
         except KeyError as e:
             raise NetworkNotFormed() from e
 
-    async def start_network(self):
+    async def start_network(self) -> None:
         # Both startup sequences end with the same callback
         started_as_coordinator = self.wait_for_response(
             c.ZDO.StateChangeInd.Callback(State=t.DeviceState.StartedAsCoordinator)
@@ -285,6 +292,7 @@ class ZNP:
                 else:
                     # In Z-Stack 1.2.2, StartupFromApp actually does what it says
                     rsp = await self.request(c.ZDO.StartupFromApp.Req(StartDelay=100))
+                    assert rsp is not None
 
                     if rsp.State not in (
                         c.zdo.StartupState.NewNetworkState,
@@ -324,7 +332,7 @@ class ZNP:
 
             await asyncio.sleep(1)
 
-    async def reset_network_info(self):
+    async def reset_network_info(self) -> None:
         """
         Resets node network information and leaves the current network.
         """
@@ -476,11 +484,11 @@ class ZNP:
 
             nvram[OsalNvIds.TCLK_SEED] = tclk_seed
 
-        for key, value in nvram.items():
+        for nv_id, value in nvram.items():
             if value is None:
-                await self.nvram.osal_delete(key)
+                await self.nvram.osal_delete(nv_id)
             else:
-                await self.nvram.osal_write(key, value, create=True)
+                await self.nvram.osal_write(nv_id, value, create=True)
 
         await security.write_nwk_frame_counter(
             self,
@@ -488,7 +496,7 @@ class ZNP:
             ext_pan_id=network_info.extended_pan_id,
         )
 
-        devices = {}
+        devices: dict[t.EUI64, security.StoredDevice] = {}
 
         for ieee in network_info.children or []:
             devices[ieee] = security.StoredDevice(
@@ -521,6 +529,8 @@ class ZNP:
 
         # Recompute the TCLK if necessary
         if self.version > 1.2:
+            # Z-Stack 3 always has a seed, see above
+            assert tclk_seed is not None
             optimal_tclk_seed = security.find_optimal_tclk_seed(
                 devices.values(), tclk_seed
             )
@@ -573,6 +583,8 @@ class ZNP:
         """
 
         from zigpy_znp.znp import security
+
+        migration_id: int
 
         try:
             migration_id = await self.nvram.osal_read(
@@ -643,18 +655,22 @@ class ZNP:
 
     @property
     def _port_path(self) -> str:
-        return self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
+        path: str = self._config[conf.CONF_DEVICE][conf.CONF_DEVICE_PATH]
+        return path
 
     @property
     def _znp_config(self) -> conf.ConfigType:
-        return self._config[conf.CONF_ZNP_CONFIG]
+        znp_config: conf.ConfigType = self._config[conf.CONF_ZNP_CONFIG]
+        return znp_config
 
-    async def _skip_bootloader(self) -> c.SYS.Ping.Rsp:
+    async def _skip_bootloader(self) -> t.CommandBase | None:
         """
         Attempt to skip the bootloader and return the ping response.
         """
 
-        async def ping_task():
+        async def ping() -> t.CommandBase | None:
+            assert self._uart is not None
+
             LOGGER.debug("Toggling RTS/DTR pins to skip bootloader or reset chip")
 
             # The default sequence is DTR=false and RTS toggling false/true/false
@@ -689,8 +705,10 @@ class ZNP:
                 except TimeoutError:
                     pass
 
+        result: t.CommandBase | None
+
         async with self.capture_responses([CatchAllResponse()]) as responses:
-            ping_task = asyncio.create_task(ping_task())
+            ping_task = asyncio.create_task(ping())
 
             try:
                 async with asyncio.timeout(CONNECT_PROBE_TIMEOUT):
@@ -709,7 +727,7 @@ class ZNP:
 
                 try:
                     async with asyncio.timeout(CONNECT_PING_TIMEOUT):
-                        result = await ping_task  # type:ignore[misc]
+                        result = await ping_task
                 except TimeoutError:
                     ping_task.cancel()
 
@@ -718,7 +736,7 @@ class ZNP:
 
         return await self.request(c.SYS.Ping.Req())
 
-    async def connect(self, *, test_port=True) -> None:
+    async def connect(self, *, test_port: bool = True) -> None:
         """
         Connects to the device specified by the "device" section of the config dict.
 
@@ -737,11 +755,12 @@ class ZNP:
             if test_port:
                 # The reset indication callback is sent when some sticks start up
                 if self._znp_config[conf.CONF_SKIP_BOOTLOADER]:
-                    self.capabilities = (await self._skip_bootloader()).Capabilities
+                    ping_rsp = await self._skip_bootloader()
                 else:
-                    self.capabilities = (
-                        await self.request(c.SYS.Ping.Req())
-                    ).Capabilities
+                    ping_rsp = await self.request(c.SYS.Ping.Req())
+
+                assert ping_rsp is not None
+                self.capabilities = ping_rsp.Capabilities
 
                 # We need to know how structs are packed to deserialize frames correctly
                 await self.nvram.determine_alignment()
@@ -760,7 +779,7 @@ class ZNP:
         Called by the UART object to indicate that the port was opened.
         """
 
-    def connection_lost(self, exc) -> None:
+    def connection_lost(self, exc: BaseException | None) -> None:
         """
         Called by the UART object to indicate that the port was closed. Propagates up
         to the `ControllerApplication` that owns this ZNP instance.
@@ -785,8 +804,8 @@ class ZNP:
                 listener.cancel()
 
         self._listeners.clear()
-        self.version = None
-        self.capabilities = None
+        self.version = None  # type: ignore[assignment]
+        self.capabilities = None  # type: ignore[assignment]
 
     async def disconnect(self) -> None:
         """
@@ -824,7 +843,7 @@ class ZNP:
                 )
                 del self._listeners[header]
 
-        counts = Counter()
+        counts: Counter[type[BaseResponseListener]] = Counter()
 
         for listener in itertools.chain.from_iterable(self._listeners.values()):
             counts[type(listener)] += 1
@@ -851,7 +870,10 @@ class ZNP:
         command_cls = c.COMMANDS_BY_ID[frame.header]
 
         try:
-            command = command_cls.from_frame(frame, align=self.nvram.align_structs)
+            # The alignment is unknown until `determine_alignment`: unaligned until then
+            command = command_cls.from_frame(
+                frame, align=bool(self.nvram.align_structs)
+            )
         except ValueError:
             # Some commands can be received corrupted. They are not useful:
             # https://github.com/home-assistant/core/issues/50005
@@ -890,7 +912,7 @@ class ZNP:
 
         return matched
 
-    def _unhandled_command(self, command: t.CommandBase):
+    def _unhandled_command(self, command: t.CommandBase) -> None:
         """
         Called when a command that is not handled by any listener is received.
         """
@@ -898,12 +920,14 @@ class ZNP:
         LOGGER.debug("Command was not handled")
 
     @contextlib.asynccontextmanager
-    async def capture_responses(self, responses):
+    async def capture_responses(
+        self, responses: typing.Sequence[ResponseMatcher]
+    ) -> typing.AsyncIterator[asyncio.Queue[t.CommandBase]]:
         """
         Captures all matched responses in a queue within the context manager.
         """
 
-        queue = asyncio.Queue()
+        queue: asyncio.Queue[t.CommandBase] = asyncio.Queue()
         listener = self.callback_for_responses(responses, callback=queue.put_nowait)
 
         try:
@@ -911,7 +935,11 @@ class ZNP:
         finally:
             self.remove_listener(listener)
 
-    def callback_for_responses(self, responses, callback) -> CallbackResponseListener:
+    def callback_for_responses(
+        self,
+        responses: typing.Sequence[ResponseMatcher],
+        callback: typing.Callable[[t.CommandBase], typing.Any],
+    ) -> CallbackResponseListener:
         """
         Creates a callback listener that matches any of the provided responses.
 
@@ -929,7 +957,9 @@ class ZNP:
         return listener
 
     def callback_for_response(
-        self, response: t.CommandBase, callback
+        self,
+        response: t.CommandBase,
+        callback: typing.Callable[[t.CommandBase], typing.Any],
     ) -> CallbackResponseListener:
         """
         Creates a callback listener for a single response.
@@ -939,17 +969,26 @@ class ZNP:
 
     @typing.overload
     def wait_for_responses(
-        self, responses, *, context: typing_extensions.Literal[False] = ...
-    ) -> asyncio.Future: ...
+        self,
+        responses: typing.Sequence[ResponseMatcher],
+        *,
+        context: typing.Literal[False] = ...,
+    ) -> asyncio.Future[t.CommandBase]: ...
 
     @typing.overload
     def wait_for_responses(
-        self, responses, *, context: typing_extensions.Literal[True]
-    ) -> tuple[asyncio.Future, OneShotResponseListener]: ...
+        self,
+        responses: typing.Sequence[ResponseMatcher],
+        *,
+        context: typing.Literal[True],
+    ) -> tuple[asyncio.Future[t.CommandBase], OneShotResponseListener]: ...
 
     def wait_for_responses(
-        self, responses, *, context: bool = False
-    ) -> asyncio.Future | tuple[asyncio.Future, OneShotResponseListener]:
+        self, responses: typing.Sequence[ResponseMatcher], *, context: bool = False
+    ) -> (
+        asyncio.Future[t.CommandBase]
+        | tuple[asyncio.Future[t.CommandBase], OneShotResponseListener]
+    ):
         """
         Creates a one-shot listener that matches any *one* of the given responses.
         """
@@ -969,7 +1008,9 @@ class ZNP:
         else:
             return listener.future
 
-    def wait_for_response(self, response: t.CommandBase) -> asyncio.Future:
+    def wait_for_response(
+        self, response: t.CommandBase
+    ) -> asyncio.Future[t.CommandBase]:
         """
         Creates a one-shot listener for a single response.
         """
@@ -998,7 +1039,10 @@ class ZNP:
         }.get(type(request), 0)
 
     async def request(
-        self, request: t.CommandBase, timeout: int | None = None, **response_params
+        self,
+        request: t.CommandBase,
+        timeout: float | None = None,
+        **response_params: typing.Any,
     ) -> t.CommandBase | None:
         """
         Sends a SREQ/AREQ request and returns its SRSP (only for SREQ), failing if any
@@ -1029,7 +1073,8 @@ class ZNP:
                 f"will have no effect"
             )
 
-        frame = request.to_frame(align=self.nvram.align_structs)
+        # The alignment is unknown until `determine_alignment`: unaligned until then
+        frame = request.to_frame(align=bool(self.nvram.align_structs))
 
         if self._uart is None:
             raise RuntimeError("Coordinator is disconnected, cannot send request")
@@ -1083,9 +1128,37 @@ class ZNP:
 
         return response
 
+    @typing.overload
     async def request_callback_rsp(
-        self, *, request, callback, timeout=None, background=False, **response_params
-    ):
+        self,
+        *,
+        request: t.CommandBase,
+        callback: t.CommandBase,
+        timeout: float | None = None,
+        background: typing.Literal[False] = ...,
+        **response_params: typing.Any,
+    ) -> t.CommandBase: ...
+
+    @typing.overload
+    async def request_callback_rsp(
+        self,
+        *,
+        request: t.CommandBase,
+        callback: t.CommandBase,
+        timeout: float | None = None,
+        background: typing.Literal[True],
+        **response_params: typing.Any,
+    ) -> t.CommandBase | None: ...
+
+    async def request_callback_rsp(
+        self,
+        *,
+        request: t.CommandBase,
+        callback: t.CommandBase,
+        timeout: float | None = None,
+        background: bool = False,
+        **response_params: typing.Any,
+    ) -> t.CommandBase | None:
         """
         Sends an SREQ, gets its SRSP confirmation, and waits for its real AREQ response.
         A bug-free version of:
@@ -1099,7 +1172,7 @@ class ZNP:
 
         # Every request should have a timeout to prevent deadlocks
         if timeout is None:
-            timeout = self._znp_config[conf.CONF_ARSP_TIMEOUT]
+            timeout = typing.cast(float, self._znp_config[conf.CONF_ARSP_TIMEOUT])
 
         callback_rsp, listener = self.wait_for_responses([callback], context=True)
 
@@ -1127,7 +1200,7 @@ class ZNP:
         # If it succeeds, create a background task to receive the AREQ but take into
         # account the time it took to start the SREQ to ensure we do not grossly exceed
         # the timeout
-        async def callback_catcher(timeout):
+        async def callback_catcher(timeout: float) -> None:
             try:
                 async with asyncio.timeout(timeout):
                     await callback_rsp

@@ -15,9 +15,20 @@ _P = typing.ParamSpec("_P")
 _R = typing.TypeVar("_R")
 
 
+class ResponseMatcher(typing.Protocol):
+    """
+    A (partial) command or `CatchAllResponse` that a listener matches responses with.
+    """
+
+    @property
+    def header(self) -> object: ...
+
+    def matches(self, other: typing.Any) -> bool: ...
+
+
 def deduplicate_commands(
-    commands: typing.Iterable[t.CommandBase],
-) -> tuple[t.CommandBase, ...]:
+    commands: typing.Iterable[ResponseMatcher],
+) -> tuple[ResponseMatcher, ...]:
     """
     Deduplicates an iterable of commands by folding more-specific commands into less-
     specific commands. Used to avoid triggering callbacks multiple times per packet.
@@ -25,7 +36,7 @@ def deduplicate_commands(
 
     # We essentially need to find the "maximal" commands, if you treat the relationship
     # between two commands as a partial order.
-    maximal_commands: list[t.CommandBase] = []
+    maximal_commands: list[ResponseMatcher] = []
 
     # Command matching as a relation forms a partially ordered set.
     for command in commands:
@@ -50,7 +61,7 @@ def deduplicate_commands(
 
 @dataclasses.dataclass(frozen=True)
 class BaseResponseListener:
-    matching_commands: tuple[t.CommandBase, ...]
+    matching_commands: typing.Sequence[ResponseMatcher]
 
     def __post_init__(self) -> None:
         commands = deduplicate_commands(self.matching_commands)
@@ -61,7 +72,7 @@ class BaseResponseListener:
         # We're frozen so __setattr__ is disallowed
         object.__setattr__(self, "matching_commands", commands)
 
-    def matching_headers(self) -> set[t.CommandHeader]:
+    def matching_headers(self) -> set[object]:
         """
         Returns the set of Z-Stack MT command headers for all the matching commands.
         """
