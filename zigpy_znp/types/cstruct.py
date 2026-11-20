@@ -200,7 +200,9 @@ class CStruct:
         return type(self)(**d)
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(self, type(other)) and not isinstance(other, type(self)):
+        if not isinstance(other, CStruct) or (
+            not isinstance(self, type(other)) and not isinstance(other, type(self))
+        ):
             return NotImplemented
 
         return self.as_dict() == other.as_dict()

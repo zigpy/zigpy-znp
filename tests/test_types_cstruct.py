@@ -46,6 +46,19 @@ def test_struct_field_values():
     assert struct.serialize() == struct2.serialize()
 
 
+def test_struct_equality_with_other_types():
+    class TestStruct(t.CStruct):
+        a: t.uint8_t
+
+    struct = TestStruct(a=1)
+
+    # Objects that aren't structs never compare equal and don't raise
+    assert struct != object()
+    assert not struct == object()  # noqa: SIM201
+    assert struct != 1
+    assert struct != {"a": 1}
+
+
 def test_struct_methods_and_constants():
     class TestStruct(t.CStruct):
         a: t.uint8_t
