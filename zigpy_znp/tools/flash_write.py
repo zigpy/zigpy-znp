@@ -52,7 +52,7 @@ def get_firmware_crcs(firmware: bytes) -> tuple[int, int]:
     return real_crc, compute_crc16(firmware_without_crcs)
 
 
-async def write_firmware(znp: ZNP, firmware: bytes, reset_nvram: bool):
+async def write_firmware(znp: ZNP, firmware: bytes, reset_nvram: bool) -> None:
     if len(firmware) != c.ubl.IMAGE_SIZE:
         raise ValueError(
             f"Firmware is the wrong size."
@@ -135,7 +135,7 @@ async def write_firmware(znp: ZNP, firmware: bytes, reset_nvram: bool):
         LOGGER.info("Unplug your adapter to leave bootloader mode!")
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Write firmware to a radio")
     parser.add_argument(
         "--input",

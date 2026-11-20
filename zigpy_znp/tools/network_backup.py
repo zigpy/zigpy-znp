@@ -31,10 +31,12 @@ def zigpy_state_to_json_backup(
         }
 
     for ieee in network_info.children:
-        nwk = network_info.nwk_addresses.get(ieee, None)
+        child_nwk = network_info.nwk_addresses.get(ieee, None)
         devices[ieee] = {
             "ieee_address": ieee.serialize()[::-1].hex(),
-            "nwk_address": nwk.serialize()[::-1].hex() if nwk is not None else None,
+            "nwk_address": (
+                child_nwk.serialize()[::-1].hex() if child_nwk is not None else None
+            ),
             "is_child": True,
         }
 

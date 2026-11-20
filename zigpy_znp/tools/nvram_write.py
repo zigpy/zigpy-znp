@@ -6,12 +6,13 @@ import sys
 from zigpy_znp.api import ZNP
 from zigpy_znp.config import CONFIG_SCHEMA
 from zigpy_znp.tools.common import ClosableFileType, setup_parser
+import zigpy_znp.types as t
 from zigpy_znp.types.nvids import ExNvIds, OsalNvIds
 
 LOGGER = logging.getLogger(__name__)
 
 
-async def nvram_write(znp: ZNP, backup):
+async def nvram_write(znp: ZNP, backup: t.JSONType) -> None:
     # First write the NVRAM items common to all radios
     for nwk_nvid, value in backup["LEGACY"].items():
         if "+" in nwk_nvid:
@@ -50,7 +51,7 @@ async def nvram_write(znp: ZNP, backup):
     await znp.reset()
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Restore a radio's NVRAM from a previous backup")
     parser.add_argument(
         "--input", "-i", type=ClosableFileType("r"), help="Input file", required=True

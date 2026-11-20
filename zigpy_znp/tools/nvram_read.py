@@ -13,8 +13,8 @@ from zigpy_znp.types.nvids import NWK_NVID_TABLES, ExNvIds, OsalNvIds
 LOGGER = logging.getLogger(__name__)
 
 
-async def nvram_read(znp: ZNP):
-    data = {}
+async def nvram_read(znp: ZNP) -> t.JSONType:
+    data: t.JSONType = {}
     data["LEGACY"] = {}
 
     # Legacy items need to be handled first, since they are named
@@ -77,7 +77,7 @@ async def nvram_read(znp: ZNP):
     return data
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Backup a radio's NVRAM")
     parser.add_argument(
         "--output", "-o", type=ClosableFileType("w"), help="Output file", default="-"

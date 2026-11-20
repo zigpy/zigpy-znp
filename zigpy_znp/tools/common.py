@@ -117,15 +117,19 @@ def validate_backup_json(backup: t.JSONType) -> None:
 
 
 class CustomArgumentParser(argparse.ArgumentParser):
-    def parse_args(self, args: typing.Sequence[str] | None = None, namespace=None):
-        args = super().parse_args(args, namespace)
+    def parse_args(
+        self,
+        args: typing.Iterable[str] | None = None,
+        namespace: typing.Any = None,
+    ) -> typing.Any:
+        parsed_args = super().parse_args(args, namespace)
 
         # Since we're running as a CLI tool, install our own log level and color logger
         log.TRACE = log._TRACE
         logging.addLevelName(log.TRACE, "TRACE")
 
         # But still allow the user to configure verbosity
-        verbosity = args.verbosity
+        verbosity = parsed_args.verbosity
         log_level = LOG_LEVELS[min(max(0, verbosity), len(LOG_LEVELS) - 1)]
 
         # coloredlogs uses "spam" for level 5, not "trace"
@@ -145,7 +149,7 @@ class CustomArgumentParser(argparse.ArgumentParser):
             level_styles=level_styles,
         )
 
-        return args
+        return parsed_args
 
 
 class UnclosableFile:
@@ -153,19 +157,19 @@ class UnclosableFile:
     Wraps a file object so that every operation but "close" is proxied.
     """
 
-    def __init__(self, f):
+    def __init__(self, f: typing.IO[typing.Any]) -> None:
         self.f = f
 
-    def close(self):
+    def close(self) -> None:
         return
 
-    def __enter__(self):
+    def __enter__(self) -> typing.Self:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, *exc_info: object) -> None:
         return
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> typing.Any:
         return getattr(self.f, name)
 
 
@@ -174,13 +178,14 @@ class ClosableFileType(argparse.FileType):
     Allows `FileType` to always be closed properly, even with stdout and stdin.
     """
 
-    def __call__(self, string):
+    def __call__(self, string: str) -> typing.IO[typing.Any]:
         f = super().__call__(string)
 
         if f not in (sys.stdin, sys.stdout, sys.stdin.buffer, sys.stdout.buffer):
             return f
 
-        return UnclosableFile(f)
+        # Proxies every file method but `close`
+        return typing.cast(typing.IO[typing.Any], UnclosableFile(f))
 
 
 def setup_parser(description: str) -> argparse.ArgumentParser:

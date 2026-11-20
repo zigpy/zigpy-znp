@@ -51,7 +51,7 @@ async def read_firmware(znp: ZNP) -> bytearray:
     return data
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Backup a radio's firmware")
     parser.add_argument(
         "--output",

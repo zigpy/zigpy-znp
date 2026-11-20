@@ -22,13 +22,13 @@ async def nvram_reset(znp: ZNP) -> None:
             start = nvid
             end = NWK_NVID_TABLES[nvid]
 
-            for nvid in range(start, end + 1):
-                deleted = await znp.nvram.osal_delete(nvid)
+            for table_nvid in range(start, end + 1):
+                deleted = await znp.nvram.osal_delete(table_nvid)
 
                 if not deleted:
                     break
 
-                LOGGER.info("Cleared %s[%s]", start, nvid - start)
+                LOGGER.info("Cleared %s[%s]", start, table_nvid - start)
         elif nvid in NWK_NVID_TABLE_KEYS:
             continue
         else:
@@ -38,14 +38,14 @@ async def nvram_reset(znp: ZNP) -> None:
                 LOGGER.debug("Item does not exist: %s", nvid)
 
     if znp.version >= 3.30:
-        for nvid in ExNvIds:
+        for ex_nvid in ExNvIds:
             # Skip the LEGACY items, we did them above
-            if nvid == ExNvIds.LEGACY:
+            if ex_nvid == ExNvIds.LEGACY:
                 continue
 
             for sub_id in range(2**16):
-                existed = await znp.nvram.delete(item_id=nvid, sub_id=sub_id)
-                LOGGER.info("Cleared %s[0x%04X]", nvid.name, sub_id)
+                existed = await znp.nvram.delete(item_id=ex_nvid, sub_id=sub_id)
+                LOGGER.info("Cleared %s[0x%04X]", ex_nvid.name, sub_id)
 
                 if not existed:
                     # Once a delete fails, no later reads will succeed
@@ -55,7 +55,7 @@ async def nvram_reset(znp: ZNP) -> None:
     await znp.reset()
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Reset a radio's state")
     parser.add_argument(
         "-c",

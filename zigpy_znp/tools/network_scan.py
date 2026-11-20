@@ -3,6 +3,7 @@ import itertools
 import logging
 import sys
 import time
+import typing
 
 from zigpy_znp.api import ZNP
 import zigpy_znp.commands as c
@@ -14,7 +15,9 @@ from zigpy_znp.types.nvids import OsalNvIds
 LOGGER = logging.getLogger(__name__)
 
 
-async def scan_once(znp: ZNP, channels: t.Channels, duration_exp: int):
+async def scan_once(
+    znp: ZNP, channels: t.Channels, duration_exp: int
+) -> typing.AsyncIterator[typing.Any]:
     async with znp.capture_responses(
         [
             c.ZDO.BeaconNotifyInd.Callback(partial=True),
@@ -99,15 +102,16 @@ async def network_scan(
         await znp.disconnect()
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Actively scan for Zigbee networks")
 
     parser.add_argument(
         "-c",
         "--channels",
         dest="channels",
-        # type: ignore[misc]
-        type=lambda s: t.Channels.from_channel_list(map(int, s.split(","))),
+        type=lambda s: t.Channels.from_channel_list(  # type: ignore[misc]
+            map(int, s.split(","))
+        ),
         default=t.Channels.ALL_CHANNELS,
         help="Channels on which to scan for networks",
     )

@@ -14,7 +14,7 @@ from zigpy_znp.zigbee.application import ControllerApplication
 LOGGER = logging.getLogger(__name__)
 
 
-async def perform_energy_scan(radio_path, num_scans=None):
+async def perform_energy_scan(radio_path: str, num_scans: int | None = None) -> None:
     LOGGER.info("Starting up zigpy-znp")
 
     config = {"device": {"path": radio_path}}
@@ -31,7 +31,9 @@ async def perform_energy_scan(radio_path, num_scans=None):
     LOGGER.info("Running scan...")
 
     # We compute an average over the last 5 scans
-    channel_energies = defaultdict(lambda: deque([], maxlen=5))
+    channel_energies: defaultdict[int, deque[int]] = defaultdict(
+        lambda: deque([], maxlen=5)
+    )
 
     for i in itertools.count(start=1):
         if num_scans is not None and i > num_scans:
@@ -76,7 +78,7 @@ async def perform_energy_scan(radio_path, num_scans=None):
     await app.shutdown()
 
 
-async def main(argv):
+async def main(argv: list[str]) -> None:
     parser = setup_parser("Perform an energy scan")
     parser.add_argument(
         "-n",
