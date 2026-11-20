@@ -152,9 +152,17 @@ class CommandHeader(t.uint16_t):
 @dataclasses.dataclass(frozen=True)
 class CommandDef:
     command_type: CommandType
-    command_id: t.uint8_t
-    req_schema: tuple | None = None
-    rsp_schema: tuple | None = None
+    command_id: int
+    req_schema: tuple[t.Param, ...] | None = None
+    rsp_schema: tuple[t.Param, ...] | None = None
+
+    if typing.TYPE_CHECKING:
+        # `CommandsMeta` replaces every `CommandDef` in a `CommandsBase` subclass with
+        # a class carrying the generated command classes. Only the ones matching the
+        # definition exist (the others are `None`), callers know which ones they use.
+        Req: typing.ClassVar[type[CommandBase]]
+        Rsp: typing.ClassVar[type[CommandBase]]
+        Callback: typing.ClassVar[type[CommandBase]]
 
 
 class CommandsMeta(type):
@@ -291,9 +299,13 @@ class CommandsBase(metaclass=CommandsMeta, subsystem=None):
 
 
 class CommandBase:
-    Req = None
-    Rsp = None
-    Callback = None
+    Req: type[CommandBase] | None = None
+    Rsp: type[CommandBase] | None = None
+    Callback: type[CommandBase] | None = None
+
+    # Set by `__init_subclass__`
+    header: CommandHeader
+    schema: tuple[t.Param, ...]
 
     def __init_subclass__(cls, *, header, schema):
         super().__init_subclass__()
