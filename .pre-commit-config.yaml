@@ -14,11 +14,12 @@ repos:
         additional_dependencies: [tomli]
         args: ["--toml", "pyproject.toml"]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.3.1
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies:
-          - zigpy>=1.5.0
-          - types-setuptools
+        name: mypy
+        entry: script/run-in-env.sh mypy
+        language: script
+        types_or: [python, pyi]
+        require_serial: true
         exclude: ^tests/
