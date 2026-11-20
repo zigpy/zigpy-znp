@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import typing
 
 import zigpy.application
 import zigpy.config
@@ -50,18 +51,18 @@ class RetryMethod(t.bitmap8):
 class ControllerApplication(zigpy.application.ControllerApplication):
     SCHEMA = conf.CONFIG_SCHEMA
 
-    def __init__(self, config: conf.ConfigType):
+    def __init__(self, config: conf.ConfigType) -> None:
         super().__init__(config=config)
 
         self._znp: ZNP | None = None
-        self._version_rsp = None
+        self._version_rsp: t.CommandBase | None = None
         self._join_announce_tasks: dict[t.EUI64, asyncio.TimerHandle] = {}
 
     ##################################################################
     # Implementation of the core zigpy ControllerApplication methods #
     ##################################################################
 
-    async def connect(self):
+    async def connect(self) -> None:
         assert self._znp is None
 
         znp = ZNP(self.config)
@@ -73,7 +74,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self._bind_callbacks()
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         if self._znp is not None:
             try:
                 await self._znp.reset(wait_for_reset=False)
@@ -88,6 +89,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Registers a new endpoint on the device.
         """
 
+        assert self._znp is not None
         await self._znp.request(
             c.AF.Register.Req(
                 Endpoint=descriptor.endpoint,
@@ -101,11 +103,12 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             RspStatus=t.Status.SUCCESS,
         )
 
-    async def load_network_info(self, *, load_devices=False) -> None:
+    async def load_network_info(self, *, load_devices: bool = False) -> None:
         """
         Loads network information from NVRAM.
         """
 
+        assert self._znp is not None
         await self._znp.load_network_info(load_devices=load_devices)
 
         self.state.node_info = self._znp.node_info
@@ -116,6 +119,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Resets node network information and leaves the current network.
         """
 
+        assert self._znp is not None
         await self._znp.reset_network_info()
 
     async def write_network_info(
@@ -133,13 +137,16 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         if "tclk_seed" not in network_info.stack_specific["zstack"]:
             network_info.stack_specific["zstack"]["tclk_seed"] = os.urandom(16).hex()
 
+        assert self._znp is not None
         await self._znp.write_network_info(
             network_info=network_info, node_info=node_info
         )
 
-    async def start_network(self, *, read_only=False):
+    async def start_network(self, *, read_only: bool = False) -> None:
         if self.state.node_info == zigpy.state.NodeInfo():
             await self.load_network_info()
+
+        assert self._znp is not None
 
         # Needed by the stack settings below
         self._version_rsp = await self._znp.request(c.SYS.Version.Req())
@@ -202,7 +209,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Sets the radio TX power.
         """
 
+        assert self._znp is not None
         rsp = await self._znp.request(c.SYS.SetTxPower.Req(TXPower=dbm))
+        assert rsp is not None
 
         if self._znp.version >= 3.30 and rsp.StatusOrPower != t.Status.SUCCESS:
             # Z-Stack 3's response indicates success or failure
@@ -235,7 +244,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return dst_addr
 
-    async def permit(self, time_s: int = 60, node: t.EUI64 | str | None = None):
+    async def permit(self, time_s: int = 60, node: t.EUI64 | str | None = None) -> None:
         """
         Permit joining the network via a specific node or via all router nodes.
         """
@@ -253,6 +262,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             or self._zstack_build_id < 20210708
             or node == self.state.node_info.ieee
         ):
+            assert self._znp is not None
             response = await self._znp.request_callback_rsp(
                 request=c.ZDO.MgmtPermitJoinReq.Req(
                     AddrMode=t.AddrMode.NWK,
@@ -292,6 +302,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Permits a new device to join with the given IEEE and link key.
         """
 
+        assert self._znp is not None
         await self._znp.request(
             c.AppConfig.BDBAddInstallCode.Req(
                 InstallCodeFormat=(
@@ -328,11 +339,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         self, new_channel: int, new_nwk_update_id: int
     ) -> None:
         """Moves device to a new channel."""
+        assert self._znp is not None
         await self._znp.request(
             request=c.ZDO.MgmtNWKUpdateReq.Req(
                 Dst=0x0000,
                 DstAddrMode=t.AddrMode.NWK,
-                # type: ignore[misc]
                 Channels=t.Channels.from_channel_list([new_channel]),
                 ScanDuration=zdo_t.NwkUpdate.CHANNEL_CHANGE_REQ,
                 ScanCount=0,
@@ -354,12 +365,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         ZNP requests/responses.
         """
 
+        assert self._znp is not None
         self._znp.callback_for_response(
             c.AF.IncomingMsg.Callback(partial=True), self.on_af_message
         )
 
         self._znp.callback_for_response(
-            c.ZDO.TCDevInd.Callback.Callback(partial=True),
+            c.ZDO.TCDevInd.Callback(partial=True),
             self.on_zdo_tc_device_join,
         )
 
@@ -391,7 +403,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         reduce unnecessary logging messages, they are given an explicit callback.
         """
 
-    async def on_zdo_message(self, msg: c.ZDO.MsgCbIncoming.Callback) -> None:
+    async def on_zdo_message(self, msg: t.CommandBase) -> None:
         """
         Global callback for all ZDO messages.
         """
@@ -454,7 +466,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         self.packet_received(packet)
 
-    def on_zdo_permit_join_message(self, msg: c.ZDO.PermitJoinInd.Callback) -> None:
+    def on_zdo_permit_join_message(self, msg: t.CommandBase) -> None:
         """
         Coordinator join status change message. Only sent with Z-Stack 1.2 and 3.0.
         """
@@ -464,14 +476,14 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         else:
             LOGGER.info("Coordinator is permitting joins for %d seconds", msg.Duration)
 
-    async def on_zdo_relays_message(self, msg: c.ZDO.SrcRtgInd.Callback) -> None:
+    async def on_zdo_relays_message(self, msg: t.CommandBase) -> None:
         """
         ZDO source routing message callback
         """
 
         self.handle_relays(nwk=msg.DstAddr, relays=msg.Relays)
 
-    def on_zdo_tc_device_join(self, msg: c.ZDO.TCDevInd.Callback) -> None:
+    def on_zdo_tc_device_join(self, msg: t.CommandBase) -> None:
         """
         ZDO trust center device join callback.
         """
@@ -510,11 +522,11 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             ),
         )
 
-    def on_zdo_device_leave(self, msg: c.ZDO.LeaveInd.Callback) -> None:
+    def on_zdo_device_leave(self, msg: t.CommandBase) -> None:
         LOGGER.info("ZDO device left: %s", msg)
         self.handle_leave(nwk=msg.NWK, ieee=msg.IEEE)
 
-    async def on_af_message(self, msg: c.AF.IncomingMsg.Callback) -> None:
+    async def on_af_message(self, msg: t.CommandBase) -> None:
         """
         Handler for all non-ZDO messages.
         """
@@ -575,11 +587,15 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Z-Stack build ID, more recently the build date.
         """
 
+        # Set by `start_network`
+        assert self._version_rsp is not None
+
         # Old versions of Z-Stack do not include `CodeRevision` in the version response
         if self._version_rsp.CodeRevision is None:
             return t.uint32_t(0x00000000)
 
-        return self._version_rsp.CodeRevision
+        build_id: t.uint32_t = self._version_rsp.CodeRevision
+        return build_id
 
     @property
     def znp_config(self) -> conf.ConfigType:
@@ -587,21 +603,25 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Shortcut property to access the ZNP radio config.
         """
 
-        return self.config[conf.CONF_ZNP_CONFIG]
+        znp_config: conf.ConfigType = self.config[conf.CONF_ZNP_CONFIG]
+        return znp_config
 
-    async def _watchdog_feed(self):
+    async def _watchdog_feed(self) -> None:
         """
         Watchdog loop to periodically test if Z-Stack is still running.
         """
 
+        assert self._znp is not None
         await self._znp.request(c.SYS.Ping.Req())
 
-    async def _set_led_mode(self, *, led: t.uint8_t, mode: c.util.LEDMode) -> None:
+    async def _set_led_mode(self, *, led: int, mode: c.util.LEDMode) -> None:
         """
         Attempts to set the provided LED's mode. A Z-Stack bug causes the underlying
         command to never receive a response if the board has no LEDs, requiring this
         wrapper function to prevent the command from taking many seconds to time out.
         """
+
+        assert self._znp is not None
 
         # XXX: If Z-Stack is not compiled with HAL_LED, it will just not respond at all
         try:
@@ -619,6 +639,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         If no settings actually change, no reset will be performed.
         """
 
+        assert self._znp is not None
         # It's better to be explicit than rely on the NVRAM defaults
         settings = {
             OsalNvIds.LOGICAL_TYPE: t.uint8_t(self.state.node_info.logical_type),
@@ -643,6 +664,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         any_changed = False
 
         for nvid, value in settings.items():
+            current_value: object
+
             try:
                 current_value = await self._znp.nvram.osal_read(
                     nvid, item_type=type(value)
@@ -657,7 +680,9 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         return any_changed
 
-    def _find_endpoint(self, dst_ep: int, profile: int, cluster: int) -> int:
+    def _find_endpoint(
+        self, dst_ep: int | None, profile: int | None, cluster: int
+    ) -> int:
         """
         Zigpy defaults to sending messages with src_ep == dst_ep. This does not work
         with all versions of Z-Stack, which requires endpoints to be registered
@@ -701,8 +726,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
     async def _send_request_raw(
         self,
         dst_addr: t.AddrModeAddress,
-        dst_ep: int,
-        src_ep: int,
+        dst_ep: int | None,
+        src_ep: int | None,
         profile: int,
         cluster: int,
         sequence: int,
@@ -710,7 +735,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         radius: int,
         data: bytes,
         *,
-        relays: list[int] | None = None,
+        relays: typing.Sequence[int] | None = None,
         extended_timeout: bool = False,
     ) -> None:
         """
@@ -756,6 +781,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # addressing another device. The router will receive the ZDO request and a
             # device will try to join, but Z-Stack will never send the network key.
             if cluster == zdo_t.ZDOCmd.Mgmt_Permit_Joining_req:
+                permit_addr: t.NWK | t.EUI64 | None
+
                 if dst_addr.mode == t.AddrMode.Broadcast:
                     # The coordinator responds to broadcasts
                     permit_addr = self.state.node_info.nwk
@@ -836,6 +863,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                         background=(dst_addr.mode == t.AddrMode.Group),
                     )
                 )
+                assert response is not None
 
                 # Both the callback and the response can have an error status
                 if response.Status != t.Status.SUCCESS:
@@ -850,6 +878,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         Instructs the coordinator to re-discover routes to the provided NWK.
         Runs concurrently and at most once per NWK, even if called multiple times.
         """
+
+        assert self._znp is not None
 
         # Route discovery with Z-Stack 1.2 and Z-Stack 3.0.2 on the CC2531 doesn't
         # appear to work very well (Z2M#2901)
@@ -913,6 +943,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             and dst_addr.mode == t.AddrMode.NWK
                             and dst_addr.address != self.state.node_info.nwk
                         ):
+                            assert self._znp is not None
                             route_status = await self._znp.request(
                                 c.ZDO.ExtRouteChk.Req(
                                     Dst=dst_addr.address,
@@ -923,9 +954,13 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                                     ),
                                 )
                             )
+                            assert route_status is not None
 
                             if route_status.Status != c.zdo.RoutingStatus.SUCCESS:
-                                await self._discover_route(dst_addr.address)
+                                # The address of an NWK address is an NWK
+                                await self._discover_route(
+                                    typing.cast(t.NWK, dst_addr.address)
+                                )
 
                         await self._send_request_raw(
                             dst_addr=dst_addr,
@@ -953,14 +988,17 @@ class ControllerApplication(zigpy.application.ControllerApplication):
                             e.response.Status == t.Status.MAC_TRANSACTION_EXPIRED
                             and device is not None
                             and child_association is None
-                            and self._znp.version >= 3.30
+                            # Only reached after a request was sent through `_znp`
+                            and typing.cast(ZNP, self._znp).version >= 3.30
                         ):
+                            assert self._znp is not None
                             child_association = await self._znp.request(
                                 c.UTIL.AssocGetWithAddress.Req(
                                     IEEE=device.ieee,
                                     NWK=0x0000,  # IEEE takes priority
                                 )
                             )
+                            assert child_association is not None
 
                             if (
                                 child_association.Device.nodeRelation
@@ -1014,6 +1052,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
             # not be able to find it again.
             if not succeeded and tried_assoc_remove:
                 assert child_association is not None
+                assert device is not None
+                assert self._znp is not None
                 await self._znp.request(
                     c.UTIL.AssocAdd.Req(
                         NWK=child_association.Device.shortAddr,

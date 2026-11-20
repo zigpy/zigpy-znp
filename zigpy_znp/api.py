@@ -1154,6 +1154,17 @@ class ZNP:
         **response_params: typing.Any,
     ) -> t.CommandBase | None: ...
 
+    @typing.overload
+    async def request_callback_rsp(
+        self,
+        *,
+        request: t.CommandBase,
+        callback: t.CommandBase,
+        timeout: float | None = None,
+        background: bool,
+        **response_params: typing.Any,
+    ) -> t.CommandBase | None: ...
+
     async def request_callback_rsp(
         self,
         *,
