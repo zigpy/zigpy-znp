@@ -23,6 +23,9 @@ dependencies = [
 [tool.setuptools.packages.find]
 exclude = ["tests", "tests.*", "tools", "tools.*"]
 
+[tool.setuptools.package-data]
+zigpy_znp = ["py.typed"]
+
 [dependency-groups]
 testing = [
     "mypy==2.4.1",
