@@ -110,6 +110,8 @@ class ControllerApplication(zigpy.application.ControllerApplication):
 
         assert self._znp is not None
         await self._znp.load_network_info(load_devices=load_devices)
+        assert self._znp.node_info is not None
+        assert self._znp.network_info is not None
 
         self.state.node_info = self._znp.node_info
         self.state.network_info = self._znp.network_info
@@ -735,7 +737,7 @@ class ControllerApplication(zigpy.application.ControllerApplication):
         radius: int,
         data: bytes,
         *,
-        relays: typing.Sequence[int] | None = None,
+        relays: list[t.NWK] | None = None,
         extended_timeout: bool = False,
     ) -> None:
         """
